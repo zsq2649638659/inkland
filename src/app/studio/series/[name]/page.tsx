@@ -3,6 +3,7 @@
 import { useEffect, useState, use, useRef, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
+import { SkeletonLine } from "@/components/Skeleton";
 import { useAuth } from "@/components/AuthProvider";
 
 interface ChapterInfo {
@@ -169,7 +170,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
 
-  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-5xl mx-auto px-4 py-8"><p className="text-sm text-muted text-center py-8">加载中...</p></main></div>;
+  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-5xl mx-auto px-4 py-8"><div className="space-y-3">{Array.from({ length: 8 }).map((_, i) => <SkeletonLine key={i} height="3rem" />)}</div></main></div>;
 
   if (!user) {
     return <div className="min-h-screen bg-paper flex items-center justify-center"><p className="text-muted">请先登录</p></div>;

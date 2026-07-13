@@ -115,12 +115,12 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           >
             <div className="flex gap-3">
               {/* 连载封面 */}
-              <div className="w-16 h-20 rounded-md overflow-hidden bg-accent-light flex-shrink-0">
+              <div className="w-16 h-20 rounded-md overflow-hidden bg-rule flex-shrink-0">
                 {seriesCover ? (
                   <img src={seriesCover} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent-light/60 to-accent-light/20">
-                    <i className="fa-solid fa-book text-xl text-accent/30" />
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-rule/60 to-rule/20">
+                    <i className="fa-solid fa-book text-xl text-muted/30" />
                   </div>
                 )}
               </div>

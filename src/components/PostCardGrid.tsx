@@ -51,7 +51,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
   return (
     <div className="rounded-xl bg-white border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
       {hasImage ? (
-        <Link href={`/read/${post.id}`} className="block relative flex-1 min-h-0 overflow-hidden bg-accent-light no-underline">
+        <Link href={`/read/${post.id}`} className="block relative flex-1 min-h-0 overflow-hidden bg-rule no-underline">
           <img
             src={firstImage}
             alt={post.title}
@@ -77,7 +77,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
           )}
         </Link>
       ) : (
-        <Link href={`/read/${post.id}`} className="block flex-1 min-h-0 p-4 bg-gradient-to-br from-accent-light/40 to-accent-light/10 no-underline flex flex-col justify-start overflow-hidden">
+        <Link href={`/read/${post.id}`} className="block flex-1 min-h-0 p-4 bg-gradient-to-br from-rule/60 to-rule/20 no-underline flex flex-col justify-start overflow-hidden">
           <h3 className="font-semibold text-sm text-warm mb-2 line-clamp-2">
             {seriesLabel}
             {post.title || "无标题"}

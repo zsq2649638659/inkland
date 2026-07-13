@@ -33,7 +33,7 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
       {/* 封面区 */}
       <Link
         href={`/series/${encodeURIComponent(series.name)}`}
-        className="block relative flex-1 min-h-0 overflow-hidden bg-accent-light no-underline"
+        className="block relative flex-1 min-h-0 overflow-hidden bg-rule no-underline"
       >
         {series.cover_url ? (
           <img
@@ -43,9 +43,9 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-accent-light/60 to-accent-light/20 p-4">
-            <i className="fa-solid fa-book-open text-4xl text-accent/30 mb-2" />
-            <span className="text-xs text-accent/40 line-clamp-3 text-center">{series.name}</span>
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-rule/60 to-rule/20 p-4">
+            <i className="fa-solid fa-book-open text-4xl text-muted/30 mb-2" />
+            <span className="text-xs text-muted/50 line-clamp-3 text-center">{series.name}</span>
           </div>
         )}
 

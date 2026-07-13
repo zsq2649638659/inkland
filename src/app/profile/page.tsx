@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import PostCardGrid from "@/components/PostCardGrid";
 import SeriesCardGrid from "@/components/SeriesCardGrid";
+import { SkeletonProfile } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import type { Post } from "@/lib/types";
 
 type FilterType = "all" | "novel" | "illustration" | "serial";
@@ -199,7 +201,7 @@ export default function ProfilePage() {
               <h1 className="text-xl font-bold text-warm">{displayName}</h1>
               <p className="text-sm text-muted mt-0.5">{profile?.bio || "这个人很懒，什么都没写"}</p>
             </div>
-            <Link href="/profile/edit" className="btn-ghost ml-auto text-sm no-underline"><i className="fa-solid fa-pen mr-1" />编辑资料</Link>
+            <Link href="/profile/edit" className="btn-outline ml-auto text-sm no-underline"><i className="fa-solid fa-pen mr-1" />编辑资料</Link>
           </div>
         </div>
 
@@ -256,12 +258,12 @@ export default function ProfilePage() {
         )}
 
         {loading ? (
-          <p className="text-sm text-muted text-center py-8">加载中...</p>
+          <SkeletonProfile />
         ) : error ? (
           <div className="text-center py-8"><p className="text-sm text-red-500 mb-2">{error}</p></div>
         ) : tab === "works" ? (
           displayPosts.length === 0 && seriesList.length === 0 ? (
-            <div className="text-center py-12"><p className="text-muted mb-4">还没有发布过作品</p><Link href="/create" className="submit-btn no-underline"><i className="fa-solid fa-pen-to-square mr-1" />去创作</Link></div>
+            <div className="text-center py-12"><EmptyState icon="fa-pen-to-square" title="还没有发布过作品" actionLabel="去创作" actionHref="/create" /></div>
           ) : displayPosts.length === 0 && seriesList.length > 0 ? (
             <div className="space-y-4">
               {(filter === "all" || filter === "serial") && seriesList.map((series) => (
@@ -473,7 +475,7 @@ export default function ProfilePage() {
                   return cp.post_type === likeFilter;
                 });
             return filteredLikes.length === 0 ? (
-            <div className="text-center py-12"><p className="text-muted">还没有喜欢过的作品</p></div>
+            <div className="text-center py-12"><EmptyState icon="fa-heart" title="还没有喜欢过的作品" /></div>
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{filteredLikes.map((post) => <PostCardGrid key={post.id} post={post} />)}</div>
           ) : (
@@ -530,7 +532,7 @@ export default function ProfilePage() {
                   return cp.post_type === bookmarkFilter;
                 });
             return filteredBookmarks.length === 0 ? (
-            <div className="text-center py-12"><p className="text-muted">还没有收藏的作品</p></div>
+            <div className="text-center py-12"><EmptyState icon="fa-bookmark" title="还没有收藏的作品" /></div>
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{filteredBookmarks.map((post) => <PostCardGrid key={post.id} post={post} />)}</div>
           ) : (

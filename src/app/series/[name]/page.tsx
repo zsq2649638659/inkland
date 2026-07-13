@@ -3,6 +3,8 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
+import { SkeletonSeriesDetail } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
 
 interface ChapterInfo {
@@ -187,10 +189,14 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-4xl mx-auto px-4 py-8"><p className="text-sm text-muted text-center py-8">加载中...</p></main></div>;
+  if (loading) return <SkeletonSeriesDetail />;
 
   if (!seriesInfo) {
-    return <div className="min-h-screen bg-paper flex items-center justify-center"><p className="text-muted">该连载暂无内容</p></div>;
+    return (
+      <div className="min-h-screen bg-paper">
+        <EmptyState icon="fa-book" title="该连载暂无内容" />
+      </div>
+    );
   }
 
   const avatarChar = seriesInfo.author.nickname?.[0] || "?";
@@ -282,7 +288,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                   </span>
                 )}
                 {isOwner && (
-                  <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="btn-ghost border border-rule text-sm no-underline">
+                  <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="btn-outline text-sm no-underline">
                     <i className="fa-solid fa-gear mr-1" />管理章节
                   </Link>
                 )}

@@ -32,6 +32,7 @@ export default function RootLayout({
       lang="zh-CN"
       className={`${notoSans.variable} ${notoSerif.variable} h-full antialiased`}
       suppressHydrationWarning
+      data-scroll-behavior="smooth"
     >
       <Script
         id="theme-init"

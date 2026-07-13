@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import EmptyState from "@/components/EmptyState";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import LikeButton from "@/components/LikeButton";
@@ -328,14 +329,14 @@ export default function PostCard({ post }: PostCardProps) {
                   {commentCount > 5 && (
                     <Link
                       href={`/read/${post.id}`}
-                      className="block text-xs text-accent hover:underline py-1"
+                      className="btn-text text-xs py-1 inline-block no-underline"
                     >
-                      查看全部 {commentCount} 条评论 &gt;
+                      查看全部 {commentCount} 条评论
                     </Link>
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-muted text-center py-3">暂无评论，来说点什么吧</p>
+                <EmptyState icon="fa-comment-dots" title="暂无评论，来说点什么吧" compact />
               )}
             </div>
           )}

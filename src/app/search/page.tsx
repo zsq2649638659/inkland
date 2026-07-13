@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import EmptyState from "@/components/EmptyState";
 import { createClient } from "@/lib/supabase/browser";
 import type { Post } from "@/lib/types";
 
@@ -204,7 +205,7 @@ function SearchContent() {
                 )}
                 {posts.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-muted">没有找到相关作品</p>
+                    <EmptyState icon="fa-magnifying-glass" title="没有找到相关作品" />
                   </div>
                 ) : (
                   <div className="space-y-3">

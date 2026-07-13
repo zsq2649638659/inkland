@@ -80,8 +80,26 @@ export default function HomeSidebar() {
   if (loading) {
     return (
       <aside className="space-y-5 w-64">
-        <div className="rounded-xl bg-white border border-rule p-4">
-          <p className="text-xs text-muted text-center">加载中...</p>
+        <div className="sidebar-section">
+          <div className="h-4 w-20 bg-rule animate-pulse rounded mb-4" />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-2 py-2">
+              <div className="w-5 h-5 rounded bg-rule animate-pulse" />
+              <div className="h-3 w-24 bg-rule animate-pulse rounded" />
+              <div className="h-3 w-8 bg-rule animate-pulse rounded ml-auto" />
+            </div>
+          ))}
+        </div>
+        <div className="sidebar-section">
+          <div className="h-4 w-20 bg-rule animate-pulse rounded mb-4" />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-2 py-2">
+              <div className="w-5 h-5 rounded bg-rule animate-pulse" />
+              <div className="w-6 h-6 rounded-full bg-rule animate-pulse" />
+              <div className="h-3 w-20 bg-rule animate-pulse rounded" />
+              <div className="h-3 w-6 bg-rule animate-pulse rounded ml-auto" />
+            </div>
+          ))}
         </div>
       </aside>
     );
@@ -106,7 +124,7 @@ export default function HomeSidebar() {
                 className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-accent-light transition-colors no-underline"
               >
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  i < 3 ? "bg-accent text-white" : "bg-accent-light text-accent"
+                  i < 3 ? "bg-accent text-white" : "bg-rule text-muted"
                 }`}>
                   {i + 1}
                 </span>
@@ -135,7 +153,7 @@ export default function HomeSidebar() {
                 className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-accent-light transition-colors no-underline"
               >
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  i < 3 ? "bg-accent text-white" : "bg-accent-light text-accent"
+                  i < 3 ? "bg-accent text-white" : "bg-rule text-muted"
                 }`}>
                   {i + 1}
                 </span>

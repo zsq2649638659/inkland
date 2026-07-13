@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import PostCardGrid from "@/components/PostCardGrid";
 import SeriesCardGrid from "@/components/SeriesCardGrid";
+import { SkeletonProfile } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import type { Post } from "@/lib/types";
 
 interface FollowUser {
@@ -275,7 +277,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const displayName = profile?.nickname || "匿名用户";
   const avatarChar = profile?.nickname?.[0] || "?";
 
-  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-4xl mx-auto px-4 py-8"><p className="text-sm text-muted text-center py-8">加载中...</p></main></div>;
+  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-4xl mx-auto px-4 py-8"><SkeletonProfile /></main></div>;
 
   return (
     <div className="min-h-screen bg-paper">
@@ -306,7 +308,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             {tabLoading ? (
               <p className="text-sm text-muted text-center py-8">加载中...</p>
             ) : (activeTab === "followers" ? followers : following).length === 0 ? (
-              <div className="text-center py-12"><p className="text-muted">{activeTab === "followers" ? "还没有粉丝" : "还没有关注任何人"}</p></div>
+              <div className="text-center py-12"><EmptyState icon={activeTab === "followers" ? "fa-users" : "fa-user-check"} title={activeTab === "followers" ? "还没有粉丝" : "还没有关注任何人"} /></div>
             ) : (
               <div className="space-y-2">
                 {(activeTab === "followers" ? followers : following).map((u) => (
@@ -364,7 +366,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             </div>
 
             {posts.length === 0 && seriesList.length === 0 ? (
-              <div className="text-center py-12"><p className="text-muted">暂无作品</p></div>
+              <div className="text-center py-12"><EmptyState icon="fa-feather-pointed" title="暂无作品" /></div>
             ) : viewMode === "grid" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {seriesList.map((series) => (

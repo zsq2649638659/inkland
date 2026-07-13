@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { marked } from "marked";
 import { createClient } from "@/lib/supabase/browser";
+import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
@@ -381,18 +382,18 @@ export default function ReaderClient({ post }: ReaderClientProps) {
           className="max-w-full py-6 pb-16"
           style={{ width: readerWidth === "auto" ? "100%" : `${readerWidth}px` }}
         >
-          <header className="mb-8">
+          <header className="mb-10">
             <h1
-              className="text-[1.6rem] font-bold mb-2.5 leading-relaxed"
-              style={{ color: darkMode ? "#d4c8b8" : "#2c2416" }}
+              className="text-[clamp(1.6rem,3vw,2.2rem)] font-bold mb-3 leading-tight"
+              style={{ color: darkMode ? "#e6e0d8" : "#2c2416" }}
             >
               {post.title}
             </h1>
-            <div className="flex flex-wrap gap-3 items-center text-sm text-muted">
-              <span><i className="fa-solid fa-user-pen mr-1" />{authorName}</span>
-              <span style={{ color: darkMode ? "#555" : "#e8e0d5" }}>|</span>
+            <div className="flex flex-wrap gap-3 items-center text-sm text-muted mb-3">
+              <span className="flex items-center gap-1"><i className="fa-solid fa-user-pen" />{authorName}</span>
+              <span className="opacity-50">|</span>
               <span>{post.word_count?.toLocaleString() || 0}字</span>
-              <span style={{ color: darkMode ? "#555" : "#e8e0d5" }}>|</span>
+              <span className="opacity-50">|</span>
               <span>{createdAt}</span>
             </div>
             {tagNames.length > 0 && (
@@ -561,9 +562,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
 
             <div className="space-y-4">
               {comments.length === 0 ? (
-                <p className="text-sm text-muted text-center py-8">
-                  暂无评论，成为第一个评论的人吧
-                </p>
+                <EmptyState icon="fa-comment-dots" title="暂无评论，成为第一个评论的人吧" compact />
               ) : (
                 comments.map((c) => (
                   <div

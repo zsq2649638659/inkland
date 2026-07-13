@@ -3,6 +3,8 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
+import { SkeletonCardList } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
 import PostCardGrid from "@/components/PostCardGrid";
 import SeriesCardGrid from "@/components/SeriesCardGrid";
@@ -231,7 +233,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
     setFollowLoading(false);
   };
 
-  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-6xl mx-auto px-4 py-6"><p className="text-sm text-muted text-center py-8">加载中...</p></main></div>;
+  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-6xl mx-auto px-4 py-6"><div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <SkeletonCardList key={i} />)}</div></main></div>;
 
   const hasContent = standalonePosts.length > 0 || seriesList.length > 0;
 
@@ -269,7 +271,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
         </div>
 
         {!hasContent ? (
-          <div className="text-center py-12"><p className="text-muted">该标签下暂无作品</p></div>
+          <div className="text-center py-12"><EmptyState icon="fa-tag" title="该标签下暂无作品" /></div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {seriesList.map((series) => (

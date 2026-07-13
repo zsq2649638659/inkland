@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { SkeletonStudio } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 
 type FilterType = "all" | "novel" | "illustration" | "serial";
 type SortType = "updated" | "created";
@@ -294,19 +296,15 @@ export default function StudioPage() {
 
         {/* 作品列表 */}
         {loading ? (
-          <div className="bg-card rounded-xl border border-rule p-12 text-center">
-            <i className="fa-solid fa-spinner animate-spin text-2xl text-accent/40 mb-3 block" />
-            <p className="text-sm text-muted">加载中...</p>
-          </div>
+          <SkeletonStudio />
         ) : filteredWorks.length === 0 && seriesList.length === 0 ? (
-          <div className="bg-card rounded-xl border border-rule p-16 text-center">
-            <i className="fa-solid fa-feather-pointed text-5xl text-accent/20 mb-4 block" />
-            <p className="text-muted mb-4">
-              {searchQuery ? "没有找到匹配的作品" : "还没有作品，开始创作吧"}
-            </p>
-            {!searchQuery && (
-              <Link href="/create" className="btn-accent no-underline">开始创作</Link>
-            )}
+          <div className="bg-card rounded-xl border border-rule">
+            <EmptyState
+              icon="fa-feather-pointed"
+              title={searchQuery ? "没有找到匹配的作品" : "还没有作品，开始创作吧"}
+              actionLabel={searchQuery ? undefined : "开始创作"}
+              actionHref={searchQuery ? undefined : "/create"}
+            />
           </div>
         ) : (
           <div className="bg-card rounded-xl border border-rule overflow-hidden">

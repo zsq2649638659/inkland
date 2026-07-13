@@ -8,6 +8,8 @@ import HomeSidebar from "@/components/HomeSidebar";
 import MobileNav from "@/components/MobileNav";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { SkeletonCardList } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import type { Post } from "@/lib/types";
 
 type TabType = "following" | "myTags" | "hot24";
@@ -358,7 +360,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 py-5">
+      <main className="max-w-6xl mx-auto px-4 pt-12 pb-8">
         <div className="flex gap-6">
           {tab === "myTags" ? (
             <div className="flex-1 min-w-0">
@@ -381,12 +383,17 @@ export default function HomePage() {
               </div>
 
               {loading ? (
-                <p className="text-sm text-muted text-center py-8">加载中...</p>
-              ) : followedTags.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted mb-4">还没有关注任何标签</p>
-                  <p className="text-xs text-muted">去标签详情页关注感兴趣的标签吧</p>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <SkeletonCardList key={i} />
+                  ))}
                 </div>
+              ) : followedTags.length === 0 ? (
+                <EmptyState
+                  icon="fa-tags"
+                  title="还没有关注任何标签"
+                  description="去标签详情页关注感兴趣的标签吧，关注后首页会推送相关作品"
+                />
               ) : tagsViewMode === "grid" ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {followedTags.map((tag) => (
@@ -430,9 +437,10 @@ export default function HomePage() {
                 </button>
               )}
               {loading ? (
-                <div className="text-center py-20 text-muted">
-                  <i className="fa-solid fa-spinner animate-spin text-2xl mb-4 block" />
-                  <p className="text-sm">加载中...</p>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <SkeletonCardList key={i} />
+                  ))}
                 </div>
               ) : hasContent ? (
                 <>
@@ -446,17 +454,18 @@ export default function HomePage() {
                   ))}
                 </>
               ) : (
-                <div className="text-center py-20 text-muted">
-                  <i className="fa-solid fa-feather-pointed text-4xl mb-4 block" />
-                  <p className="text-lg">
-                    {error ? `数据加载失败: ${error}` : tab === "following" ? "你还没有关注任何作者，去看看热门标签吧" : "暂无作品"}
-                  </p>
-                </div>
+                <EmptyState
+                  icon={error ? "fa-triangle-exclamation" : "fa-feather-pointed"}
+                  title={error ? `数据加载失败: ${error}` : tab === "following" ? "还没有关注任何作者" : "暂无作品"}
+                  description={error ? undefined : tab === "following" ? "关注一些作者后，他们的新作品会出现在这里" : "成为第一个发布作品的人吧"}
+                  actionLabel={error ? undefined : "开始创作"}
+                  actionHref={error ? undefined : "/create"}
+                />
               )}
               {hasMore ? (
                 <div className="text-center py-6">
                   <button className="btn-ghost text-sm" onClick={loadMore}>
-                    <i className="fa-solid fa-spinner mr-1" />
+                    <i className="fa-solid fa-chevron-down mr-1" />
                     加载更多
                   </button>
                 </div>
