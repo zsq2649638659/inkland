@@ -9,6 +9,7 @@ import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
+import CenteredToast from "@/components/CenteredToast";
 import type { Comment } from "@/lib/types";
 
 export interface SerialPostCardData {
@@ -360,7 +361,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
         onClose={() => setModerationModal(null)}
         onSubmit={submitModeration}
       />
-      <div className={`toast${toastMessage ? " show" : ""}`}>{toastMessage}</div>
+      <CenteredToast message={toastMessage} />
     </article>
   );
 }
