@@ -62,6 +62,16 @@ export default function PostCard({ post }: PostCardProps) {
   const [resolvedContent, setResolvedContent] = useState(post.content || "");
   const [resolvedCover, setResolvedCover] = useState(post.cover_url || null);
   const imageScrollRef = useRef<HTMLDivElement>(null);
+  const cardMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!cardMenuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!cardMenuRef.current?.contains(event.target as Node)) setCardMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [cardMenuOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,7 +316,7 @@ export default function PostCard({ post }: PostCardProps) {
               {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
             </button>
           )}
-          <div className="card-more-wrap">
+          <div className="card-more-wrap" ref={cardMenuRef}>
             <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
             {cardMenuOpen && (
               <div className="card-more-menu">
