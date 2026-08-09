@@ -504,7 +504,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
           </svg>
         </button>
         <button className="floating-btn" title="举报作品" onClick={handlePostReport}>
-          <i className="fa-solid fa-flag" />
+          <i className="fa-regular fa-flag" />
         </button>
       </div>
 
@@ -783,7 +783,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
                               className="comment-popup-item"
                               onClick={() => { setCommentMenuId(null); handleReport(c.id, c.user_id); }}
                             >
-                              <i className="fa-solid fa-flag" />
+                              <i className="fa-regular fa-flag" />
                               举报
                             </button>
                             <button
@@ -866,7 +866,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
                                         className="comment-popup-item"
                                         onClick={() => { setCommentMenuId(null); handleReport(reply.id, reply.user_id); }}
                                       >
-                                        <i className="fa-solid fa-flag" />
+                                        <i className="fa-regular fa-flag" />
                                         举报
                                       </button>
                                       <button
