@@ -41,8 +41,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   const [isFollowing, setIsFollowing] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
 
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [lastReadChapter, setLastReadChapter] = useState<ChapterInfo | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     const load = async () => {
@@ -161,16 +160,6 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
           created_at: c.created_at as string,
         }));
         setChapters(chapterList);
-
-        // 读取本地阅读进度
-        try {
-          const saved = localStorage.getItem(`reading_progress_${decodedName}`);
-          if (saved) {
-            const progress = JSON.parse(saved) as { chapterId: string; chapterNumber: number };
-            const found = chapterList.find((c) => c.id === progress.chapterId);
-            if (found) setLastReadChapter(found);
-          }
-        } catch { /* ignore */ }
       }
 
       setLoading(false);
@@ -189,17 +178,16 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
     }
   };
 
-  if (loading) return <SkeletonSeriesDetail />;
+  if (loading) return <div id="page-series"><SkeletonSeriesDetail /></div>;
 
   if (!seriesInfo) {
     return (
-      <div className="min-h-screen bg-paper">
+      <div id="page-series" className="min-h-screen bg-paper">
         <EmptyState icon="fa-book" title="该连载暂无内容" />
       </div>
     );
   }
 
-  const avatarChar = seriesInfo.author.nickname?.[0] || "?";
   const totalWords = seriesInfo.word_count;
 
   const sortedChapters = [...chapters].sort((a, b) => {
@@ -212,172 +200,165 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
 
-  return (
-    <div className="min-h-screen bg-paper">
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* 顶部信息区 - 起点风格 */}
-        <div className="bg-white rounded-xl border border-rule p-6 mb-4">
-          <div className="flex gap-6">
-            {/* 封面 */}
-            <div className="w-36 h-48 rounded-lg overflow-hidden bg-accent-light flex-shrink-0 shadow-md">
-              {seriesInfo.cover_url ? (
-                <img src={seriesInfo.cover_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent-light/60 to-accent-light/20">
-                  <i className="fa-solid fa-book text-5xl text-accent/30" />
-                </div>
-              )}
-            </div>
+  const lastChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
 
-            {/* 信息 */}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold text-warm mb-2">{decodedName}</h1>
-              <div className="flex items-center gap-4 text-sm text-muted mb-3">
-                <Link href={`/user/${seriesInfo.user_id}`} className="flex items-center gap-1.5 no-underline hover:text-accent">
-                  <img src={seriesInfo.author.avatar_url || `https://placehold.co/20x20/f5e6d3/b8752e?text=${encodeURIComponent(avatarChar)}`}
-                    className="w-5 h-5 rounded-full object-cover" alt="" />
-                  {seriesInfo.author.nickname}
-                </Link>
-                <span className="text-rule">|</span>
-                <span className="flex items-center gap-1">
-                  <i className="fa-solid fa-list-ul text-accent text-xs" />{chapters.length} 章
-                </span>
-                <span className="text-rule">|</span>
-                <span className="flex items-center gap-1">
-                  <i className="fa-solid fa-font text-accent text-xs" />{totalWords.toLocaleString()} 字
-                </span>
-                <span className="text-rule">|</span>
-                <span>{seriesInfo.series_type === "fanfic" ? "同人" : "原创"}</span>
-                <span className="text-rule">|</span>
-                <span className={seriesInfo.status === "ongoing" ? "text-green-600" : "text-muted"}>
+  return (
+    <div id="page-series" className="min-h-screen bg-paper">
+      <div className="page-wrapper">
+        <div className="content-container">
+
+          {/* Hero Card */}
+          <div className="hero-card">
+            <div className="hero-title-row">
+              <div className="hero-title-left">
+                <h1 className="hero-title">{decodedName}</h1>
+                <span className={`serial-badge ${seriesInfo.status === "completed" ? "completed" : ""}`}>
                   {seriesInfo.status === "ongoing" ? "连载中" : "已完结"}
                 </span>
               </div>
-
-              {/* 最新更新 */}
-              {chapters.length > 0 && (
-                <div className="flex items-center gap-2 text-sm text-muted mb-3">
-                  <i className="fa-solid fa-clock-rotate-left text-accent text-xs" />
-                  <span>最新更新：</span>
-                  <Link href={`/read/${chapters[chapters.length - 1].id}`} className="text-accent hover:underline no-underline">
-                    第{chapters[chapters.length - 1].chapter_number}章 {chapters[chapters.length - 1].chapter_title || chapters[chapters.length - 1].title || "无标题"}
-                  </Link>
-                  <span className="text-rule">·</span>
-                  <span>{new Date(chapters[chapters.length - 1].created_at).toLocaleDateString("zh-CN")}</span>
-                </div>
-              )}
-
-              {/* 标签 */}
-              {seriesInfo.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {seriesInfo.tags.map((tag) => (
-                    <Link key={tag} href={`/tag/${encodeURIComponent(tag)}`} className="tag">{tag}</Link>
-                  ))}
-                </div>
-              )}
-
-              {/* 操作按钮 */}
-              <div className="flex gap-2">
-                {chapters.length > 0 ? (
-                  <Link href={`/read/${chapters[0]?.id}`} className="btn-accent no-underline">
-                    开始阅读
-                  </Link>
-                ) : (
-                  <span className="btn-accent opacity-50 cursor-not-allowed no-underline">
-                    暂无章节
-                  </span>
-                )}
-                {isOwner && (
-                  <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="btn-outline text-sm no-underline">
-                    <i className="fa-solid fa-gear mr-1" />管理章节
+              <div className="hero-actions">
+                {chapters.length > 0 && (
+                  <Link href={`/read/${chapters[0]?.id}`} className="hero-action-btn primary">
+                    <i className="fa-solid fa-book-open" /> 开始阅读
                   </Link>
                 )}
                 {user && !isOwner && (
-                  <button className={`btn-ghost ${isFollowing ? "text-accent" : ""}`} onClick={handleFollow}>
-                    {isFollowing ? <><i className="fa-solid fa-check mr-1" />已关注作品</> : <><i className="fa-solid fa-plus mr-1" />关注作品</>}
+                  <button
+                    className={`hero-action-btn ${isFollowing ? "bookmarked" : "primary"}`}
+                    onClick={handleFollow}
+                  >
+                    <i className="fa-solid fa-bookmark" />
+                    {isFollowing ? "已收藏" : "加入收藏"}
                   </button>
+                )}
+                {isOwner && (
+                  <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="hero-action-btn">
+                    <i className="fa-solid fa-gear" /> 管理
+                  </Link>
                 )}
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* 简介 - 独立卡片 */}
-        {seriesInfo.description && (
-          <div className="bg-white rounded-xl border border-rule p-4 mb-4">
-            <h2 className="font-semibold text-warm mb-2">
-              作品简介
-            </h2>
-            <p className="text-sm text-muted leading-relaxed whitespace-pre-line">
-              {seriesInfo.description}
-            </p>
-          </div>
-        )}
-
-        {/* 章节列表 */}
-        <div className="bg-white rounded-xl border border-rule">
-          <div className="px-5 py-3 border-b border-rule flex items-center justify-between">
-            <h2 className="font-semibold text-warm">
-              章节目录
-              <span className="text-xs text-muted ml-2 font-normal">共 {chapters.length} 章</span>
-            </h2>
-            <button
-              onClick={toggleSort}
-              className="flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors px-2 py-1 rounded-md hover:bg-accent-light/30"
-              title={sortOrder === "asc" ? "切换为倒序" : "切换为正序"}
-            >
-              <i className={`fa-solid fa-arrow-down-${sortOrder === "asc" ? "1-9" : "9-1"} text-[0.7rem]`} />
-              <span>{sortOrder === "asc" ? "正序" : "倒序"}</span>
-            </button>
-          </div>
-
-          {/* 阅读进度 */}
-          {lastReadChapter && (
-            <div className="px-5 py-2.5 border-b border-rule bg-[#fdf6e8]">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted">
-                  你已读至
-                  <Link
-                    href={`/read/${lastReadChapter.id}`}
-                    className="text-accent hover:underline no-underline mx-1 font-medium"
-                  >
-                    第{lastReadChapter.chapter_number}章 {lastReadChapter.chapter_title || lastReadChapter.title || "无标题"}
-                  </Link>
-                </span>
-                <Link
-                  href={`/read/${lastReadChapter.id}`}
-                  className="text-xs text-accent hover:underline no-underline flex items-center gap-0.5"
-                >
-                  立即阅读 <i className="fa-solid fa-chevron-right text-[0.6rem]" />
+            <div className="hero-meta-row">
+              <div className="hero-author">
+                <Link href={`/user/${seriesInfo.user_id}`} className="hero-author-avatar" style={{ textDecoration: "none" }}>
+                  {seriesInfo.author.avatar_url ? (
+                    <img src={seriesInfo.author.avatar_url} alt="" />
+                  ) : (
+                    <i className="fa-solid fa-user" />
+                  )}
+                </Link>
+                <Link href={`/user/${seriesInfo.user_id}`} className="hero-author-name" style={{ textDecoration: "none" }}>
+                  {seriesInfo.author.nickname}
                 </Link>
               </div>
-            </div>
-          )}
-
-          {chapters.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted">该连载暂无章节</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-rule">
-              {sortedChapters.map((ch) => (
-                <Link
-                  key={ch.id}
-                  href={`/read/${ch.id}`}
-                  className="flex items-center px-5 py-3.5 no-underline hover:bg-accent-light/20 transition-colors"
-                >
-                  <span className="text-xs text-muted w-12 flex-shrink-0">第{ch.chapter_number}章</span>
-                  <span className="text-sm text-warm flex-1 truncate">{ch.chapter_title || ch.title || "无标题"}</span>
-                  <span className="text-xs text-muted flex-shrink-0 ml-3">{ch.word_count?.toLocaleString() || 0} 字</span>
-                  <span className="text-xs text-muted flex-shrink-0 ml-3 w-20 text-right">
-                    {new Date(ch.created_at).toLocaleDateString("zh-CN")}
+              <span className="meta-sep">|</span>
+              <span className="meta-item">
+                {seriesInfo.series_type === "fanfic" ? "同人" : "原创"}
+              </span>
+              <span className="meta-sep">|</span>
+              <span className="meta-item">
+                最近更新 <span>{lastChapter ? new Date(lastChapter.created_at).toLocaleDateString("zh-CN") : "暂无"}</span>
+              </span>
+              {lastChapter && (
+                <>
+                  <span className="meta-sep">|</span>
+                  <span className="meta-item">
+                    最新章 <span>{lastChapter.chapter_title || lastChapter.title || `第${lastChapter.chapter_number}章`}</span>
                   </span>
-                </Link>
-              ))}
+                </>
+              )}
             </div>
-          )}
+
+            <div className="hero-stats-row">
+              <div className="stat-item">
+                <span className="stat-label">总章节</span>
+                <span className="stat-value">{chapters.length}</span>
+              </div>
+              <span className="stat-sep">|</span>
+              <div className="stat-item">
+                <span className="stat-label">总字数</span>
+                <span className="stat-value">{totalWords.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {seriesInfo.description && (
+              <>
+                <div className="synopsis-header">
+                  <span className="synopsis-title">作品简介</span>
+                </div>
+                <p className="synopsis-text">{seriesInfo.description}</p>
+              </>
+            )}
+
+            {seriesInfo.tags.length > 0 && (
+              <div className="tags-row">
+                {seriesInfo.tags.map((tag) => (
+                  <Link key={tag} href={`/tag/${encodeURIComponent(tag)}`} className="card-tag">
+                    {tag}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Chapter Section */}
+          <div className="chapter-section">
+            <div className="chapter-section-header">
+              <div>
+                <span className="chapter-section-title">目录</span>
+                <span className="chapter-section-count"> &middot; 共 {chapters.length} 章</span>
+              </div>
+              {chapters.length > 0 && (
+                <button className={`sort-toggle${sortOrder === "desc" ? " reversed" : ""}`} onClick={toggleSort}>
+                  <i className="fa-solid fa-arrow-down" /> {sortOrder === "desc" ? "正序" : "倒序"}
+                </button>
+              )}
+            </div>
+
+            {chapters.length > 0 && lastChapter && (
+              <Link href={`/read/${lastChapter.id}`} className="update-banner" style={{ textDecoration: "none" }}>
+                <span className="banner-dot"></span>
+                最新章 <span className="banner-chapter">{lastChapter.chapter_title || lastChapter.title || `第${lastChapter.chapter_number}章`}</span>
+                <span className="banner-time">{new Date(lastChapter.created_at).toLocaleDateString("zh-CN")}</span>
+              </Link>
+            )}
+
+            {chapters.length === 0 ? (
+              <div className="chapter-grid-wrapper">
+                <div className="chapter-empty-state">
+                  <div className="chapter-empty-illustration">
+                    <div className="chapter-empty-ring">
+                      <div className="chapter-ring-outer"></div>
+                      <div className="chapter-ring-inner">
+                        <i className="fa-solid fa-book-open"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="chapter-empty-title">暂无章节</p>
+                  <p className="chapter-empty-desc">作者还没有发布任何章节，敬请期待</p>
+                </div>
+              </div>
+            ) : (
+              <div className="chapter-grid-wrapper">
+                <div className="chapter-grid">
+                  {sortedChapters.map((ch) => (
+                    <Link
+                      key={ch.id}
+                      href={`/read/${ch.id}`}
+                      className="chapter-grid-item"
+                    >
+                      <span className="ch-num">第{ch.chapter_number}章</span>
+                      {ch.chapter_title || ch.title || "无标题"}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
-      </main>
+      </div>
     </div>
   );
 }

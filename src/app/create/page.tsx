@@ -3,15 +3,26 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { marked } from "marked";
 import { createClient } from "@/lib/supabase/browser";
+import { compressImage } from "@/lib/image";
+import { renderSafeMarkdown } from "@/lib/markdown";
 import { useMarkdownEditor } from "@/lib/useMarkdownEditor";
 
-marked.setOptions({ breaks: true, gfm: true });
+function notifyStatsChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("inkland:stats-changed"));
+}
+
+function toLocalDateTimeValue(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 // ============ 类型定义 ============
 
 type ViewType = "select" | "text" | "image" | "series-create" | "series-detail" | "chapter-create";
+const MAX_UPLOAD_IMAGES = 9;
 
 interface SeriesInfo {
   id: string;
@@ -33,6 +44,50 @@ interface ChapterInfo {
   created_at: string;
 }
 
+interface UploadedImage {
+  name: string;
+  url: string;
+  storedUrl: string;
+  bucket?: string;
+  path?: string;
+  file?: File;
+}
+
+function privateImageMarker(path: string) {
+  return `private://private-post-images/${path}`;
+}
+
+function VisibilityOptions({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: "public" | "followers_only" | "private";
+  onChange: (value: "public" | "followers_only" | "private") => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="form-section">
+      <span className="form-label">可见范围</span>
+      <div className="collection-options" role="radiogroup" aria-label="可见范围">
+          <button type="button" className={`collection-option ${value === "public" ? "selected" : ""}`} onClick={() => onChange("public")} disabled={disabled} role="radio" aria-checked={value === "public"}>
+          <span className={`radio-circle ${value === "public" ? "selected" : ""}`}><span className="radio-dot" /></span>
+          <span className="collection-option-copy"><span className="collection-option-text">公开</span><span className="collection-option-desc">所有人可见</span></span>
+        </button>
+        <button type="button" className={`collection-option ${value === "followers_only" ? "selected" : ""}`} onClick={() => onChange("followers_only")} disabled={disabled} role="radio" aria-checked={value === "followers_only"}>
+          <span className={`radio-circle ${value === "followers_only" ? "selected" : ""}`}><span className="radio-dot" /></span>
+          <span className="collection-option-copy"><span className="collection-option-text">仅关注用户可见</span><span className="collection-option-desc">只有关注作者的人可见</span></span>
+        </button>
+        <button type="button" className={`collection-option ${value === "private" ? "selected" : ""}`} onClick={() => onChange("private")} disabled={disabled} role="radio" aria-checked={value === "private"}>
+          <span className={`radio-circle ${value === "private" ? "selected" : ""}`}><span className="radio-dot" /></span>
+          <span className="collection-option-copy"><span className="collection-option-text">仅自己可见</span><span className="collection-option-desc">保存为草稿，仅作者本人可见</span></span>
+        </button>
+      </div>
+      {disabled && <p className="text-xs text-muted mt-2">正在同步图片权限，完成后即可发布。</p>}
+    </div>
+  );
+}
+
 // ============ 工具栏组件（共用） ============
 
 function EditorToolbar({
@@ -52,24 +107,24 @@ function EditorToolbar({
   uploadedCount: number;
 }) {
   return (
-    <div className="flex items-center gap-1 flex-wrap p-2 rounded-lg bg-white border border-rule sticky top-[72px] z-40">
-      <button className="tool-btn" onClick={onBold} title="加粗" type="button">
+    <div className="editor-toolbar">
+      <button className="toolbar-btn" onClick={onBold} title="加粗" type="button">
         <i className="fa-solid fa-bold" />
       </button>
-      <button className="tool-btn" onClick={onItalic} title="斜体" type="button">
+      <button className="toolbar-btn" onClick={onItalic} title="斜体" type="button">
         <i className="fa-solid fa-italic" />
       </button>
-      <button className="tool-btn" onClick={onUnderline} title="下划线" type="button">
+      <button className="toolbar-btn" onClick={onUnderline} title="下划线" type="button">
         <i className="fa-solid fa-underline" />
       </button>
-      <button className="tool-btn" onClick={onStrikethrough} title="删除线" type="button">
+      <button className="toolbar-btn" onClick={onStrikethrough} title="删除线" type="button">
         <i className="fa-solid fa-strikethrough" />
       </button>
 
-      <span className="w-px h-5 bg-rule mx-1" />
+      <div className="toolbar-divider" />
 
       <button
-        className={`tool-btn ${uploadingImage ? "opacity-50" : ""}`}
+        className={`toolbar-btn ${uploadingImage ? "opacity-50" : ""}`}
         onClick={onImage}
         title="上传图片"
         disabled={uploadingImage}
@@ -77,28 +132,219 @@ function EditorToolbar({
       >
         <i className={`fa-solid ${uploadingImage ? "fa-spinner animate-spin" : "fa-image"}`} />
       </button>
-      <button className="tool-btn" onClick={onHr} title="分割线" type="button">
+      <button className="toolbar-btn" onClick={onHr} title="分割线" type="button">
         <i className="fa-solid fa-minus" />
       </button>
 
-      <span className="flex-1" />
+      <div className="editor-preview-toggle">
+        <button
+          className={`preview-toggle-btn ${!previewMode ? "active" : ""}`}
+          onClick={() => { if (previewMode) onTogglePreview(); }}
+          type="button"
+        >
+          编辑
+        </button>
+        <button
+          className={`preview-toggle-btn ${previewMode ? "active" : ""}`}
+          onClick={() => { if (!previewMode) onTogglePreview(); }}
+          type="button"
+        >
+          预览
+        </button>
+      </div>
+    </div>
+  );
+}
 
-      {uploadedCount > 0 && (
-        <span className="text-xs text-muted mr-2">
-          <i className="fa-solid fa-check-circle text-green-500 mr-1" />
-          {uploadedCount} 张
-        </span>
+function ArticleToolbar({
+  onBold, onItalic, onUnderline, onStrikethrough,
+  onLink, onClear, onAlignLeft, onAlignCenter, onAlignRight, onAlignJustify, onHr,
+}: {
+  onBold: () => void;
+  onItalic: () => void;
+  onUnderline: () => void;
+  onStrikethrough: () => void;
+  onLink: () => void;
+  onClear: () => void;
+  onAlignLeft: () => void;
+  onAlignCenter: () => void;
+  onAlignRight: () => void;
+  onAlignJustify: () => void;
+  onHr: () => void;
+}) {
+  const button = (icon: string, label: string, onClick: () => void) => (
+    <button type="button" className="tb-btn" aria-label={label} title={label} onMouseDown={(event) => event.preventDefault()} onClick={onClick}>
+      <i className={`fa-solid ${icon}`} aria-hidden="true" />
+    </button>
+  );
+
+  return (
+    <div className="editor-toolbar" role="toolbar" aria-label="格式化工具栏">
+      <div className="tb-group">
+        {button("fa-rotate-left", "撤销", () => undefined)}
+        {button("fa-rotate-right", "重做", () => undefined)}
+      </div>
+      <span className="tb-divider" aria-hidden="true" />
+      <div className="tb-group">
+        {button("fa-bold", "加粗", onBold)}
+        {button("fa-italic", "斜体", onItalic)}
+        {button("fa-underline", "下划线", onUnderline)}
+        {button("fa-strikethrough", "删除线", onStrikethrough)}
+      </div>
+      <span className="tb-divider" aria-hidden="true" />
+      <div className="tb-group">
+        {button("fa-link", "超链接", onLink)}
+        {button("fa-eraser", "清除格式", onClear)}
+      </div>
+      <span className="tb-divider" aria-hidden="true" />
+      <div className="tb-group">
+        {button("fa-align-left", "左对齐", onAlignLeft)}
+        {button("fa-align-center", "居中对齐", onAlignCenter)}
+        {button("fa-align-right", "右对齐", onAlignRight)}
+        {button("fa-align-justify", "两端对齐", onAlignJustify)}
+      </div>
+      <span className="tb-divider" aria-hidden="true" />
+      <div className="tb-group">
+        {button("fa-minus", "分割线", onHr)}
+      </div>
+      <span className="tb-spacer" />
+    </div>
+  );
+}
+
+function htmlToMarkdown(html: string): string {
+  if (typeof DOMParser === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+
+  const render = (node: Node, inPre = false): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent || "";
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const element = node as HTMLElement;
+    const tag = element.tagName.toLowerCase();
+    const content = Array.from(element.childNodes).map((child) => render(child, inPre || tag === "pre")).join("");
+
+    if (tag === "br") return "\n";
+    if (tag === "strong" || tag === "b") return `**${content}**`;
+    if (tag === "em" || tag === "i") return `*${content}*`;
+    if (tag === "u") return `<u>${content}</u>`;
+    if (tag === "s" || tag === "del") return `~~${content}~~`;
+    if (tag === "code" && !inPre) return `\`${content}\``;
+    if (tag === "a") return `[${content}](${element.getAttribute("href") || ""})`;
+    if (tag === "hr") return "\n---\n";
+    if (tag === "blockquote") return content.split("\n").map((line) => line ? `> ${line}` : "> ").join("\n") + "\n";
+    if (tag === "ul" || tag === "ol") {
+      const ordered = tag === "ol";
+      return Array.from(element.children).map((item, index) => `${ordered ? `${index + 1}.` : "-"} ${render(item).trim()}`).join("\n") + "\n";
+    }
+    if (tag === "li") return content;
+    if (tag === "pre") return `\n\`\`\`\n${element.textContent || ""}\n\`\`\`\n`;
+    if (["p", "div", "h1", "h2", "h3"].includes(tag)) return `${content}\n`;
+    return content;
+  };
+
+  return render(doc.body).replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function ArticleEditorSurface({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("https://");
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    const currentMarkdown = htmlToMarkdown(surface.innerHTML);
+    if (currentMarkdown.trim() !== value.trim()) {
+      surface.innerHTML = renderSafeMarkdown(value || "");
+    }
+  }, [value]);
+
+  const exec = (command: string, commandValue?: string) => {
+    surfaceRef.current?.focus();
+    document.execCommand(command, false, commandValue);
+    if (surfaceRef.current) onChange(htmlToMarkdown(surfaceRef.current.innerHTML));
+  };
+
+  return (
+    <div className="editor-wrap">
+      <ArticleToolbar
+        onBold={() => exec("bold")}
+        onItalic={() => exec("italic")}
+        onUnderline={() => exec("underline")}
+        onStrikethrough={() => exec("strikeThrough")}
+        onLink={() => {
+          setLinkUrl("https://");
+          setLinkDialogOpen(true);
+        }}
+        onClear={() => exec("removeFormat")}
+        onAlignLeft={() => exec("justifyLeft")}
+        onAlignCenter={() => exec("justifyCenter")}
+        onAlignRight={() => exec("justifyRight")}
+        onAlignJustify={() => exec("justifyFull")}
+        onHr={() => exec("insertHorizontalRule")}
+      />
+      <div className="editor-body">
+        <div
+          ref={surfaceRef}
+          className="editor-content"
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          onInput={(event) => onChange(htmlToMarkdown(event.currentTarget.innerHTML))}
+          onKeyDown={(event) => {
+            if (event.key === "Tab") {
+              event.preventDefault();
+              exec("insertText", "  ");
+            }
+          }}
+        />
+      </div>
+      <div className="editor-footer">
+        <span><i className="fa-solid fa-check" /> 草稿已保存</span>
+        <span className="char-count">{value.replace(/\s/g, "").length} 字</span>
+      </div>
+      {linkDialogOpen && (
+        <div className="modal-overlay active" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setLinkDialogOpen(false);
+        }}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="link-dialog-title">
+            <h2 id="link-dialog-title" className="modal-title">插入超链接</h2>
+            <div className="modal-body">
+              <label htmlFor="link-url-input" className="sr-only">链接地址</label>
+              <input
+                id="link-url-input"
+                className="sidebar-dialog-input"
+                type="url"
+                value={linkUrl}
+                onChange={(event) => setLinkUrl(event.target.value)}
+                placeholder="https://example.com"
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-modal btn-modal-cancel" onClick={() => setLinkDialogOpen(false)}>取消</button>
+              <button
+                type="button"
+                className="btn-modal btn-modal-primary"
+                onClick={() => {
+                  if (linkUrl.trim()) exec("createLink", linkUrl.trim());
+                  setLinkDialogOpen(false);
+                }}
+                disabled={!linkUrl.trim()}
+              >
+                插入链接
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      <button
-        className={`tool-btn ${previewMode ? "active" : ""}`}
-        onClick={onTogglePreview}
-        title={previewMode ? "编辑" : "预览"}
-        type="button"
-      >
-        <i className={`fa-solid fa-${previewMode ? "pen-to-square" : "eye"}`} />
-        <span className="text-xs ml-1 hidden sm:inline">{previewMode ? "编辑" : "预览"}</span>
-      </button>
     </div>
   );
 }
@@ -172,7 +418,7 @@ function PublishHeader({
   submitting?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-rule">
+    <header className="sticky top-0 z-50 bg-card border-b border-rule">
       <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
         <Link href="/" className="btn-ghost no-underline">
           <i className="fa-solid fa-arrow-left mr-1" />返回
@@ -193,15 +439,14 @@ function PublishHeader({
 
 // ============ 主组件 ============
 
-export default function CreatePage() {
+export default function CreatePage({ initialView = "select" }: { initialView?: ViewType }) {
   const supabase = createClient();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const coverFileInputRef = useRef<HTMLInputElement>(null);
   const editor = useMarkdownEditor();
 
   // ---- 视图 ----
-  const [view, setView] = useState<ViewType>("select");
+  const [view, setView] = useState<ViewType>(initialView);
   const [initDone, setInitDone] = useState(false);
 
   // ---- 处理 URL 参数 ----
@@ -244,12 +489,21 @@ export default function CreatePage() {
       const loadPost = async () => {
         const { data } = await supabase
           .from("posts")
-          .select("id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason")
+          .select("id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility")
           .eq("id", editPost)
           .single();
         if (data) {
           const p = data as unknown as Record<string, unknown>;
+          const savedPublishedAt = (p.published_at as string) || null;
           setTitle(p.title as string || "");
+          setVisibility(p.visibility === "followers_only" || p.visibility === "private" ? p.visibility : "public");
+          setEditingPublishedAt(savedPublishedAt);
+          if (p.status === "draft" && savedPublishedAt && new Date(savedPublishedAt).getTime() > Date.now()) {
+            const localSchedule = toLocalDateTimeValue(savedPublishedAt);
+            setScheduleValue(localSchedule);
+            setScheduleTime(localSchedule.slice(11, 16));
+            setScheduleMonth(localSchedule.slice(0, 7));
+          }
           editor.setContent(p.content as string || "");
           setEditingPostSeriesName((p.series_name as string) || null);
           if (p.review_status === "rejected") {
@@ -260,10 +514,17 @@ export default function CreatePage() {
             // 提取已有图片
             const content = p.content as string;
             const imgRegex = /!\[(.*?)\]\((.*?)\)/g;
-            const existingImages: { name: string; url: string }[] = [];
+            const existingImages: UploadedImage[] = [];
             let match;
             while ((match = imgRegex.exec(content)) !== null) {
-              existingImages.push({ name: match[1], url: match[2] });
+              const storedUrl = match[2];
+              let previewUrl = storedUrl;
+              const privateMatch = storedUrl.match(/^private:\/\/private-post-images\/(.+)$/);
+              if (privateMatch) {
+                const { data: signedData } = await supabase.storage.from("private-post-images").createSignedUrl(privateMatch[1], 3600);
+                previewUrl = signedData?.signedUrl || storedUrl;
+              }
+              existingImages.push({ name: match[1], url: previewUrl, storedUrl });
             }
             setUploadedImages(existingImages);
             // 提取图片描述
@@ -293,8 +554,7 @@ export default function CreatePage() {
           }
         }
       };
-      loadPost();
-      setInitDone(true);
+      loadPost().finally(() => setInitDone(true));
     } else {
       setInitDone(true);
     }
@@ -306,10 +566,23 @@ export default function CreatePage() {
   const [tagInput, setTagInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [successAction, setSuccessAction] = useState<"publish" | "collection" | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [editPostId, setEditPostId] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<"public" | "followers_only" | "private">("public");
+
+  useEffect(() => {
+    if (!successMsg || successAction !== "publish") return;
+    const redirectTimer = window.setTimeout(() => {
+      router.push(editPostId ? "/studio" : "/");
+      router.refresh();
+    }, 1400);
+    return () => window.clearTimeout(redirectTimer);
+  }, [successMsg, successAction, editPostId, router]);
 
   // ---- 图片 ----
-  const [uploadedImages, setUploadedImages] = useState<{ name: string; url: string }[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageDesc, setImageDesc] = useState("");
 
@@ -321,6 +594,17 @@ export default function CreatePage() {
   const [collectionTagInput, setCollectionTagInput] = useState("");
   const [existingCollections, setExistingCollections] = useState<{ name: string; count: number }[]>([]);
   const [selectedCollection, setSelectedCollection] = useState("");
+  const [collectionSelectOpen, setCollectionSelectOpen] = useState(false);
+  const [publishMenuOpen, setPublishMenuOpen] = useState(false);
+  const [publishModal, setPublishModal] = useState<"schedule" | "draft" | null>(null);
+  const [scheduleValue, setScheduleValue] = useState("");
+  const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [scheduleMonth, setScheduleMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [scheduleTime, setScheduleTime] = useState("20:00");
 
   // ---- 长篇连载 ----
   const [currentSeries, setCurrentSeries] = useState<SeriesInfo | null>(null);
@@ -329,130 +613,182 @@ export default function CreatePage() {
   const [newSeriesDesc, setNewSeriesDesc] = useState("");
   const [newSeriesTags, setNewSeriesTags] = useState<string[]>([]);
   const [newSeriesTagInput, setNewSeriesTagInput] = useState("");
-  const [newSeriesStatus, setNewSeriesStatus] = useState<"ongoing" | "completed">("ongoing");
-  const [newSeriesType, setNewSeriesType] = useState<"fanfic" | "original">("fanfic");
+  const [newSeriesType, setNewSeriesType] = useState<"fanfic" | "original">("original");
   const [editingSeries, setEditingSeries] = useState(false);
   const [editingSeriesId, setEditingSeriesId] = useState<string | null>(null);
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const [newSeriesCover, setNewSeriesCover] = useState<string | null>(null);
 
   // ---- 编辑模式 ----
-  const [editPostId, setEditPostId] = useState<string | null>(null);
+  const [editingPublishedAt, setEditingPublishedAt] = useState<string | null>(null);
   const [reviewRejectionReason, setReviewRejectionReason] = useState<string | null>(null);
   const [editingPostSeriesName, setEditingPostSeriesName] = useState<string | null>(null);
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
 
   const wordCount = editor.content.replace(/\s/g, "").length;
-  const [recommendedTags, setRecommendedTags] = useState<string[]>(["HE", "BE", "短篇", "正剧向", "已完结"]);
+  const [recommendedTags, setRecommendedTags] = useState<string[]>([]);
+
+  const calendarMonthDate = new Date(`${scheduleMonth}-01T00:00:00`);
+  const calendarYear = calendarMonthDate.getFullYear();
+  const calendarMonthIndex = calendarMonthDate.getMonth();
+  const now = new Date();
+  const todayLocalValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const currentCalendarMonth = todayLocalValue.slice(0, 7);
+  const calendarDays = Array.from(
+    { length: new Date(calendarYear, calendarMonthIndex + 1, 0).getDate() + new Date(calendarYear, calendarMonthIndex, 1).getDay() },
+    (_, index) => index < new Date(calendarYear, calendarMonthIndex, 1).getDay() ? null : index - new Date(calendarYear, calendarMonthIndex, 1).getDay() + 1,
+  );
+  const scheduleSelectedDate = scheduleValue ? scheduleValue.slice(0, 10) : "";
+  const scheduleHour = scheduleTime.split(":")[0] || "20";
+  const scheduleMinute = scheduleTime.split(":")[1] || "00";
+  const scheduleDisplayValue = scheduleValue
+    ? new Date(scheduleValue).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
+    : "选择公开日期";
 
   // 加载近期使用标签
   useEffect(() => {
     const loadRecentTags = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      // 获取用户最近的 post_ids
-      const { data: posts } = await supabase
-        .from("posts")
-        .select("id")
+      const { data: recentTags } = await supabase
+        .from("user_tag_usage")
+        .select("last_used_at, tags(name)")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (!posts || posts.length === 0) return;
-      const postIds = (posts as Record<string, unknown>[]).map((p) => p.id as string);
-      // 从 post_tags 获取这些 post 的 tag_id
-      const { data: postTags } = await supabase
-        .from("post_tags")
-        .select("tag_id")
-        .in("post_id", postIds);
-      if (!postTags || postTags.length === 0) return;
-      // 去重并获取 tag_id 列表
-      const tagIds = [...new Set((postTags as Record<string, unknown>[]).map((pt) => pt.tag_id as string))];
-      // 查询 tags 表获取标签名
-      const { data: tags } = await supabase
-        .from("tags")
-        .select("id, name")
-        .in("id", tagIds);
-      if (tags && tags.length > 0) {
-        const tagNames = (tags as Record<string, unknown>[]).map((t) => t.name as string);
-        const unique = [...new Set(tagNames)].slice(0, 10);
-        if (unique.length > 0) setRecommendedTags(unique);
-      }
+        .order("last_used_at", { ascending: false })
+        .limit(10);
+      if (!recentTags) return;
+      const names = (recentTags as Array<Record<string, unknown>>)
+        .map((row) => {
+          const tag = row.tags as { name?: string } | { name?: string }[] | null;
+          return Array.isArray(tag) ? tag[0]?.name : tag?.name;
+        })
+        .filter((name): name is string => Boolean(name));
+      setRecommendedTags([...new Set(names)].slice(0, 10));
     };
     loadRecentTags();
   }, []);
 
   // ============ 图片上传 ============
 
-  const uploadImageToStorage = useCallback(async (file: File): Promise<string | null> => {
+  const uploadImageToStorage = useCallback(async (file: File): Promise<UploadedImage | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录后再上传图片"); return null; }
 
-    const fileExt = file.name.split(".").pop() || "png";
+    let compressedFile: File;
+    try {
+      const result = await compressImage(file);
+      compressedFile = result.file;
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "图片处理失败，请换一张图片重试");
+      return null;
+    }
+
+    const fileExt = "webp";
     const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${fileExt}`;
+    const bucketName = visibility === "public" ? "post-images" : "private-post-images";
 
     const { error } = await supabase.storage
-      .from("post-images")
-      .upload(fileName, file, { upsert: true });
+      .from(bucketName)
+      .upload(fileName, compressedFile, { upsert: true, contentType: "image/webp" });
 
     if (error) {
       if (error.message?.includes("Bucket") || error.message?.includes("not found")) {
-        setErrorMsg("图片上传失败：存储桶 'post-images' 未创建。请在 Supabase Dashboard → Storage 中创建名为 'post-images' 的公开存储桶，并添加 INSERT 和 SELECT 策略。");
+        setErrorMsg(`图片上传失败：存储桶 '${bucketName}' 未创建或策略未配置。`);
       } else {
         setErrorMsg(`图片上传失败: ${error.message}`);
       }
       return null;
     }
-    const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(fileName);
-    return urlData?.publicUrl || null;
-  }, [supabase]);
+    if (visibility !== "public") {
+      const { data: signedData, error: signedError } = await supabase.storage.from(bucketName).createSignedUrl(fileName, 3600);
+      if (signedError || !signedData?.signedUrl) {
+        setErrorMsg("图片已上传，但临时预览链接生成失败，请检查私有 bucket 的 SELECT 策略。");
+        return null;
+      }
+      return { name: file.name, url: signedData.signedUrl, storedUrl: privateImageMarker(fileName), bucket: bucketName, path: fileName, file: compressedFile };
+    }
+    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+    return urlData?.publicUrl ? { name: file.name, url: urlData.publicUrl, storedUrl: urlData.publicUrl, bucket: bucketName, path: fileName, file: compressedFile } : null;
+  }, [supabase, visibility]);
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const handleVisibilityChange = useCallback(async (next: "public" | "followers_only" | "private") => {
+    if (next === visibility || uploadedImages.length === 0) { setVisibility(next); return; }
+    const previousVisibility = visibility;
+    // 先立即反馈选择结果，图片存储位置在后台同步。
+    setVisibility(next);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setVisibility(previousVisibility); setErrorMsg("请先登录"); return; }
+
     setUploadingImage(true);
     setErrorMsg("");
-    for (const file of Array.from(files)) {
+    const targetBucket = next === "public" ? "post-images" : "private-post-images";
+    const migrated: UploadedImage[] = [];
+    try {
+      for (const image of uploadedImages) {
+        let sourceFile = image.file;
+        if (!sourceFile) {
+          const response = await fetch(image.url);
+          if (!response.ok) throw new Error(`无法读取图片：${image.name}`);
+          sourceFile = new File([await response.blob()], image.name, { type: "image/webp" });
+        }
+        const targetPath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.webp`;
+        const { error: uploadError } = await supabase.storage.from(targetBucket).upload(targetPath, sourceFile, { upsert: true, contentType: "image/webp" });
+        if (uploadError) throw uploadError;
+
+        let url = "";
+        let storedUrl = "";
+        if (next === "public") {
+          const { data } = supabase.storage.from(targetBucket).getPublicUrl(targetPath);
+          url = data.publicUrl;
+          storedUrl = data.publicUrl;
+        } else {
+          const { data, error } = await supabase.storage.from(targetBucket).createSignedUrl(targetPath, 3600);
+          if (error || !data?.signedUrl) throw error || new Error("无法生成图片预览链接");
+          url = data.signedUrl;
+          storedUrl = privateImageMarker(targetPath);
+        }
+        migrated.push({ ...image, url, storedUrl, bucket: targetBucket, path: targetPath, file: sourceFile });
+      }
+      const replacements = new Map<string, string>();
+      uploadedImages.forEach((image, index) => replacements.set(image.url, migrated[index].url));
+      editor.setContentRaw(replacements ? [...replacements.entries()].reduce((value, [from, to]) => value.split(from).join(to), editor.content) : editor.content);
+      setUploadedImages(migrated);
+      await Promise.all(uploadedImages
+        .filter((image) => image.bucket && image.path)
+        .map((image) => supabase.storage.from(image.bucket as string).remove([image.path as string])));
+    } catch (error) {
+      setVisibility(previousVisibility);
+      setErrorMsg(error instanceof Error ? error.message : "图片可见范围切换失败，请重试");
+    } finally {
+      setUploadingImage(false);
+    }
+  }, [editor, supabase, uploadedImages, visibility]);
+
+  const processImageFiles = useCallback(async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_UPLOAD_IMAGES - uploadedImages.length;
+    if (remaining <= 0) { setErrorMsg(`单篇作品最多上传 ${MAX_UPLOAD_IMAGES} 张图片`); return; }
+    const selectedFiles = Array.from(files).slice(0, remaining);
+    setUploadingImage(true);
+    setErrorMsg("");
+    if (files.length > remaining) setErrorMsg(`单篇作品最多上传 ${MAX_UPLOAD_IMAGES} 张图片，超出的图片未添加`);
+    for (const file of selectedFiles) {
       if (!file.type.startsWith("image/")) { setErrorMsg(`"${file.name}" 不是图片文件，已跳过`); continue; }
-      const url = await uploadImageToStorage(file);
-      if (url) {
-        setUploadedImages((prev) => [...prev, { name: file.name, url }]);
-        editor.insertAtCursor(`![${file.name}](${url})\n`);
+      if (file.size > 20 * 1024 * 1024) { setErrorMsg(`"${file.name}" 原文件超过 20MB，已跳过`); continue; }
+      const uploaded = await uploadImageToStorage(file);
+      if (uploaded) {
+        setUploadedImages((prev) => [...prev, uploaded]);
+        editor.insertAtCursor(`![${uploaded.name}](${uploaded.url})\n`);
       }
     }
     setUploadingImage(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [uploadImageToStorage, editor]);
+  }, [uploadImageToStorage, editor, uploadedImages.length]);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    await processImageFiles(e.target.files || []);
+  }, [processImageFiles]);
 
   const triggerImageUpload = () => fileInputRef.current?.click();
-
-  // ============ 封面上传 ============
-
-  const handleCoverUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    if (!file.type.startsWith("image/")) {
-      setErrorMsg("请选择图片文件");
-      if (coverFileInputRef.current) coverFileInputRef.current.value = "";
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("封面图片大小不能超过5MB");
-      if (coverFileInputRef.current) coverFileInputRef.current.value = "";
-      return;
-    }
-    setUploadingCover(true);
-    setErrorMsg("");
-    const url = await uploadImageToStorage(file);
-    if (url) {
-      setNewSeriesCover(url);
-    }
-    setUploadingCover(false);
-    if (coverFileInputRef.current) coverFileInputRef.current.value = "";
-  }, [uploadImageToStorage]);
-
-  const triggerCoverUpload = () => coverFileInputRef.current?.click();
 
   // ============ 加载合集列表 ============
 
@@ -495,10 +831,27 @@ export default function CreatePage() {
   }, [supabase]);
 
   useEffect(() => {
-    if (view === "text" && collectionMode === "select") loadCollections();
+    if ((view === "text" || view === "image") && collectionMode === "select") loadCollections();
   }, [view, collectionMode, loadCollections]);
 
   // ============ 保存标签 ============
+
+  const recordRecentTags = async (userId: string, tagNames: string[]) => {
+    const uniqueNames = [...new Set(tagNames.map((name) => name.trim()).filter(Boolean))];
+    await Promise.all(uniqueNames.map(async (tagName) => {
+      const { data: existing } = await supabase.from("tags").select("id").eq("name", tagName).maybeSingle();
+      let tagId = existing?.id as string | undefined;
+      if (!tagId) {
+        const { data: newTag } = await supabase.from("tags").insert({ name: tagName, type: "fandom", post_count: 0 }).select("id").single();
+        tagId = newTag?.id as string | undefined;
+      }
+      if (!tagId) return;
+      await supabase.from("user_tag_usage").upsert(
+        { user_id: userId, tag_id: tagId, last_used_at: new Date().toISOString() },
+        { onConflict: "user_id,tag_id" },
+      );
+    }));
+  };
 
   const saveTags = async (userId: string, postId?: string) => {
     if (tags.length === 0) return;
@@ -513,25 +866,87 @@ export default function CreatePage() {
       pid = posts?.[0]?.id;
     }
     if (!pid) return;
-    for (const tagName of tags) {
-      const { data: existing } = await supabase.from("tags").select("id").eq("name", tagName).single();
-      let tagId: string;
-      if (existing) {
-        tagId = existing.id;
-      } else {
-        const { data: newTag } = await supabase.from("tags").insert({ name: tagName, type: "fandom", post_count: 0 }).select("id").single();
-        tagId = newTag!.id;
-      }
-      await supabase.from("post_tags").insert({ post_id: pid, tag_id: tagId });
+    const tagIds = await Promise.all(tags.map(async (tagName) => {
+      const { data: existing } = await supabase.from("tags").select("id").eq("name", tagName).maybeSingle();
+      if (existing?.id) return existing.id as string;
+      const { data: newTag } = await supabase.from("tags").insert({ name: tagName, type: "fandom", post_count: 0 }).select("id").single();
+      return newTag?.id as string | undefined;
+    }));
+    await Promise.all([
+      Promise.all(tagIds.filter((tagId): tagId is string => Boolean(tagId)).map((tagId) =>
+        supabase.from("post_tags").insert({ post_id: pid, tag_id: tagId }),
+      )),
+      recordRecentTags(userId, tags),
+    ]);
+  };
+
+  const renderNotice = () => (
+    <>
+      {errorMsg && (
+        <div className="create-notice create-notice-error" role="alert">
+          <i className="fa-solid fa-circle-exclamation" /> {errorMsg}
+        </div>
+      )}
+      {successMsg && (
+        <div className="create-success-overlay" role="status">
+          <div className="create-success-dialog">
+            <span className="create-success-icon"><i className="fa-solid fa-check" /></span>
+            <strong>操作成功</strong>
+            <p>{successMsg}{successAction === "publish" && <><br />即将返回{editPostId ? "创作中心" : "首页"}</>}</p>
+            {successAction !== "publish" && (
+              <button type="button" onClick={() => {
+                setSuccessMsg("");
+                setSuccessAction(null);
+              }}>确认</button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const createCollection = async () => {
+    const name = collectionName.trim();
+    if (!name) { setErrorMsg("请填写合集名称"); setSuccessMsg(""); return; }
+    setSubmitting(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+    setSuccessAction(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
+
+    const { error } = await supabase.from("series").insert({
+      user_id: user.id,
+      name,
+      description: collectionDesc.trim() || null,
+      tags: [],
+      status: "ongoing",
+      series_type: "original",
+    });
+    if (error) {
+      setErrorMsg(`创建合集失败：${error.message}`);
+      setSubmitting(false);
+      return;
     }
+
+    setCollectionMode("select");
+    setSelectedCollection(name);
+    setCollectionName("");
+    setCollectionDesc("");
+    setSubmitting(false);
+    setSuccessAction("collection");
+    setSuccessMsg(`合集“${name}”创建成功，已自动选中`);
   };
 
   // ============ 发布单篇 ============
 
-  const submitText = async () => {
+  const submitText = async (options?: { scheduledAt?: string }) => {
+    if (!title.trim()) { setErrorMsg("请填写作品标题"); setSuccessMsg(""); return; }
     if (!editor.content.trim()) { setErrorMsg("请填写内容"); return; }
     setSubmitting(true);
     setErrorMsg("");
+    setSuccessMsg("");
+    setSuccessAction(null);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
@@ -540,65 +955,255 @@ export default function CreatePage() {
     if (collectionMode === "select" && selectedCollection) finalSeriesName = selectedCollection;
     if (collectionMode === "create" && collectionName.trim()) finalSeriesName = collectionName.trim();
 
+    const scheduledAt = visibility !== "private"
+      ? (options?.scheduledAt || (scheduleValue ? new Date(scheduleValue).toISOString() : undefined))
+      : undefined;
     const postData: Record<string, unknown> = {
       title: title.trim() || "无标题",
-      content: editor.content.trim(),
+      content: uploadedImages.reduce((value, image) => value.split(image.url).join(image.storedUrl), editor.content.trim()),
       word_count: wordCount,
-      status: "published",
+      status: visibility === "private" || scheduledAt ? "draft" : "published",
       post_type: uploadedImages.length > 0 ? "illustration" : "novel",
+      visibility,
+      published_at: visibility === "private" ? null : (scheduledAt || editingPublishedAt || new Date().toISOString()),
     };
     if (finalSeriesName) postData.series_name = finalSeriesName;
 
+    let savedPostId = editPostId || undefined;
     if (editPostId) {
       const { error } = await supabase.from("posts").update(postData).eq("id", editPostId);
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
     } else {
-      const { error } = await supabase.from("posts").insert({ ...postData, user_id: user.id });
+      const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id").single();
       if (error) { setErrorMsg(`发布失败: ${error.message}`); setSubmitting(false); return; }
+      savedPostId = createdPost?.id;
     }
 
-    await saveTags(user.id, editPostId || undefined);
-    router.push("/");
-    router.refresh();
+    await saveTags(user.id, savedPostId);
+    notifyStatsChanged();
+    if (scheduledAt) {
+      setSubmitting(false);
+      setSuccessAction("publish");
+      setSuccessMsg(`发布成功，作品将于 ${new Date(scheduledAt).toLocaleString("zh-CN")} 公开`);
+      return;
+    }
+    if (visibility === "private") {
+      setSubmitting(false);
+      setSuccessAction("publish");
+      setSuccessMsg("作品已保存为仅自己可见");
+      return;
+    }
+    setSubmitting(false);
+    setSuccessAction("publish");
+    setSuccessMsg(editPostId ? "作品修改成功" : "发布成功");
   };
 
-  // ============ 发布图片 ============
+  // ============ 保存草稿 ============
 
-  const submitImage = async () => {
-    if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
+  const handleSaveDraft = async () => {
+    if (!title.trim()) { setErrorMsg("请填写作品标题"); setSuccessMsg(""); return; }
+    if (!editor.content.trim()) { setErrorMsg("请先填写内容再保存草稿"); return; }
     setSubmitting(true);
     setErrorMsg("");
+    setSuccessMsg("");
+    setSuccessAction(null);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
 
-    const imageMd = uploadedImages.map((img) => `![${img.name}](${img.url})`).join("\n\n");
+    let finalSeriesName: string | null = null;
+    if (selectedCollection) finalSeriesName = selectedCollection;
+
+    const postData: Record<string, unknown> = {
+      title: title.trim() || "无标题",
+      content: editor.content.trim(),
+      word_count: wordCount,
+      status: "draft",
+      post_type: "novel",
+      visibility,
+    };
+    if (finalSeriesName) postData.series_name = finalSeriesName;
+
+    const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id").single();
+    if (error) { setErrorMsg(`保存失败: ${error.message}`); setSubmitting(false); return; }
+
+    await saveTags(user.id, createdPost?.id);
+    notifyStatsChanged();
+    setSubmitting(false);
+    setSuccessAction("publish");
+    setSuccessMsg("草稿保存成功，当前编辑内容已保留");
+  };
+
+  // ============ 发布图片 ============
+
+  const submitImage = async (options?: { scheduledAt?: string; draft?: boolean }) => {
+    if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
+    if (tags.length === 0) { setErrorMsg("请至少添加一个标签"); return; }
+    setSubmitting(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+    setSuccessAction(null);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
+
+    const imageMd = uploadedImages.map((img) => `![${img.name}](${img.storedUrl})`).join("\n\n");
     const parts: string[] = [];
     if (title.trim()) parts.push(title.trim());
     if (imageDesc.trim()) parts.push(imageDesc.trim());
     parts.push(imageMd);
     const fullContent = parts.join("\n\n");
+    const finalSeriesName = collectionMode === "select" && selectedCollection
+      ? selectedCollection
+      : collectionMode === "create" && collectionName.trim()
+        ? collectionName.trim()
+        : null;
 
-    const postData = {
+    const scheduledAt = visibility !== "private" && !options?.draft
+      ? (options?.scheduledAt || (scheduleValue ? new Date(scheduleValue).toISOString() : undefined))
+      : undefined;
+    const postData: Record<string, unknown> = {
       title: title.trim() || "图片分享",
       content: fullContent,
       word_count: fullContent.replace(/\s/g, "").length,
-      status: "published",
+      status: visibility === "private" || scheduledAt || options?.draft ? "draft" : "published",
       post_type: "illustration",
+      visibility,
+      published_at: visibility === "private" || options?.draft ? null : (scheduledAt || editingPublishedAt || new Date().toISOString()),
     };
+    if (finalSeriesName) postData.series_name = finalSeriesName;
 
+    let savedPostId = editPostId || undefined;
     if (editPostId) {
       const { error } = await supabase.from("posts").update(postData).eq("id", editPostId);
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
     } else {
-      const { error } = await supabase.from("posts").insert({ ...postData, user_id: user.id });
+      const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id").single();
       if (error) { setErrorMsg(`发布失败: ${error.message}`); setSubmitting(false); return; }
+      savedPostId = createdPost?.id;
     }
 
-    await saveTags(user.id, editPostId || undefined);
-    router.push("/");
-    router.refresh();
+    await saveTags(user.id, savedPostId);
+    notifyStatsChanged();
+    setSubmitting(false);
+    if (scheduledAt) {
+      setSuccessAction("publish");
+      setSuccessMsg(`发布成功，作品将于 ${new Date(scheduledAt).toLocaleString("zh-CN")} 公开`);
+    } else if (options?.draft) {
+      setSuccessAction("publish");
+      setSuccessMsg("草稿保存成功");
+    } else if (visibility === "private") {
+      setSuccessAction("publish");
+      setSuccessMsg("作品已保存为仅自己可见");
+    } else {
+      setSuccessAction("publish");
+      setSuccessMsg(editPostId ? "作品修改成功" : "发布成功");
+    }
   };
+
+  const handleSaveImageDraft = async () => {
+    if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
+    if (tags.length === 0) { setErrorMsg("请至少添加一个标签"); return; }
+    await submitImage({ draft: true });
+  };
+
+  const renderImagePublishModal = () => publishModal && (
+    <div className="publish-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) setPublishModal(null); }}>
+      <div className="publish-modal" role="dialog" aria-modal="true" aria-labelledby="image-publish-modal-title">
+        <div className="publish-modal-header">
+          <div className={`publish-modal-icon publish-modal-icon-${publishModal}`}>
+            <i className={`fa-solid ${publishModal === "schedule" ? "fa-clock" : "fa-bookmark"}`} />
+          </div>
+          <button type="button" className="publish-modal-close" aria-label="关闭弹窗" onClick={() => setPublishModal(null)} disabled={submitting}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+        <div className="publish-modal-copy">
+          <h2 id="image-publish-modal-title">
+            {publishModal === "schedule" ? "定时发布" : "保存为草稿"}
+          </h2>
+          <p>
+            {publishModal === "schedule" ? "选择作品公开的日期和时间，完成后点击发布作品提交。" : "当前图片、标题、说明和标签都会保留，之后可以继续编辑。"}
+          </p>
+        </div>
+        {publishModal === "schedule" && (
+          <div className="publish-modal-field">
+            <span className="publish-schedule-label">公开日期和时间</span>
+            <span className="publish-schedule-fields">
+              <span className="publish-datetime-picker">
+                <span className="publish-picker-label">公开日期</span>
+                <button type="button" className={`publish-datetime-trigger ${scheduleValue ? "selected" : ""}`} onClick={() => { setSchedulePickerOpen(!schedulePickerOpen); setTimePickerOpen(false); }} aria-expanded={schedulePickerOpen}>
+                  <span><i className="fa-regular fa-calendar-days" /> {scheduleDisplayValue}</span>
+                  <i className={`fa-solid fa-chevron-down ${schedulePickerOpen ? "up" : ""}`} />
+                </button>
+                {schedulePickerOpen && (
+                  <span className="publish-calendar-popover" role="dialog" aria-label="选择公开日期">
+                    <span className="publish-calendar-header">
+                      <button type="button" aria-label="上个月" disabled={scheduleMonth <= currentCalendarMonth} onClick={() => {
+                        const previous = new Date(calendarYear, calendarMonthIndex - 1, 1);
+                        setScheduleMonth(`${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`);
+                      }}><i className="fa-solid fa-chevron-left" /></button>
+                      <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
+                      <button type="button" aria-label="下个月" onClick={() => {
+                        const next = new Date(calendarYear, calendarMonthIndex + 1, 1);
+                        setScheduleMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+                      }}><i className="fa-solid fa-chevron-right" /></button>
+                    </span>
+                    <span className="publish-calendar-weekdays">{["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day}>{day}</span>)}</span>
+                    <span className="publish-calendar-grid">
+                      {calendarDays.map((day, index) => {
+                        if (!day) return <span key={`image-empty-${index}`} />;
+                        const dayValue = `${scheduleMonth}-${String(day).padStart(2, "0")}`;
+                        const isSelected = scheduleSelectedDate === dayValue;
+                        const isToday = todayLocalValue === dayValue;
+                        const isPast = dayValue < todayLocalValue;
+                        return <button type="button" key={dayValue} disabled={isPast} className={`${isSelected ? "selected" : ""} ${isToday ? "today" : ""} ${isPast ? "past" : ""}`} onClick={() => { if (isPast) return; setScheduleValue(`${dayValue}T${scheduleTime}`); setSchedulePickerOpen(false); }}>{day}</button>;
+                      })}
+                    </span>
+                  </span>
+                )}
+              </span>
+              <span className="publish-time-picker">
+                <span className="publish-picker-label">公开时间</span>
+                <button type="button" className={`publish-time-trigger ${timePickerOpen ? "open" : ""}`} onClick={() => { setTimePickerOpen(!timePickerOpen); setSchedulePickerOpen(false); }} aria-expanded={timePickerOpen}>
+                  <span><i className="fa-regular fa-clock" /> {scheduleTime}</span>
+                  <i className={`fa-solid fa-chevron-down ${timePickerOpen ? "up" : ""}`} />
+                </button>
+                {timePickerOpen && (
+                  <span className="publish-time-popover" role="dialog" aria-label="选择公开时间">
+                    <span className="publish-time-popover-title">选择小时和分钟</span>
+                    <span className="publish-time-columns">
+                      <span className="publish-time-column"><span>小时</span><span className="publish-time-options publish-hour-options">
+                        {Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0")).map((hour) => <button type="button" key={hour} className={scheduleHour === hour ? "selected" : ""} onClick={() => { const nextTime = `${hour}:${scheduleMinute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) setScheduleValue(`${scheduleSelectedDate}T${nextTime}`); }}>{hour}</button>)}
+                      </span></span>
+                      <span className="publish-time-column"><span>分钟</span><span className="publish-time-options publish-minute-options">
+                        {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((minute) => <button type="button" key={minute} className={scheduleMinute === minute ? "selected" : ""} onClick={() => { const nextTime = `${scheduleHour}:${minute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) setScheduleValue(`${scheduleSelectedDate}T${nextTime}`); setTimePickerOpen(false); }}>{minute}</button>)}
+                      </span></span>
+                    </span>
+                  </span>
+                )}
+              </span>
+            </span>
+          </div>
+        )}
+        <div className="publish-modal-actions">
+          <button type="button" className="publish-modal-button publish-modal-button-secondary" onClick={() => setPublishModal(null)} disabled={submitting}>取消</button>
+          <button type="button" className="publish-modal-button publish-modal-button-primary" disabled={submitting} onClick={() => {
+            if (publishModal === "schedule") {
+              if (!scheduleValue) { setErrorMsg("请选择公开时间"); return; }
+              const date = new Date(scheduleValue);
+              if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) { setErrorMsg("公开时间必须晚于当前时间"); return; }
+              setErrorMsg(""); setSchedulePickerOpen(false); setTimePickerOpen(false); setPublishModal(null);
+            } else if (publishModal === "draft") {
+              setPublishModal(null); handleSaveImageDraft();
+            }
+          }}>
+            {submitting ? "处理中..." : publishModal === "schedule" ? "完成选择" : "保存草稿"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   // ============ 创建/编辑连载 ============
 
@@ -613,20 +1218,24 @@ export default function CreatePage() {
     const seriesData = {
       name: newSeriesName.trim(),
       description: newSeriesDesc || null,
-      cover_url: newSeriesCover || null,
+      cover_url: null,
       tags: newSeriesTags,
-      status: newSeriesStatus,
+      status: "ongoing" as const,
       series_type: newSeriesType,
     };
 
     if (editingSeries && editingSeriesId) {
       const { error } = await supabase.from("series").update(seriesData).eq("id", editingSeriesId);
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
+      await recordRecentTags(user.id, newSeriesTags);
+      notifyStatsChanged();
       setSubmitting(false);
       router.push(`/studio/series/${encodeURIComponent(newSeriesName.trim())}`);
     } else {
       const { error } = await supabase.from("series").insert({ ...seriesData, user_id: user.id });
       if (error) { setErrorMsg(`创建失败: ${error.message}`); setSubmitting(false); return; }
+      await recordRecentTags(user.id, newSeriesTags);
+      notifyStatsChanged();
       setSubmitting(false);
       router.push(`/studio/series/${encodeURIComponent(newSeriesName.trim())}`);
     }
@@ -659,6 +1268,7 @@ export default function CreatePage() {
       content: editor.content.trim(),
       word_count: editor.content.replace(/\s/g, "").length,
       status: "published",
+      published_at: new Date().toISOString(),
       post_type: "serial",
       series_name: targetSeriesName,
       chapter_number: nextChapter,
@@ -675,6 +1285,7 @@ export default function CreatePage() {
           content: editor.content.trim(),
           word_count: editor.content.replace(/\s/g, "").length,
           status: "published",
+          published_at: new Date().toISOString(),
           post_type: "serial",
           series_name: targetSeriesName,
         });
@@ -687,6 +1298,7 @@ export default function CreatePage() {
     }
 
     await saveTags(user.id);
+    notifyStatsChanged();
     setSubmitting(false);
     if (seriesNameFromUrl) {
       router.push(`/studio/series/${encodeURIComponent(targetSeriesName)}`);
@@ -701,7 +1313,7 @@ export default function CreatePage() {
 
   // ============ 渲染 HTML ============
 
-  const renderHTML = () => ({ __html: marked.parse(editor.content) as string });
+  const renderHTML = () => ({ __html: renderSafeMarkdown(editor.content) });
 
   // ============ 共用编辑器区域 ============
 
@@ -713,20 +1325,16 @@ export default function CreatePage() {
         previewMode={previewMode} onTogglePreview={() => setPreviewMode(!previewMode)}
         uploadingImage={uploadingImage} uploadedCount={uploadedImages.length}
       />
-      <div className="min-h-[350px]">
+      <div className="editor-wrapper">
         {previewMode ? (
           <div
-            className="p-6 rounded-lg bg-white border border-rule min-h-[350px]"
-            style={{
-              fontFamily: '"Noto Serif SC", "Songti SC", "SimSun", serif',
-              fontSize: "17px", lineHeight: 2, color: "#2c2416",
-            }}
+            className="editor-preview active"
             dangerouslySetInnerHTML={renderHTML()}
           />
         ) : (
           <textarea
             ref={editor.textareaRef}
-            className="editor-area"
+            className="editor-textarea"
             placeholder={placeholder}
             value={editor.content}
             onChange={(e) => editor.setContentRaw(e.target.value)}
@@ -734,9 +1342,7 @@ export default function CreatePage() {
           />
         )}
       </div>
-      <div className="text-xs text-muted text-right mt-1">
-        {wordCount.toLocaleString()} 字
-      </div>
+
     </>
   );
 
@@ -744,10 +1350,22 @@ export default function CreatePage() {
 
   const renderError = () =>
     errorMsg && (
-      <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg p-3">
-        <i className="fa-solid fa-circle-exclamation mr-1" />{errorMsg}
-      </p>
+      <div className="create-form-error" role="alert">
+        <span className="create-form-error-icon"><i className="fa-solid fa-circle-exclamation" /></span>
+        <span className="create-form-error-copy">
+          <strong>还不能发布</strong>
+          <span>{errorMsg}</span>
+        </span>
+      </div>
     );
+
+  if (!initDone) {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center" role="status" aria-live="polite">
+        <span className="text-muted">正在加载作品…</span>
+      </div>
+    );
+  }
 
   // ============ 审核未通过提示 ============
 
@@ -766,46 +1384,43 @@ export default function CreatePage() {
   // ---- 类型选择 ----
   if (view === "select") {
     const types = [
-      { view: "text" as ViewType, icon: "fa-file-lines", color: "#b8752e", label: "发布单篇", desc: "短文、随笔、博客式内容" },
-      { view: "image" as ViewType, icon: "fa-images", color: "#e67e22", label: "发布图片", desc: "单张或多张图片分享" },
-      { view: "series-create" as ViewType, icon: "fa-book-open", color: "#8e44ad", label: "长篇连载", desc: "分章节的小说连载" },
+      { view: "text" as ViewType, icon: "fa-file-lines", label: "发布单篇", desc: "发布独立的文章，支持 Markdown 编辑，适合短篇故事、随笔、杂谈" },
+      { view: "image" as ViewType, icon: "fa-image", label: "发布图片", desc: "上传插画、漫画或摄影作品，配以文字说明，展示你的视觉创作" },
+      { view: "series-create" as ViewType, icon: "fa-book", label: "长篇连载", desc: "创建长篇连载作品，支持多章节管理，适合小说、长篇等持续创作" },
     ];
 
     return (
-      <div className="min-h-screen bg-paper">
-        <header className="sticky top-0 z-50 bg-white border-b border-rule">
-          <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-            <Link href="/" className="btn-ghost no-underline">
-              <i className="fa-solid fa-arrow-left mr-1" />返回
-            </Link>
-            <span className="text-sm font-medium text-warm">选择发布类型</span>
-            <span />
-          </div>
-        </header>
-        <main className="max-w-4xl mx-auto px-4 py-10">
-          <h2 className="text-xl font-bold text-warm mb-2">选择发布类型</h2>
-          <p className="text-sm text-muted mb-8">请根据你的内容选择合适的发布方式</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {types.map((t) => (
-              <button
-                key={t.view}
-                className="flex flex-col items-center gap-3 p-6 rounded-xl bg-white border border-rule hover:border-accent hover:shadow-md transition-all cursor-pointer"
-                onClick={() => { setErrorMsg(""); setView(t.view); if (t.view === "series-create") { setNewSeriesName(""); setNewSeriesDesc(""); setNewSeriesTags([]); setNewSeriesCover(null); setNewSeriesStatus("ongoing"); setNewSeriesType("fanfic"); setEditingSeries(false); setEditingSeriesId(null); } }}
-              >
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center"
-                  style={{ background: `${t.color}15`, color: t.color }}
+      <div id="page-create" className="min-h-screen bg-paper">
+        <div className="page-container">
+          <div className="form-view active" id="view-type-select">
+            <h1 className="view-title">选择发布类型</h1>
+            <p className="view-subtitle">选择你想要发布的作品类型，开始创作之旅</p>
+            <div className="type-cards">
+              {types.map((t) => (
+                <button
+                  key={t.view}
+                  type="button"
+                  className="type-card"
+                  onClick={() => {
+                    setErrorMsg("");
+                    if (t.view === "text") router.push("/create/article");
+                    else if (t.view === "image") router.push("/create/image");
+                    else if (t.view === "series-create") {
+                      setNewSeriesName(""); setNewSeriesDesc(""); setNewSeriesTags([]); setNewSeriesType("original");
+                      setEditingSeries(false); setEditingSeriesId(null); router.push("/create/series");
+                    }
+                  }}
                 >
-                  <i className={`fa-solid ${t.icon} text-2xl`} />
-                </div>
-                <div className="text-center">
-                  <h3 className="font-semibold text-warm mb-0.5">{t.label}</h3>
-                  <p className="text-xs text-muted">{t.desc}</p>
-                </div>
-              </button>
-            ))}
+                  <div className="type-card-icon">
+                    <i className={`fa-solid ${t.icon}`} />
+                  </div>
+                  <div className="type-card-title">{t.label}</div>
+                  <div className="type-card-desc">{t.desc}</div>
+                </button>
+              ))}
+            </div>
           </div>
-        </main>
+        </div>
       </div>
     );
   }
@@ -813,146 +1428,536 @@ export default function CreatePage() {
   // ---- 发布单篇 ----
   if (view === "text") {
     return (
-      <div className="min-h-screen bg-paper">
-        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-        <PublishHeader title={editPostId ? "编辑作品" : "发布单篇"} onSubmit={submitText} submitting={submitting} />
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="space-y-5">
-            {renderRejectionBanner()}
-            {editingPostSeriesName && (
-              <div className="text-sm text-muted bg-gray-50 border border-rule rounded-lg p-3">
-                <i className="fa-solid fa-layer-group mr-1.5 text-accent" />
-                所属合集：<span className="font-medium text-warm">{editingPostSeriesName}</span>
-                <span className="text-xs text-muted ml-2">（只读，不可修改）</span>
-              </div>
-            )}
-            <input
-              type="text" placeholder="作品标题（选填）" className="input-field text-lg font-medium"
-              style={{ padding: "14px 16px" }} value={title} onChange={(e) => setTitle(e.target.value)}
-            />
-            {renderEditor("开始创作你的故事...\n\n**加粗** | *斜体* | <u>下划线</u> | ~~删除线~~\n![图片描述](图片链接)\n--- 分割线")}
-            <TagInput
-              tags={tags} setTags={setTags} inputVal={tagInput} setInputVal={setTagInput}
-              recommended={recommendedTags} wrapperClass="tag-main-input"
-            />
+      <main id="page-create" className="publish-page publish-article-page">
+        <div className="publish-container">
+          <div className="publish-form">
+            {renderNotice()}
+            <div className="form-section">
+              <label className="form-label" htmlFor="articleTitle">作品标题 <span className="required-mark">*</span></label>
+              <input
+                id="articleTitle"
+                type="text"
+                className="form-input"
+                placeholder="请输入作品标题"
+                required
+                maxLength={50}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <div className="title-character-count" aria-live="polite">{title.length}/50</div>
+            </div>
 
-            {/* 合集 - 仅新建时显示，编辑已有 series_name 时隐藏 */}
-            {!editingPostSeriesName && (
-              <div className="p-4 rounded-lg bg-white border border-rule">
-                <label className="text-sm font-medium text-warm block mb-3">
-                  <i className="fa-solid fa-layer-group mr-1.5 text-accent" />加入合集
-                </label>
-                <div className="flex gap-3 flex-wrap mb-3">
-                  {[
-                    { mode: "none" as const, label: "不加入合集" },
-                    { mode: "select" as const, label: "选择已有合集" },
-                    { mode: "create" as const, label: "创建新合集" },
-                  ].map((opt) => (
-                    <label key={opt.mode} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
-                      collectionMode === opt.mode ? "border-accent bg-accent-light text-accent" : "border-rule text-muted hover:border-accent"
-                    }`}>
-                      <input type="radio" name="collectionMode" className="sr-only"
-                        checked={collectionMode === opt.mode} onChange={() => setCollectionMode(opt.mode)} />
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
-                {collectionMode === "select" && (
-                  <div className="pt-3 border-t border-rule">
-                    <select className="input-field" value={selectedCollection} onChange={(e) => setSelectedCollection(e.target.value)}>
-                      <option value="">-- 请选择合集 --</option>
-                      {existingCollections.map((c) => (
-                        <option key={c.name} value={c.name}>{c.name}（{c.count} 篇）</option>
+            <div className="form-section">
+              <label className="form-label">正文</label>
+              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} />
+            </div>
+
+            <div className="form-section">
+              <label className="form-label" htmlFor="articleTagInput">标签</label>
+              <div className="tag-input-wrapper" onClick={() => document.getElementById("articleTagInput")?.focus()}>
+                {tags.map((tag) => (
+                  <span key={tag} className="tag-chip">
+                    {tag}
+                    <button type="button" className="tag-chip-remove" aria-label={`删除标签 ${tag}`} onClick={() => setTags(tags.filter((item) => item !== tag))}>
+                      <i className="fa-solid fa-xmark" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id="articleTagInput"
+                  type="text"
+                  className="tag-input-field"
+                  placeholder="输入标签，按回车添加"
+                  maxLength={20}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const tag = tagInput.trim();
+                      if (tag && !tags.includes(tag)) { setTags([...tags, tag]); setTagInput(""); }
+                    }
+                  }}
+                />
+              </div>
+              <div className="tag-suggestions">
+                <span className="tag-suggestion-label">近期使用标签</span>
+                {recommendedTags.map((tag) => (
+                  <button type="button" key={tag} className="tag-suggestion-chip" onClick={() => { if (!tags.includes(tag)) setTags([...tags, tag]); }}>
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-section">
+              <span className="form-label">加入合集</span>
+              <div className="collection-options" role="radiogroup" aria-label="加入合集">
+                {[
+                  { value: "none" as const, title: "不加入合集", desc: "作品将独立发布，不归属任何合集" },
+                  { value: "select" as const, title: "选择已有合集", desc: "将作品加入你已创建的合集" },
+                  { value: "create" as const, title: "创建新合集", desc: "为此作品创建一个全新的合集" },
+                ].map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    className={`collection-option ${collectionMode === option.value ? "selected" : ""}`}
+                    onClick={() => setCollectionMode(option.value)}
+                    role="radio"
+                    aria-checked={collectionMode === option.value}
+                  >
+                    <span className={`radio-circle ${collectionMode === option.value ? "selected" : ""}`}>
+                      <span className="radio-dot" />
+                    </span>
+                    <span className="collection-option-copy">
+                      <span className="collection-option-text">{option.title}</span>
+                      <span className="collection-option-desc">{option.desc}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {collectionMode === "select" && (
+                <div className="collection-existing-select show">
+                  <div className={`custom-select ${collectionSelectOpen ? "open" : ""}`}>
+                  <button type="button" className="custom-select-trigger" onClick={() => setCollectionSelectOpen(!collectionSelectOpen)}>
+                    <span className={`custom-select-value ${selectedCollection ? "selected" : ""}`}>{selectedCollection || "请选择合集..."}</span>
+                    <i className="fa-solid fa-chevron-down custom-select-arrow" />
+                  </button>
+                  {collectionSelectOpen && (
+                    <div className="custom-select-dropdown">
+                      {existingCollections.map((collection) => (
+                        <button type="button" key={collection.name} className={`custom-select-option ${selectedCollection === collection.name ? "selected" : ""}`} onClick={() => { setSelectedCollection(collection.name); setCollectionSelectOpen(false); }}>
+                          {collection.name}（{collection.count} 篇）
+                        </button>
                       ))}
-                    </select>
+                      {existingCollections.length === 0 && <div className="custom-select-empty">暂无可选合集</div>}
+                    </div>
+                  )}
                   </div>
-                )}
-                {collectionMode === "create" && (
-                  <div className="pt-3 border-t border-rule space-y-3">
-                    <input className="input-field" placeholder="合集名称（≤15字）" value={collectionName} onChange={(e) => setCollectionName(e.target.value)} />
-                    <input className="input-field" placeholder="合集简介（≤80字）" value={collectionDesc} onChange={(e) => setCollectionDesc(e.target.value)} />
-                    <TagInput
-                      tags={collectionTags} setTags={setCollectionTags}
-                      inputVal={collectionTagInput} setInputVal={setCollectionTagInput}
-                      recommended={recommendedTags} wrapperClass="tag-collection-input"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+              {collectionMode === "create" && (
+                <div className="collection-new-form show">
+                  <input className="form-input" placeholder="合集名称" maxLength={50} value={collectionName} onChange={(e) => setCollectionName(e.target.value)} />
+                  <input className="form-input" placeholder="合集简介（选填）" maxLength={200} value={collectionDesc} onChange={(e) => setCollectionDesc(e.target.value)} />
+                  <button type="button" className="btn-collection-create" onClick={createCollection} disabled={submitting}>
+                    <i className="fa-solid fa-check" /> 创建合集
+                  </button>
+                </div>
+              )}
+            </div>
 
-            {renderError()}
-            <div className="flex items-center justify-between pt-4 border-t border-rule">
-              <div className="text-xs text-muted">发布即同意 <a href="#" className="text-accent">社区公约</a> 和 <a href="#" className="text-accent">创作规范</a></div>
-              <button className="submit-btn" onClick={submitText} disabled={submitting}>
-                <i className="fa-solid fa-paper-plane mr-1" />{submitting ? "发布中..." : (editPostId ? "保存" : "发布")}
-              </button>
+            <VisibilityOptions
+              value={visibility}
+              disabled={uploadingImage}
+              onChange={(next) => { void handleVisibilityChange(next); }}
+            />
+
+            {errorMsg && !successMsg && renderError()}
+
+            <div className="publish-footer">
+              <Link href="/guidelines" className="publish-guidelines"><i className="fa-solid fa-shield-halved" /> 社区公约与发布规范</Link>
+              <div className="publish-actions">
+                {scheduleValue && visibility !== "private" && (
+                  <div className="scheduled-summary" role="status">
+                    <i className="fa-regular fa-clock" />
+                    <span>定时于 {new Date(scheduleValue).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 发布</span>
+                    <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><i className="fa-solid fa-xmark" /></button>
+                  </div>
+                )}
+                <div className="publish-dropdown">
+                  <div className="btn-publish-split">
+                    <button type="button" className="btn-publish" onClick={() => submitText(scheduleValue && visibility !== "private" ? { scheduledAt: new Date(scheduleValue).toISOString() } : undefined)} disabled={submitting || uploadingImage}>
+                      <i className={`fa-solid ${submitting || uploadingImage ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                      {submitting ? "发布中..." : uploadingImage ? "准备图片中..." : (editPostId ? "保存修改" : "发布作品")}
+                    </button>
+                    <button type="button" className="btn-publish-arrow" aria-label="更多发布选项" onClick={() => setPublishMenuOpen(!publishMenuOpen)}>
+                      <i className="fa-solid fa-chevron-down" />
+                    </button>
+                  </div>
+                  {publishMenuOpen && (
+                    <div className="publish-dropdown-menu show">
+                      <button
+                        type="button"
+                        className="publish-dropdown-item"
+                        onClick={() => {
+                          setPublishMenuOpen(false);
+                          setErrorMsg("");
+                          setPublishModal("schedule");
+                        }}
+                      >
+                        <i className="fa-solid fa-clock" /> 定时发布
+                      </button>
+                      <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setPublishModal("draft"); }}><i className="fa-solid fa-bookmark" /> 保存为草稿</button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </main>
-        <div className="h-16" />
-      </div>
+        </div>
+        {publishModal && (
+          <div className="publish-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) setPublishModal(null); }}>
+            <div className="publish-modal" role="dialog" aria-modal="true" aria-labelledby="publish-modal-title">
+              <div className="publish-modal-header">
+                <div className={`publish-modal-icon publish-modal-icon-${publishModal}`}>
+                  <i className={`fa-solid ${publishModal === "schedule" ? "fa-clock" : "fa-bookmark"}`} />
+                </div>
+                <button type="button" className="publish-modal-close" aria-label="关闭弹窗" onClick={() => setPublishModal(null)} disabled={submitting}>
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              </div>
+              <div className="publish-modal-copy">
+                <h2 id="publish-modal-title">
+                  {publishModal === "schedule" ? "定时发布" : "保存为草稿"}
+                </h2>
+                <p>
+                  {publishModal === "schedule" ? "选择作品公开的日期和时间，完成后点击发布作品提交。" : "当前标题、正文和标签都会保留，之后可以继续编辑。"}
+                </p>
+              </div>
+              {publishModal === "schedule" && (
+                <div className="publish-modal-field">
+                  <span className="publish-schedule-label">公开日期和时间</span>
+                  <span className="publish-schedule-fields">
+                    <span className="publish-datetime-picker">
+                      <span className="publish-picker-label">公开日期</span>
+                      <button type="button" className={`publish-datetime-trigger ${scheduleValue ? "selected" : ""}`} onClick={() => { setSchedulePickerOpen(!schedulePickerOpen); setTimePickerOpen(false); }} aria-expanded={schedulePickerOpen}>
+                        <span><i className="fa-regular fa-calendar-days" /> {scheduleDisplayValue}</span>
+                        <i className={`fa-solid fa-chevron-down ${schedulePickerOpen ? "up" : ""}`} />
+                      </button>
+                      {schedulePickerOpen && (
+                        <span className="publish-calendar-popover" role="dialog" aria-label="选择公开日期">
+                        <span className="publish-calendar-header">
+                          <button type="button" aria-label="上个月" disabled={scheduleMonth <= currentCalendarMonth} onClick={() => {
+                            const previous = new Date(calendarYear, calendarMonthIndex - 1, 1);
+                            setScheduleMonth(`${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`);
+                          }}><i className="fa-solid fa-chevron-left" /></button>
+                          <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
+                          <button type="button" aria-label="下个月" onClick={() => {
+                            const next = new Date(calendarYear, calendarMonthIndex + 1, 1);
+                            setScheduleMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+                          }}><i className="fa-solid fa-chevron-right" /></button>
+                        </span>
+                        <span className="publish-calendar-weekdays">{["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day}>{day}</span>)}</span>
+                        <span className="publish-calendar-grid">
+                          {calendarDays.map((day, index) => {
+                            if (!day) return <span key={`empty-${index}`} />;
+                            const dayValue = `${scheduleMonth}-${String(day).padStart(2, "0")}`;
+                            const isSelected = scheduleSelectedDate === dayValue;
+                            const isToday = todayLocalValue === dayValue;
+                            const isPast = dayValue < todayLocalValue;
+                            return (
+                              <button type="button" key={dayValue} disabled={isPast} className={`${isSelected ? "selected" : ""} ${isToday ? "today" : ""} ${isPast ? "past" : ""}`} onClick={() => { if (isPast) return; setScheduleValue(`${dayValue}T${scheduleTime}`); setSchedulePickerOpen(false); }}>
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </span>
+                      </span>
+                      )}
+                    </span>
+                    <span className="publish-time-picker">
+                      <span className="publish-picker-label">公开时间</span>
+                      <button type="button" className={`publish-time-trigger ${timePickerOpen ? "open" : ""}`} onClick={() => { setTimePickerOpen(!timePickerOpen); setSchedulePickerOpen(false); }} aria-expanded={timePickerOpen}>
+                        <span><i className="fa-regular fa-clock" /> {scheduleTime}</span>
+                        <i className={`fa-solid fa-chevron-down ${timePickerOpen ? "up" : ""}`} />
+                      </button>
+                      {timePickerOpen && (
+                        <span className="publish-time-popover" role="dialog" aria-label="选择公开时间">
+                          <span className="publish-time-popover-title">选择小时和分钟</span>
+                          <span className="publish-time-columns">
+                            <span className="publish-time-column">
+                              <span>小时</span>
+                              <span className="publish-time-options publish-hour-options">
+                                {Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0")).map((hour) => (
+                                  <button type="button" key={hour} className={scheduleHour === hour ? "selected" : ""} onClick={() => { const nextTime = `${hour}:${scheduleMinute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) setScheduleValue(`${scheduleSelectedDate}T${nextTime}`); }}>
+                                    {hour}
+                                  </button>
+                                ))}
+                              </span>
+                            </span>
+                            <span className="publish-time-column">
+                              <span>分钟</span>
+                              <span className="publish-time-options publish-minute-options">
+                                {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((minute) => (
+                                  <button type="button" key={minute} className={scheduleMinute === minute ? "selected" : ""} onClick={() => { const nextTime = `${scheduleHour}:${minute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) setScheduleValue(`${scheduleSelectedDate}T${nextTime}`); setTimePickerOpen(false); }}>
+                                    {minute}
+                                  </button>
+                                ))}
+                              </span>
+                            </span>
+                          </span>
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                </div>
+              )}
+              <div className="publish-modal-actions">
+                <button type="button" className="publish-modal-button publish-modal-button-secondary" onClick={() => setPublishModal(null)} disabled={submitting}>取消</button>
+                <button
+                  type="button"
+                  className="publish-modal-button publish-modal-button-primary"
+                  disabled={submitting}
+                  onClick={() => {
+                    if (publishModal === "schedule") {
+                      if (!scheduleValue) { setErrorMsg("请选择公开时间"); return; }
+                      const date = new Date(scheduleValue);
+                      if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) { setErrorMsg("公开时间必须晚于当前时间"); return; }
+                      setErrorMsg("");
+                      setSchedulePickerOpen(false);
+                      setTimePickerOpen(false);
+                      setPublishModal(null);
+                    } else if (publishModal === "draft") {
+                      setPublishModal(null);
+                      handleSaveDraft();
+                    }
+                  }}
+                >
+                  {submitting ? "处理中..." : publishModal === "schedule" ? "完成选择" : "保存草稿"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     );
   }
 
   // ---- 发布图片 ----
   if (view === "image") {
     return (
-      <div className="min-h-screen bg-paper">
-        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-        <PublishHeader title={editPostId ? "编辑图片" : "发布图片"} onSubmit={submitImage} submitting={submitting} />
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="space-y-5">
+      <div id="page-create" className="publish-page publish-article-page min-h-screen bg-paper">
+        <div className="publish-container">
+          <div className="publish-form">
+            {renderNotice()}
             {renderRejectionBanner()}
-            <input
-              type="text" placeholder="为图片添加标题（选填）" className="input-field text-lg"
-              style={{ padding: "14px 16px" }} value={title} onChange={(e) => setTitle(e.target.value)}
-            />
-            <textarea
-              className="input-field resize-none"
-              rows={3}
-              placeholder="写一些关于图片的看法或说明（选填）"
-              value={imageDesc}
-              onChange={(e) => setImageDesc(e.target.value)}
-            />
-            <div
-              className="border-2 border-dashed border-rule rounded-xl p-8 text-center cursor-pointer hover:border-accent transition-colors bg-white"
-              onClick={triggerImageUpload}
-            >
-              <i className="fa-solid fa-cloud-arrow-up text-4xl text-muted mb-3 block" />
-              <p className="text-sm text-muted mb-1">点击上传图片</p>
-              <p className="text-xs text-muted">支持 JPG、PNG、GIF、WEBP，可多选</p>
-              {uploadingImage && <p className="text-xs text-accent mt-2"><i className="fa-solid fa-spinner animate-spin mr-1" />上传中...</p>}
+
+            {/* 作品标题 */}
+            <div className="form-section">
+              <label className="form-label">作品标题</label>
+              <input
+                type="text" className="form-input" placeholder="（选填）" maxLength={100}
+                value={title} onChange={(e) => setTitle(e.target.value)}
+              />
             </div>
-            {uploadedImages.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {uploadedImages.map((img, i) => (
-                  <div key={i} className="relative group rounded-lg overflow-hidden border border-rule bg-white">
-                    <img src={img.url} alt={img.name} className="w-full aspect-square object-cover" />
-                    <button
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setUploadedImages((prev) => prev.filter((_, j) => j !== i))}
-                    >
-                      <i className="fa-solid fa-xmark" />
-                    </button>
+
+            {/* 图片上传 */}
+            <div className="form-section">
+              <label className="form-label">上传图片</label>
+              <div
+                className="image-upload-area"
+                onClick={triggerImageUpload}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  void processImageFiles(event.dataTransfer.files);
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") triggerImageUpload();
+                }}
+                aria-label="上传图片"
+              >
+                <i className="fa-solid fa-cloud-arrow-up image-upload-icon"></i>
+                <div className="image-upload-title">点击或拖拽上传图片</div>
+                <div className="image-upload-hint">支持 JPG / PNG / WEBP，最多上传 {MAX_UPLOAD_IMAGES} 张；上传后会自动压缩为 WebP</div>
+                <div className="image-upload-hint">已选择 {uploadedImages.length}/{MAX_UPLOAD_IMAGES} 张</div>
+                {uploadingImage && (
+                  <div className="image-upload-hint" style={{ marginTop: 8 }}>
+                    <i className="fa-solid fa-spinner fa-spin"></i> 上传中...
                   </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="image-upload-input"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
+                onChange={handleFileSelect}
+              />
+              {uploadedImages.length > 0 && (
+                <div className="image-grid">
+                  {uploadedImages.map((img, i) => (
+                    <div key={i} className="image-grid-item">
+                      <img src={img.url} alt={img.name} />
+                      <div className="image-grid-item-overlay">
+                        <button
+                          className="image-grid-item-delete"
+                          onClick={() => setUploadedImages((prev) => prev.filter((_, j) => j !== i))}
+                          title="删除图片"
+                        >
+                          <i className="fa-solid fa-trash-can"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 图片说明 */}
+            <div className="form-section">
+              <label className="form-label">图片说明</label>
+              <textarea
+                className="form-textarea"
+                placeholder="分享一些关于图片的看法或说明（选填）"
+                maxLength={2000}
+                value={imageDesc}
+                onChange={(e) => setImageDesc(e.target.value)}
+              />
+            </div>
+
+            {/* 标签 */}
+            <div className="form-section">
+              <label className="form-label">标签</label>
+              <div className="tag-input-wrapper" onClick={() => { const inp = document.querySelector<HTMLInputElement>('#page-create .tag-input-field'); inp?.focus(); }}>
+                {tags.map((tag) => (
+                  <span key={tag} className="tag-chip">
+                    {tag}
+                    <span className="tag-chip-remove" onClick={() => setTags(tags.filter((t) => t !== tag))}>
+                      <i className="fa-solid fa-xmark"></i>
+                    </span>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  className="tag-input-field"
+                  placeholder="输入标签，按回车添加"
+                  maxLength={20}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const t = tagInput.trim();
+                      if (t && !tags.includes(t)) {
+                        setTags([...tags, t]);
+                        setTagInput("");
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div className="tag-suggestions">
+                <span className="tag-suggestion-label">近期使用标签</span>
+                {recommendedTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="tag-suggestion-chip"
+                    onClick={() => { if (!tags.includes(tag)) setTags([...tags, tag]); }}
+                  >
+                    {tag}
+                  </span>
                 ))}
               </div>
-            )}
-            <TagInput
-              tags={tags} setTags={setTags} inputVal={tagInput} setInputVal={setTagInput}
-              recommended={recommendedTags} wrapperClass="tag-image-input"
-            />
-            {renderError()}
-            <div className="flex items-center justify-between pt-4 border-t border-rule">
-              <div className="text-xs text-muted">发布即同意 <a href="#" className="text-accent">社区公约</a></div>
-              <button className="submit-btn" onClick={submitImage} disabled={submitting || uploadingImage}>
-                <i className="fa-solid fa-paper-plane mr-1" />{submitting ? "发布中..." : (editPostId ? "保存" : "发布")}
-              </button>
             </div>
+
+            {/* 加入合集 */}
+            <div className="form-section">
+              <span className="form-label">加入合集</span>
+              <div className="collection-options" role="radiogroup" aria-label="加入合集">
+                {[
+                  { value: "none" as const, title: "不加入合集", desc: "作品将独立发布，不归属任何合集" },
+                  { value: "select" as const, title: "选择已有合集", desc: "将作品加入你已创建的合集" },
+                  { value: "create" as const, title: "创建新合集", desc: "为此作品创建一个全新的合集" },
+                ].map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    className={`collection-option ${collectionMode === option.value ? "selected" : ""}`}
+                    onClick={() => setCollectionMode(option.value)}
+                    role="radio"
+                    aria-checked={collectionMode === option.value}
+                  >
+                    <span className={`radio-circle ${collectionMode === option.value ? "selected" : ""}`}>
+                      <span className="radio-dot" />
+                    </span>
+                    <span className="collection-option-copy">
+                      <span className="collection-option-text">{option.title}</span>
+                      <span className="collection-option-desc">{option.desc}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {collectionMode === "select" && (
+                <div className="collection-existing-select show">
+                  <div className={`custom-select ${collectionSelectOpen ? "open" : ""}`}>
+                    <button type="button" className="custom-select-trigger" onClick={() => setCollectionSelectOpen(!collectionSelectOpen)}>
+                      <span className={`custom-select-value ${selectedCollection ? "selected" : ""}`}>{selectedCollection || "请选择合集..."}</span>
+                      <i className="fa-solid fa-chevron-down custom-select-arrow" />
+                    </button>
+                    {collectionSelectOpen && (
+                      <div className="custom-select-dropdown">
+                        {existingCollections.map((collection) => (
+                          <button type="button" key={collection.name} className={`custom-select-option ${selectedCollection === collection.name ? "selected" : ""}`} onClick={() => { setSelectedCollection(collection.name); setCollectionSelectOpen(false); }}>
+                            {collection.name}（{collection.count} 篇）
+                          </button>
+                        ))}
+                        {existingCollections.length === 0 && <div className="custom-select-empty">暂无可选合集</div>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {collectionMode === "create" && (
+                <div className="collection-new-form show">
+                  <input className="form-input" placeholder="合集名称" maxLength={50} value={collectionName} onChange={(e) => setCollectionName(e.target.value)} />
+                  <input className="form-input" placeholder="合集简介（选填）" maxLength={200} value={collectionDesc} onChange={(e) => setCollectionDesc(e.target.value)} />
+                  <button type="button" className="btn-collection-create" onClick={createCollection} disabled={submitting}>
+                    <i className="fa-solid fa-check" /> 创建合集
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <VisibilityOptions
+              value={visibility}
+              disabled={uploadingImage}
+              onChange={(next) => { void handleVisibilityChange(next); }}
+            />
+
+            {/* Footer */}
+            <div className="publish-footer">
+              <Link href="/guidelines" className="publish-guidelines">
+                <i className="fa-solid fa-shield-halved"></i> 社区公约与发布规范
+              </Link>
+              <div className="publish-actions">
+                {scheduleValue && visibility !== "private" && (
+                  <div className="scheduled-summary" role="status">
+                    <i className="fa-regular fa-clock" />
+                    <span>定时于 {new Date(scheduleValue).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 发布</span>
+                    <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><i className="fa-solid fa-xmark" /></button>
+                  </div>
+                )}
+                <div className="publish-dropdown">
+                  <div className="btn-publish-split">
+                    <button type="button" className="btn-publish" onClick={() => submitImage(scheduleValue && visibility !== "private" ? { scheduledAt: new Date(scheduleValue).toISOString() } : undefined)} disabled={submitting || uploadingImage}>
+                      <i className={`fa-solid ${submitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                      {submitting ? "发布中..." : (editPostId ? "保存修改" : "发布作品")}
+                    </button>
+                    <button type="button" className="btn-publish-arrow" aria-label="更多发布选项" onClick={() => setPublishMenuOpen(!publishMenuOpen)}>
+                      <i className="fa-solid fa-chevron-down" />
+                    </button>
+                  </div>
+                  {publishMenuOpen && (
+                    <div className="publish-dropdown-menu show">
+                      <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("schedule"); }}>
+                        <i className="fa-solid fa-clock" /> 定时发布
+                      </button>
+                      <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setPublishModal("draft"); }}>
+                        <i className="fa-solid fa-bookmark" /> 保存为草稿
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {renderImagePublishModal()}
           </div>
-        </main>
-        <div className="h-16" />
+        </div>
       </div>
     );
   }
@@ -960,106 +1965,130 @@ export default function CreatePage() {
   // ---- 长篇连载 - 创建/编辑 ----
   if (view === "series-create") {
     return (
-      <div className="min-h-screen bg-paper">
-        <header className="sticky top-0 z-50 bg-white border-b border-rule">
-          <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-            <button className="btn-ghost" onClick={() => { router.push("/studio"); setEditingSeries(false); setEditingSeriesId(null); }}>
-              <i className="fa-solid fa-arrow-left mr-1" />返回
-            </button>
-            <span className="text-sm font-medium text-warm">{editingSeries ? "编辑连载" : "创建连载"}</span>
-            <button className="submit-btn" onClick={createSeries} disabled={submitting}>
-              {submitting ? "保存中..." : "确认"}
-            </button>
-          </div>
-        </header>
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="space-y-5">
-            <div>
-              <label className="text-sm text-muted block mb-1">连载封面（选填）</label>
+      <main id="page-create" className="publish-page publish-series-page">
+        <div className="publish-container">
+          <div className="publish-form">
+            <div className="form-section">
+              <label className="form-label" htmlFor="seriesName">连载名称</label>
               <input
-                ref={coverFileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/jpg"
-                className="hidden"
-                onChange={handleCoverUpload}
+                id="seriesName"
+                type="text"
+                className="form-input"
+                placeholder="连载名称（必填）"
+                maxLength={80}
+                value={newSeriesName}
+                onChange={(e) => setNewSeriesName(e.target.value)}
               />
-              {newSeriesCover ? (
-                <div className="relative w-40">
-                  <img
-                    src={newSeriesCover}
-                    alt="封面预览"
-                    className="w-full aspect-[3/4] object-cover rounded-lg border border-rule"
-                  />
+            </div>
+
+            <div className="form-section">
+              <label className="form-label" htmlFor="seriesDescription">连载简介</label>
+              <textarea
+                id="seriesDescription"
+                className="form-textarea"
+                placeholder="连载简介（选填）"
+                maxLength={1000}
+                value={newSeriesDesc}
+                onChange={(e) => setNewSeriesDesc(e.target.value)}
+              />
+            </div>
+
+            <div className="form-section">
+              <label className="form-label" htmlFor="seriesTagInput">标签</label>
+              <div className="tag-input-wrapper" onClick={() => document.getElementById("seriesTagInput")?.focus()}>
+                {newSeriesTags.map((tag) => (
+                  <span key={tag} className="tag-chip">
+                    {tag}
+                    <button
+                      type="button"
+                      className="tag-chip-remove"
+                      aria-label={`删除标签 ${tag}`}
+                      onClick={() => setNewSeriesTags(newSeriesTags.filter((item) => item !== tag))}
+                    >
+                      <i className="fa-solid fa-xmark" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id="seriesTagInput"
+                  type="text"
+                  className="tag-input-field"
+                  placeholder="输入标签，按回车添加"
+                  maxLength={20}
+                  value={newSeriesTagInput}
+                  onChange={(e) => setNewSeriesTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const tag = newSeriesTagInput.trim();
+                      if (tag && !newSeriesTags.includes(tag)) {
+                        setNewSeriesTags([...newSeriesTags, tag]);
+                        setNewSeriesTagInput("");
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div className="tag-suggestions">
+                <span className="tag-suggestion-label">近期使用标签</span>
+                {recommendedTags.map((tag) => (
                   <button
-                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white text-xs flex items-center justify-center"
-                    onClick={() => setNewSeriesCover(null)}
+                    type="button"
+                    key={tag}
+                    className="tag-suggestion-chip"
+                    onClick={() => { if (!newSeriesTags.includes(tag)) setNewSeriesTags([...newSeriesTags, tag]); }}
                   >
-                    <i className="fa-solid fa-xmark" />
+                    {tag}
                   </button>
-                </div>
-              ) : (
-                <div
-                  className="w-40 aspect-[3/4] border-2 border-dashed border-rule rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-accent transition-colors bg-white"
-                  onClick={triggerCoverUpload}
-                >
-                  {uploadingCover ? (
-                    <i className="fa-solid fa-spinner animate-spin text-2xl text-muted" />
-                  ) : (
-                    <>
-                      <i className="fa-solid fa-cloud-arrow-up text-2xl text-muted mb-1" />
-                      <span className="text-xs text-muted">上传封面</span>
-                    </>
-                  )}
-                </div>
-              )}
-              <p className="text-xs text-muted mt-1.5">建议尺寸 600x800 像素，jpg/png/jpeg，不超过5MB</p>
-            </div>
-            <input className="input-field" placeholder="连载名称（必填，≤15字）" value={newSeriesName} onChange={(e) => setNewSeriesName(e.target.value)} />
-            <textarea className="input-field resize-none" rows={3} placeholder="连载简介（选填，≤80字）" value={newSeriesDesc} onChange={(e) => setNewSeriesDesc(e.target.value)} />
-            <TagInput
-              tags={newSeriesTags} setTags={setNewSeriesTags} inputVal={newSeriesTagInput} setInputVal={setNewSeriesTagInput}
-              recommended={recommendedTags} wrapperClass="tag-series-input"
-            />
-            <div className="flex gap-6">
-              <div>
-                <label className="text-sm text-muted block mb-2">作品状态</label>
-                <div className="flex gap-3">
-                  {[
-                    { value: "ongoing" as const, label: "连载中" },
-                    { value: "completed" as const, label: "已完结" },
-                  ].map((opt) => (
-                    <label key={opt.value} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
-                      newSeriesStatus === opt.value ? "border-accent bg-accent-light text-accent" : "border-rule text-muted hover:border-accent"
-                    }`}>
-                      <input type="radio" name="seriesStatus" className="sr-only"
-                        checked={newSeriesStatus === opt.value} onChange={() => setNewSeriesStatus(opt.value)} />
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-sm text-muted block mb-2">作品类型</label>
-                <div className="flex gap-3">
-                  {[
-                    { value: "fanfic" as const, label: "同人" },
-                    { value: "original" as const, label: "原创" },
-                  ].map((opt) => (
-                    <label key={opt.value} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
-                      newSeriesType === opt.value ? "border-accent bg-accent-light text-accent" : "border-rule text-muted hover:border-accent"
-                    }`}>
-                      <input type="radio" name="seriesType" className="sr-only"
-                        checked={newSeriesType === opt.value} onChange={() => setNewSeriesType(opt.value)} />
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
+                ))}
               </div>
             </div>
+
+            <div className="form-section">
+              <span className="form-label">作品类型</span>
+              <div className="radio-options" role="radiogroup" aria-label="作品类型">
+                {[
+                  { value: "original" as const, label: "原创" },
+                  { value: "fanfic" as const, label: "同人" },
+                ].map((option) => (
+                  <label key={option.value} className={`radio-option ${newSeriesType === option.value ? "selected" : ""}`}>
+                    <input
+                      type="radio"
+                      name="seriesType"
+                      value={option.value}
+                      checked={newSeriesType === option.value}
+                      onChange={() => setNewSeriesType(option.value)}
+                    />
+                    <span
+                      className={`radio-circle ${newSeriesType === option.value ? "selected" : ""}`}
+                      onClick={() => setNewSeriesType(option.value)}
+                      style={newSeriesType === option.value ? { borderColor: "var(--color-primary)" } : undefined}
+                    >
+                      <span
+                        className="radio-dot"
+                        style={{ transform: newSeriesType === option.value ? "scale(1)" : "scale(0)" }}
+                      />
+                    </span>
+                    <span className="radio-option-text">{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             {renderError()}
+
+            <div className="publish-footer">
+              <Link href="/settings" className="publish-guidelines">
+                <i className="fa-solid fa-shield-halved" /> 社区公约与发布规范
+              </Link>
+              <button type="button" className="btn-publish" onClick={createSeries} disabled={submitting}>
+                <i className={`fa-solid ${submitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                {submitting ? "发布中..." : (editingSeries ? "保存修改" : "发布长篇")}
+              </button>
+            </div>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     );
   }
 
@@ -1067,7 +2096,7 @@ export default function CreatePage() {
   if (view === "series-detail" && currentSeries) {
     return (
       <div className="min-h-screen bg-paper">
-        <header className="sticky top-0 z-50 bg-white border-b border-rule">
+        <header className="sticky top-0 z-50 bg-card border-b border-rule">
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
             <button className="btn-ghost" onClick={() => router.push(`/studio/series/${encodeURIComponent(currentSeries.name)}`)}>
               <i className="fa-solid fa-arrow-left mr-1" />返回
@@ -1079,7 +2108,7 @@ export default function CreatePage() {
           </div>
         </header>
         <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="mb-6 p-4 rounded-xl bg-white border border-rule">
+          <div className="mb-6 p-4 rounded-xl bg-card border border-rule">
             <h3 className="font-bold text-lg text-warm">{currentSeries.name}</h3>
             <p className="text-sm text-muted mt-1">
               {currentSeries.series_type === "fanfic" ? "同人" : "原创"} · {currentSeries.status === "ongoing" ? "连载中" : "已完结"} · {chapterList.length} 章
@@ -1095,7 +2124,7 @@ export default function CreatePage() {
           ) : (
             <div className="space-y-2">
               {chapterList.map((ch) => (
-                <div key={ch.id} className="flex items-center gap-4 p-3 rounded-lg bg-white border border-rule">
+                <div key={ch.id} className="flex items-center gap-4 p-3 rounded-lg bg-card border border-rule">
                   <span className="text-sm text-muted font-mono w-10 text-center">第{ch.chapter_number}章</span>
                   <Link href={`/read/${ch.id}`} className="flex-1 text-sm text-warm no-underline hover:text-accent truncate font-medium">
                     {ch.title}
@@ -1143,7 +2172,7 @@ export default function CreatePage() {
             />
             {renderError()}
             <div className="flex items-center justify-between pt-4 border-t border-rule">
-              <div className="text-xs text-muted">发布即同意 <a href="#" className="text-accent">社区公约</a></div>
+              <div className="text-xs text-muted">发布即同意 <Link href="/guidelines" className="text-accent">社区公约</Link></div>
               <button className="submit-btn" onClick={submitChapter} disabled={submitting}>
                 <i className="fa-solid fa-paper-plane mr-1" />{submitting ? "发布中..." : "发布"}
               </button>

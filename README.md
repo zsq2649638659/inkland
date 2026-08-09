@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# inkland
 
-## Getting Started
+inkland 是一个中文同人创作社区，支持文字、图片、合集与连载发布，提供标签搜索、评论、段评、点赞、收藏、关注和创作者工作台。
 
-First, run the development server:
+## 本地开发
+
+1. 复制 `.env.example` 为 `.env.local`，填写 Supabase 配置。
+2. 安装依赖并启动开发服务器：
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开 <http://localhost:3000>。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 数据库与存储
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+部署前请按顺序检查项目中的 SQL 文件，至少执行 `feedbacks.sql` 和 `storage-policies.sql`，并在 Supabase 控制台核验所有 RLS 策略。完整清单见 [DEPLOYMENT-CHECKLIST.md](./DEPLOYMENT-CHECKLIST.md)。
 
-## Learn More
+## 生产部署
 
-To learn more about Next.js, take a look at the following resources:
+生产环境需要配置 `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY` 和 `NEXT_PUBLIC_SITE_URL`。不要使用 `NODE_TLS_REJECT_UNAUTHORIZED=0`，也不要暴露 Supabase service role key。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm ci
+npm run lint
+npm run build
+npm start
+```

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Post } from "@/lib/types";
+import { getThumbnailUrl } from "@/lib/image";
 
 interface PostCardGridProps {
   post: Post;
@@ -23,13 +24,13 @@ function getTextPreview(content?: string, maxLen = 100): string {
 function getFirstImage(content?: string): string | null {
   if (!content) return null;
   const match = content.match(/!\[.*?\]\((.*?)\)/);
-  return match ? match[1] : null;
+  return match && !match[1].startsWith("private://") ? match[1] : null;
 }
 
 function getAllImages(content?: string): string[] {
   if (!content) return [];
   const matches = content.matchAll(/!\[.*?\]\((.*?)\)/g);
-  return [...matches].map((m) => m[1]);
+  return [...matches].map((m) => m[1]).filter((url) => !url.startsWith("private://"));
 }
 
 export default function PostCardGrid({ post, showAuthor = true }: PostCardGridProps) {
@@ -49,11 +50,11 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
   ) : null;
 
   return (
-    <div className="rounded-xl bg-white border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
+    <div className="rounded-xl bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
       {hasImage ? (
         <Link href={`/read/${post.id}`} className="block relative flex-1 min-h-0 overflow-hidden bg-rule no-underline">
           <img
-            src={firstImage}
+            src={getThumbnailUrl(firstImage, { width: 400, height: 400, resize: "cover" })}
             alt={post.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
@@ -95,7 +96,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
           <div className="flex items-center gap-1.5 min-w-0">
             <Link href={`/user/${post.user_id}`}>
               <img
-                src={author?.avatar_url || `https://placehold.co/20x20/f5e6d3/b8752e?text=${encodeURIComponent(avatarChar)}`}
+                src={author?.avatar_url || `https://placehold.co/20x20/FDDCD8/F26B5B?text=${encodeURIComponent(avatarChar)}`}
                 className="w-5 h-5 rounded-full object-cover flex-shrink-0 hover:opacity-80 transition-opacity"
                 alt=""
               />

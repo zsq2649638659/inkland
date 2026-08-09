@@ -5,6 +5,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import EmojiPicker from "@/components/EmojiPicker";
+import DefaultAvatar from "@/components/DefaultAvatar";
+import { createNotification } from "@/lib/notifications";
 import type { Comment } from "@/lib/types";
 
 interface ParagraphCommentPanelProps {
@@ -35,6 +37,35 @@ onReport,
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null);
+  const [commentMenuId, setCommentMenuId] = useState<string | null>(null);
+  const [blockModal, setBlockModal] = useState<{ open: boolean; userId: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+  }, []);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => setToastMessage(null), 2000);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
+
+  // 事件委托：鼠标悬停时查找最近的 [data-comment-id] 元素
+  const handleCommentMouseOver = useCallback((e: React.MouseEvent) => {
+    const el = (e.target as HTMLElement).closest('[data-comment-id]');
+    if (el) {
+      const id = el.getAttribute('data-comment-id');
+      if (id) setHoveredCommentId(id);
+    }
+  }, []);
+
+  // 鼠标离开评论容器时重置 hover 状态
+  const handleCommentMouseOut = useCallback((e: React.MouseEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setHoveredCommentId(null);
+    }
+  }, []);
 
   const loadComments = useCallback(async () => {
     setLoading(true);
@@ -119,6 +150,13 @@ onReport,
     setComments(sorted);
     setLikedComments(likedSet);
     setLoading(false);
+
+    // 预加载有回复的评论的楼中楼
+    for (const c of sorted) {
+      if (c.reply_count && c.reply_count > 0) {
+        loadReplies(c.id);
+      }
+    }
   }, [postId, paragraphIndex, supabase, user]);
 
   useEffect(() => {
@@ -146,6 +184,12 @@ onReport,
     if (!error) {
       setCommentText("");
       await loadComments();
+      createNotification({
+        type: "comment",
+        actor_id: user.id,
+        post_id: postId,
+        content: commentText.trim(),
+      });
     }
     setSubmitting(false);
   };
@@ -165,6 +209,12 @@ onReport,
       setReplyTo(null);
       await loadComments();
       setExpandedReplies((prev) => new Set(prev).add(parentComment.id));
+      createNotification({
+        type: "reply",
+        actor_id: user.id,
+        post_id: postId,
+        content: replyText.trim(),
+      });
     }
     setSubmitting(false);
   };
@@ -190,6 +240,57 @@ onReport,
       }));
     }
   };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("user_id", user.id);
+    if (!error) {
+      await loadComments();
+    }
+  };
+
+  const handleBlockUser = async (blockedUserId: string) => {
+    if (!user) return;
+    setBlockModal({ open: true, userId: blockedUserId });
+  };
+
+  const confirmBlockUser = async () => {
+    if (!blockModal || !user) return;
+    const { error } = await supabase.from("blocked_users").insert({
+      user_id: user.id,
+      blocked_user_id: blockModal.userId,
+    });
+    if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) {
+      showToast("操作失败: " + error.message);
+      return;
+    }
+    setComments((prev) => prev.filter((c) => c.user_id !== blockModal.userId));
+    setBlockModal(null);
+    setCommentMenuId(null);
+    showToast("屏蔽成功");
+  };
+
+  // 点击外部关闭更多菜单
+  useEffect(() => {
+    if (!commentMenuId) return;
+    const handleClick = () => setCommentMenuId(null);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [commentMenuId]);
+
+  // Escape 关闭屏蔽弹窗
+  useEffect(() => {
+    if (!blockModal?.open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBlockModal(null);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [blockModal]);
 
   const loadReplies = async (commentId: string) => {
     const { data } = await supabase
@@ -257,10 +358,6 @@ onReport,
       setExpandedReplies((prev) => { const next = new Set(prev); next.delete(commentId); return next; });
     } else {
       setExpandedReplies((prev) => new Set(prev).add(commentId));
-      const comment = comments.find((c) => c.id === commentId);
-      if (comment && !comment.replies) {
-        loadReplies(commentId);
-      }
     }
   };
 
@@ -287,267 +384,285 @@ onReport,
   allItems.forEach((item, i) => floorMap.set(item.id, i + 1));
 
   return (
-    <div
-      className="h-full flex flex-col"
-      style={{ background: "inherit" }}
-    >
-      {/* 标题栏 */}
-      <div
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{ borderColor }}
-      >
-        <span className="text-sm font-semibold" style={{ color: textColor }}>
+    <div className="h-full flex flex-col" style={{ background: "inherit" }}>
+      {/* 标题栏 - 使用设计稿的 CSS 类 */}
+      <div className="para-comment-panel-header">
+        <span className="para-comment-panel-title">
           评论 {comments.length}条
         </span>
-        <button
-          className="w-6 h-6 rounded-full border-none flex items-center justify-center cursor-pointer text-xs bg-transparent hover:opacity-70"
-          style={{ color: mutedColor }}
-          onClick={onClose}
-        >
+        <button className="para-comment-panel-close" onClick={onClose}>
           <i className="fa-solid fa-xmark" />
         </button>
       </div>
 
-      {/* 分割线 */}
-      <div className="border-b mx-4" style={{ borderColor }} />
-
-      {/* 评论列表 */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      {/* 评论列表 - 使用设计稿的 CSS 类 */}
+      <div className="para-comment-panel-body">
         {loading ? (
-          <p className="text-sm text-center py-8" style={{ color: mutedColor }}>加载中...</p>
+          <div className="para-comment-panel-empty">
+            <p>加载中...</p>
+          </div>
         ) : comments.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-sm" style={{ color: mutedColor }}>还没有人发表评论</p>
-            <p className="text-xs mt-1" style={{ color: mutedColor }}>来做第一个评论的人吧</p>
+          <div className="para-comment-panel-empty">
+            <p>还没有人发表评论</p>
+            <p>来做第一个评论的人吧</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-3.5" onMouseOver={handleCommentMouseOver} onMouseOut={handleCommentMouseOut}>
             {comments.map((c, idx) => (
               <div
                 key={c.id}
-                className="pb-3.5 border-b"
-                style={{ borderColor }}
-                onMouseEnter={() => setHoveredCommentId(c.id)}
-                onMouseLeave={() => setHoveredCommentId(null)}
+                className="comment"
+                data-comment-id={c.id}
               >
-                <div className="flex gap-2.5">
-                  <Link href={`/user/${c.user_id}`}>
-                    <img
-                      src={c.author?.avatar_url || `https://placehold.co/28x28/e8d5c8/8c6b4a?text=${(c.author?.nickname || "?")[0]}`}
-                      className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                      alt=""
-                    />
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        href={`/user/${c.user_id}`}
-                        className="text-sm font-medium no-underline hover:opacity-80"
-                        style={{ color: textColor }}
-                      >
+                <div className="comment-main">
+                  <div className="comment-avatar">
+                    <Link href={`/user/${c.user_id}`}>
+                      {c.author?.avatar_url ? (
+                        <img src={c.author.avatar_url} alt={c.author?.nickname || "?"} />
+                      ) : (
+                        <DefaultAvatar name={c.author?.nickname || "?"} className="comment-avatar-placeholder" />
+                      )}
+                    </Link>
+                  </div>
+                  <div className="comment-body">
+                    <div className="comment-header">
+                      <Link href={`/user/${c.user_id}`} className="comment-name">
                         {c.author?.nickname || "匿名用户"}
                       </Link>
-                      {onReport && hoveredCommentId === c.id && (
-                        <button
-                          className="ml-auto text-[0.65rem] bg-transparent border-none cursor-pointer hover:opacity-70"
-                          style={{ color: mutedColor }}
-                          onClick={(e) => { e.stopPropagation(); onReport(c.id, c.user_id); }}
-                        >
-                          <i className="fa-solid fa-flag mr-1 text-[0.6rem]" />举报
-                        </button>
-                      )}
+                      <span className="comment-time">{getTimeAgo(c.created_at || "")}</span>
                     </div>
-                    <p className="text-sm mt-1.5 leading-relaxed" style={{ color: textColor }}>
-                      {c.content}
-                    </p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <span className="text-[0.6rem] px-1.5 py-0.5 rounded" style={{ background: darkMode ? "#333" : "#f5f0ea", color: mutedColor }}>
-                        {floorMap.get(c.id) || 0}楼
-                      </span>
-                      <span className="text-xs" style={{ color: mutedColor }}>
-                        {getTimeAgo(c.created_at || "")}
-                      </span>
+                    <p className="comment-text">{c.content}</p>
+                    <div className="comment-actions">
                       <button
-                        className="flex items-center gap-1 text-xs bg-transparent border-none cursor-pointer hover:opacity-80"
-                        style={{ color: darkMode ? "#8a8078" : "#3B82F6" }}
-                        onClick={() => { setReplyTo(c); setReplyText(""); }}
-                      >
-                        <i className="fa-regular fa-comment text-[0.7rem]" />
-                        <span>回复</span>
-                      </button>
-                      <button
-                        className="flex items-center gap-1 text-xs bg-transparent border-none cursor-pointer hover:opacity-80 ml-auto"
-                        style={{ color: c.liked_by_me ? "#e74c3c" : mutedColor }}
+                        className={`comment-action-btn${c.liked_by_me ? " liked" : ""}`}
                         onClick={() => toggleLike(c.id)}
                       >
-                        <i className={`fa-${c.liked_by_me ? "solid" : "regular"} fa-heart text-[0.7rem]`} />
+                        <i className={`fa-${c.liked_by_me ? "solid" : "regular"} fa-heart`} />
                         <span>{c.like_count || 0}</span>
                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                {replyTo?.id === c.id && (
-                  <div className="mt-2 ml-9 flex gap-2">
-                    <img
-                      src={profile?.avatar_url || `https://placehold.co/24x24/e8d5c8/8c6b4a?text=${encodeURIComponent(avatarChar)}`}
-                      className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-1"
-                      alt=""
-                    />
-                    <div className="flex-1 flex gap-2">
-                      <input
-                        type="text"
-                        placeholder={`回复 ${c.author?.nickname || "匿名用户"}...`}
-                        className="flex-1 px-2.5 py-1.5 border rounded-lg text-xs font-sans"
-                        value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") submitReply(c); }}
-                        autoFocus
-                        style={{ borderColor, background: inputBg, color: textColor }}
-                      />
                       <button
-                        className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white border-none cursor-pointer flex-shrink-0"
-                        onClick={() => submitReply(c)}
-                        disabled={submitting || !replyText.trim()}
+                        className="comment-action-btn"
+                        onClick={() => { setReplyTo(c); setReplyText(""); }}
                       >
-                        {submitting ? "..." : "发送"}
+                        <i className="fa-regular fa-comment" />
+                        <span>回复</span>
                       </button>
-                    </div>
-                  </div>
-                )}
-
-                {(c.reply_count || 0) > 0 && (
-                  <div className="mt-2 ml-9">
-                    <button
-                      className="text-xs bg-transparent border-none cursor-pointer hover:opacity-80"
-                      style={{ color: mutedColor }}
-                      onClick={() => toggleExpandReplies(c.id)}
-                    >
-                      <i className={`fa-solid fa-chevron-${expandedReplies.has(c.id) ? "up" : "down"} mr-1 text-[0.6rem]`} />
-                      {expandedReplies.has(c.id) ? "收起" : `展示${c.reply_count}条回复`}
-                    </button>
-
-                    {expandedReplies.has(c.id) && c.replies && c.replies.length > 0 && (
-                      <div
-                        className="mt-2 rounded-lg px-3 py-2 space-y-3"
-                        style={{ background: darkMode ? "#222" : "#f5f5f5" }}
+                      {user && c.user_id === user.id && (
+                        <button
+                          className="comment-action-btn-delete"
+                          onClick={() => handleDeleteComment(c.id)}
+                        >
+                          <i className="fa-regular fa-trash-can" />
+                        </button>
+                      )}
+                      <button
+                        className="comment-more-btn"
+                        style={{ opacity: hoveredCommentId === c.id ? 1 : 0 }}
+                        title="更多"
+                        onClick={(e) => { e.stopPropagation(); setCommentMenuId(commentMenuId === c.id ? null : c.id); }}
                       >
-                        {c.replies.map((reply) => {
-                          const replyFloor = floorMap.get(reply.id) || 0;
-                          return (
-                            <div
-                              key={reply.id}
-                              onMouseEnter={() => setHoveredCommentId(reply.id)}
-                              onMouseLeave={() => setHoveredCommentId(null)}
-                            >
-                              {/* Row 1: 头像 + 昵称 */}
-                              <div className="flex items-center gap-2">
-                                <Link href={`/user/${reply.user_id}`}>
-                                  <img
-                                    src={reply.author?.avatar_url || `https://placehold.co/28x28/e8d5c8/8c6b4a?text=${(reply.author?.nickname || "?")[0]}`}
-                                    className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                                    alt=""
-                                  />
-                                </Link>
-                                <Link
-                                  href={`/user/${reply.user_id}`}
-                                  className="text-sm font-medium no-underline hover:opacity-80"
-                                  style={{ color: textColor }}
+                        ⋮
+                      </button>
+                      {commentMenuId === c.id && (
+                        <div className="comment-popup show">
+                          <button
+                            className="comment-popup-item"
+                            onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(c.id, c.user_id); }}
+                          >
+                            <i className="fa-solid fa-flag" /> 举报
+                          </button>
+                          <button
+                            className="comment-popup-item"
+                            onClick={(e) => { e.stopPropagation(); handleBlockUser(c.user_id); }}
+                          >
+                            <i className="fa-solid fa-ban" /> 屏蔽
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 回复输入框 */}
+                    {replyTo?.id === c.id && (
+                      <div className="inline-reply-area show">
+                        <textarea
+                          className="inline-reply-textarea"
+                          placeholder={`回复 ${c.author?.nickname || "匿名用户"}...`}
+                          rows={2}
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          autoFocus
+                        />
+                        <div className="inline-reply-actions">
+                          <button className="btn-cancel-reply" onClick={() => { setReplyTo(null); setReplyText(""); }}>
+                            取消
+                          </button>
+                          <button
+                            className="btn-submit-reply"
+                            onClick={() => submitReply(c)}
+                            disabled={submitting || !replyText.trim()}
+                          >
+                            <i className="fa-solid fa-paper-plane" /> 发布
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 展开回复 */}
+                    {(c.reply_count || 0) > 0 && (
+                      <div className="nested-replies">
+                        {/* 显示回复列表（默认显示前3条，展开后显示全部） */}
+                        {c.replies && c.replies.length > 0 && (
+                          <>
+                            {(expandedReplies.has(c.id) ? c.replies : c.replies.slice(0, 3)).map((reply, replyIdx, arr) => {
+                              const isLast = replyIdx === arr.length - 1;
+                              return (
+                                <div
+                                  key={reply.id}
+                                  className="nested-reply-item"
+                                  data-comment-id={reply.id}
                                 >
-                                  {reply.author?.nickname || "匿名用户"}
-                                </Link>
-                                {onReport && hoveredCommentId === reply.id && (
-                                  <button
-                                    className="ml-auto text-xs bg-transparent border-none cursor-pointer hover:opacity-70"
-                                    style={{ color: mutedColor }}
-                                    onClick={(e) => { e.stopPropagation(); onReport(reply.id, reply.user_id); }}
-                                  >
-                                    <i className="fa-solid fa-flag mr-1 text-[0.7rem]" />举报
-                                  </button>
+                                  <div className="nested-reply-avatar">
+                                    <Link href={`/user/${reply.user_id}`}>
+                                      {reply.author?.avatar_url ? (
+                                        <img src={reply.author.avatar_url} alt={reply.author?.nickname || "?"} />
+                                      ) : (
+                                        <DefaultAvatar name={reply.author?.nickname || "?"} className="nested-reply-avatar-placeholder" />
+                                      )}
+                                    </Link>
+                                  </div>
+                                  <div className="nested-reply-body">
+                                    <div className="nested-reply-header">
+                                      <Link href={`/user/${reply.user_id}`} className="nested-reply-name">
+                                        {reply.author?.nickname || "匿名用户"}
+                                      </Link>
+                                      <span className="reply-to">回复 <Link href={`/user/${c.user_id}`}>@{c.author?.nickname || "匿名用户"}</Link></span>
+                                      <span className="nested-reply-time">{getTimeAgo(reply.created_at || "")}</span>
+                                    </div>
+                                    <p className="nested-reply-text">{reply.content}</p>
+                                    <div className="nested-reply-actions">
+                                      <button
+                                        className={`comment-action-btn${reply.liked_by_me ? " liked" : ""}`}
+                                        onClick={() => toggleLike(reply.id)}
+                                      >
+                                        <i className={`fa-${reply.liked_by_me ? "solid" : "regular"} fa-heart`} />
+                                        <span>{reply.like_count || 0}</span>
+                                      </button>
+                                      <button
+                                        className="comment-action-btn"
+                                        onClick={() => { setReplyTo(c); setReplyText(""); }}
+                                      >
+                                        <i className="fa-regular fa-comment" />
+                                        <span>回复</span>
+                                      </button>
+                                      {user && reply.user_id === user.id && (
+                                        <button
+                                          className="comment-action-btn-delete"
+                                          onClick={() => handleDeleteComment(reply.id)}
+                                        >
+                                          <i className="fa-regular fa-trash-can" />
+                                        </button>
+                                      )}
+                                      <button
+                                        className="comment-more-btn"
+                                        style={{ opacity: hoveredCommentId === reply.id ? 1 : 0, marginLeft: 'auto' }}
+                                        title="更多"
+                                        onClick={(e) => { e.stopPropagation(); setCommentMenuId(commentMenuId === reply.id ? null : reply.id); }}
+                                      >
+                                        ⋮
+                                      </button>
+                                      {commentMenuId === reply.id && (
+                                        <div className="comment-popup show">
+                                          <button
+                                            className="comment-popup-item"
+                                            onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(reply.id, reply.user_id); }}
+                                          >
+                                            <i className="fa-solid fa-flag" /> 举报
+                                          </button>
+                                          <button
+                                            className="comment-popup-item"
+                                            onClick={(e) => { e.stopPropagation(); handleBlockUser(reply.user_id); }}
+                                          >
+                                            <i className="fa-solid fa-ban" /> 屏蔽
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            
+                            {/* 超过3条回复时显示展开/收起按钮 */}
+                            {(c.reply_count || 0) > 3 && (
+                              <button
+                                className="nested-reply-toggle-btn"
+                                onClick={() => toggleExpandReplies(c.id)}
+                              >
+                                {expandedReplies.has(c.id) ? (
+                                  <>收起回复 <i className="fa-solid fa-chevron-up" /></>
+                                ) : (
+                                  <>展开全部{c.reply_count}条回复 <i className="fa-solid fa-chevron-down" /></>
                                 )}
-                              </div>
-
-                              {/* Row 2: 评论内容 */}
-                              <p className="text-sm mt-1 leading-relaxed" style={{ color: textColor }}>
-                                {reply.content}
-                              </p>
-
-                              {/* Row 3: 楼层 + 时间 + 回复 + 点赞 */}
-                              <div className="flex items-center gap-3 mt-1.5">
-                                <span className="text-[0.6rem] px-1.5 py-0.5 rounded" style={{ background: darkMode ? "#333" : "#f5f0ea", color: mutedColor }}>
-                                  {replyFloor}楼
-                                </span>
-                                <span className="text-xs" style={{ color: mutedColor }}>
-                                  {getTimeAgo(reply.created_at || "")}
-                                </span>
-                                <button
-                                  className="flex items-center gap-1 text-xs bg-transparent border-none cursor-pointer hover:opacity-80"
-                                  style={{ color: darkMode ? "#8a8078" : "#3B82F6" }}
-                                  onClick={() => { setReplyTo(c); setReplyText(""); }}
-                                >
-                                  <i className="fa-regular fa-comment text-[0.7rem]" />
-                                  <span>回复</span>
-                                </button>
-                                <button
-                                  className="flex items-center gap-1 text-xs bg-transparent border-none cursor-pointer hover:opacity-80 ml-auto"
-                                  style={{ color: reply.liked_by_me ? "#e74c3c" : mutedColor }}
-                                  onClick={() => toggleLike(reply.id)}
-                                >
-                                  <i className={`fa-${reply.liked_by_me ? "solid" : "regular"} fa-heart text-[0.7rem]`} />
-                                  <span>{reply.like_count || 0}</span>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* 底部输入框 */}
-      <div
-        className="flex gap-2.5 px-4 py-3 border-t flex-shrink-0"
-        style={{ borderColor }}
-      >
+      {/* 底部输入框 - 使用设计稿的 CSS 类 */}
+      <div className="para-comment-panel-input">
         {user ? (
-          <img
-            src={profile?.avatar_url || `https://placehold.co/32x32/e8d5c8/8c6b4a?text=${encodeURIComponent(avatarChar)}`}
-            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-            alt=""
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: darkMode ? "#333" : "#f5f0ea", color: mutedColor }}>
-            <i className="fa-solid fa-user text-xs" />
+          <div className="comment-avatar" style={{ width: 32, height: 32 }}>
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <DefaultAvatar name={displayName} className="comment-avatar-placeholder" style={{ fontSize: 12 }} />
+            )}
           </div>
-        )}
-        <div className="flex-1 flex gap-2">
-          <input
-            type="text"
-            placeholder={user ? "写下你的想法..." : "请先登录"}
-            className="flex-1 px-3 py-2 border rounded-lg text-sm font-sans"
-            disabled={!user}
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitComment();
-            }}
-            style={{ borderColor, background: inputBg, color: textColor }}
-          />
-          <button
-            className="text-sm px-4 py-2 rounded-lg bg-accent text-white border-none cursor-pointer flex-shrink-0 disabled:opacity-50"
-            onClick={submitComment}
-            disabled={!user || submitting || !commentText.trim()}
-          >
-            {submitting ? "..." : "发送"}
-          </button>
+        ) : null}
+        <textarea
+          placeholder={user ? "写下你的想法..." : "请先登录"}
+          rows={1}
+          value={commentText}
+          onChange={(e) => setCommentText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(); }
+          }}
+          disabled={!user}
+        />
+        <button
+          className="btn-submit"
+          onClick={submitComment}
+          disabled={!user || submitting || !commentText.trim()}
+        >
+          {submitting ? "..." : "发布"}
+        </button>
+      </div>
+
+      {/* 屏蔽确认弹窗 */}
+      <div className={`modal-overlay${blockModal?.open ? ' active' : ''}`} onClick={() => setBlockModal(null)}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-title">确认屏蔽</div>
+          <div className="modal-body">
+            <p>确定要屏蔽该用户吗？屏蔽后，该用户将无法评论你的作品。</p>
+          </div>
+          <div className="modal-actions">
+            <button className="btn-modal btn-modal-cancel" onClick={() => setBlockModal(null)}>取消</button>
+            <button className="btn-modal btn-modal-danger" onClick={confirmBlockUser}>确认屏蔽</button>
+          </div>
         </div>
       </div>
+
+      {/* Toast 提示 */}
+      <div className={`toast${toastMessage ? ' show' : ''}`}>{toastMessage || ''}</div>
     </div>
   );
 }

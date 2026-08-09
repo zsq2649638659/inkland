@@ -5,22 +5,24 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
-import UserHoverCard from "@/components/UserHoverCard";
+import { useMobileDrawer } from "@/components/MobileDrawerContext";
 
 interface Suggestion {
   name: string;
-  type: "tag" | "user" | "post";
+  type: "tag" | "user" | "post" | "content";
   subtitle?: string;
   id?: string;
 }
 
 export default function Navbar() {
-  const { user, profile, loading } = useAuth();
+  const { user } = useAuth();
   const supabase = createClient();
+  const { open, openDrawer } = useMobileDrawer();
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     const t = document.documentElement.getAttribute("data-theme");
@@ -33,11 +35,21 @@ export default function Navbar() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 0);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<Suggestion[]>([]);
   const [userSuggestions, setUserSuggestions] = useState<Suggestion[]>([]);
   const [postSuggestions, setPostSuggestions] = useState<Suggestion[]>([]);
+  const [contentSuggestions, setContentSuggestions] = useState<Suggestion[]>([]);
   const [searching, setSearching] = useState(false);
+  const [activeFilterTab, setActiveFilterTab] = useState<"tags" | "users" | "works" | "content">("tags");
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -45,29 +57,37 @@ export default function Navbar() {
         setTagSuggestions([]);
         setUserSuggestions([]);
         setPostSuggestions([]);
+        setContentSuggestions([]);
       }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const displayName = profile?.nickname || user?.email?.split("@")[0] || "用户";
-  const avatarChar = profile?.nickname?.[0] || user?.email?.[0] || "?";
-
   const fetchSuggestions = useCallback(async (q: string) => {
     if (q.length < 1) {
-      setTagSuggestions([]); setUserSuggestions([]); setPostSuggestions([]);
+      setTagSuggestions([]); setUserSuggestions([]); setPostSuggestions([]); setContentSuggestions([]);
       return;
     }
     setSearching(true);
+    const { data: blockedRows } = user
+      ? await supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id)
+      : { data: [] };
+    const blockedIds = new Set((blockedRows || []).map((row) => row.blocked_user_id as string));
     const { data: tags } = await supabase.from("tags").select("name, post_count").ilike("name", `%${q}%`).order("post_count", { ascending: false }).limit(5);
     setTagSuggestions((tags || []).map((t: Record<string, unknown>) => ({ name: t.name as string, type: "tag" as const, subtitle: `${t.post_count} 篇` })));
     const { data: users } = await supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(5);
-    setUserSuggestions((users || []).map((u: Record<string, unknown>) => ({ name: (u.nickname as string) || "匿名用户", type: "user" as const, id: u.id as string, subtitle: (u.avatar_url as string) || "" })));
-    const { data: posts } = await supabase.from("posts").select("id, title").or(`title.ilike.%${q}%,content.ilike.%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5);
-    setPostSuggestions((posts || []).map((p: Record<string, unknown>) => ({ name: (p.title as string) || "无标题", type: "post" as const, id: p.id as string })));
+    setUserSuggestions((users || []).filter((u: Record<string, unknown>) => !blockedIds.has(u.id as string)).map((u: Record<string, unknown>) => ({ name: (u.nickname as string) || "匿名用户", type: "user" as const, id: u.id as string, subtitle: (u.avatar_url as string) || "" })));
+    const { data: titlePosts } = await supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5);
+    setPostSuggestions((titlePosts || []).filter((p: Record<string, unknown>) => !blockedIds.has(p.user_id as string)).map((p: Record<string, unknown>) => ({ name: (p.title as string) || "无标题", type: "post" as const, id: p.id as string })));
+    const { data: contentPosts } = await supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5);
+    setContentSuggestions((contentPosts || []).filter((p: Record<string, unknown>) => !blockedIds.has(p.user_id as string)).map((p: Record<string, unknown>) => {
+      const rawContent = (p.content as string) || "";
+      const excerpt = rawContent.replace(/!\[.*?\]\(.*?\)/g, "").replace(/\[([^\]]*)\]\(.*?\)/g, "$1").replace(/[*_~`#>|-]/g, "").replace(/\n+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+      return { name: `${(p.title as string) || "无标题"}`, type: "content" as const, id: p.id as string, subtitle: excerpt ? `...${excerpt}...` : "" };
+    }));
     setSearching(false);
-  }, [supabase]);
+  }, [supabase, user]);
 
   const handleSearchInput = (val: string) => {
     setSearchQuery(val);
@@ -84,102 +104,136 @@ export default function Navbar() {
   const selectSuggestion = (s: Suggestion) => {
     if (s.type === "tag") window.location.href = `/tag/${encodeURIComponent(s.name)}`;
     else if (s.type === "user") window.location.href = `/user/${s.id}`;
-    else window.location.href = `/read/${s.id}`;
+    else if (s.type === "post" || s.type === "content") window.location.href = `/read/${s.id}`;
   };
 
-  const hasAnyResults = tagSuggestions.length > 0 || userSuggestions.length > 0 || postSuggestions.length > 0;
+  const hasAnyResults = tagSuggestions.length > 0 || userSuggestions.length > 0 || postSuggestions.length > 0 || contentSuggestions.length > 0;
 
   return (
-    <header
-      className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm border-b"
-      style={{
-        background: theme === "dark" ? "rgba(26,26,26,0.95)" : "rgba(250,248,245,0.95)",
-        borderColor: theme === "dark" ? "#333" : "#e8e0d5",
-      }}
-    >
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold text-warm no-underline flex items-center gap-1.5">
-          <i className="fa-solid fa-feather-pointed text-accent" />墨者
-        </Link>
+    <nav className={`navbar ${scrolled ? "scrolled" : ""}`} id="navbar">
+      <div className="navbar-inner">
+        {/* V2: navbar-left with wordmark logo */}
+        <div className="navbar-left">
+          <Link href="/" className="wordmark-logo" aria-label="inkland 首页" />
+        </div>
 
-        <div className="flex items-center gap-3">
-          <div ref={searchRef} className="relative">
-              <div className="relative">
-                <input type="text" placeholder="搜索作品、标签、用户..." className="search-box" style={{ width: "320px" }}
-                  value={searchQuery} onChange={(e) => handleSearchInput(e.target.value)} onKeyDown={handleSearchKey} onFocus={() => { if (searchQuery) fetchSuggestions(searchQuery); }}
-                />
-                {hasAnyResults && (
-                  <div
-                  className="absolute left-0 top-full mt-1 w-[640px] max-w-[95vw] border rounded-xl shadow-lg py-4 z-[200]"
-                  style={{
-                    background: theme === "dark" ? "#2a2a2a" : "#fff",
-                    borderColor: theme === "dark" ? "#333" : "#e8e0d5",
-                  }}
-                >
-                    <div className="grid grid-cols-3 gap-0 divide-x divide-rule">
-                      <div className="px-4">
-                        <div className="text-xs text-muted font-medium mb-2.5 px-1"><i className="fa-solid fa-tag mr-1" />相关标签</div>
-                        {tagSuggestions.length > 0 ? tagSuggestions.map((s) => (
-                          <button key={s.name} className="w-full text-left px-2 py-2 text-sm text-warm hover:bg-accent-light rounded-md flex items-center gap-2"
-                            onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
-                            <span className="truncate">{s.name}</span><span className="text-xs text-muted flex-shrink-0">{s.subtitle}</span>
-                          </button>
-                        )) : <p className="text-xs text-muted px-2 py-2">无匹配</p>}
-                        <Link href={`/search?q=${encodeURIComponent(searchQuery)}&type=tags`} className="block text-xs text-accent hover:underline px-2 pt-1.5 mt-1" onMouseDown={(e) => e.preventDefault()}>查看更多 &gt;</Link>
+        {/* V2: navbar-center with search input */}
+        <div className="navbar-center" ref={searchRef}>
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              className="search-input"
+              aria-label="全局搜索"
+              placeholder="搜索作品、标签、用户..."
+              value={searchQuery}
+              onChange={(e) => handleSearchInput(e.target.value)}
+              onKeyDown={handleSearchKey}
+              onFocus={() => { if (searchQuery) fetchSuggestions(searchQuery); }}
+            />
+            {hasAnyResults && (
+              <div className="search-dropdown">
+                {/* Filter Tabs */}
+                <div className="search-dropdown-filters">
+                  <button
+                    className={`search-dropdown-tab${activeFilterTab === "tags" ? " active" : ""}`}
+                    onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("tags"); }}
+                  ><i className="fa-solid fa-tag" /> 标签</button>
+                  <button
+                    className={`search-dropdown-tab${activeFilterTab === "users" ? " active" : ""}`}
+                    onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("users"); }}
+                  ><i className="fa-solid fa-user" /> 用户</button>
+                  <button
+                    className={`search-dropdown-tab${activeFilterTab === "works" ? " active" : ""}`}
+                    onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("works"); }}
+                  ><i className="fa-solid fa-file-lines" /> 作品</button>
+                  <button
+                    className={`search-dropdown-tab${activeFilterTab === "content" ? " active" : ""}`}
+                    onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("content"); }}
+                  ><i className="fa-solid fa-align-left" /> 正文</button>
+                </div>
+
+                {/* Results */}
+                <div className="search-dropdown-results">
+                  {/* Tags */}
+                  {activeFilterTab === "tags" && (tagSuggestions.length > 0 ? tagSuggestions.map((s) => (
+                    <button key={s.name} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
+                      <div className="search-dropdown-item-icon"><i className="fa-solid fa-tag" /></div>
+                      <div className="search-dropdown-item-body">
+                        <span className="search-dropdown-item-title">{s.name}</span>
                       </div>
-                      <div className="px-4">
-                        <div className="text-xs text-muted font-medium mb-2.5 px-1"><i className="fa-solid fa-user mr-1" />相关用户</div>
-                        {userSuggestions.length > 0 ? userSuggestions.map((s) => (
-                          <button key={s.id} className="w-full text-left px-2 py-2 text-sm text-warm hover:bg-accent-light rounded-md flex items-center gap-2"
-                            onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
-                            <img src={s.subtitle || `https://placehold.co/24x24/f5e6d3/b8752e?text=${encodeURIComponent(s.name[0] || "?")}`}
-                              className="w-5 h-5 rounded-full object-cover flex-shrink-0" alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                            <span className="truncate">{s.name}</span>
-                          </button>
-                        )) : <p className="text-xs text-muted px-2 py-2">无匹配</p>}
-                        <Link href={`/search?q=${encodeURIComponent(searchQuery)}&type=users`} className="block text-xs text-accent hover:underline px-2 pt-1.5 mt-1" onMouseDown={(e) => e.preventDefault()}>查看更多 &gt;</Link>
+                      <span className="search-dropdown-item-meta">{s.subtitle}</span>
+                    </button>
+                  )) : <div className="search-dropdown-empty"><i className="fa-solid fa-tag" />无匹配标签</div>)}
+
+                  {/* Users */}
+                  {activeFilterTab === "users" && (userSuggestions.length > 0 ? userSuggestions.map((s) => (
+                    <button key={s.id} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
+                      <div className="search-dropdown-item-icon avatar">
+                        {s.subtitle ? (
+                          <img src={s.subtitle} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : (
+                          <i className="fa-solid fa-user" />
+                        )}
                       </div>
-                      <div className="px-4">
-                        <div className="text-xs text-muted font-medium mb-2.5 px-1"><i className="fa-solid fa-file-lines mr-1" />相关文章</div>
-                        {postSuggestions.length > 0 ? postSuggestions.map((s) => (
-                          <button key={s.id} className="w-full text-left px-2 py-2 text-sm text-warm hover:bg-accent-light rounded-md truncate block"
-                            onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>{s.name}</button>
-                        )) : <p className="text-xs text-muted px-2 py-2">无匹配</p>}
-                        <Link href={`/search?q=${encodeURIComponent(searchQuery)}`} className="block text-xs text-accent hover:underline px-2 pt-1.5 mt-1" onMouseDown={(e) => e.preventDefault()}>查看更多 &gt;</Link>
+                      <div className="search-dropdown-item-body">
+                        <span className="search-dropdown-item-title">{s.name}</span>
                       </div>
-                    </div>
-                  </div>
-            )}
-            {searching && !hasAnyResults && (
-              <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-rule rounded-xl shadow-lg py-3 z-[200] text-center">
-                <span className="text-xs text-muted"><i className="fa-solid fa-spinner animate-spin mr-1" />搜索中...</span>
+                    </button>
+                  )) : <div className="search-dropdown-empty">无匹配用户</div>)}
+
+                  {/* Works (title) */}
+                  {activeFilterTab === "works" && (postSuggestions.length > 0 ? postSuggestions.map((s) => (
+                    <button key={s.id} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
+                      <div className="search-dropdown-item-icon work"><i className="fa-solid fa-file-lines" /></div>
+                      <div className="search-dropdown-item-body">
+                        <span className="search-dropdown-item-title">{s.name}</span>
+                      </div>
+                    </button>
+                  )) : <div className="search-dropdown-empty"><i className="fa-solid fa-file-lines" />无匹配作品</div>)}
+
+                  {/* Content */}
+                  {activeFilterTab === "content" && (contentSuggestions.length > 0 ? contentSuggestions.map((s) => (
+                    <button key={s.id} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
+                      <div className="search-dropdown-item-icon content"><i className="fa-solid fa-align-left" /></div>
+                      <div className="search-dropdown-item-body">
+                        <span className="search-dropdown-item-title">{s.name}</span>
+                        {s.subtitle && <span className="search-dropdown-item-subtitle">{s.subtitle}</span>}
+                      </div>
+                    </button>
+                  )) : <div className="search-dropdown-empty"><i className="fa-solid fa-align-left" />无匹配正文</div>)}
+                </div>
+
+                {/* Footer */}
+                <div className="search-dropdown-footer">
+                  <Link
+                    href={`/search?q=${encodeURIComponent(searchQuery)}${activeFilterTab === "tags" ? "&type=tags" : activeFilterTab === "users" ? "&type=users" : activeFilterTab === "works" ? "&type=works" : "&type=posts"}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                  >查看全部结果 <i className="fa-solid fa-arrow-right" /></Link>
+                </div>
               </div>
             )}
           </div>
-          </div>
+        </div>
 
-          <Link href="/create" className="btn-accent hidden sm:inline-flex items-center gap-1.5 no-underline">
-            <i className="fa-solid fa-pen-to-square text-sm" />创作
+        {/* V2: navbar-right — only create button + mobile menu (avatar is in sidebar) */}
+        <div className="navbar-right">
+          <Link href={user ? "/create" : "/login"} className="btn-create no-underline">
+            <i className="fa-solid fa-pen-to-square" /> 创作
           </Link>
 
-          {loading ? (
-            <span className="btn-ghost"><i className="fa-solid fa-spinner animate-spin" /></span>
-          ) : user ? (
-            <UserHoverCard userId={user.id} profile={profile} displayName={displayName} avatarChar={avatarChar}>
-              {/* 点击头像跳转个人中心，不出现下拉菜单 */}
-              <Link href="/profile" className="btn-ghost flex items-center gap-1.5 no-underline">
-                <img
-                  src={profile?.avatar_url || `https://placehold.co/36x36/f5e6d3/b8752e?text=${encodeURIComponent(avatarChar)}`}
-                  className="w-9 h-9 rounded-full object-cover border-2 border-accent/20 hover:border-accent/60 transition-colors"
-                  alt="avatar"
-                />
-              </Link>
-            </UserHoverCard>
-          ) : (
-            <Link href="/login" className="btn-ghost no-underline"><i className="fa-solid fa-user" /></Link>
-          )}
+          {/* V2: mobile menu button */}
+          <button
+            className="btn-mobile-menu"
+            id="btnMobileMenu"
+            aria-label="打开菜单"
+            aria-expanded={open}
+            aria-controls="mobile-drawer"
+            onClick={openDrawer}
+          >
+            <i className="fa-solid fa-bars" />
+          </button>
         </div>
       </div>
-    </header>
+    </nav>
   );
 }

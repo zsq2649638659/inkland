@@ -93,7 +93,7 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
   const cardContent = (
     <div
       ref={cardRef}
-      className="fixed w-72 bg-white border border-rule rounded-2xl shadow-2xl overflow-hidden"
+      className="fixed w-72 bg-card border border-rule rounded-2xl shadow-2xl overflow-hidden"
       style={{
         zIndex: 99999,
         top: `${cardPosition.top}px`,
@@ -107,7 +107,7 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
       <div className="px-4 pt-5 pb-3 flex flex-col items-center">
         <Link href={`/user/${userId}`} onClick={() => setOpen(false)}>
           <img
-            src={profile?.avatar_url || `https://placehold.co/64x64/f5e6d3/b8752e?text=${encodeURIComponent(avatarChar)}`}
+            src={profile?.avatar_url || `https://placehold.co/64x64/FDDCD8/F26B5B?text=${encodeURIComponent(avatarChar)}`}
             className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-md"
             alt=""
           />

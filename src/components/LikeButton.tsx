@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { createNotification } from "@/lib/notifications";
 
 interface LikeButtonProps {
   postId: string;
@@ -11,9 +12,10 @@ interface LikeButtonProps {
   onLogin?: () => void;
   iconOnly?: boolean;
   plain?: boolean;
+  className?: string;
 }
 
-export default function LikeButton({ postId, initialCount, onLogin, iconOnly, plain }: LikeButtonProps) {
+export default function LikeButton({ postId, initialCount, onLogin, iconOnly, plain, className }: LikeButtonProps) {
   const supabase = createClient();
   const router = useRouter();
   const { user } = useAuth();
@@ -58,6 +60,11 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
       if (!error) {
         setLiked(true);
         setCount((c) => c + 1);
+        createNotification({
+          type: "like",
+          actor_id: user.id,
+          post_id: postId,
+        });
       }
     }
     setLoading(false);
@@ -66,8 +73,8 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
   if (iconOnly) {
     if (plain) {
       return (
-        <button className="flex items-center gap-1 text-sm text-muted hover:text-accent transition-colors bg-transparent border-none cursor-pointer p-0" title="点赞" onClick={toggle} disabled={loading}>
-          <i className={`${liked ? "fa-solid" : "fa-regular"} fa-heart`} style={liked ? { color: "#e74c3c" } : undefined} />
+        <button className={`stat-item ${className || ""}`} title="点赞" onClick={toggle} disabled={loading}>
+          <i className={`${liked ? "fa-solid" : "fa-regular"} fa-heart`} style={liked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
           <span>{count}</span>
         </button>
       );
@@ -82,12 +89,12 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
 
   return (
     <button
-      className={`interact-btn ${liked ? "liked" : ""}`}
+      className={`card-action ${liked ? "liked" : ""}`}
       onClick={toggle}
       disabled={loading}
     >
-      <i className={`${liked ? "fa-solid" : "fa-regular"} fa-heart mr-1`} />
-      {count}
+      <i className={`${liked ? "fa-solid" : "fa-regular"} fa-heart`} />
+      <span>{count}</span>
     </button>
   );
 }

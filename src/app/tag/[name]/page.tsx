@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
-import Link from "next/link";
+import { useEffect, useState, use, useCallback } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { SkeletonCardList } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
-import PostCardGrid from "@/components/PostCardGrid";
-import SeriesCardGrid from "@/components/SeriesCardGrid";
+import PostTagCard from "@/components/PostTagCard";
 import type { Post } from "@/lib/types";
 
 type TagTab = "latest" | "hottest";
+type TimeFilter = "all" | "day" | "week" | "month";
+type TypeFilter = "all" | "single" | "image" | "series";
 
 interface SeriesEntry {
   id: string;
@@ -27,7 +27,11 @@ interface SeriesEntry {
   latestChapterId: string | null;
   latestChapterNumber: number | null;
   latestChapterTitle: string | null;
+  latestChapterContent: string | null;
   latestChapterCreatedAt: string | null;
+  like_count: number;
+  comment_count: number;
+  bookmark_count: number;
 }
 
 export default function TagPage({ params }: { params: Promise<{ name: string }> }) {
@@ -40,9 +44,15 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
   const [loading, setLoading] = useState(true);
   const [tagInfo, setTagInfo] = useState<{ id: string; post_count: number } | null>(null);
   const [tagTab, setTagTab] = useState<TagTab>("latest");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [draftTimeFilter, setDraftTimeFilter] = useState<TimeFilter>("all");
+  const [draftTypeFilter, setDraftTypeFilter] = useState<TypeFilter>("all");
   const [isFollowingTag, setIsFollowingTag] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [participantCount, setParticipantCount] = useState(0);
+  const [viewCount, setViewCount] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -75,9 +85,9 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           .eq("status", "published");
 
         if (postsData) {
-          // 收集章节帖子所属的系列名
           for (const p of postsData as Array<Record<string, unknown>>) {
-            if (p.series_name) {
+            // 只有真正的 serial 章节才合并为长篇连载；图片作品加入合集时也可能有 series_name，不能误合并。
+            if (p.post_type === "serial" && p.series_name) {
               chapterSeriesNames.add(p.series_name as string);
             }
           }
@@ -106,6 +116,9 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
             return {
               id: p.id as string, title: (p.title as string) || "无标题",
               content: p.content as string, cover_url: p.cover_url as string | null,
+              post_type: p.post_type as Post["post_type"],
+              series_name: p.series_name as string | null,
+              chapter_number: p.chapter_number as number | null,
               word_count: p.word_count as number, created_at: p.created_at as string,
               user_id: p.user_id as string,
               author: { nickname: a?.nickname || "匿名用户", avatar_url: a?.avatar_url },
@@ -114,10 +127,9 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
             } as Post;
           });
 
-          // 分离：没有 series_name 的是独立帖子，有 series_name 的是连载章节
           standalonePostsList = allPosts.filter((p) => {
             const raw = postsData.find((r: Record<string, unknown>) => r.id === p.id) as Record<string, unknown> | undefined;
-            return !raw?.series_name;
+            return !(raw?.post_type === "serial" && raw?.series_name);
           });
 
           standalonePostsList.sort((a, b) =>
@@ -128,7 +140,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
         }
       }
 
-      // 2. 查询 series 表中 tags 字段包含该标签的系列（补充 chapterSeriesNames）
+      // 2. 查询 series 表中 tags 字段包含该标签的系列
       const { data: seriesByTag } = await supabase
         .from("series")
         .select("name")
@@ -170,7 +182,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           matchedSeries = await Promise.all(rawSeries.map(async (s) => {
             const { data: chapters, count } = await supabase
               .from("posts")
-              .select("id, title, chapter_number, created_at", { count: "exact" })
+              .select("id, title, content, chapter_number, created_at", { count: "exact" })
               .eq("series_name", s.name)
               .eq("post_type", "serial")
               .eq("status", "published")
@@ -178,6 +190,32 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
               .limit(1);
 
             const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
+
+            // 统计系列所有章节的互动数据
+            let seriesStats = { like_count: 0, comment_count: 0, bookmark_count: 0 };
+            if (count && count > 0) {
+              const { data: chapterIds } = await supabase
+                .from("posts")
+                .select("id")
+                .eq("series_name", s.name)
+                .eq("post_type", "serial")
+                .eq("status", "published");
+              if (chapterIds && chapterIds.length > 0) {
+                const cids = chapterIds.map((c: Record<string, unknown>) => c.id as string);
+                const { data: chStats } = await supabase
+                  .from("post_stats")
+                  .select("like_count, comment_count, bookmark_count")
+                  .in("id", cids);
+                if (chStats) {
+                  for (const cs of chStats as Array<Record<string, unknown>>) {
+                    seriesStats.like_count += (cs.like_count as number) || 0;
+                    seriesStats.comment_count += (cs.comment_count as number) || 0;
+                    seriesStats.bookmark_count += (cs.bookmark_count as number) || 0;
+                  }
+                }
+              }
+            }
+
             return {
               ...s,
               author: profileMap[s.user_id] || { nickname: "匿名用户", avatar_url: null },
@@ -185,13 +223,17 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
               latestChapterId: latest ? latest.id as string : null,
               latestChapterNumber: latest ? latest.chapter_number as number : null,
               latestChapterTitle: latest ? latest.title as string : null,
+              latestChapterContent: latest ? latest.content as string : null,
               latestChapterCreatedAt: latest ? latest.created_at as string : null,
+              like_count: seriesStats.like_count,
+              comment_count: seriesStats.comment_count,
+              bookmark_count: seriesStats.bookmark_count,
             };
           }));
 
           matchedSeries.sort((a, b) =>
             tagTab === "hottest"
-              ? b.totalChapters - a.totalChapters
+              ? (b.like_count + b.comment_count * 2 + b.bookmark_count * 3) - (a.like_count + a.comment_count * 2 + a.bookmark_count * 3)
               : new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime()
           );
         }
@@ -202,6 +244,26 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
 
       const totalCount = standalonePostsList.length + matchedSeries.length;
       setTagInfo({ id: tagId, post_count: totalCount });
+
+      // 参与用户数：去重作者数
+      const authorIds = new Set<string>();
+      for (const p of standalonePostsList) {
+        if (p.user_id) authorIds.add(p.user_id);
+      }
+      for (const s of matchedSeries) {
+        if (s.user_id) authorIds.add(s.user_id);
+      }
+      setParticipantCount(authorIds.size);
+
+      // 浏览：所有作品的互动总数
+      let totalInteractions = 0;
+      for (const p of standalonePostsList) {
+        totalInteractions += (p.like_count || 0) + (p.comment_count || 0) + (p.bookmark_count || 0);
+      }
+      for (const s of matchedSeries) {
+        totalInteractions += s.like_count + s.comment_count + s.bookmark_count;
+      }
+      setViewCount(totalInteractions);
 
       if (totalCount !== (tag as Record<string, unknown>).post_count) {
         supabase.from("tags").update({ post_count: totalCount }).eq("id", tagId).then(({ error }) => {
@@ -233,195 +295,317 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
     setFollowLoading(false);
   };
 
-  if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-6xl mx-auto px-4 py-6"><div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <SkeletonCardList key={i} />)}</div></main></div>;
+  const handleShare = useCallback(() => {
+    if (typeof window !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href).catch(() => {});
+    }
+  }, []);
+
+  const openFilterModal = () => {
+    setDraftTimeFilter(timeFilter);
+    setDraftTypeFilter(typeFilter);
+    setIsFilterModalOpen(true);
+  };
+
+  const applyMobileFilters = () => {
+    setTimeFilter(draftTimeFilter);
+    setTypeFilter(draftTypeFilter);
+    setIsFilterModalOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isFilterModalOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsFilterModalOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "";
+    };
+  }, [isFilterModalOpen]);
+
+  // 时间筛选
+  const applyTimeFilter = (items: Array<Post | SeriesEntry>): Array<Post | SeriesEntry> => {
+    if (timeFilter === "all") return items;
+    const now = new Date();
+    const ranges: Record<Exclude<TimeFilter, "all">, number> = { day: 1, week: 7, month: 30 };
+    const cutoff = new Date(now.getTime() - ranges[timeFilter] * 24 * 60 * 60 * 1000);
+    return items.filter((item) => {
+      const date = "created_at" in item ? item.created_at : "";
+      return date && new Date(date) >= cutoff;
+    });
+  };
+
+  if (loading) {
+    return (
+      <div id="page-tag" className="min-h-screen bg-paper">
+        <main className="main-container">
+          <div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <SkeletonCardList key={i} />)}</div>
+        </main>
+      </div>
+    );
+  }
 
   const hasContent = standalonePosts.length > 0 || seriesList.length > 0;
 
+  // 类型筛选
+  const isImagePost = (post: Post) => post.post_type === "illustration" || post.post_type === "comic" || post.post_type === "cosplay";
+  const filteredStandalone = typeFilter === "series"
+    ? []
+    : typeFilter === "image"
+      ? standalonePosts.filter(isImagePost)
+      : typeFilter === "single"
+        ? standalonePosts.filter((post) => !isImagePost(post))
+        : standalonePosts;
+
+  const filteredSeries = typeFilter === "single" || typeFilter === "image" ? [] : seriesList;
+
+  // 最热模式下应用时间筛选
+  const displayStandalone = tagTab === "hottest" ? applyTimeFilter(filteredStandalone) as Post[] : filteredStandalone;
+  const displaySeries = tagTab === "hottest" ? applyTimeFilter(filteredSeries) as SeriesEntry[] : filteredSeries;
+
+  // 最热排序
+  if (tagTab === "hottest") {
+    displayStandalone.sort((a, b) =>
+      ((b.like_count || 0) + (b.comment_count || 0)) - ((a.like_count || 0) + (a.comment_count || 0))
+    );
+    displaySeries.sort((a, b) =>
+      (b.like_count + b.comment_count * 2 + b.bookmark_count * 3) - (a.like_count + a.comment_count * 2 + a.bookmark_count * 3)
+    );
+  }
+
+  const formatCount = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+
   return (
-    <div className="min-h-screen bg-paper">
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        <div className="flex items-center gap-4 mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-warm"><i className="fa-solid fa-tag mr-2 text-accent" />{decodedName}</h2>
-            <p className="text-sm text-muted mt-0.5">{tagInfo ? `${tagInfo.post_count} 篇作品` : "暂无作品"}</p>
+    <div id="page-tag" className="min-h-screen bg-paper">
+      <main className="main-container">
+        {/* ===== Profile Section ===== */}
+        <section className="profile-section">
+          <div className="profile-avatar">
+            <i className="fa-solid fa-hashtag"></i>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            {user && (
-              <button
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${isFollowingTag ? "bg-accent-light text-accent border border-accent" : "bg-accent text-white border border-accent"}`}
-                onClick={handleTagFollow} disabled={followLoading}
-              >
-                {followLoading ? <i className="fa-solid fa-spinner animate-spin" /> : isFollowingTag ? <><i className="fa-solid fa-check mr-1" />已关注标签</> : <><i className="fa-solid fa-plus mr-1" />关注标签</>}
-              </button>
-            )}
-            <div className="flex border border-rule rounded-lg overflow-hidden">
-              <button className={`px-2 py-1.5 text-xs ${viewMode === "grid" ? "bg-accent text-white" : "text-muted bg-white"}`} onClick={() => setViewMode("grid")}>
-                <i className="fa-solid fa-grip" />
-              </button>
-              <button className={`px-2 py-1.5 text-xs ${viewMode === "list" ? "bg-accent text-white" : "text-muted bg-white"}`} onClick={() => setViewMode("list")}>
-                <i className="fa-solid fa-list" />
-              </button>
+          <div className="profile-info">
+            <h1 className="profile-name">{decodedName}</h1>
+            <p className="profile-bio">浏览标签下的所有作品，发现更多精彩内容</p>
+            <div className="profile-stats">
+              <div className="profile-stat">
+                <i className="fa-solid fa-book"></i>
+                <span>作品</span>
+                <span className="stat-value">{tagInfo ? tagInfo.post_count : 0}</span>
+              </div>
+              <div className="profile-stat">
+                <i className="fa-solid fa-users"></i>
+                <span>参与</span>
+                <span className="stat-value">{formatCount(participantCount)}</span>
+              </div>
+              <div className="profile-stat">
+                <i className="fa-solid fa-eye"></i>
+                <span>浏览</span>
+                <span className="stat-value">{formatCount(viewCount)}</span>
+              </div>
             </div>
           </div>
+          <div className="profile-actions">
+            {user && (
+              <button
+                type="button"
+                className={`profile-action-btn${isFollowingTag ? " saved" : ""}`}
+                onClick={handleTagFollow}
+                disabled={followLoading}
+              >
+                {followLoading ? (
+                  <i className="fa-solid fa-spinner fa-spin" />
+                ) : isFollowingTag ? (
+                  <><i className="fa-solid fa-bookmark" /> 已关注</>
+                ) : (
+                  <><i className="fa-solid fa-bookmark" /> 关注标签</>
+                )}
+              </button>
+            )}
+            <button type="button" className="profile-action-btn" onClick={handleShare}>
+              <i className="fa-solid fa-share-nodes" /> 分享
+            </button>
+          </div>
+        </section>
+
+        {/* ===== Segmented Tabs ===== */}
+        <div className="segmented-tabs">
+          <div className="segmented-tabs-left">
+            <button
+              className={`segmented-tab${tagTab === "latest" ? " active" : ""}`}
+              onClick={() => setTagTab("latest")}
+            >最新</button>
+            <button
+              className={`segmented-tab${tagTab === "hottest" ? " active" : ""}`}
+              onClick={() => setTagTab("hottest")}
+            >最热</button>
+          </div>
+          {tagTab === "hottest" && (
+            <div className="segmented-tabs-right">
+              <button
+                className={`segmented-tab${timeFilter === "all" ? " active" : ""}`}
+                onClick={() => setTimeFilter("all")}
+              >全部</button>
+              <button
+                className={`segmented-tab${timeFilter === "day" ? " active" : ""}`}
+                onClick={() => setTimeFilter("day")}
+              >一日</button>
+              <button
+                className={`segmented-tab${timeFilter === "week" ? " active" : ""}`}
+                onClick={() => setTimeFilter("week")}
+              >一周</button>
+              <button
+                className={`segmented-tab${timeFilter === "month" ? " active" : ""}`}
+                onClick={() => setTimeFilter("month")}
+              >一月</button>
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-1 mb-5 border-b border-rule pb-2">
-          <button className={`px-4 py-1.5 text-sm rounded-full transition-colors ${tagTab === "latest" ? "bg-accent text-white" : "text-muted hover:text-warm"}`} onClick={() => setTagTab("latest")}>最新</button>
-          <button className={`px-4 py-1.5 text-sm rounded-full transition-colors ${tagTab === "hottest" ? "bg-accent text-white" : "text-muted hover:text-warm"}`} onClick={() => setTagTab("hottest")}>最热</button>
+        {/* ===== Type Filters Row ===== */}
+        <div className="type-filters-row">
+          <div className="type-filters">
+            <button
+              className={`type-filter-pill${typeFilter === "all" ? " active" : ""}`}
+              onClick={() => setTypeFilter("all")}
+            >全部</button>
+            <button
+              className={`type-filter-pill${typeFilter === "single" ? " active" : ""}`}
+              onClick={() => setTypeFilter("single")}
+            >单篇</button>
+            <button
+              className={`type-filter-pill${typeFilter === "image" ? " active" : ""}`}
+              onClick={() => setTypeFilter("image")}
+            >图片</button>
+            <button
+              className={`type-filter-pill${typeFilter === "series" ? " active" : ""}`}
+              onClick={() => setTypeFilter("series")}
+            >长篇连载</button>
+          </div>
         </div>
 
-        {!hasContent ? (
-          <div className="text-center py-12"><EmptyState icon="fa-tag" title="该标签下暂无作品" /></div>
-        ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {seriesList.map((series) => (
-              <SeriesCardGrid key={series.id} series={series} showAuthor />
-            ))}
-            {standalonePosts.map((post) => (
-              <PostCardGrid key={post.id} post={post} showAuthor />
-            ))}
+        {/* 移动端筛选入口：选项在弹窗中确认后才应用 */}
+        <button
+          type="button"
+          className="tag-mobile-filter-trigger"
+          onClick={openFilterModal}
+          aria-haspopup="dialog"
+          aria-expanded={isFilterModalOpen}
+        >
+          <i className="fa-solid fa-sliders" aria-hidden="true" />
+          <span>筛选</span>
+          {(timeFilter !== "all" || typeFilter !== "all") && <i className="fa-solid fa-circle-check tag-mobile-filter-active" aria-label="已有筛选" />}
+        </button>
+
+        {isFilterModalOpen && (
+          <div className="tag-filter-modal" role="dialog" aria-modal="true" aria-label="筛选作品">
+            <button
+              type="button"
+              className="tag-filter-modal-backdrop"
+              onClick={() => setIsFilterModalOpen(false)}
+              aria-label="关闭筛选弹窗"
+            />
+            <div className="tag-filter-modal-panel">
+              <div className="tag-filter-modal-header">
+                <h2>筛选作品</h2>
+                <button
+                  type="button"
+                  className="tag-filter-modal-close"
+                  onClick={() => setIsFilterModalOpen(false)}
+                  aria-label="关闭筛选弹窗"
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+              </div>
+
+              {tagTab === "hottest" && (
+                <fieldset className="tag-filter-group">
+                  <legend>时间范围</legend>
+                  <div className="tag-filter-options">
+                    {([
+                      ["all", "全部"],
+                      ["day", "一日"],
+                      ["week", "一周"],
+                      ["month", "一月"],
+                    ] as Array<[TimeFilter, string]>).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`tag-filter-option${draftTimeFilter === value ? " selected" : ""}`}
+                        onClick={() => setDraftTimeFilter(value)}
+                      >
+                        <span>{label}</span>
+                        {draftTimeFilter === value && <i className="fa-solid fa-check" aria-hidden="true" />}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+
+              <fieldset className="tag-filter-group">
+                <legend>内容类型</legend>
+                <div className="tag-filter-options">
+                  {([
+                    ["all", "全部"],
+                    ["single", "单篇"],
+                    ["image", "图片"],
+                    ["series", "连载"],
+                  ] as Array<[TypeFilter, string]>).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`tag-filter-option${draftTypeFilter === value ? " selected" : ""}`}
+                      onClick={() => setDraftTypeFilter(value)}
+                    >
+                      <span>{label}</span>
+                      {draftTypeFilter === value && <i className="fa-solid fa-check" aria-hidden="true" />}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className="tag-filter-modal-actions">
+                <button type="button" className="tag-filter-reset" onClick={() => { setDraftTimeFilter("all"); setDraftTypeFilter("all"); }}>
+                  重置
+                </button>
+                <button type="button" className="tag-filter-apply" onClick={applyMobileFilters}>
+                  筛选
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== Card Grid ===== */}
+        {displayStandalone.length === 0 && displaySeries.length === 0 ? (
+          <div className="text-center py-12">
+            <EmptyState icon="fa-tag" title="该标签下暂无作品" />
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* 系列列表卡片 */}
-            {seriesList.map((series) => {
-              const avatarUrl = series.author?.avatar_url || `https://placehold.co/20x20/f5e6d3/b8752e?text=${encodeURIComponent(series.author?.nickname?.[0] || "?")}`;
-              return (
-                <div key={series.id} className="flex gap-4 p-4 rounded-xl bg-white border border-rule hover:shadow-md transition-shadow">
-                  <Link
-                    href={`/series/${encodeURIComponent(series.name)}`}
-                    className="flex-shrink-0 w-[140px] self-stretch rounded-lg overflow-hidden bg-accent-light shadow-sm"
-                  >
-                    {series.cover_url ? (
-                      <img src={series.cover_url} alt={series.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent-light/60 to-accent-light/20">
-                        <i className="fa-solid fa-book-open text-3xl text-accent/30" />
-                      </div>
-                    )}
-                  </Link>
-                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                    <div>
-                      <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline">
-                        <h3 className="font-bold text-warm text-base mb-1 hover:text-accent transition-colors">{series.name}</h3>
-                      </Link>
-                      <p className="text-sm text-muted line-clamp-2 leading-relaxed mb-2">{series.description || "暂无简介"}</p>
-                      <div className="flex items-center gap-3 text-xs text-muted flex-wrap mb-1">
-                        <span className="inline-block px-1.5 py-0.5 rounded bg-accent-light text-accent text-[0.65rem]">长篇连载</span>
-                        <span>{series.series_type === "fanfic" ? "同人" : "原创"}</span>
-                        <span className={series.status === "ongoing" ? "text-accent" : "text-green-600"}>
-                          {series.status === "ongoing" ? "连载中" : "已完结"}
-                        </span>
-                        <span>共 {series.totalChapters} 章</span>
-                        {series.tags && series.tags.length > 0 && series.tags.map((tag) => (
-                          <Link key={tag} href={`/tag/${encodeURIComponent(tag)}`}
-                            className="inline-block px-1.5 py-0.5 text-[0.6rem] rounded-full bg-accent-light/40 text-accent/70 hover:bg-accent-light/60 no-underline">
-                            {tag}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted">
-                      <Link href={`/user/${series.user_id}`} className="flex items-center gap-1.5 no-underline hover:opacity-80">
-                        <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
-                        <span className="text-muted">{series.author?.nickname || "匿名"}</span>
-                      </Link>
-                      <span className="flex items-center gap-1">
-                        <i className="fa-solid fa-heart text-[0.65rem] text-red-400" />
-                        0
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <i className="fa-solid fa-comment text-[0.65rem]" />
-                        0
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <i className="fa-solid fa-bookmark text-[0.65rem]" />
-                        0
-                      </span>
-                      <span className="ml-auto">{new Date(series.created_at || "").toLocaleDateString("zh-CN")}</span>
-                    </div>
-                  </div>
-                </div>
-              );
+          <div className="card-grid">
+            {displaySeries.map((series) => {
+              const postForCard: Post = {
+                id: series.id,
+                title: series.name,
+                content: series.description,
+                cover_url: series.cover_url,
+                user_id: series.user_id,
+                author: series.author,
+                like_count: series.like_count,
+                comment_count: series.comment_count,
+                bookmark_count: series.bookmark_count,
+                tags: series.tags,
+                created_at: series.created_at,
+                series_name: series.name,
+                status: "published",
+              };
+              return <PostTagCard key={`series-${series.id}`} post={postForCard} showAuthorAvatar />;
             })}
-            {/* 独立帖子列表卡片 */}
-            {standalonePosts.map((post) => {
-              const cp = post as unknown as Record<string, unknown>;
-              const contentImages = (() => {
-                const content = (cp.content as string) || "";
-                const matches = content.matchAll(/!\[.*?\]\((.*?)\)/g);
-                return [...matches].map((m) => m[1]);
-              })();
-              const allImages = (cp.cover_url && !contentImages.includes(cp.cover_url as string))
-                ? [cp.cover_url as string, ...contentImages]
-                : contentImages;
-              const hasImage = allImages.length > 0;
-              const plainText = (() => {
-                const content = (cp.content as string) || "";
-                return content
-                  .replace(/!\[.*?\]\(.*?\)/g, "")
-                  .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
-                  .replace(/[*_~`#>|-]/g, "")
-                  .replace(/\n+/g, " ")
-                  .replace(/\s+/g, " ")
-                  .trim();
-              })();
-              const author = cp.author as { nickname: string; avatar_url: string | null } | null;
-              const avatarUrl = author?.avatar_url || `https://placehold.co/20x20/f5e6d3/b8752e?text=${encodeURIComponent((author?.nickname || "?")[0])}`;
-              return (
-                <div key={post.id} className="p-4 rounded-xl bg-white border border-rule hover:shadow-md transition-shadow">
-                  <Link href={`/read/${post.id}`} className="no-underline">
-                    <h3 className="font-semibold text-warm mb-1 hover:text-accent line-clamp-1">
-                      {post.title || "无标题"}
-                    </h3>
-                  </Link>
-                  {plainText && (
-                    <p className="text-sm text-muted line-clamp-3 mb-2">{plainText.slice(0, 200)}</p>
-                  )}
-                  {hasImage && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 mb-2" style={{ scrollbarWidth: "none" }}>
-                      {allImages.map((img, idx) => (
-                        <Link key={idx} href={`/read/${post.id}`} className="flex-shrink-0 no-underline">
-                          <img src={img} alt="" className="h-40 w-auto rounded-lg object-cover" loading="lazy" />
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                  {post.tags && post.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {post.tags.map((tag) => {
-                        const tagName = typeof tag === "string" ? tag : tag.name;
-                        return (
-                          <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`}
-                            className="inline-block px-1.5 py-0.5 text-[0.6rem] rounded-full bg-accent-light/40 text-accent/70 hover:bg-accent-light/60 no-underline">
-                            {tagName}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 text-xs text-muted">
-                    <Link href={`/user/${post.user_id}`} className="flex items-center gap-1.5 no-underline hover:opacity-80">
-                      <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
-                      <span className="text-muted">{author?.nickname || "匿名"}</span>
-                    </Link>
-                    <span className="flex items-center gap-1">
-                      <i className="fa-solid fa-heart text-[0.65rem] text-red-400" />
-                      {post.like_count || 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <i className="fa-solid fa-comment text-[0.65rem]" />
-                      {post.comment_count || 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <i className="fa-solid fa-bookmark text-[0.65rem]" />
-                      {post.bookmark_count || 0}
-                    </span>
-                    <span className="ml-auto">{new Date(post.created_at || "").toLocaleDateString("zh-CN")}</span>
-                  </div>
-                </div>
-              );
-            })}
+            {displayStandalone.map((post) => (
+              <PostTagCard key={post.id} post={post} showAuthorAvatar />
+            ))}
           </div>
         )}
       </main>

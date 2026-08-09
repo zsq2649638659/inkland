@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import EmptyState from "@/components/EmptyState";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { getThumbnailUrl } from "@/lib/image";
+import { createNotification } from "@/lib/notifications";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
+import InlineCommentPanel from "@/components/InlineCommentPanel";
+import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Post, Comment } from "@/lib/types";
 
 interface PostCardProps {
@@ -32,40 +35,123 @@ function stripMarkdown(content?: string, maxLen = 300): string {
 function extractImages(content?: string): string[] {
   if (!content) return [];
   const matches = content.matchAll(/!\[.*?\]\((.*?)\)/g);
-  return [...matches].map((m) => m[1]);
+  return [...matches].map((m) => m[1]).filter((url) => !url.startsWith("private://"));
+}
+
+function isPlaceholderTitle(title?: string) {
+  return !title || ["无标题", "图片分享", "Image Title"].includes(title.trim());
 }
 
 export default function PostCard({ post }: PostCardProps) {
   const router = useRouter();
-  const { user } = useAuth();
-  const supabase = createClient();
+  const { user, profile } = useAuth();
+  const supabase = useMemo(() => createClient(), []);
 
   const [showComment, setShowComment] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [commentCount, setCommentCount] = useState(post.comment_count || 0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [shareTip, setShareTip] = useState(false);
+  const [activeImageDot, setActiveImageDot] = useState(0);
+  const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [resolvedContent, setResolvedContent] = useState(post.content || "");
+  const [resolvedCover, setResolvedCover] = useState(post.cover_url || null);
+  const imageScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolvePrivateImages = async () => {
+      const marker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
+      const sourceContent = post.content || "";
+      const sourceCover = post.cover_url || null;
+      const matches = [...sourceContent.matchAll(marker)];
+      const urls = new Map<string, string>();
+      const paths = [...matches.map((match) => match[1]), ...(sourceCover?.match(/^private:\/\/private-post-images\/(.+)$/)?.slice(1) || [])];
+      if (!user || paths.length === 0) {
+        setResolvedContent(sourceContent);
+        setResolvedCover(sourceCover);
+        return;
+      }
+      await Promise.all(paths.map(async (path) => {
+        const { data } = await supabase.storage.from("private-post-images").createSignedUrl(path, 3600);
+        if (data?.signedUrl) urls.set(`private://private-post-images/${path}`, data.signedUrl);
+      }));
+      if (cancelled) return;
+      setResolvedContent(sourceContent.replace(marker, (value) => urls.get(value) || value));
+      setResolvedCover(sourceCover ? urls.get(sourceCover) || sourceCover : null);
+    };
+    void resolvePrivateImages();
+    return () => { cancelled = true; };
+  }, [post.content, post.cover_url, supabase, user]);
 
   const goToLogin = () => {
     router.push("/login");
   };
 
+  // Check follow status
+  useEffect(() => {
+    if (!user || user.id === post.user_id) return;
+    supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", user.id)
+      .eq("following_id", post.user_id)
+      .single()
+      .then(({ data }) => setFollowing(!!data));
+  }, [user, post.user_id]);
+
+  const toggleFollow = async () => {
+    if (!user) { goToLogin(); return; }
+    if (followLoading) return;
+    setFollowLoading(true);
+    if (following) {
+      const { error } = await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", user.id)
+        .eq("following_id", post.user_id);
+      if (!error) setFollowing(false);
+    } else {
+      const { error } = await supabase
+        .from("follows")
+        .insert({ follower_id: user.id, following_id: post.user_id });
+      if (!error) setFollowing(true);
+    }
+    setFollowLoading(false);
+  };
+
   // 计算纯文本摘要和图片
   const plainExcerpt = useMemo(() => {
-    if (post.content) return stripMarkdown(post.content);
+    if (resolvedContent) return stripMarkdown(resolvedContent);
     if (post.excerpt) return stripMarkdown(post.excerpt);
     return "";
-  }, [post.content, post.excerpt]);
+  }, [resolvedContent, post.excerpt]);
   const contentImages = useMemo(() => {
-    if (post.content) return extractImages(post.content);
+    if (resolvedContent) return extractImages(resolvedContent);
     if (post.images) return post.images;
     return [];
-  }, [post.content, post.images]);
-  const hasCover = !!post.cover_url;
+  }, [resolvedContent, post.images]);
+  const hasCover = !!resolvedCover && !resolvedCover.startsWith("private://");
   // 内容中的图片（排除与 cover_url 重复的）
-  const galleryImages = contentImages.filter((img) => !hasCover || img !== post.cover_url);
+  const galleryImages = contentImages.filter((img) => !hasCover || img !== resolvedCover);
+  // 合并所有图片（封面图 + 内容图）
+  const allImages = useMemo(() => {
+    const imgs: string[] = [];
+    if (hasCover && resolvedCover) imgs.push(resolvedCover);
+    if (galleryImages.length > 0) imgs.push(...galleryImages);
+    return imgs;
+  }, [hasCover, resolvedCover, galleryImages]);
+
+  const handleImageScroll = useCallback(() => {
+    if (!imageScrollRef.current) return;
+    const el = imageScrollRef.current;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setActiveImageDot(idx);
+  }, []);
 
   const handleShare = async () => {
     const url = `${window.location.origin}/read/${post.id}`;
@@ -143,11 +229,17 @@ export default function PostCard({ post }: PostCardProps) {
         created_at: (data as Record<string, unknown>).created_at as string,
         parent_id: null,
         paragraph_index: null,
-        author: { nickname: user.email?.split("@")[0] || "我", avatar_url: null },
+        author: { nickname: profile?.nickname || user.email?.split("@")[0] || "我", avatar_url: profile?.avatar_url || null },
       };
       setComments((prev) => [newComment, ...prev]);
       setCommentText("");
       setCommentCount((c) => c + 1);
+      createNotification({
+        type: "comment",
+        actor_id: user.id,
+        post_id: post.id,
+        content: commentText.trim(),
+      });
     }
     setSubmitting(false);
   };
@@ -164,184 +256,143 @@ export default function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <article className="card p-4">
-      <div className="flex items-start gap-3">
-        {/* 左侧：头像 */}
+    <article className="card">
+      {/* V2: card-header — avatar + author info + follow button */}
+      <div className="card-header">
         <Link href={`/user/${post.user_id}`} className="flex-shrink-0">
-          <img
-            src={post.author?.avatar_url || `https://placehold.co/40x40/f5e6d3/b8752e?text=${(post.author?.username || post.author?.nickname)?.[0] || "?"}`}
-            className="w-10 h-10 rounded-full object-cover hover:opacity-80 transition-opacity"
-            alt=""
-          />
-        </Link>
-
-        {/* 右侧：内容区 */}
-        <div className="flex-1 min-w-0">
-          {/* 用户信息行 */}
-          <div className="flex items-center gap-2 mb-1">
-            <Link href={`/user/${post.user_id}`} className="font-medium text-sm text-warm no-underline hover:text-accent">
-              {post.author?.username || post.author?.nickname || "匿名用户"}
-            </Link>
-            <span className="text-xs text-muted">
-              {post.time_ago || post.created_at ? getTimeAgo(post.created_at || "") : "刚刚"}
-            </span>
-            {post.word_count && post.word_count > 5000 && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-accent-light text-accent">
-                万字长文
-              </span>
+          <div className="card-avatar">
+            {post.author?.avatar_url ? (
+              <img src={post.author.avatar_url} alt="" />
+            ) : (
+              <DefaultAvatar name={post.author?.username || post.author?.nickname || "?"} />
             )}
           </div>
+        </Link>
 
-          {/* 标题（无标题时不显示） */}
-          {post.title && post.title !== "无标题" && (
-            <h2 className="mb-2">
-              <Link
-                href={`/read/${post.id}`}
-                className="text-base font-bold text-warm no-underline hover:text-accent leading-snug line-clamp-2"
-              >
-                {post.title}
-              </Link>
-            </h2>
-          )}
+        <div className="card-author-info">
+          <Link href={`/user/${post.user_id}`} className="no-underline">
+            <div className="card-author-name">
+              {post.author?.username || post.author?.nickname || "匿名用户"}
+            </div>
+          </Link>
+          <div className="card-time">
+            {post.time_ago || post.created_at ? getTimeAgo(post.created_at || "") : "刚刚"}
+          </div>
+        </div>
 
-          {/* 摘要（纯文本，无 Markdown） */}
-          {plainExcerpt && (
-            <p className="text-sm text-muted leading-relaxed line-clamp-3 mb-3">
-              {plainExcerpt}
-            </p>
-          )}
+        {user?.id !== post.user_id && (
+          <button
+            className="card-follow-btn"
+            onClick={toggleFollow}
+            disabled={followLoading}
+          >
+            {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
+          </button>
+        )}
 
-          {/* 多图横排展示 */}
-          {galleryImages.length > 0 && (
-            <div className="flex gap-2 mb-3 overflow-x-auto">
-              {galleryImages.map((img, i) => (
+        </div>
+
+      {/* V2: card-title */}
+      {!isPlaceholderTitle(post.title) && (
+        <Link
+          href={`/read/${post.id}`}
+          className="card-title no-underline hover:text-accent"
+        >
+          {post.title}
+        </Link>
+      )}
+
+      {/* V2: card-excerpt — 纯文本摘要 */}
+      {plainExcerpt && (
+        <p className="card-excerpt">
+          {plainExcerpt}
+        </p>
+      )}
+
+      {/* 图片展示：PC端横向滚动 + 渐变遮罩，移动端单图 + 圆点 */}
+      {allImages.length > 0 && (
+        <div className="card-image-strip">
+          <div
+            className={`card-image-scroll ${allImages.length > 1 ? "has-overflow" : ""}`}
+            ref={imageScrollRef}
+            onScroll={handleImageScroll}
+          >
+            {allImages.map((img, i) => (
+              <div key={i} className="card-image-item">
                 <img
-                  key={i}
-                  src={img}
-                  className="feed-cover rounded-lg flex-shrink-0"
+                  src={getThumbnailUrl(img, { width: 400, height: 300, resize: "cover" })}
                   alt=""
-                  loading="lazy"
-                  style={{ height: "200px", width: "auto", maxWidth: "100%" }}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={i === 0 ? "high" : "auto"}
+                  onLoad={() => setLoadedImages(prev => new Set(prev).add(i))}
+                  className={loadedImages.has(i) ? "loaded" : ""}
                 />
+              </div>
+            ))}
+          </div>
+          {allImages.length > 1 && (
+            <div className="card-image-dots">
+              {allImages.map((_, i) => (
+                <span key={i} className={i === activeImageDot ? "active" : ""} />
               ))}
             </div>
           )}
+        </div>
+      )}
 
-          {/* 单图大图（封面图） */}
-          {hasCover && galleryImages.length === 0 && (
-            <Link href={`/read/${post.id}`} className="block mb-3">
-              <img
-                src={post.cover_url!}
-                className="feed-cover rounded-lg flex-shrink-0"
-                alt=""
-                style={{ height: "200px", width: "auto", maxWidth: "100%" }}
-              />
-            </Link>
-          )}
+      {/* V2: 标签 */}
+      {post.tags && post.tags.length > 0 && (
+        <div className="card-tags">
+          {post.tags.map((tag) => {
+            const tagName = typeof tag === "string" ? tag : tag.name;
+            return (
+              <Link key={tagName} href={`/tag/${tagName}`} className="card-tag no-underline">
+                {tagName}
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
-          {/* 标签 */}
-          {post.tags && post.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {post.tags.map((tag) => {
-                const tagName = typeof tag === "string" ? tag : tag.name;
-                return (
-                  <Link key={tagName} href={`/tag/${tagName}`} className="tag">
-                    {tagName}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 底部互动栏 */}
-          <div className="flex items-center gap-3 text-sm">
-            <LikeButton postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} />
-            <button className="interact-btn" onClick={handleCommentClick}>
-              <i className="fa-regular fa-comment mr-1" />
-              {commentCount}
-            </button>
-            <BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} />
-            <div className="ml-auto relative">
-              <button className="interact-btn" onClick={handleShare}>
-                <i className="fa-regular fa-share-from-square" />
-              </button>
-              {shareTip && (
-                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-warm text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                  链接已复制
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 评论区（展开后） */}
-          {showComment && (
-            <div className="mt-3 pt-3 border-t border-rule/50">
-              {/* 输入框 */}
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  placeholder="发一条友善的评论"
-                  className="flex-1 px-3 py-2 text-sm border border-rule rounded-full bg-white text-warm font-sans focus:outline-none focus:border-accent"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submitComment();
-                    if (e.key === "Escape") setShowComment(false);
-                  }}
-                  autoFocus
-                />
-                <button
-                  className="submit-btn text-sm px-4 py-2 rounded-full"
-                  onClick={submitComment}
-                  disabled={submitting || !commentText.trim()}
-                >
-                  {submitting ? "..." : "发送"}
-                </button>
-              </div>
-
-              {/* 评论列表 */}
-              {loadingComments ? (
-                <p className="text-xs text-muted text-center py-3">加载中...</p>
-              ) : comments.length > 0 ? (
-                <div className="space-y-3">
-                  {comments.map((c) => (
-                    <div key={c.id} className="flex gap-2.5">
-                      <img
-                        src={c.author?.avatar_url || `https://placehold.co/28x28/e8d5c8/8c6b4a?text=${(c.author?.nickname || "?")[0]}`}
-                        className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                        alt=""
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-medium text-accent">
-                            {c.author?.nickname || "匿名用户"}
-                          </span>
-                          <span className="text-[0.7rem] text-muted">
-                            {getTimeAgo(c.created_at || "")}
-                          </span>
-                        </div>
-                        <p className="text-sm mt-0.5 leading-relaxed text-warm break-words">
-                          {c.content}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  {commentCount > 5 && (
-                    <Link
-                      href={`/read/${post.id}`}
-                      className="btn-text text-xs py-1 inline-block no-underline"
-                    >
-                      查看全部 {commentCount} 条评论
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <EmptyState icon="fa-comment-dots" title="暂无评论，来说点什么吧" compact />
-              )}
-            </div>
+      {/* V2: card-actions — 互动按钮 */}
+      <div className="card-actions">
+        <LikeButton postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} />
+        <button className="card-action" onClick={handleCommentClick}>
+          <i className="fa-regular fa-comment"></i>
+          <span>{commentCount}</span>
+        </button>
+        <BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} />
+        <div className="relative">
+          <button className="card-action" onClick={handleShare}>
+            <i className="fa-solid fa-arrow-up-from-bracket"></i>
+            <span>分享</span>
+          </button>
+          {shareTip && (
+            <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-warm text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+              链接已复制
+            </span>
           )}
         </div>
       </div>
+
+      {/* 评论区（展开后） */}
+      {showComment && (
+        <InlineCommentPanel
+          postId={post.id}
+          user={user}
+          displayName={profile?.nickname || user?.email?.split("@")[0] || "我"}
+          avatarUrl={profile?.avatar_url}
+          comments={comments}
+          commentCount={commentCount}
+          commentText={commentText}
+          loadingComments={loadingComments}
+          submitting={submitting}
+          onCommentTextChange={setCommentText}
+          onSubmit={submitComment}
+          onClose={() => setShowComment(false)}
+        />
+      )}
     </article>
   );
 }

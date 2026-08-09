@@ -3,8 +3,11 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { compressImage } from "@/lib/image";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 export default function EditProfilePage() {
   const supabase = createClient();
@@ -20,12 +23,33 @@ export default function EditProfilePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // 昵称和邮箱的编辑切换
+  const [nicknameEditOpen, setNicknameEditOpen] = useState(false);
+  const [emailEditOpen, setEmailEditOpen] = useState(false);
+  const [emailValue, setEmailValue] = useState(user?.email || "");
+
+  // 未登录状态
   if (!user) {
     return (
-      <div className="min-h-screen bg-paper flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted mb-4">请先登录</p>
-          <Link href="/login" className="btn-accent no-underline">去登录</Link>
+      <div id="page-profile-edit" className="min-h-screen bg-paper pb-20 lg:pb-0">
+        <div className="main-container">
+          <HomeSidebar />
+          <div className="profile-edit-content">
+            <div className="feed-empty-state">
+              <div className="feed-empty-illustration">
+                <div className="feed-empty-tag-ring">
+                  <div className="feed-empty-ring-outer"></div>
+                  <div className="feed-empty-ring-inner">
+                    <i className="fa-solid fa-user-pen"></i>
+                  </div>
+                </div>
+              </div>
+              <h2 className="feed-empty-title">登录后编辑资料</h2>
+              <p className="feed-empty-desc">登录后即可编辑个人资料和偏好设置</p>
+              <Link href="/login" className="feed-empty-action">登录</Link>
+              <Link href="/register" className="feed-empty-register">还没有账号？立即注册 →</Link>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -38,27 +62,27 @@ export default function EditProfilePage() {
       setError("请选择图片文件");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setError("图片大小不能超过 2MB");
-      return;
-    }
-
     setUploading(true);
     setError("");
 
-    const fileExt = file.name.split(".").pop() || "png";
+    let compressedFile: File;
+    try {
+      compressedFile = (await compressImage(file, { maxDimension: 512, maxBytes: 512 * 1024, quality: 0.88 })).file;
+    } catch (compressionError) {
+      setError(compressionError instanceof Error ? compressionError.message : "图片处理失败，请换一张图片重试");
+      setUploading(false);
+      return;
+    }
+
+    const fileExt = "webp";
     const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 
     const { error: uploadErr } = await supabase.storage
       .from("post-images")
-      .upload(fileName, file, { upsert: true });
+      .upload(fileName, compressedFile, { upsert: true, contentType: "image/webp" });
 
     if (uploadErr) {
-      if (uploadErr.message?.includes("Bucket") || uploadErr.message?.includes("not found")) {
-        setError("上传失败：存储桶 'post-images' 未创建。请在 Supabase Dashboard → Storage 中创建名为 'post-images' 的公开存储桶。");
-      } else {
-        setError(`上传失败: ${uploadErr.message}`);
-      }
+      setError(`上传失败: ${uploadErr.message}`);
       setUploading(false);
       return;
     }
@@ -92,99 +116,187 @@ export default function EditProfilePage() {
       setError(`保存失败: ${updateErr.message}`);
     } else {
       setSuccess("保存成功！");
-      // 刷新页面以更新 AuthProvider 中的 profile
-      setTimeout(() => router.push("/profile"), 800);
+      setNicknameEditOpen(false);
+      setEmailEditOpen(false);
+      setTimeout(() => setSuccess(""), 2500);
     }
     setSaving(false);
   };
 
-  const avatarChar = nickname?.[0] || user.email?.[0] || "?";
+  const handleCancel = () => {
+    setNickname(profile?.nickname || "");
+    setBio(profile?.bio || "");
+    setAvatarUrl(profile?.avatar_url || "");
+    setEmailValue(user?.email || "");
+    setNicknameEditOpen(false);
+    setEmailEditOpen(false);
+    setError("");
+    setSuccess("");
+  };
 
   return (
-    <div className="min-h-screen bg-paper">
-      <header className="sticky top-0 z-50 bg-white border-b border-rule">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/profile" className="btn-ghost no-underline">
-            <i className="fa-solid fa-arrow-left mr-1" />返回
-          </Link>
-          <span className="text-sm font-medium text-warm">编辑资料</span>
-          <button className="submit-btn" onClick={handleSave} disabled={saving}>
-            {saving ? "保存中..." : "保存"}
-          </button>
-        </div>
-      </header>
+    <div id="page-profile-edit" className="min-h-screen bg-paper pb-20 lg:pb-0">
+      <div className="main-container">
+        <HomeSidebar />
 
-      <main className="max-w-lg mx-auto px-4 py-8">
-        <div className="space-y-6">
-          {/* 头像 */}
-          <div className="flex flex-col items-center gap-4">
-            <img
-              src={avatarUrl || `https://placehold.co/100x100/f5e6d3/b8752e?text=${encodeURIComponent(avatarChar)}`}
-              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
-              alt="avatar"
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarUpload}
-            />
-            <button
-              className="text-sm text-accent bg-transparent border border-accent rounded-full px-4 py-1.5 cursor-pointer hover:bg-accent-light transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+        <div className="profile-edit-content">
+          {/* Page Header */}
+          <div className="page-header">
+            <h1 className="page-title">编辑资料</h1>
+          </div>
+
+          {/* Form Card */}
+          <div className="form-card">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSave();
+              }}
+              noValidate
             >
-              {uploading ? (
-                <><i className="fa-solid fa-spinner animate-spin mr-1" />上传中...</>
-              ) : (
-                <><i className="fa-solid fa-camera mr-1" />更换头像</>
+              {/* Avatar */}
+              <div className="avatar-section">
+                <div className="avatar-upload">
+                  <div className="avatar-preview">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="" />
+                    ) : (
+                      <DefaultAvatar name={nickname || user?.email?.[0] || "?"} />
+                    )}
+                  </div>
+                  <div className="avatar-overlay" aria-hidden="true">
+                    <i className="fa-solid fa-camera"></i>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp"
+                    aria-label="更换头像"
+                    onChange={handleAvatarUpload}
+                  />
+                </div>
+                <span className="avatar-hint">
+                  {uploading ? "正在压缩并上传..." : "点击更换头像，支持 PNG、JPEG、WebP，自动压缩"}
+                </span>
+              </div>
+
+              {/* Nickname — 与邮箱同理：显示已有值 + 修改入口 */}
+              <div className="field-group">
+                <label className="field-label">昵称</label>
+                <div className="inline-display" style={{ display: nicknameEditOpen ? "none" : "flex" }}>
+                  <span className="inline-value">{nickname || "未设置"}</span>
+                  <button
+                    type="button"
+                    className="inline-edit-btn"
+                    onClick={() => setNicknameEditOpen(true)}
+                  >
+                    <i className="fa-solid fa-pen"></i> 修改
+                  </button>
+                </div>
+                {nicknameEditOpen && (
+                  <div className="inline-edit-row">
+                    <input
+                      type="text"
+                      className="field-input"
+                      placeholder="输入你的昵称…"
+                      maxLength={30}
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      autoFocus
+                    />
+                    <div className={`char-count${nickname.length > 30 ? " over" : ""}`}>
+                      {nickname.length} / 30
+                    </div>
+                    <span className={`field-error${!nickname.trim() ? " visible" : ""}`} role="alert">
+                      昵称不能为空
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Bio */}
+              <div className="field-group">
+                <label htmlFor="bio" className="field-label">简介</label>
+                <textarea
+                  id="bio"
+                  name="bio"
+                  className="field-textarea"
+                  placeholder="简单介绍一下自己…"
+                  maxLength={200}
+                  rows={4}
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                ></textarea>
+                <div className={`char-count${bio.length > 200 ? " over" : ""}`}>
+                  {bio.length} / 200
+                </div>
+                <span className="field-error" role="alert">简介不能超过 200 个字符</span>
+              </div>
+
+              {/* Email */}
+              <div className="field-group">
+                <label className="field-label">邮箱</label>
+                <div className="inline-display" style={{ display: emailEditOpen ? "none" : "flex" }}>
+                  <span className="inline-value">{user.email}</span>
+                  <button
+                    type="button"
+                    className="inline-edit-btn"
+                    onClick={() => setEmailEditOpen(true)}
+                  >
+                    <i className="fa-solid fa-pen"></i> 修改
+                  </button>
+                </div>
+                {emailEditOpen && (
+                  <div className="inline-edit-row">
+                    <input
+                      type="email"
+                      className="field-input"
+                      placeholder="your@email.com…"
+                      maxLength={50}
+                      value={emailValue}
+                      onChange={(e) => setEmailValue(e.target.value)}
+                      autoFocus
+                    />
+                    <div className={`char-count${emailValue.length > 50 ? " over" : ""}`}>
+                      {emailValue.length} / 50
+                    </div>
+                    <span className="field-error" role="alert">请输入有效的邮箱地址</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 错误/成功提示 */}
+              {error && (
+                <span className="field-error visible" role="alert" style={{ display: "block", marginBottom: "16px" }}>
+                  <i className="fa-solid fa-circle-exclamation" style={{ marginRight: "4px" }}></i>{error}
+                </span>
               )}
-            </button>
-            <p className="text-xs text-muted">支持 JPG、PNG，最大 2MB</p>
-          </div>
+              {success && (
+                <div className="success-toast">
+                  <span className="success-toast-icon">
+                    <i className="fa-solid fa-circle-check"></i>
+                  </span>
+                  <span className="success-toast-text">{success}</span>
+                </div>
+              )}
 
-          {/* 昵称 */}
-          <div>
-            <label className="text-sm text-warm font-medium block mb-1.5">昵称</label>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="输入昵称"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              maxLength={20}
-            />
-            <p className="text-xs text-muted mt-1">{nickname.length}/20</p>
+              {/* Actions */}
+              <div className="form-actions">
+                <button type="button" className="btn-cancel" onClick={handleCancel}>
+                  取消
+                </button>
+                <button type="submit" className="btn-save" disabled={saving}>
+                  {saving ? (
+                    <><i className="fa-solid fa-spinner" style={{ animation: "spin 1s linear infinite" }}></i>保存中...</>
+                  ) : (
+                    <><i className="fa-solid fa-check" aria-hidden="true"></i> 保存</>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-
-          {/* 个人简介 */}
-          <div>
-            <label className="text-sm text-warm font-medium block mb-1.5">个人简介</label>
-            <textarea
-              className="input-field resize-none"
-              rows={4}
-              placeholder="介绍一下自己..."
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              maxLength={200}
-            />
-            <p className="text-xs text-muted mt-1">{bio.length}/200</p>
-          </div>
-
-          {/* 错误/成功提示 */}
-          {error && (
-            <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg p-3">
-              <i className="fa-solid fa-circle-exclamation mr-1" />{error}
-            </p>
-          )}
-          {success && (
-            <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">
-              <i className="fa-solid fa-circle-check mr-1" />{success}
-            </p>
-          )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

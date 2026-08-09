@@ -2,17 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { getThumbnailUrl } from "@/lib/image";
 import { SkeletonStudio } from "@/components/Skeleton";
-import EmptyState from "@/components/EmptyState";
 
 type FilterType = "all" | "novel" | "illustration" | "serial";
-type SortType = "updated" | "created";
+type StatusFilter = "all" | "published" | "draft" | "rejected";
+type SortType = "updated" | "created" | "popular";
 
 interface WorkItem {
   id: string;
   title: string;
+  content: string | null;
   cover_url: string | null;
   post_type: string;
   status: string;
@@ -21,64 +24,61 @@ interface WorkItem {
   word_count: number;
   created_at: string;
   updated_at: string;
+  published_at: string | null;
   series_name: string | null;
   chapter_number: number | null;
   like_count: number;
   comment_count: number;
   bookmark_count: number;
+  series_chapter_count?: number;
+  tags?: string[];
 }
 
 interface SeriesWorkItem {
   id: string;
   name: string;
-  cover_url: string | null;
   description: string;
   series_type: string;
   created_at: string;
   updated_at: string | null;
+  chapter_count: number;
+  tags: string[];
 }
 
 export default function StudioPage() {
   const supabase = createClient();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [works, setWorks] = useState<WorkItem[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesWorkItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string[]>>({});
   const [filter, setFilter] = useState<FilterType>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortType, setSortType] = useState<SortType>("updated");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortOpen, setSortOpen] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
     loadWorks();
     loadSeries();
-  }, [user, filter]);
+  }, [user]);
 
   const loadWorks = async () => {
     if (!user) return;
     setLoading(true);
 
-    // 长篇连载 filter 只从 series 表加载，不需要查 posts
-    if (filter === "serial") {
-      setWorks([]);
-      setLoading(false);
-      return;
-    }
-
     let q = supabase
       .from("posts")
-      .select("id, title, cover_url, post_type, status, review_status, review_reason, word_count, created_at, updated_at, series_name, chapter_number")
+      .select("id, title, content, cover_url, post_type, status, review_status, review_reason, word_count, created_at, updated_at, published_at, series_name, chapter_number, post_tags(tags(name))")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
-
-    if (filter !== "all") {
-      q = q.eq("post_type", filter);
-    }
 
     const { data } = await q.limit(50);
     if (!data) { setLoading(false); return; }
 
-    // 过滤掉所有连载类型的帖子（包括章节和元数据），连载由 series 表统一管理
     const filtered = (data as unknown as Record<string, unknown>[]).filter((p) => {
       return p.post_type !== "serial";
     });
@@ -97,54 +97,117 @@ export default function StudioPage() {
       });
     }
 
-    setWorks(filtered.map((p) => {
+    const workList = filtered.map((p) => {
       const s = statsMap.get(p.id as string) || { like_count: 0, comment_count: 0, bookmark_count: 0 };
-      return { ...p, ...s } as WorkItem;
-    }));
+      const postTags = (p.post_tags as Array<{ tags?: { name?: string } | null }> | undefined) || [];
+      return { ...p, ...s, tags: postTags.map((item) => item.tags?.name).filter((name): name is string => Boolean(name)) } as WorkItem;
+    });
+    setWorks(workList);
     setLoading(false);
+
+    // 解析私有图片的 signed URL
+    const imageTypes = new Set(["illustration", "comic", "cosplay"]);
+    const privateMarker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
+    const urlMap: Record<string, string[]> = {};
+    const resolveTasks = workList
+      .filter((w) => imageTypes.has(w.post_type) && w.content?.includes("private://"))
+      .map(async (w) => {
+        const content = w.content || "";
+        const paths = [...content.matchAll(privateMarker)].map((m) => m[1]);
+        const results = await Promise.all(
+          paths.map(async (path) => {
+            const { data } = await supabase.storage.from("private-post-images").createSignedUrl(path, 3600);
+            return { marker: `private://private-post-images/${path}`, signedUrl: data?.signedUrl || null };
+          })
+        );
+        let resolved = content;
+        for (const { marker, signedUrl } of results) {
+          if (signedUrl) resolved = resolved.split(marker).join(signedUrl);
+        }
+        urlMap[w.id] = [...resolved.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1]);
+      });
+    if (resolveTasks.length > 0) {
+      await Promise.all(resolveTasks);
+      setResolvedImageUrls((prev) => ({ ...prev, ...urlMap }));
+    }
   };
 
   const loadSeries = async () => {
     if (!user) return;
     const { data } = await supabase
       .from("series")
-      .select("id, name, cover_url, description, series_type, created_at, updated_at")
+      .select("id, name, description, tags, series_type, created_at, updated_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (data) {
-      // 按 name 去重（同一连载可能因多次创建在 series 表中有重复条目）
       const seen = new Set<string>();
       const deduped = (data as unknown as SeriesWorkItem[]).filter((s) => {
         if (seen.has(s.name)) return false;
         seen.add(s.name);
         return true;
       });
-      setSeriesList(deduped);
+      const names = deduped.map((s) => s.name);
+      const chapterCountMap = new Map<string, number>();
+      if (names.length > 0) {
+        const { data: chapterRows } = await supabase
+          .from("posts")
+          .select("series_name")
+          .in("series_name", names)
+          .eq("post_type", "serial");
+        for (const row of (chapterRows || []) as Array<{ series_name: string | null }>) {
+          if (row.series_name) chapterCountMap.set(row.series_name, (chapterCountMap.get(row.series_name) || 0) + 1);
+        }
+      }
+      setSeriesList(deduped.map((s) => ({ ...s, chapter_count: chapterCountMap.get(s.name) || 0 })));
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (work: WorkItem) => {
     if (!confirm("确定要删除这篇作品吗？此操作不可撤销。")) return;
-    const { error } = await supabase.from("posts").delete().eq("id", id);
-    if (error) { alert(`删除失败: ${error.message}`); return; }
-    setWorks((prev) => prev.filter((w) => w.id !== id));
+    if (work.post_type === "serial" && work.series_name) {
+      const { error: postsError } = await supabase
+        .from("posts")
+        .delete()
+        .eq("user_id", user?.id)
+        .eq("series_name", work.series_name);
+      if (postsError) { alert(`删除连载章节失败: ${postsError.message}`); return; }
+      const { error: seriesError } = await supabase
+        .from("series")
+        .delete()
+        .eq("id", work.id)
+        .eq("user_id", user?.id);
+      if (seriesError) { alert(`删除合集失败: ${seriesError.message}`); return; }
+      setSeriesList((prev) => prev.filter((s) => s.id !== work.id));
+    } else {
+      const { error } = await supabase.from("posts").delete().eq("id", work.id).eq("user_id", user?.id);
+      if (error) { alert(`删除失败: ${error.message}`); return; }
+    }
+    setWorks((prev) => prev.filter((w) => w.id !== work.id));
+    window.dispatchEvent(new Event("inkland:stats-changed"));
   };
 
+  // Filter by type
+  const typeFilteredWorks = filter === "all"
+    ? works
+    : works.filter((w) => w.post_type === filter);
   const filteredWorks = searchQuery
-    ? works.filter((w) => w.title?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : works;
+    ? typeFilteredWorks.filter((w) => w.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : typeFilteredWorks;
 
-  // 将 series 合并到作品列表中（作为 serial 类型）
+  // Series as works
   const seriesAsWorks: WorkItem[] = seriesList.map((s) => ({
     id: s.id,
     title: s.name,
-    cover_url: s.cover_url,
+    content: s.description || null,
+    // 创作中心不读取连载封面，避免封面字段影响连载作品的识别。
+    cover_url: null,
     post_type: "serial",
     status: "published",
     review_status: "approved",
     review_reason: null,
     word_count: 0,
+    published_at: null,
     created_at: s.created_at,
     updated_at: s.updated_at || s.created_at,
     series_name: s.name,
@@ -152,49 +215,70 @@ export default function StudioPage() {
     like_count: 0,
     comment_count: 0,
     bookmark_count: 0,
+    series_chapter_count: s.chapter_count,
+    tags: s.tags || [],
   }));
 
   const seriesFiltered = searchQuery
     ? seriesAsWorks.filter((s) => s.title?.toLowerCase().includes(searchQuery.toLowerCase()))
     : seriesAsWorks;
 
-  // 根据 filter 决定是否显示 series
   const showSeries = filter === "all" || filter === "serial";
-  const allWorks = [...filteredWorks, ...(showSeries ? seriesFiltered : [])];
+  let allWorks = [...filteredWorks, ...(showSeries ? seriesFiltered : [])];
 
-  // 排序
-  const sortKey = sortType === "updated" ? "updated_at" : "created_at";
-  allWorks.sort((a, b) => {
-    const da = new Date(a[sortKey] || a.created_at).getTime();
-    const db = new Date(b[sortKey] || b.created_at).getTime();
-    return db - da;
-  });
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-paper flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted mb-4">请先登录</p>
-          <Link href="/login" className="btn-accent no-underline">去登录</Link>
-        </div>
-      </div>
-    );
+  // Filter by status
+  if (statusFilter !== "all") {
+    allWorks = allWorks.filter((w) => {
+      if (statusFilter === "rejected") return w.review_status === "rejected";
+      if (statusFilter === "published") return w.status === "published" && w.review_status !== "rejected";
+      if (statusFilter === "draft") return w.status === "draft" && w.review_status !== "rejected";
+      return true;
+    });
   }
 
-  const filters: { key: FilterType; label: string }[] = [
+  // Sort
+  const sortKey = sortType === "updated" ? "updated_at" : "created_at";
+  if (sortType === "popular") {
+    allWorks.sort((a, b) => (b.like_count + b.comment_count + b.bookmark_count) - (a.like_count + a.comment_count + a.bookmark_count));
+  } else {
+    allWorks.sort((a, b) => {
+      const da = new Date(a[sortKey] || a.created_at).getTime();
+      const db = new Date(b[sortKey] || b.created_at).getTime();
+      return db - da;
+    });
+  }
+
+  // Stats (from unfiltered data, not affected by type filter)
+  const allPostsForStats = works.filter((w) => w.post_type !== "serial");
+  const publishedCount = allPostsForStats.filter((w) => w.status === "published" && w.review_status !== "rejected").length + seriesList.length;
+  const draftCount = allPostsForStats.filter((w) => w.status === "draft" && w.review_status !== "rejected").length;
+  const rejectedCount = allPostsForStats.filter((w) => w.review_status === "rejected").length;
+
+  const typeFilters: { key: FilterType; label: string }[] = [
     { key: "all", label: "全部" },
     { key: "novel", label: "单篇" },
     { key: "illustration", label: "图片" },
     { key: "serial", label: "长篇连载" },
   ];
 
-  const publishedCount = allWorks.filter((w) => w.status === "published").length;
-  const draftCount = allWorks.filter((w) => w.status === "draft").length;
-  const rejectedCount = allWorks.filter((w) => w.review_status === "rejected").length;
+  const statusFilters: { key: StatusFilter; label: string }[] = [
+    { key: "all", label: "全部状态" },
+    { key: "published", label: "已发布" },
+    { key: "draft", label: "草稿" },
+    { key: "rejected", label: "未过审" },
+  ];
+
+  const sortOptions: { key: SortType; label: string }[] = [
+    { key: "updated", label: "最近更新" },
+    { key: "created", label: "最近创建" },
+    { key: "popular", label: "热度最高" },
+  ];
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case "illustration": return "图片";
+      case "illustration":
+      case "comic":
+      case "cosplay": return "图片";
       case "serial": return "长篇连载";
       case "novel": return "单篇";
       default: return type;
@@ -203,213 +287,501 @@ export default function StudioPage() {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case "illustration": return "fa-image";
+      case "illustration":
+      case "comic":
+      case "cosplay": return "fa-image";
       case "serial": return "fa-book";
       default: return "fa-feather-pointed";
     }
   };
 
-  const getStatusBadge = (w: WorkItem) => {
-    if (w.review_status === "rejected") {
-      return (
-        <span className="inline-block px-2 py-0.5 rounded-full text-[0.6rem] bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800" title={w.review_reason || "未过审"}>
-          未过审
-        </span>
-      );
-    }
-    if (w.status === "published") {
-      return <span className="inline-block px-2 py-0.5 rounded-full text-[0.6rem] bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800">已发布</span>;
-    }
-    return <span className="inline-block px-2 py-0.5 rounded-full text-[0.6rem] bg-orange-50 dark:bg-orange-900/30 text-orange-500 dark:text-orange-400 border border-orange-200 dark:border-orange-800">草稿</span>;
+  const getImageUrls = (content?: string | null) => {
+    if (!content) return [];
+    return [...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]);
   };
 
-  return (
-    <div className="min-h-screen bg-paper">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* 顶部统计 */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-card rounded-xl border border-rule p-4">
-            <div className="text-2xl font-bold text-warm">{allWorks.length}</div>
-            <div className="text-xs text-muted mt-1">总作品数</div>
-          </div>
-          <div className="bg-card rounded-xl border border-rule p-4">
-            <div className="text-2xl font-bold text-warm">{publishedCount}</div>
-            <div className="text-xs text-muted mt-1">已发布</div>
-          </div>
-          <div className="bg-card rounded-xl border border-rule p-4">
-            <div className="text-2xl font-bold text-orange-500">{draftCount}</div>
-            <div className="text-xs text-muted mt-1">草稿</div>
-          </div>
-          <div className="bg-card rounded-xl border border-rule p-4">
-            <div className="text-2xl font-bold text-red-500">{rejectedCount}</div>
-            <div className="text-xs text-muted mt-1">未过审</div>
+  const getExcerpt = (content?: string | null) => {
+    if (!content) return "";
+    return content
+      .replace(/!\[[^\]]*\]\(([^)]+)\)/g, "")
+      .replace(/[#>*_`~-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 48);
+  };
+
+  const handleTagDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const startX = event.clientX;
+    const startScrollLeft = element.scrollLeft;
+    const handleMove = (moveEvent: MouseEvent) => {
+      element.scrollLeft = startScrollLeft - (moveEvent.clientX - startX);
+    };
+    const handleUp = () => {
+      element.classList.remove("is-dragging");
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+    };
+    element.classList.add("is-dragging");
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+  };
+
+  useEffect(() => {
+    const tagRows = Array.from(document.querySelectorAll<HTMLElement>(".studio-card-tags"));
+    const updateOverflow = (element: HTMLElement) => {
+      element.classList.toggle("has-overflow", element.scrollWidth > element.clientWidth + 1);
+    };
+    const observers = tagRows.map((element) => {
+      updateOverflow(element);
+      const observer = new ResizeObserver(() => updateOverflow(element));
+      observer.observe(element);
+      return observer;
+    });
+    return () => observers.forEach((observer) => observer.disconnect());
+  }, [allWorks.length, filter, statusFilter, searchQuery]);
+
+  const getStatusClass = (w: WorkItem) => {
+    if (w.review_status === "rejected") return "status-rejected";
+    if (w.status === "published") return "status-published";
+    return "status-draft";
+  };
+
+  const isScheduled = (w: WorkItem) => w.status === "draft" && w.published_at && new Date(w.published_at).getTime() > Date.now();
+
+  const getStatusLabel = (w: WorkItem) => {
+    if (w.review_status === "rejected") return "未过审";
+    if (w.status === "published") return "已发布";
+    if (isScheduled(w)) return "定时发布";
+    return "草稿";
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === allWorks.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allWorks.map((w) => w.id)));
+    }
+  };
+
+  const batchPublish = async () => {
+    if (selectedIds.size === 0) return;
+    const { error } = await supabase.from("posts").update({ status: "published", published_at: new Date().toISOString() }).in("id", Array.from(selectedIds));
+    if (error) { alert(`批量发布失败: ${error.message}`); return; }
+    setWorks((prev) => prev.map((w) => selectedIds.has(w.id) ? { ...w, status: "published" } : w));
+    setBatchMode(false);
+    setSelectedIds(new Set());
+    window.dispatchEvent(new Event("inkland:stats-changed"));
+  };
+
+  const batchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!user) return;
+    if (!confirm(`确定要删除选中的 ${selectedIds.size} 篇作品吗？此操作不可撤销。`)) return;
+    const selectedWorks = allWorks.filter((w) => selectedIds.has(w.id));
+    const selectedSeries = selectedWorks.filter((w) => w.post_type === "serial" && w.series_name);
+    const selectedPosts = selectedWorks.filter((w) => w.post_type !== "serial");
+    if (selectedPosts.length > 0) {
+      const { error } = await supabase.from("posts").delete().in("id", selectedPosts.map((w) => w.id)).eq("user_id", user.id);
+      if (error) { alert(`批量删除失败: ${error.message}`); return; }
+    }
+    for (const seriesWork of selectedSeries) {
+      const { error: postsError } = await supabase.from("posts").delete().eq("user_id", user.id).eq("series_name", seriesWork.series_name);
+      if (postsError) { alert(`批量删除连载章节失败: ${postsError.message}`); return; }
+    }
+    if (selectedSeries.length > 0) {
+      const { error } = await supabase.from("series").delete().in("id", selectedSeries.map((w) => w.id)).eq("user_id", user.id);
+      if (error) { alert(`批量删除合集失败: ${error.message}`); return; }
+      setSeriesList((prev) => prev.filter((s) => !selectedSeries.some((w) => w.id === s.id)));
+    }
+    setWorks((prev) => prev.filter((w) => !selectedIds.has(w.id)));
+    setBatchMode(false);
+    setSelectedIds(new Set());
+    window.dispatchEvent(new Event("inkland:stats-changed"));
+  };
+
+  if (authLoading) {
+    return <div className="min-h-screen bg-paper pb-20 lg:pb-0"><div className="main-container"><HomeSidebar /><div className="content-area"><SkeletonStudio /></div></div></div>;
+  }
+
+  // 未登录状态
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-paper pb-20 lg:pb-0">
+        <div className="main-container">
+          <HomeSidebar />
+          <div className="content-area">
+            <div className="feed-empty-state">
+              <div className="feed-empty-illustration">
+                <div className="feed-empty-tag-ring">
+                  <div className="feed-empty-ring-outer"></div>
+                  <div className="feed-empty-ring-inner">
+                    <i className="fa-solid fa-pen-to-square"></i>
+                  </div>
+                </div>
+              </div>
+              <h2 className="feed-empty-title">登录后管理你的创作</h2>
+              <p className="feed-empty-desc">登录后即可发布作品、管理草稿和查看数据</p>
+              <Link href="/login" className="feed-empty-action">登录</Link>
+              <Link href="/register" className="feed-empty-register">还没有账号？立即注册 →</Link>
+            </div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* 工具栏 */}
-        <div className="bg-card rounded-xl border border-rule p-4 mb-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Link href="/create" className="btn-accent no-underline text-sm">
-                <i className="fa-solid fa-plus mr-1" />新建作品
-              </Link>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="搜索作品..."
-                  className="pl-8 pr-3 py-1.5 text-sm border border-rule rounded-lg bg-paper dark:bg-[#2a2a2a] focus:outline-none focus:border-accent w-48"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted" />
+  return (
+    <div className="min-h-screen bg-paper pb-20 lg:pb-0">
+      <div className="main-container">
+        <HomeSidebar />
+        <div className="content-area">
+          {loading ? (
+            <SkeletonStudio />
+          ) : (
+            <>
+          {/* 页面头部 */}
+          <div className="page-header">
+            <h1 className="page-title">创作中心</h1>
+            <p className="page-subtitle">管理你的所有作品，追踪创作进度与互动数据</p>
+          </div>
+
+          {/* 统计卡片（使用未筛选数据，不受 type/status 筛选影响） */}
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--total">
+                <i className="fa-solid fa-layer-group"></i>
+              </div>
+              <div className="stat-card-number">{works.length + seriesList.length}</div>
+              <div className="stat-card-label">总作品数</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--published">
+                <i className="fa-solid fa-circle-check"></i>
+              </div>
+              <div className="stat-card-number">{publishedCount}</div>
+              <div className="stat-card-label">已发布</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--draft">
+                <i className="fa-solid fa-pencil"></i>
+              </div>
+              <div className="stat-card-number">{draftCount}</div>
+              <div className="stat-card-label">草稿</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon stat-card-icon--rejected">
+                <i className="fa-solid fa-circle-exclamation"></i>
+              </div>
+              <div className="stat-card-number">{rejectedCount}</div>
+              <div className="stat-card-label">未过审</div>
+            </div>
+          </div>
+
+          {/* 移动端工具栏 */}
+          <div className="toolbar toolbar-mobile">
+            <div className="segmented-tabs">
+              <div className="segmented-tabs-left">
+                {typeFilters.map((f) => (
+                  <button
+                    key={f.key}
+                    className={`segmented-tab ${filter === f.key ? "active" : ""}`}
+                    onClick={() => setFilter(f.key)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="segmented-tabs-right">
+                {statusFilters.map((f) => (
+                  <button
+                    key={f.key}
+                    className={`segmented-tab ${statusFilter === f.key ? "active" : ""}`}
+                    onClick={() => setStatusFilter(f.key)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="flex gap-1 bg-paper dark:bg-[#2a2a2a] rounded-lg p-0.5">
-              {filters.map((f) => (
-                <button
-                  key={f.key}
-                  className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
-                    filter === f.key ? "bg-accent text-white" : "text-muted hover:text-warm"
-                  }`}
-                  onClick={() => setFilter(f.key)}
-                >
-                  {f.label}
+            <div className="search-wrap">
+              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+              <input
+                type="text"
+                placeholder="搜索作品标题..."
+                aria-label="创作中心搜索"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="toolbar-row" style={{ justifyContent: "space-between" }}>
+              <div className="sort-wrap">
+                <button className="btn-sort" onClick={() => setSortOpen(!sortOpen)}>
+                  <i className="fa-solid fa-arrow-down-wide-short"></i>
+                  <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
                 </button>
-              ))}
-            </div>
-            <div className="flex gap-1 bg-paper dark:bg-[#2a2a2a] rounded-lg p-0.5">
-              <button
-                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${sortType === "updated" ? "bg-accent text-white" : "text-muted hover:text-warm"}`}
-                onClick={() => setSortType("updated")}
-              >
-                <i className="fa-solid fa-clock-rotate-left mr-1" />最近更新
-              </button>
-              <button
-                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${sortType === "created" ? "bg-accent text-white" : "text-muted hover:text-warm"}`}
-                onClick={() => setSortType("created")}
-              >
-                <i className="fa-solid fa-calendar-plus mr-1" />最近创建
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 作品列表 */}
-        {loading ? (
-          <SkeletonStudio />
-        ) : filteredWorks.length === 0 && seriesList.length === 0 ? (
-          <div className="bg-card rounded-xl border border-rule">
-            <EmptyState
-              icon="fa-feather-pointed"
-              title={searchQuery ? "没有找到匹配的作品" : "还没有作品，开始创作吧"}
-              actionLabel={searchQuery ? undefined : "开始创作"}
-              actionHref={searchQuery ? undefined : "/create"}
-            />
-          </div>
-        ) : (
-          <div className="bg-card rounded-xl border border-rule overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-rule bg-paper dark:bg-[#2a2a2a]">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted w-12">#</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted">作品标题</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted w-20">类型</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted w-20">状态</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted w-32">互动数据</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted w-36">更新时间</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted w-36">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allWorks.map((w, i) => (
-                  <tr key={w.id} className="border-b border-rule last:border-b-0 hover:bg-paper dark:hover:bg-[#333] transition-colors">
-                    <td className="px-4 py-3 text-xs text-muted">{i + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-accent-light flex-shrink-0">
-                          {w.cover_url ? (
-                            <img src={w.cover_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <i className={`fa-solid ${getTypeIcon(w.post_type)} text-accent/40 text-sm`} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <Link
-                            href={w.post_type === "serial" && w.series_name
-                              ? `/studio/series/${encodeURIComponent(w.series_name)}`
-                              : `/read/${w.id}`}
-                            className="text-sm font-medium text-warm hover:text-accent no-underline truncate block"
-                          >
-                            {w.title || "无标题"}
-                          </Link>
-                          {w.series_name && (
-                            <span className="text-xs text-accent">{w.series_name}</span>
-                          )}
-                          {w.review_status === "rejected" && w.review_reason && (
-                            <p className="text-xs text-red-500 mt-0.5 truncate">
-                              <i className="fa-solid fa-circle-exclamation mr-1" />{w.review_reason}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-muted">{getTypeLabel(w.post_type)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {getStatusBadge(w)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3 text-xs text-muted">
-                        <span className="flex items-center gap-1">
-                          <i className="fa-regular fa-heart text-[0.6rem]" />{w.like_count || 0}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <i className="fa-regular fa-comment text-[0.6rem]" />{w.comment_count || 0}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <i className="fa-regular fa-bookmark text-[0.6rem]" />{w.bookmark_count || 0}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-muted">
-                        {new Date(w.updated_at || w.created_at).toLocaleDateString("zh-CN")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        {w.post_type === "serial" && w.series_name ? (
-                          <Link
-                            href={`/studio/series/${encodeURIComponent(w.series_name)}`}
-                            className="text-xs text-accent hover:bg-accent-light px-2 py-1 rounded-md transition-colors no-underline"
-                          >
-                            <i className="fa-solid fa-pen-to-square mr-1" />管理
-                          </Link>
-                        ) : (
-                          <Link
-                            href={`/create?editPost=${w.id}`}
-                            className="text-xs text-accent hover:bg-accent-light px-2 py-1 rounded-md transition-colors no-underline"
-                          >
-                            <i className="fa-solid fa-pen-to-square mr-1" />编辑
-                          </Link>
-                        )}
-                        <button
-                          className="text-xs text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded-md transition-colors border-none bg-transparent cursor-pointer"
-                          onClick={() => handleDelete(w.id)}
-                        >
-                          <i className="fa-solid fa-trash-can mr-1" />删除
+                {sortOpen && (
+                  <>
+                    <div className="sort-overlay show" onClick={() => setSortOpen(false)}></div>
+                    <div className="sort-popup show">
+                      <div className="sort-popup-header">
+                        <span className="sort-popup-title">排序方式</span>
+                        <button className="sort-popup-close" onClick={() => setSortOpen(false)}>
+                          <i className="fa-solid fa-xmark"></i>
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      {sortOptions.map((opt) => (
+                        <button
+                          key={opt.key}
+                          className={`sort-option ${sortType === opt.key ? "active" : ""}`}
+                          onClick={() => { setSortType(opt.key); setSortOpen(false); }}
+                        >
+                          <span>{opt.label}</span>
+                          <i className="fa-solid fa-check"></i>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              <button
+                className="btn-batch"
+                onClick={() => { setBatchMode(!batchMode); setSelectedIds(new Set()); }}
+              >
+                <i className="fa-solid fa-list-check"></i> 批量操作
+              </button>
+            </div>
           </div>
-        )}
+
+          {/* PC 工具栏 */}
+          <div className="toolbar toolbar-pc">
+            {!batchMode ? (
+              <div className="toolbar-pc-normal">
+                <div className="segmented-tabs">
+                  <div className="segmented-tabs-left">
+                    {typeFilters.map((f) => (
+                      <button
+                        key={f.key}
+                        className={`segmented-tab ${filter === f.key ? "active" : ""}`}
+                        onClick={() => setFilter(f.key)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="segmented-tabs-right">
+                    {statusFilters.map((f) => (
+                      <button
+                        key={f.key}
+                        className={`segmented-tab ${statusFilter === f.key ? "active" : ""}`}
+                        onClick={() => setStatusFilter(f.key)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="studio-toolbar-row2">
+                  <div className="search-wrap">
+                    <i className="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input
+                      type="text"
+                      placeholder="搜索作品标题..."
+                      aria-label="创作中心搜索"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <div className="toolbar-spacer"></div>
+                  <div className="toolbar-pc-right">
+                    <div className="sort-wrap">
+                      <button
+                        className={`sort-select ${sortOpen ? "open" : ""}`}
+                        onClick={() => setSortOpen(!sortOpen)}
+                      >
+                        <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
+                        <i className="fa-solid fa-chevron-down sort-arrow"></i>
+                      </button>
+                      <div className={`sort-dropdown ${sortOpen ? "show" : ""}`}>
+                        {sortOptions.map((opt) => (
+                          <button
+                            key={opt.key}
+                            className={`sort-option ${sortType === opt.key ? "active" : ""}`}
+                            onClick={() => { setSortType(opt.key); setSortOpen(false); }}
+                          >
+                            <i className="fa-solid fa-check"></i> {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button className="btn-batch-toggle" onClick={() => setBatchMode(true)}>
+                      <i className="fa-solid fa-list-check"></i> 批量操作
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="toolbar-pc-batch active">
+                <span className="batch-count">已选 {selectedIds.size} 项</span>
+                <button className="batch-chip" onClick={selectAll}>全选</button>
+                <div className="toolbar-divider"></div>
+                <button className="batch-action" onClick={batchPublish}>
+                  <i className="fa-solid fa-cloud-arrow-up"></i> 批量发布
+                </button>
+                <button className="batch-action batch-action--danger" onClick={batchDelete}>
+                  <i className="fa-solid fa-trash-can"></i> 批量删除
+                </button>
+                <div className="toolbar-spacer"></div>
+                <button className="batch-action batch-action--cancel" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>
+                  <i className="fa-solid fa-xmark"></i> 取消选择
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 作品列表 */}
+          {allWorks.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-illustration">
+                <div className="empty-tag-ring">
+                  <div className="tag-ring-outer"></div>
+                  <div className="tag-ring-inner">
+                    <i className="fa-solid fa-feather-pointed"></i>
+                  </div>
+                </div>
+              </div>
+              <h2 className="empty-title">{searchQuery ? "没有找到匹配的作品" : "还没有任何作品"}</h2>
+              <p className="empty-desc">{searchQuery ? "换个关键词试试吧" : "创建你的第一个作品，开始创作之旅"}</p>
+              {!searchQuery && (
+                <Link href="/create" className="empty-action">
+                  <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>创建作品
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="works-card-grid">
+              {allWorks.map((w) => (
+                <div
+                  key={w.id}
+                  className={`work-card ${batchMode ? "batch-mode" : ""} ${selectedIds.has(w.id) ? "selected" : ""}`}
+                  onClick={() => batchMode && toggleSelect(w.id)}
+                >
+                  <input
+                    type="checkbox"
+                    className="card-check"
+                    checked={selectedIds.has(w.id)}
+                    onChange={() => toggleSelect(w.id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <div className="card-body">
+                    {(() => {
+                      const imageUrls = resolvedImageUrls[w.id] || getImageUrls(w.content);
+                      const isImage = ["illustration", "comic", "cosplay"].includes(w.post_type);
+                      const isSeries = w.post_type === "serial";
+                      const isPlaceholderTitle = isImage && ["图片分享", "Image Title"].includes(w.title?.trim());
+                      const displayTitle = isPlaceholderTitle ? "" : w.title?.trim();
+                      return <>
+                    {!isImage && <div className="card-meta">
+                      <span className="card-type-label">
+                        <i className={`fa-solid ${getTypeIcon(w.post_type)}`}></i>
+                        {getTypeLabel(w.post_type)}
+                      </span>
+                      <span className={`card-status ${getStatusClass(w)}`}>
+                        <span className="status-dot"></span>
+                        {getStatusLabel(w)}
+                      </span>
+                    </div>}
+                    {isImage && imageUrls[0] && (
+                      <div className="studio-work-preview">
+                        <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
+                        <div className="card-meta studio-preview-meta">
+                          <span className="card-type-label">
+                            <i className={`fa-solid ${getTypeIcon(w.post_type)}`}></i>
+                            {getTypeLabel(w.post_type)}
+                          </span>
+                          <span className={`card-status ${getStatusClass(w)}`}>
+                            <span className="status-dot"></span>
+                            {getStatusLabel(w)}
+                          </span>
+                        </div>
+                        <span className="studio-image-count">{imageUrls.length} 张图片</span>
+                      </div>
+                    )}
+                    {isImage && !imageUrls[0] && <div className="card-meta">
+                      <span className="card-type-label"><i className={`fa-solid ${getTypeIcon(w.post_type)}`}></i>{getTypeLabel(w.post_type)}</span>
+                      <span className={`card-status ${getStatusClass(w)}`}><span className="status-dot"></span>{getStatusLabel(w)}</span>
+                    </div>}
+                    {!isImage && displayTitle ? <div className="card-title">{displayTitle}</div> : (
+                      !isImage && <div className="card-title card-title-placeholder">{getExcerpt(w.content) || "无标题"}</div>
+                    )}
+                    {!isImage && <div className="studio-card-description">{getExcerpt(w.content) || (isSeries ? "暂无系列简介，进入管理页面查看章节内容" : "暂无正文摘要")}</div>}
+                    {(w.tags || []).length > 0 && (
+                      <div className="studio-card-tags" onMouseDown={handleTagDragStart} title="拖动查看全部标签">
+                        {(w.tags || []).map((tag) => <span key={tag} className="studio-card-tag">{tag}</span>)}
+                      </div>
+                    )}
+                    <div className="card-actions">
+                      {w.post_type === "serial" && w.series_name ? (
+                        <Link
+                          href={`/studio/series/${encodeURIComponent(w.series_name)}`}
+                          className="card-btn card-btn-edit"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <i className="fa-solid fa-pen-to-square"></i> 管理
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/create?editPost=${w.id}`}
+                          className="card-btn card-btn-edit"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <i className="fa-solid fa-pen-to-square"></i> 编辑
+                        </Link>
+                      )}
+                      <button
+                        className="card-btn card-btn-delete"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(w); }}
+                      >
+                        <i className="fa-solid fa-trash-can"></i> 删除
+                      </button>
+                    </div>
+                      </>;
+                    })()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="page-footer">&copy; 2026 inkland. All rights reserved.</div>
+          </>
+          )}
+        </div>
+      </div>
+
+      {/* 批量操作底部栏（移动端） */}
+      <div className={`batch-bar ${batchMode ? "show" : ""}`}>
+        <span className="batch-bar-count">已选 {selectedIds.size} 项</span>
+        <div className="batch-bar-actions">
+          <button className="batch-bar-btn batch-bar-btn--publish" onClick={batchPublish}>
+            <i className="fa-solid fa-cloud-arrow-up"></i> 发布
+          </button>
+          <button className="batch-bar-btn batch-bar-btn--delete" onClick={batchDelete}>
+            <i className="fa-solid fa-trash-can"></i> 删除
+          </button>
+          <button className="batch-bar-btn batch-bar-btn--cancel" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>
+            <i className="fa-solid fa-xmark"></i> 取消
+          </button>
+        </div>
       </div>
     </div>
   );

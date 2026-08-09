@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { createNotification } from "@/lib/notifications";
 
 interface BookmarkButtonProps {
   postId: string;
@@ -11,9 +12,10 @@ interface BookmarkButtonProps {
   onLogin?: () => void;
   iconOnly?: boolean;
   plain?: boolean;
+  className?: string;
 }
 
-export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly, plain }: BookmarkButtonProps) {
+export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly, plain, className }: BookmarkButtonProps) {
   const supabase = createClient();
   const router = useRouter();
   const { user } = useAuth();
@@ -58,6 +60,11 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
       if (!error) {
         setBookmarked(true);
         setCount((c) => c + 1);
+        createNotification({
+          type: "bookmark",
+          actor_id: user.id,
+          post_id: postId,
+        });
       }
     }
     setLoading(false);
@@ -66,27 +73,27 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
   if (iconOnly) {
     if (plain) {
       return (
-        <button className="flex items-center gap-1 text-sm text-muted hover:text-accent transition-colors bg-transparent border-none cursor-pointer p-0" title="收藏" onClick={toggle} disabled={loading}>
-          <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "#b8752e" } : undefined} />
+        <button className={`stat-item ${className || ""}`} title="收藏" onClick={toggle} disabled={loading}>
+          <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
           <span>{count}</span>
         </button>
       );
     }
     return (
       <button className="rs-btn" title="收藏" onClick={toggle} disabled={loading}>
-        <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "#b8752e" } : undefined} />
+        <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "#F26B5B" } : undefined} />
       </button>
     );
   }
 
   return (
     <button
-      className="interact-btn"
+      className={`card-action ${bookmarked ? "liked" : ""}`}
       onClick={toggle}
       disabled={loading}
     >
-      <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark mr-1`} />
-      {count}
+      <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} />
+      <span>{count}</span>
     </button>
   );
 }

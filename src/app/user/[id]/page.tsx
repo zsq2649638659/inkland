@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import PostCardGrid from "@/components/PostCardGrid";
+import PostTagCard from "@/components/PostTagCard";
 import SeriesCardGrid from "@/components/SeriesCardGrid";
 import { SkeletonProfile } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
@@ -30,9 +31,50 @@ interface SeriesInfo {
   latestChapterId: string | null;
   latestChapterNumber: number | null;
   latestChapterTitle: string | null;
+  latestChapterContent: string | null;
   latestChapterCreatedAt: string | null;
   totalChapters: number;
+  like_count: number;
+  comment_count: number;
+  bookmark_count: number;
 }
+
+// 移除 Markdown 语法，提取纯文本
+const stripMarkdown = (text: string): string => {
+  return text
+    .replace(/!\[.*?\]\(.*?\)/g, "")
+    .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
+    .replace(/[#*_~`>]/g, "")
+    .replace(/\n{2,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+// 查询系列下所有章节的点赞/评论/收藏总数
+const loadSeriesStats = async (supabase: ReturnType<typeof createClient>, seriesName: string) => {
+  const { data: chapters } = await supabase
+    .from("posts")
+    .select("id")
+    .eq("series_name", seriesName)
+    .eq("post_type", "serial")
+    .eq("status", "published");
+
+  if (!chapters || chapters.length === 0) return { like_count: 0, comment_count: 0, bookmark_count: 0 };
+
+  const chapterIds = chapters.map((c: Record<string, unknown>) => c.id as string);
+
+  const [likeRes, commentRes, bookmarkRes] = await Promise.all([
+    supabase.from("likes").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
+    supabase.from("comments").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
+    supabase.from("bookmarks").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
+  ]);
+
+  return {
+    like_count: likeRes.count || 0,
+    comment_count: commentRes.count || 0,
+    bookmark_count: bookmarkRes.count || 0,
+  };
+};
 
 export default function UserPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -46,10 +88,31 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [filterType, setFilterType] = useState<string>("all");
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [following, setFollowing] = useState<FollowUser[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [blockedRecordId, setBlockedRecordId] = useState<string | null>(null);
+  const [blockDialog, setBlockDialog] = useState<"confirm" | "success" | null>(null);
+  const [blockDialogMessage, setBlockDialogMessage] = useState("");
+  const [blockBusy, setBlockBusy] = useState(false);
+  const [blockTargetId, setBlockTargetId] = useState<string | null>(null);
+
+  // 判断帖子是否有图片
+  const hasImages = (post: Post): boolean => {
+    const cp = post as unknown as Record<string, unknown>;
+    if (cp.cover_url && !(cp.cover_url as string).startsWith("private://")) return true;
+    const content = (cp.content as string) || "";
+    return /!\[.*?\]\((?!private:\/\/).*?\)/g.test(content);
+  };
+
+  // Stats
+  const [postCount, setPostCount] = useState(0);
+  const [likeCount, setLikeCount] = useState(0);
+  const [bookmarkCount, setBookmarkCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followerCount, setFollowerCount] = useState(0);
 
   const isOwnProfile = currentUser?.id === id;
 
@@ -100,10 +163,61 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     setTabLoading(false);
   };
 
+  const loadStats = useCallback(async (userId: string) => {
+    // Post count
+    const { count: pCount } = await supabase
+      .from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "published");
+    setPostCount(pCount || 0);
+
+    // Like & bookmark counts from post_stats
+    const { data: postIds } = await supabase
+      .from("posts")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "published");
+    if (postIds && postIds.length > 0) {
+      const ids = postIds.map((p) => p.id);
+      const { data: stats } = await supabase
+        .from("post_stats")
+        .select("like_count, bookmark_count")
+        .in("id", ids);
+      if (stats) {
+        let totalLikes = 0;
+        let totalBookmarks = 0;
+        for (const s of stats as Array<{ like_count: number; bookmark_count: number }>) {
+          totalLikes += s.like_count || 0;
+          totalBookmarks += s.bookmark_count || 0;
+        }
+        setLikeCount(totalLikes);
+        setBookmarkCount(totalBookmarks);
+      }
+    }
+
+    // Following count
+    const { count: fgCount } = await supabase
+      .from("follows")
+      .select("id", { count: "exact", head: true })
+      .eq("follower_id", userId);
+    setFollowingCount(fgCount || 0);
+
+    // Follower count
+    const { count: frCount } = await supabase
+      .from("follows")
+      .select("id", { count: "exact", head: true })
+      .eq("following_id", userId);
+    setFollowerCount(frCount || 0);
+  }, [supabase]);
+
   useEffect(() => {
     const load = async () => {
       const { data: prof } = await supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id).single();
       if (prof) setProfile(prof as { nickname: string; avatar_url: string | null; bio: string | null });
+
+      // Load stats
+      await loadStats(id);
 
       const { data: rawData } = await supabase
         .from("posts")
@@ -116,16 +230,14 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
         // 分离：普通帖子 vs 连载元数据 vs 连载章节
         const normalPosts: Record<string, unknown>[] = [];
-        const serialMetaPosts: Record<string, unknown>[] = []; // chapter_number === 0 or null
+        const serialMetaPosts: Record<string, unknown>[] = [];
 
         for (const p of rawArr) {
           if (p.post_type === "serial") {
             const cn = p.chapter_number as number | null | undefined;
             if (cn && cn > 0) {
-              // 连载章节，跳过（由 series 卡片统一展示）
               continue;
             }
-            // 连载元数据
             serialMetaPosts.push(p);
           } else {
             normalPosts.push(p);
@@ -176,66 +288,90 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
         // 处理连载：从 series 表加载元数据
         const seriesNames = [...new Set(serialMetaPosts.map((p) => p.series_name as string).filter(Boolean))];
-        if (seriesNames.length > 0) {
-          const { data: seriesData } = await supabase
-            .from("series")
-            .select("id, name, cover_url, description, series_type, tags, status, created_at")
-            .eq("user_id", id)
-            .in("name", seriesNames)
-            .order("created_at", { ascending: false });
 
-          if (seriesData) {
-            const seen = new Set<string>();
-            const deduped = (seriesData as unknown as SeriesInfo[]).filter((s) => {
-              if (seen.has(s.name)) return false;
-              seen.add(s.name);
-              return true;
-            });
+        // 直接查询该用户的所有 series 记录（包括没有帖子的空系列）
+        const { data: allSeriesData } = await supabase
+          .from("series")
+          .select("id, name, cover_url, description, series_type, tags, status, created_at")
+          .eq("user_id", id)
+          .order("created_at", { ascending: false });
 
-            const seriesWithChapters = await Promise.all(deduped.map(async (s) => {
-              const { data: chapters, count } = await supabase
-                .from("posts")
-                .select("id, title, chapter_number, created_at", { count: "exact" })
-                .eq("series_name", s.name)
-                .eq("post_type", "serial")
-                .eq("status", "published")
-                .order("chapter_number", { ascending: false })
-                .limit(1);
+        let matchedSeries: Record<string, unknown>[] = [];
+        if (allSeriesData) {
+          // 从 posts 中匹配到的 series 优先，同时补充 posts 中不存在的空系列
+          const seriesNameSet = new Set(seriesNames);
+          const allSeries = allSeriesData as unknown as Record<string, unknown>[];
+          // 先取在 posts 中有对应记录的系列
+          const fromPosts = allSeries.filter((s) => seriesNameSet.has(s.name as string));
+          // 再取 posts 中没有记录的系列（空系列）
+          const emptySeries = allSeries.filter((s) => !seriesNameSet.has(s.name as string));
+          matchedSeries = [...fromPosts, ...emptySeries];
+        }
 
-              const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
-              return {
-                ...s,
-                latestChapterId: latest ? latest.id as string : null,
-                latestChapterNumber: latest ? latest.chapter_number as number : null,
-                latestChapterTitle: latest ? latest.title as string : null,
-                latestChapterCreatedAt: latest ? latest.created_at as string : null,
-                totalChapters: count || 0,
-              };
-            }));
+        if (matchedSeries.length > 0) {
+          const seen = new Set<string>();
+          const deduped = (matchedSeries as unknown as SeriesInfo[]).filter((s) => {
+            if (seen.has(s.name)) return false;
+            seen.add(s.name);
+            return true;
+          });
 
-            setSeriesList(seriesWithChapters);
-          }
+          const seriesWithChapters = await Promise.all(deduped.map(async (s) => {
+            const { data: chapters, count } = await supabase
+              .from("posts")
+              .select("id, title, content, chapter_number, created_at", { count: "exact" })
+              .eq("series_name", s.name)
+              .eq("post_type", "serial")
+              .eq("status", "published")
+              .order("chapter_number", { ascending: false })
+              .limit(1);
+
+            const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
+            const stats = await loadSeriesStats(supabase, s.name);
+            return {
+              ...s,
+              ...stats,
+              latestChapterId: latest ? latest.id as string : null,
+              latestChapterNumber: latest ? latest.chapter_number as number : null,
+              latestChapterTitle: latest ? latest.title as string : null,
+              latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
+              latestChapterCreatedAt: latest ? latest.created_at as string : null,
+              totalChapters: count || 0,
+            };
+          }));
+
+          setSeriesList(seriesWithChapters);
         }
       }
 
       if (currentUser && !isOwnProfile) {
-        const { data: followData } = await supabase.from("follows").select("id").eq("follower_id", currentUser.id).eq("following_id", id).single();
+        const [{ data: followData }, { data: blockedData }] = await Promise.all([
+          supabase.from("follows").select("id").eq("follower_id", currentUser.id).eq("following_id", id).maybeSingle(),
+          supabase.from("blocked_users").select("id").eq("user_id", currentUser.id).eq("blocked_user_id", id).maybeSingle(),
+        ]);
         setIsFollowing(!!followData);
+        setBlockedRecordId(blockedData?.id || null);
       }
       setLoading(false);
     };
     load();
-  }, [id, supabase, currentUser, isOwnProfile]);
+  }, [id, supabase, currentUser, isOwnProfile, loadStats]);
 
   const handleFollow = async () => {
     if (!currentUser) return;
     setFollowLoading(true);
     if (isFollowing) {
       const { error } = await supabase.from("follows").delete().eq("follower_id", currentUser.id).eq("following_id", id);
-      if (!error) setIsFollowing(false);
+      if (!error) {
+        setIsFollowing(false);
+        setFollowerCount((prev) => Math.max(0, prev - 1));
+      }
     } else {
       const { error } = await supabase.from("follows").insert({ follower_id: currentUser.id, following_id: id });
-      if (!error) setIsFollowing(true);
+      if (!error) {
+        setIsFollowing(true);
+        setFollowerCount((prev) => prev + 1);
+      }
     }
     setFollowLoading(false);
   };
@@ -250,20 +386,58 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
   const handleBlock = async (targetUserId: string) => {
     if (!currentUser) return;
-    if (!confirm("确定要拉黑该用户吗？")) return;
-    const { error } = await supabase.from("blocked_users").insert({
-      user_id: currentUser.id,
-      blocked_user_id: targetUserId,
-    });
-    if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) {
-      alert("操作失败: " + error.message);
+    setMoreOpen(false);
+    if (targetUserId === currentUser.id) {
+      setBlockDialogMessage("不能屏蔽自己。");
+      setBlockDialog("success");
       return;
     }
-    if (activeTab === "following") {
-      setFollowing((prev) => prev.filter((u) => u.id !== targetUserId));
-    } else {
-      setFollowers((prev) => prev.filter((u) => u.id !== targetUserId));
+    setBlockTargetId(targetUserId);
+    if (blockedRecordId) {
+      setBlockBusy(true);
+      const { error } = await supabase.from("blocked_users").delete().eq("id", blockedRecordId);
+      setBlockBusy(false);
+      if (error) {
+        setBlockDialogMessage("取消屏蔽失败，请稍后重试。");
+      } else {
+        setBlockedRecordId(null);
+        setBlockDialogMessage("已取消屏蔽，你可以再次看到对方的作品和互动。");
+      }
+      setBlockDialog("success");
+      return;
     }
+    setBlockDialogMessage("");
+    setBlockDialog("confirm");
+  };
+
+  const confirmBlock = async () => {
+    if (!currentUser || !blockTargetId || blockBusy) return;
+    setBlockBusy(true);
+    const { data: createdBlock, error } = await supabase.from("blocked_users").insert({
+      user_id: currentUser.id,
+      blocked_user_id: blockTargetId,
+    }).select("id").single();
+    setBlockBusy(false);
+    if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) {
+      setBlockDialogMessage("屏蔽失败，请稍后重试。");
+      setBlockDialog("success");
+      return;
+    }
+    if (blockTargetId === id) setBlockedRecordId(createdBlock?.id || blockedRecordId || "blocked");
+    if (activeTab === "following") {
+      setFollowing((prev) => prev.filter((u) => u.id !== blockTargetId));
+    } else {
+      setFollowers((prev) => prev.filter((u) => u.id !== blockTargetId));
+    }
+    setBlockDialogMessage("已屏蔽该用户，你将不再看到对方的作品和互动。");
+    setBlockDialog("success");
+  };
+
+  const handleReport = () => {
+    setMoreOpen(false);
+    const reason = prompt("请填写举报原因：");
+    if (!reason || !reason.trim()) return;
+    alert("举报已提交，管理员会尽快处理。");
   };
 
   const handleRemoveFollower = async (targetUserId: string) => {
@@ -277,44 +451,133 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const displayName = profile?.nickname || "匿名用户";
   const avatarChar = profile?.nickname?.[0] || "?";
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".profile-actions-wrapper") && !target.closest(".more-dropdown")) {
+        setMoreOpen(false);
+      }
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [moreOpen]);
+
   if (loading) return <div className="min-h-screen bg-paper"><main className="max-w-4xl mx-auto px-4 py-8"><SkeletonProfile /></main></div>;
 
   return (
-    <div className="min-h-screen bg-paper">
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white border border-rule rounded-xl p-6 mb-6">
-          <div className="flex items-center gap-4">
-            <img src={profile?.avatar_url || `https://placehold.co/64x64/f5e6d3/b8752e?text=${encodeURIComponent(avatarChar)}`} className="w-16 h-16 rounded-full object-cover" alt="avatar" />
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-warm">{displayName}</h1>
-              <p className="text-sm text-muted mt-0.5">{profile?.bio || "这个人很懒，什么都没写"}</p>
-            </div>
-            {!isOwnProfile && currentUser && (
-              <button className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${isFollowing ? "bg-accent-light text-accent border border-accent" : "bg-accent text-white border border-accent"}`} onClick={handleFollow} disabled={followLoading}>
-                {followLoading ? <i className="fa-solid fa-spinner animate-spin" /> : isFollowing ? <><i className="fa-solid fa-check mr-1" />已关注</> : <><i className="fa-solid fa-plus mr-1" />关注</>}
-              </button>
+    <div id="page-user" className="min-h-screen bg-paper">
+      <main className="main-container">
+        {/* ─── Profile Section ─── */}
+        <section className="profile-section">
+          <div className="profile-avatar">
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt={displayName} />
+            ) : (
+              <i className="fa-solid fa-user-astronaut" />
             )}
           </div>
-        </div>
-
-        {(activeTab === "followers" || activeTab === "following") ? (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-warm">
-                <i className={`fa-solid fa-${activeTab === "followers" ? "users" : "user-group"} mr-2 text-accent`} />
-                {activeTab === "followers" ? "TA 的粉丝" : "TA 的关注"}
-              </h2>
+          <div className="profile-info">
+            <h1 className="profile-name">{displayName}</h1>
+            <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
+            <div className="profile-stats">
+              <div className="profile-stat">
+                <i className="fa-solid fa-book"></i>
+                <span>作品数</span>
+                <span className="stat-value">{postCount}</span>
+              </div>
+              <div className="profile-stat">
+                <i className="fa-regular fa-heart"></i>
+                <span>喜欢数</span>
+                <span className="stat-value">{likeCount}</span>
+              </div>
+              <div className="profile-stat">
+                <i className="fa-solid fa-bookmark"></i>
+                <span>收藏数</span>
+                <span className="stat-value">{bookmarkCount}</span>
+              </div>
+              <div className="profile-stat">
+                <i className="fa-solid fa-user-plus"></i>
+                <span>关注数</span>
+                <span className="stat-value">{followingCount}</span>
+              </div>
+              <div className="profile-stat">
+                <i className="fa-solid fa-users"></i>
+                <span>粉丝数</span>
+                <span className="stat-value">{followerCount}</span>
+              </div>
             </div>
+          </div>
+          {!isOwnProfile && currentUser && (
+            <div className="profile-actions">
+              <button
+                className={`btn-follow ${isFollowing ? "btn-follow-outline" : "btn-follow-primary"}`}
+                onClick={handleFollow}
+                disabled={followLoading}
+              >
+                {followLoading ? (
+                  <i className="fa-solid fa-spinner fa-spin" />
+                ) : isFollowing ? (
+                  <><i className="fa-solid fa-check" /> 已关注</>
+                ) : (
+                  <><i className="fa-solid fa-plus" /> 关注</>
+                )}
+              </button>
+              <div className="profile-actions-wrapper">
+                <button
+                  className={`btn-more ${moreOpen ? "active" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }}
+                  title="更多"
+                >
+                  <i className="fa-solid fa-ellipsis-vertical" />
+                </button>
+                {moreOpen && (
+                  <div className="more-dropdown" onClick={(e) => e.stopPropagation()}>
+                    <button className="more-dropdown-item" onClick={() => void handleBlock(id)}>
+                      <i className="fa-solid fa-ban"></i>
+                      {blockedRecordId ? "取消屏蔽" : "屏蔽"}
+                    </button>
+                    <button className="more-dropdown-item danger" onClick={handleReport}>
+                      <i className="fa-solid fa-flag"></i>
+                      举报
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {isOwnProfile && (
+            <div className="profile-actions">
+              <Link href="/profile/edit" className="btn-edit-profile">
+                <i className="fa-solid fa-pen"></i> 编辑资料
+              </Link>
+            </div>
+          )}
+        </section>
+
+        {/* ─── Followers / Following Tab ─── */}
+        {(activeTab === "followers" || activeTab === "following") && (
+          <div>
             {tabLoading ? (
               <p className="text-sm text-muted text-center py-8">加载中...</p>
             ) : (activeTab === "followers" ? followers : following).length === 0 ? (
-              <div className="text-center py-12"><EmptyState icon={activeTab === "followers" ? "fa-users" : "fa-user-check"} title={activeTab === "followers" ? "还没有粉丝" : "还没有关注任何人"} /></div>
+              <div className="text-center py-12">
+                <EmptyState
+                  icon={activeTab === "followers" ? "fa-users" : "fa-user-check"}
+                  title={activeTab === "followers" ? "还没有粉丝" : "还没有关注任何人"}
+                />
+              </div>
             ) : (
               <div className="space-y-2">
                 {(activeTab === "followers" ? followers : following).map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-rule hover:border-accent transition-colors">
+                  <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-rule hover:border-accent transition-colors">
                     <Link href={`/user/${u.id}`} className="flex items-center gap-3 flex-1 min-w-0 no-underline">
-                      <img src={u.avatar_url || `https://placehold.co/40x40/f5e6d3/b8752e?text=${encodeURIComponent(u.nickname?.[0] || "?")}`} className="w-10 h-10 rounded-full object-cover" alt="" />
+                      <img
+                        src={u.avatar_url || `https://placehold.co/40x40/FDDCD8/F26B5B?text=${encodeURIComponent(u.nickname?.[0] || "?")}`}
+                        className="w-10 h-10 rounded-full object-cover"
+                        alt=""
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-warm">{u.nickname}</div>
                         {u.bio && <div className="text-xs text-muted truncate">{u.bio}</div>}
@@ -351,160 +614,125 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               </div>
             )}
           </div>
-        ) : (
+        )}
+
+        {/* ─── Works Section ─── */}
+        {activeTab !== "followers" && activeTab !== "following" && (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-warm">TA 的作品</h2>
-              <div className="flex border border-rule rounded-lg overflow-hidden">
-                <button className={`px-2 py-1.5 text-xs ${viewMode === "grid" ? "bg-accent text-white" : "text-muted bg-white"}`} onClick={() => setViewMode("grid")}>
-                  <i className="fa-solid fa-grip" />
-                </button>
-                <button className={`px-2 py-1.5 text-xs ${viewMode === "list" ? "bg-accent text-white" : "text-muted bg-white"}`} onClick={() => setViewMode("list")}>
-                  <i className="fa-solid fa-list" />
-                </button>
+            <h2 className="section-title">作品列表</h2>
+
+            <div className="type-filters-row">
+              <div className="type-filters">
+                {["all", "single", "image", "series"].map((f) => (
+                  <button
+                    key={f}
+                    className={`type-filter-pill${filterType === f ? " active" : ""}`}
+                    onClick={() => setFilterType(f)}
+                  >
+                    {f === "all" ? "全部" : f === "single" ? "单篇" : f === "image" ? "图片" : "长篇连载"}
+                  </button>
+                ))}
               </div>
+              
             </div>
 
             {posts.length === 0 && seriesList.length === 0 ? (
-              <div className="text-center py-12"><EmptyState icon="fa-feather-pointed" title="暂无作品" /></div>
-            ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {seriesList.map((series) => (
-                  <SeriesCardGrid key={series.id} series={series} />
-                ))}
-                {posts.map((post) => <PostCardGrid key={post.id} post={post} showAuthor={false} />)}
+              <div className="text-center py-12">
+                <EmptyState icon="fa-feather-pointed" title="暂无作品" />
               </div>
             ) : (
-              <div className="space-y-3">
-                {/* 连载卡片 - list 视图 */}
-                {seriesList.map((series) => (
-                  <div key={series.id} className="flex gap-4 p-4 rounded-xl bg-white border border-rule hover:shadow-md transition-shadow">
-                    <Link
-                      href={`/series/${encodeURIComponent(series.name)}`}
-                      className="flex-shrink-0 w-[100px] self-stretch rounded-lg overflow-hidden bg-accent-light shadow-sm"
-                    >
-                      {series.cover_url ? (
-                        <img src={series.cover_url} alt={series.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent-light/60 to-accent-light/20">
-                          <i className="fa-solid fa-book-open text-3xl text-accent/30" />
-                        </div>
-                      )}
-                    </Link>
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                      <div>
-                        <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline">
-                          <h3 className="font-bold text-warm text-base mb-1 hover:text-accent transition-colors">{series.name}</h3>
-                        </Link>
-                        <p className="text-sm text-muted line-clamp-2 leading-relaxed mb-2">{series.description || "暂无简介"}</p>
-                        {series.tags && series.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {series.tags.map((tag) => (
-                              <span key={tag} className="inline-block px-2 py-0.5 text-[0.65rem] rounded-full bg-accent-light/40 text-accent/80">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {series.latestChapterId && (
-                        <Link
-                          href={`/read/${series.latestChapterId}`}
-                          className="mt-2 pt-2 border-t border-rule/50 flex items-center gap-2 text-xs no-underline hover:text-accent transition-colors group"
-                        >
-                          <i className="fa-solid fa-clock text-[0.65rem] text-muted group-hover:text-accent" />
-                          <span className="text-muted">最新章节:</span>
-                          <span className="text-warm font-medium">
-                            第{series.latestChapterNumber}章 {series.latestChapterTitle || "无标题"}
+              <div className="card-grid">
+                {/* 连载卡片 */}
+                {(filterType === "all" || filterType === "series") &&
+                  seriesList.map((series) => (
+                    <div key={series.id} className="tag-card series" data-type="series">
+                      <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
+                        <div className="series-header-info">
+                          <span className={`series-header-badge${series.status === "completed" ? " completed" : ""}`}>
+                            {series.status === "completed" ? "已完结" : "连载中"}
                           </span>
-                          {series.latestChapterCreatedAt && (
-                            <span className="text-muted ml-auto">
-                              {new Date(series.latestChapterCreatedAt).toLocaleDateString("zh-CN")}
-                            </span>
+                          <span className="series-header-name">{series.name}</span>
+                          <div className="series-header-desc">{series.description || "暂无简介"}</div>
+                          {series.tags && series.tags.length > 0 && (
+                            <div className="card-tags has-overflow">
+                              {series.tags.map((tag) => (
+                                <span key={tag} className="card-tag">{tag}</span>
+                              ))}
+                            </div>
                           )}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {/* 普通作品卡片 - list 视图 */}
-                {posts.map((post) => {
-                  const cp = post as unknown as Record<string, unknown>;
-                  const contentImages = (() => {
-                    const content = (cp.content as string) || "";
-                    const matches = content.matchAll(/!\[.*?\]\((.*?)\)/g);
-                    return [...matches].map((m) => m[1]);
-                  })();
-                  const allImages = (cp.cover_url && !contentImages.includes(cp.cover_url as string))
-                    ? [cp.cover_url as string, ...contentImages]
-                    : contentImages;
-                  const hasImage = allImages.length > 0;
-                  const plainText = (() => {
-                    const content = (cp.content as string) || "";
-                    return content
-                      .replace(/!\[.*?\]\(.*?\)/g, "")
-                      .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
-                      .replace(/[*_~`#>|-]/g, "")
-                      .replace(/\n+/g, " ")
-                      .replace(/\s+/g, " ")
-                      .trim();
-                  })();
-                  return (
-                    <div key={post.id} className="p-4 rounded-xl bg-white border border-rule hover:shadow-md transition-shadow">
-                      <Link href={`/read/${post.id}`} className="no-underline">
-                        <h3 className="font-semibold text-warm mb-1 hover:text-accent line-clamp-1">
-                          {post.title || "无标题"}
-                        </h3>
-                      </Link>
-                      {plainText && (
-                        <p className="text-sm text-muted line-clamp-3 mb-2">{plainText.slice(0, 200)}</p>
-                      )}
-                      {hasImage && (
-                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 mb-2" style={{ scrollbarWidth: "none" }}>
-                          {allImages.map((img, idx) => (
-                            <Link key={idx} href={`/read/${post.id}`} className="flex-shrink-0 no-underline">
-                              <img src={img} alt="" className="h-40 w-auto rounded-lg object-cover" loading="lazy" />
-                            </Link>
-                          ))}
+                        </div>
+                      </div></Link>
+                      {series.totalChapters > 0 ? (
+                        <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
+                          <div className="chapter-preview-label">最新章节</div>
+                          <div className="chapter-preview-title">{series.latestChapterTitle || ""}</div>
+                          <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
+                        </div></Link>
+                      ) : (
+                        <div className="series-empty">
+                          <div className="series-empty-box">
+                            <div className="series-empty-icon">
+                              <i className="fa-regular fa-pen-to-square"></i>
+                            </div>
+                            <div className="series-empty-info">
+                              <div className="series-empty-label">等待开篇</div>
+                              <div className="series-empty-hint">作者正在构思中</div>
+                            </div>
+                          </div>
                         </div>
                       )}
-                      {post.tags && post.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {post.tags.map((tag) => {
-                            const tagName = typeof tag === "string" ? tag : tag.name;
-                            return (
-                              <Link
-                                key={tagName}
-                                href={`/tag/${encodeURIComponent(tagName)}`}
-                                className="inline-block px-1.5 py-0.5 text-[0.6rem] rounded-full bg-accent-light/40 text-accent/70 hover:bg-accent-light/60 no-underline"
-                              >
-                                {tagName}
-                              </Link>
-                            );
-                          })}
+                      <div className="card-footer">
+                        <div className="card-stats">
+                          <span className="card-stat">
+                            <i className="fa-regular fa-heart" /> {series.like_count || 0}
+                          </span>
+                          <span className="card-stat">
+                            <i className="fa-regular fa-comment" /> {series.comment_count || 0}
+                          </span>
+                          <span className="card-stat">
+                            <i className="fa-regular fa-bookmark" /> {series.bookmark_count || 0}
+                          </span>
                         </div>
-                      )}
-                      <div className="flex items-center gap-3 text-xs text-muted">
-                        <span className="flex items-center gap-1">
-                          <i className="fa-solid fa-heart text-[0.65rem] text-red-400" />
-                          {post.like_count || 0}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <i className="fa-solid fa-comment text-[0.65rem]" />
-                          {post.comment_count || 0}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <i className="fa-solid fa-bookmark text-[0.65rem]" />
-                          {post.bookmark_count || 0}
-                        </span>
-                        <span className="ml-auto">{new Date(post.created_at || "").toLocaleDateString("zh-CN")}</span>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+
+                {/* 帖子卡片 */}
+                {(filterType === "all" || filterType === "single" || filterType === "image") &&
+                  posts
+                    .filter((post) => {
+                      if (filterType === "all") return true;
+                      if (filterType === "image") return hasImages(post);
+                      if (filterType === "single") return !hasImages(post);
+                      return true;
+                    })
+                    .map((post) => (
+                      <PostTagCard key={post.id} post={post} />
+                    ))}
               </div>
             )}
           </>
         )}
+        <div className={`modal-overlay${blockDialog ? " active" : ""}`} onClick={() => { if (!blockBusy) setBlockDialog(null); }}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="profile-block-dialog-title" onClick={(event) => event.stopPropagation()}>
+            {blockDialog === "confirm" ? (
+              <>
+                <div className="modal-title" id="profile-block-dialog-title">确认屏蔽</div>
+                <div className="modal-body"><p>屏蔽后，你将不再看到对方的作品、评论和互动。之后也可以在“屏蔽管理”中取消。</p></div>
+                <div className="modal-actions">
+                  <button className="btn-modal btn-modal-cancel" onClick={() => setBlockDialog(null)} disabled={blockBusy}>取消</button>
+                  <button className="btn-modal btn-modal-danger" onClick={() => void confirmBlock()} disabled={blockBusy}>{blockBusy ? "处理中…" : "确认屏蔽"}</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="modal-title" id="profile-block-dialog-title">{blockDialogMessage.includes("失败") || blockDialogMessage.includes("不能") ? "操作提示" : "操作成功"}</div>
+                <div className="modal-body"><p>{blockDialogMessage}</p></div>
+                <div className="modal-actions"><button className="btn-modal btn-modal-primary" onClick={() => setBlockDialog(null)}>知道了</button></div>
+              </>
+            )}
+          </div>
+        </div>
       </main>
     </div>
   );

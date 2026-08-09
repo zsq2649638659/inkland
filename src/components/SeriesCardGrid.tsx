@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getThumbnailUrl } from "@/lib/image";
 
 interface SeriesCardGridProps {
   series: {
@@ -26,10 +27,10 @@ interface SeriesCardGridProps {
 
 export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCardGridProps) {
   const author = series.author;
-  const avatarUrl = author?.avatar_url || `https://placehold.co/20x20/f5e6d3/b8752e?text=${encodeURIComponent(author?.nickname?.[0] || "?")}`;
+  const avatarUrl = author?.avatar_url || `https://placehold.co/20x20/FDDCD8/F26B5B?text=${encodeURIComponent(author?.nickname?.[0] || "?")}`;
 
   return (
-    <div className="rounded-xl bg-white border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
+    <div className="rounded-xl bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
       {/* 封面区 */}
       <Link
         href={`/series/${encodeURIComponent(series.name)}`}
@@ -37,7 +38,7 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
       >
         {series.cover_url ? (
           <img
-            src={series.cover_url}
+            src={getThumbnailUrl(series.cover_url, { width: 400, height: 400, resize: "cover" })}
             alt={series.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"

@@ -14,7 +14,7 @@ export interface Post {
   title?: string;
   content?: string;
   cover_url?: string | null;
-  visibility?: "public" | "login_required";
+  visibility?: "public" | "followers_only" | "private";
   word_count?: number;
   status?: "draft" | "published";
   rating?: "all" | "r15" | "r18";
@@ -24,6 +24,7 @@ export interface Post {
   chapter_title?: string | null;
   created_at?: string;
   updated_at?: string;
+  published_at?: string | null;
   // Joined fields
   author?: Profile;
   tags?: string[] | Tag[];

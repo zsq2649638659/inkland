@@ -1,25 +1,29 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
+import "@fontsource/noto-sans-sc/300.css";
+import "@fontsource/noto-sans-sc/400.css";
+import "@fontsource/noto-sans-sc/500.css";
+import "@fontsource/noto-sans-sc/700.css";
+import "@fontsource/noto-serif-sc/400.css";
+import "@fontsource/noto-serif-sc/600.css";
+import "@fontsource/noto-serif-sc/700.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
 
-const notoSans = Noto_Sans_SC({
-  variable: "--font-noto-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "700"],
-});
-
-const notoSerif = Noto_Serif_SC({
-  variable: "--font-noto-serif",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-});
-
 export const metadata: Metadata = {
-  title: "墨者 — 同人创作社区",
+  title: "inkland — 同人创作社区",
   description: "一个干净、无广告、尊重阅读体验的同人创作社区。支持图文创作、标签搜索、段评互动。",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "inkland — 同人创作社区",
+    description: "一个干净、无广告、尊重阅读体验的同人创作社区。",
+    type: "website",
+    siteName: "inkland",
+    locale: "zh_CN",
+  },
+  twitter: { card: "summary" },
 };
 
 export default function RootLayout({
@@ -30,18 +34,18 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className={`${notoSans.variable} ${notoSerif.variable} h-full antialiased`}
+      className="h-full antialiased"
       suppressHydrationWarning
       data-scroll-behavior="smooth"
     >
-      <Script
-        id="theme-init"
-        strategy="beforeInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");else document.documentElement.setAttribute("data-theme","light");}catch(e){}})()`,
-        }}
-      />
-      <body className="min-h-full flex flex-col pt-14">
+      <body className="min-h-full">
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");else document.documentElement.setAttribute("data-theme","light");}catch(e){}})()`,
+          }}
+        />
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
