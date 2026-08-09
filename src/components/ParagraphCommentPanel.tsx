@@ -469,7 +469,7 @@ onReport,
                             className="comment-popup-item"
                             onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(c.id, c.user_id); }}
                           >
-                            <i className="fa-solid fa-flag" /> 举报
+                            <i className="fa-regular fa-flag" /> 举报
                           </button>
                           <button
                             className="comment-popup-item"
@@ -576,7 +576,7 @@ onReport,
                                             className="comment-popup-item"
                                             onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(reply.id, reply.user_id); }}
                                           >
-                                            <i className="fa-solid fa-flag" /> 举报
+                                            <i className="fa-regular fa-flag" /> 举报
                                           </button>
                                           <button
                                             className="comment-popup-item"
