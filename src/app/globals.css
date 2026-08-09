@@ -6055,6 +6055,11 @@ p {
   visibility: visible;
 }
 
+/* 举报/屏蔽弹窗不覆盖作品卡片内容 */
+.moderation-modal-overlay {
+  background: transparent;
+}
+
 .modal {
   background: var(--color-card, #FFFFFF);
   border-radius: var(--radius-lg, 20px);
