@@ -194,31 +194,36 @@ export default function SettingsPage() {
           </div>
 
           {/* ---- Panel: 修改密码 ---- */}
-          <div className="settings-panel" style={{ display: activeTab === "password" ? "block" : "none" }}>
+          <form
+            className="settings-panel"
+            autoComplete="off"
+            onSubmit={(event) => { event.preventDefault(); void handlePasswordChange(); }}
+            style={{ display: activeTab === "password" ? "block" : "none" }}
+          >
             <h2 className="settings-panel-title">修改密码</h2>
             <p className="settings-panel-desc">请设置一个强密码，建议包含大小写字母、数字和特殊字符。</p>
 
             <div className="settings-form-group">
-              <label className="settings-form-label">当前密码</label>
-              <input type="password" className="settings-form-input" placeholder="请输入当前密码" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+              <label htmlFor="settings-current-password" className="settings-form-label">当前密码</label>
+              <input id="settings-current-password" name="settings-current-password" type="password" className="settings-form-input" placeholder="请输入当前密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
             </div>
 
             <div className="settings-form-group">
-              <label className="settings-form-label">新密码</label>
-              <input type="password" className="settings-form-input" placeholder="请输入新密码" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <label htmlFor="settings-new-password" className="settings-form-label">新密码</label>
+              <input id="settings-new-password" name="settings-new-password" type="password" className="settings-form-input" placeholder="请输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
               <span className="settings-form-hint">至少 8 位，包含大小写字母和数字</span>
             </div>
 
             <div className="settings-form-group">
-              <label className="settings-form-label">确认新密码</label>
-              <input type="password" className="settings-form-input" placeholder="请再次输入新密码" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <label htmlFor="settings-confirm-password" className="settings-form-label">确认新密码</label>
+              <input id="settings-confirm-password" name="settings-confirm-password" type="password" className="settings-form-input" placeholder="请再次输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
 
             {passwordMessage && <p className="text-sm text-muted mb-4" role="status">{passwordMessage}</p>}
-            <button className="settings-btn-save" onClick={() => void handlePasswordChange()} disabled={passwordSaving}>
+            <button type="submit" className="settings-btn-save" disabled={passwordSaving}>
               <i className="fa-solid fa-check" aria-hidden="true"></i> {passwordSaving ? "保存中…" : "保存修改"}
             </button>
-          </div>
+          </form>
 
           {/* ---- Panel: 屏蔽管理 (user card grid, 2 columns) ---- */}
           <div className="settings-panel" style={{ display: activeTab === "blocked" ? "block" : "none" }}>
