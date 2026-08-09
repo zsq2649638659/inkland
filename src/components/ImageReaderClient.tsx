@@ -41,6 +41,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   // 举报状态
   const [reportModal, setReportModal] = useState<{ open: boolean; targetType: "comment" | "post"; targetId: string } | null>(null);
   const [reportReason, setReportReason] = useState("");
+  const [reportCustomReason, setReportCustomReason] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   // 屏蔽弹窗状态
   const [blockModal, setBlockModal] = useState<{ open: boolean; userId: string } | null>(null);
@@ -333,20 +334,23 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
     if (!user) { goToLogin(); return; }
     setReportModal({ open: true, targetType: "comment", targetId: commentId });
     setReportReason("");
+    setReportCustomReason("");
   };
 
   const handlePostReport = () => {
     if (!user) { goToLogin(); return; }
     setReportModal({ open: true, targetType: "post", targetId: post.id });
     setReportReason("");
+    setReportCustomReason("");
   };
 
   const submitReport = async () => {
-    if (!reportModal || !reportReason.trim()) return;
+    const reason = reportReason === "其他" ? reportCustomReason.trim() : reportReason.trim();
+    if (!reportModal || !reason) return;
     setReportSubmitting(true);
     const { error } = reportModal.targetType === "comment"
-      ? await supabase.from("comment_reports").insert({ comment_id: reportModal.targetId, reporter_id: user!.id, reason: reportReason.trim() })
-      : await supabase.from("content_reports").insert({ reporter_id: user!.id, target_type: "post", target_id: reportModal.targetId, reason: reportReason.trim() });
+      ? await supabase.from("comment_reports").insert({ comment_id: reportModal.targetId, reporter_id: user!.id, reason })
+      : await supabase.from("content_reports").insert({ reporter_id: user!.id, target_type: "post", target_id: reportModal.targetId, reason });
     setReportSubmitting(false);
     if (error) { showToast("举报失败: " + error.message); return; }
     setReportModal(null);
@@ -921,7 +925,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       </div>
 
       {/* 举报弹窗 */}
-      <div className={`modal-overlay${reportModal?.open ? " active" : ""}`} onClick={() => setReportModal(null)}>
+      <div className={`modal-overlay moderation-modal-overlay${reportModal?.open ? " active" : ""}`} onClick={() => setReportModal(null)}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">举报原因</div>
           <div className="modal-body">
@@ -938,13 +942,23 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                 </li>
               ))}
             </ul>
+            {reportReason === "其他" && (
+              <textarea
+                className="moderation-custom-reason"
+                value={reportCustomReason}
+                onChange={(event) => setReportCustomReason(event.target.value)}
+                placeholder="请填写举报理由"
+                rows={3}
+                autoFocus
+              />
+            )}
           </div>
           <div className="modal-actions">
             <button className="btn-modal btn-modal-cancel" onClick={() => setReportModal(null)}>取消</button>
             <button
               className="btn-modal btn-modal-primary"
               onClick={submitReport}
-              disabled={reportSubmitting || !reportReason}
+              disabled={reportSubmitting || !reportReason || (reportReason === "其他" && !reportCustomReason.trim())}
             >
               {reportSubmitting ? "提交中..." : "提交举报"}
             </button>
@@ -953,11 +967,11 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       </div>
 
       {/* 屏蔽确认弹窗 */}
-      <div className={`modal-overlay${blockModal?.open ? " active" : ""}`} onClick={() => setBlockModal(null)}>
+      <div className={`modal-overlay moderation-modal-overlay${blockModal?.open ? " active" : ""}`} onClick={() => setBlockModal(null)}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">确认屏蔽</div>
           <div className="modal-body">
-            <p>确定要屏蔽该用户吗？屏蔽后，该用户将无法评论你的作品。</p>
+            <p>确定要屏蔽该用户吗？屏蔽后，该用户将无法与您产生任何互动。</p>
           </div>
           <div className="modal-actions">
             <button className="btn-modal btn-modal-cancel" onClick={() => setBlockModal(null)}>取消</button>
