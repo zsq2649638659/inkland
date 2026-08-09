@@ -7,11 +7,12 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://inkland-navy.vercel
 
 export default function TermsPage() {
   return (
-    <main className="max-w-3xl mx-auto px-6 py-12 bg-paper min-h-screen">
-      <Link href="/settings" className="text-sm text-accent">← 返回设置</Link>
+    <main className="legal-page-shell">
+      <Link href="/settings" className="legal-back-link">← 返回设置</Link>
       <article className="legal-document">
-        <h1 className="mt-8">inkland 用户服务协议</h1>
-        <p className="text-muted">生效日期：{effectiveDate}　版本：1.0</p>
+        <p className="legal-kicker">INKLAND 服务条款</p>
+        <h1>inkland 用户服务协议</h1>
+        <p className="legal-meta">版本 1.0　<span aria-hidden="true">·</span>　生效日期：{effectiveDate}</p>
         <p>欢迎使用 inkland（以下简称“本平台”）。本协议由您与{operatorName}（以下简称“我们”）共同订立，适用于您通过网站使用本平台提供的同人作品发布、阅读和社区互动服务。</p>
         <p>请您在注册、登录或使用服务前仔细阅读本协议及<Link href="/privacy">《隐私政策》</Link>、<Link href="/guidelines">《社区公约与发布规范》</Link>。当您点击同意、完成注册或继续使用本平台时，即表示您已阅读、理解并同意受本协议约束。若您不同意，请停止注册和使用。</p>
 
