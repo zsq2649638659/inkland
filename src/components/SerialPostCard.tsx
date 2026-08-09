@@ -70,11 +70,30 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const [commentCount, setCommentCount] = useState(data.commentCount || 0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [cardMenuOpen, setCardMenuOpen] = useState(false);
 
   const plainExcerpt = useMemo(() => stripMarkdown(data.content), [data.content]);
   const avatarChar = data.authorNickname?.[0] || "?";
 
   const goToLogin = () => router.push("/login");
+
+  const reportTarget = async (targetType: "post" | "comment", targetId: string) => {
+    if (!user) { goToLogin(); return; }
+    const reason = window.prompt("请填写举报原因：");
+    if (!reason?.trim()) return;
+    const { error } = targetType === "comment"
+      ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: targetId, reason: reason.trim() })
+      : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: targetId, reason: reason.trim() });
+    window.alert(error ? "举报提交失败，请稍后重试。" : "举报已提交，我们会尽快处理。");
+  };
+
+  const blockUser = async (blockedUserId: string) => {
+    if (!user) { goToLogin(); return; }
+    if (blockedUserId === user.id || !window.confirm("确定要屏蔽该用户吗？屏蔽后你将不再看到对方的内容和互动。")) return;
+    const { error } = await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: blockedUserId });
+    if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) window.alert("屏蔽失败，请稍后重试。");
+    else window.alert("已屏蔽该用户。");
+  };
 
   // Check follow status
   useEffect(() => {
@@ -206,15 +225,22 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           </div>
         </div>
 
-        {user?.id !== data.authorId && (
-          <button
-            className="card-follow-btn"
-            onClick={toggleFollow}
-            disabled={followLoading}
-          >
-            {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
-          </button>
-        )}
+        <div className="card-header-actions">
+          {user?.id !== data.authorId && (
+            <button className="card-follow-btn" onClick={toggleFollow} disabled={followLoading}>
+              {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
+            </button>
+          )}
+          <div className="card-more-wrap">
+            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
+            {cardMenuOpen && (
+              <div className="card-more-menu">
+                {user?.id !== data.authorId && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
+                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><i className="fa-solid fa-flag" /> 举报</button>
+              </div>
+            )}
+          </div>
+        </div>
 
         </div>
 
@@ -289,6 +315,8 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           onCommentTextChange={setCommentText}
           onSubmit={submitComment}
           onClose={() => setShowComment(false)}
+          onReport={(commentId) => void reportTarget("comment", commentId)}
+          onBlock={(commentUserId) => void blockUser(commentUserId)}
         />
       )}
     </article>

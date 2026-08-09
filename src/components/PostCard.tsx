@@ -58,6 +58,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [shareTip, setShareTip] = useState(false);
   const [activeImageDot, setActiveImageDot] = useState(0);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [resolvedContent, setResolvedContent] = useState(post.content || "");
   const [resolvedCover, setResolvedCover] = useState(post.cover_url || null);
   const imageScrollRef = useRef<HTMLDivElement>(null);
@@ -90,6 +91,25 @@ export default function PostCard({ post }: PostCardProps) {
 
   const goToLogin = () => {
     router.push("/login");
+  };
+
+  const reportTarget = async (targetType: "post" | "comment", targetId: string, commentUserId?: string) => {
+    if (!user) { goToLogin(); return; }
+    if (targetType === "comment" && commentUserId === user.id) return;
+    const reason = window.prompt("请填写举报原因：");
+    if (!reason?.trim()) return;
+    const { error } = targetType === "comment"
+      ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: targetId, reason: reason.trim() })
+      : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: targetId, reason: reason.trim() });
+    window.alert(error ? "举报提交失败，请稍后重试。" : "举报已提交，我们会尽快处理。");
+  };
+
+  const blockUser = async (blockedUserId: string) => {
+    if (!user) { goToLogin(); return; }
+    if (blockedUserId === user.id || !window.confirm("确定要屏蔽该用户吗？屏蔽后你将不再看到对方的内容和互动。")) return;
+    const { error } = await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: blockedUserId });
+    if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) window.alert("屏蔽失败，请稍后重试。");
+    else window.alert("已屏蔽该用户。");
   };
 
   // Check follow status
@@ -280,15 +300,22 @@ export default function PostCard({ post }: PostCardProps) {
           </div>
         </div>
 
-        {user?.id !== post.user_id && (
-          <button
-            className="card-follow-btn"
-            onClick={toggleFollow}
-            disabled={followLoading}
-          >
-            {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
-          </button>
-        )}
+        <div className="card-header-actions">
+          {user?.id !== post.user_id && (
+            <button className="card-follow-btn" onClick={toggleFollow} disabled={followLoading}>
+              {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
+            </button>
+          )}
+          <div className="card-more-wrap">
+            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
+            {cardMenuOpen && (
+              <div className="card-more-menu">
+                {user?.id !== post.user_id && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
+                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><i className="fa-solid fa-flag" /> 举报</button>
+              </div>
+            )}
+          </div>
+        </div>
 
         </div>
 
@@ -391,6 +418,8 @@ export default function PostCard({ post }: PostCardProps) {
           onCommentTextChange={setCommentText}
           onSubmit={submitComment}
           onClose={() => setShowComment(false)}
+          onReport={(commentId, commentUserId) => void reportTarget("comment", commentId, commentUserId)}
+          onBlock={(commentUserId) => void blockUser(commentUserId)}
         />
       )}
     </article>
