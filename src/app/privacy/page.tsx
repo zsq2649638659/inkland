@@ -8,11 +8,12 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://inkland-navy.vercel
 
 export default function PrivacyPage() {
   return (
-    <main className="max-w-3xl mx-auto px-6 py-12 bg-paper min-h-screen">
-      <Link href="/settings" className="text-sm text-accent">← 返回设置</Link>
+    <main className="legal-page-shell">
+      <Link href="/settings" className="legal-back-link">← 返回设置</Link>
       <article className="legal-document">
-        <h1 className="mt-8">inkland 隐私政策</h1>
-        <p className="text-muted">生效日期：{effectiveDate}　版本：1.0</p>
+        <p className="legal-kicker">INKLAND 隐私说明</p>
+        <h1>inkland 隐私政策</h1>
+        <p className="legal-meta">版本 1.0　<span aria-hidden="true">·</span>　生效日期：{effectiveDate}</p>
         <p>本政策适用于{operatorName}通过 inkland 网站向您提供的账号、创作、阅读和社区互动服务。我们重视您的个人信息和隐私安全，并将按照合法、正当、必要和诚信原则处理个人信息。</p>
         <p>请您重点阅读与您权益直接相关的内容。若您不同意本政策，可能无法注册或使用需要账号的功能；您仍可以在不登录的情况下访问部分公开页面。</p>
 
