@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
@@ -71,6 +71,16 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
+  const cardMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!cardMenuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!cardMenuRef.current?.contains(event.target as Node)) setCardMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [cardMenuOpen]);
 
   const plainExcerpt = useMemo(() => stripMarkdown(data.content), [data.content]);
   const avatarChar = data.authorNickname?.[0] || "?";
@@ -231,7 +241,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
               {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
             </button>
           )}
-          <div className="card-more-wrap">
+          <div className="card-more-wrap" ref={cardMenuRef}>
             <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
             {cardMenuOpen && (
               <div className="card-more-menu">
