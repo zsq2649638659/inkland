@@ -121,9 +121,17 @@ export default function Navbar() {
         <div className="navbar-center" ref={searchRef}>
           <div style={{ position: "relative" }}>
             <input
-              type="text"
+              type="search"
+              name="site-search"
               className="search-input"
               aria-label="全局搜索"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-bwignore="true"
               placeholder="搜索作品、标签、用户..."
               value={searchQuery}
               onChange={(e) => handleSearchInput(e.target.value)}
