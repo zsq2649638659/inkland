@@ -16,7 +16,12 @@ CREATE INDEX IF NOT EXISTS idx_tag_follows_tag ON tag_follows(tag_id);
 
 ALTER TABLE tag_follows ENABLE ROW LEVEL SECURITY;
 
--- 公开可读
-CREATE POLICY "tag_follows_public_read" ON tag_follows FOR SELECT USING (true);
--- 本人可写
-CREATE POLICY "tag_follows_self_all" ON tag_follows FOR ALL USING (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tag_follows_public_read' AND tablename = 'tag_follows') THEN
+    CREATE POLICY "tag_follows_public_read" ON tag_follows FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tag_follows_self_all' AND tablename = 'tag_follows') THEN
+    CREATE POLICY "tag_follows_self_all" ON tag_follows FOR ALL USING (auth.uid() = user_id);
+  END IF;
+END $$;

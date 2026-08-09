@@ -58,11 +58,17 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
     alert("已屏蔽该用户");
   };
 
-  const handleReport = () => {
+  const handleReport = async () => {
     setMoreOpen(false);
     const reason = prompt("请填写举报原因：");
     if (!reason || !reason.trim()) return;
-    alert("举报已提交，管理员会尽快处理。");
+    const { error } = await supabase.from("content_reports").insert({
+      reporter_id: currentUserId,
+      target_type: "user",
+      target_id: user.id,
+      reason: reason.trim(),
+    });
+    alert(error ? "举报提交失败，请稍后重试。" : "举报已提交，管理员会尽快处理。");
   };
 
   // 按钮文字

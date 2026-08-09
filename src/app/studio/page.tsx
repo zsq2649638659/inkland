@@ -351,6 +351,7 @@ export default function StudioPage() {
 
   const getStatusLabel = (w: WorkItem) => {
     if (w.review_status === "rejected") return "未过审";
+    if (w.review_status === "pending") return "审核中";
     if (w.status === "published") return "已发布";
     if (isScheduled(w)) return "定时发布";
     return "草稿";

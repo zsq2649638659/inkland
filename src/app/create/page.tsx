@@ -962,7 +962,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       title: title.trim() || "无标题",
       content: uploadedImages.reduce((value, image) => value.split(image.url).join(image.storedUrl), editor.content.trim()),
       word_count: wordCount,
-      status: visibility === "private" || scheduledAt ? "draft" : "published",
+      status: "draft",
+      review_status: visibility === "private" ? "approved" : "pending",
       post_type: uploadedImages.length > 0 ? "illustration" : "novel",
       visibility,
       published_at: visibility === "private" ? null : (scheduledAt || editingPublishedAt || new Date().toISOString()),
@@ -984,7 +985,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     if (scheduledAt) {
       setSubmitting(false);
       setSuccessAction("publish");
-      setSuccessMsg(`发布成功，作品将于 ${new Date(scheduledAt).toLocaleString("zh-CN")} 公开`);
+      setSuccessMsg(`作品已提交审核，通过后将于 ${new Date(scheduledAt).toLocaleString("zh-CN")} 公开`);
       return;
     }
     if (visibility === "private") {
@@ -995,7 +996,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     }
     setSubmitting(false);
     setSuccessAction("publish");
-    setSuccessMsg(editPostId ? "作品修改成功" : "发布成功");
+    setSuccessMsg(editPostId ? "作品已提交审核" : "作品已提交审核，通过后会公开");
   };
 
   // ============ 保存草稿 ============
@@ -1066,7 +1067,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       title: title.trim() || "图片分享",
       content: fullContent,
       word_count: fullContent.replace(/\s/g, "").length,
-      status: visibility === "private" || scheduledAt || options?.draft ? "draft" : "published",
+      status: "draft",
+      review_status: options?.draft || visibility === "private" ? "approved" : "pending",
       post_type: "illustration",
       visibility,
       published_at: visibility === "private" || options?.draft ? null : (scheduledAt || editingPublishedAt || new Date().toISOString()),
@@ -1088,7 +1090,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     setSubmitting(false);
     if (scheduledAt) {
       setSuccessAction("publish");
-      setSuccessMsg(`发布成功，作品将于 ${new Date(scheduledAt).toLocaleString("zh-CN")} 公开`);
+      setSuccessMsg(`作品已提交审核，通过后将于 ${new Date(scheduledAt).toLocaleString("zh-CN")} 公开`);
     } else if (options?.draft) {
       setSuccessAction("publish");
       setSuccessMsg("草稿保存成功");
@@ -1097,7 +1099,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setSuccessMsg("作品已保存为仅自己可见");
     } else {
       setSuccessAction("publish");
-      setSuccessMsg(editPostId ? "作品修改成功" : "发布成功");
+      setSuccessMsg(editPostId ? "作品已提交审核" : "作品已提交审核，通过后会公开");
     }
   };
 
