@@ -6195,6 +6195,28 @@ p {
   background: #fff;
 }
 
+.moderation-custom-reason {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--color-border, #E5E5E5);
+  border-radius: var(--radius-md, 12px);
+  outline: none;
+  resize: vertical;
+  color: var(--color-text, #1A1A1A);
+  background: var(--color-bg-page, #FAF9F7);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.moderation-custom-reason:focus {
+  border-color: var(--color-primary, #F26B5B);
+  box-shadow: 0 0 0 3px rgba(242, 107, 91, 0.12);
+}
+
 /* ─── Toast ─── */
 .toast {
   position: fixed;
