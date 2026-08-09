@@ -16,12 +16,12 @@ export const metadata = {
 
 export default function GuidelinesPage() {
   return (
-    <main className="max-w-3xl mx-auto px-6 py-12 bg-paper min-h-screen">
-      <Link href="/settings" className="text-sm text-accent">← 返回设置</Link>
+    <main className="legal-page-shell">
+      <Link href="/settings" className="legal-back-link">← 返回设置</Link>
       <article className="legal-document">
-        <p className="mt-8 text-sm text-accent">INKLAND 社区规则</p>
+        <p className="legal-kicker">INKLAND 社区规则</p>
         <h1>社区公约与发布规范</h1>
-        <p className="text-muted">版本 1.0　生效日期：{effectiveDate}</p>
+        <p className="legal-meta">版本 1.0　<span aria-hidden="true">·</span>　生效日期：{effectiveDate}</p>
         <p>inkland 是一个面向同人创作者和读者的作品社区。规则的目的，是让创作者能安心发布，让读者能尊重地阅读和交流。使用发布、评论、互动或举报功能，即表示你愿意遵守本规范。</p>
 
         <nav aria-label="本页目录" className="my-8 rounded-2xl border border-black/10 p-5">
