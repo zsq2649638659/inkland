@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作品卡片设计方案 v2</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    --color-primary: #F26B5B;
+    --color-primary-light: #FDDCD8;
+    --color-accent: #F26B5B;
+    --color-accent-light: #FDDCD8;
+    --color-text: #1A1A1A;
+    --color-text-muted: #6B6B6B;
+    --color-text-light: #999;
+    --color-card: #FFFFFF;
+    --color-bg-page: #FAF9F7;
+    --color-bg-secondary: #E8E4E0;
+    --color-border: #E5E5E5;
+    --color-rule: #E5E5E5;
+    --radius-xl: 28px;
+    --radius-sm: 8px;
+    --spacing-sm: 6px;
+    --spacing-md: 12px;
+    --shadow-hover: 0 4px 20px rgba(0,0,0,0.08);
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-family);
+    background: var(--color-bg-page);
+    padding: 40px;
+    color: var(--color-text);
+  }
+
+  .page-header {
+    max-width: 1100px;
+    margin: 0 auto 40px;
+  }
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .page-header p {
+    font-size: 15px;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+  .page-header .note {
+    margin-top: 16px;
+    padding: 14px 20px;
+    background: #FFF8E7;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #8B7500;
+    line-height: 1.5;
+  }
+  .page-header .changelog {
+    margin-top: 10px;
+    padding: 12px 20px;
+    background: #F0F7FF;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #0066CC;
+    line-height: 1.6;
+  }
+  .page-header .changelog strong { color: #004499; }
+
+  .section {
+    max-width: 1100px;
+    margin: 0 auto 48px;
+  }
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--color-primary-light);
+  }
+  .section-title .badge {
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+    background: var(--color-primary);
+    padding: 2px 10px;
+    border-radius: 20px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .section-desc {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  /* ===== 卡片网格布局 ===== */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  /* ===== Tag Card 基础样式 ===== */
+  .tag-card {
+    background: var(--color-card);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .tag-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+  }
+
+  /* ===== 合集标签样式（重新设计，放在最顶部） ===== */
+  .tag-card .card-series-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+    padding: 3px 10px 3px 8px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    align-self: flex-start;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+  .tag-card .card-series-badge:hover {
+    background: var(--color-primary);
+    color: #fff;
+  }
+  .tag-card .card-series-badge i {
+    font-size: 10px;
+  }
+
+  .tag-card .card-image-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 100%;
+    max-width: 100%;
+  }
+  .tag-card .card-image-grid::-webkit-scrollbar { display: none; }
+  .tag-card .card-image-grid.has-overflow {
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 40px), transparent 100%);
+  }
+
+  .tag-card .card-image-placeholder {
+    height: 90px;
+    width: auto;
+    aspect-ratio: 4/3;
+    border-radius: 6px;
+    background: repeating-linear-gradient(45deg, var(--color-bg-secondary), var(--color-bg-secondary) 2px, #e0dcd8 2px, #e0dcd8 4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-light);
+    font-size: 20px;
+    overflow: hidden;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+  .tag-card .card-image-placeholder i { opacity: 0.5; }
+  .tag-card .card-image-placeholder img {
+    width: auto;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .tag-card .card-image-dots {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-top: 6px;
+  }
+  .tag-card .card-image-dots span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-border);
+    transition: background 0.2s;
+  }
+  .tag-card .card-image-dots span.active {
+    background: var(--color-text-light);
+    opacity: 0.5;
+  }
+
+  .tag-card .card-title,
+  .tag-card .card-image-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-top: 12px;
+    flex-shrink: 0;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tag-card .card-title { margin-top: 0; }
+
+  .tag-card .card-summary {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    margin-top: 8px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tag-card .card-summary.clamp-2 { -webkit-line-clamp: 2; }
+  .tag-card .card-summary.clamp-3 { -webkit-line-clamp: 3; }
+  .tag-card.single .card-summary.clamp-2,
+  .tag-card.image .card-summary.clamp-2 { margin-bottom: var(--spacing-sm); }
+
+  .tag-card .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+    margin-bottom: 0;
+  }
+  .tag-card.single .card-tags,
+  .tag-card.image .card-tags { margin-bottom: var(--spacing-md); }
+
+  .tag-card .card-tag {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background: var(--color-bg-secondary);
+    padding: 4px 12px;
+    border-radius: var(--radius-xl);
+    letter-spacing: -0.02em;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .tag-card .card-tag:hover {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+
+  .tag-card .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: var(--spacing-md);
+    flex-shrink: 0;
+  }
+  .tag-card .card-stats {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .tag-card .card-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    color: var(--color-text-light);
+    transition: color 0.2s;
+    cursor: pointer;
+  }
+  .tag-card .card-stat:hover { color: var(--color-primary); }
+  .tag-card .card-stat i { font-size: 13px; }
+
+  /* ===== 长篇连载卡片（新样式：无封面占位、无分割线、无边框） ===== */
+  .tag-card.series {
+    /* 无 border */
+  }
+  .tag-card.series .series-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .tag-card.series .series-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--color-primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .tag-card.series .series-header-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .tag-card.series .series-header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tag-card.series .series-header-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+  .tag-card.series .series-header-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 28px;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+  .tag-card.series .series-header-badge.completed {
+    background: #D4EDDA;
+    color: #28A745;
+  }
+  .tag-card.series .series-header-desc {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tag-card.series .series-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .tag-card.series .series-tags .card-tag {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background: var(--color-bg-secondary);
+    padding: 4px 12px;
+    border-radius: var(--radius-xl);
+  }
+
+  /* 有章节：显示章节内容 */
+  .tag-card.series .chapter-preview {
+    background: var(--color-bg-page);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 4px;
+  }
+  .tag-card.series .chapter-preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .tag-card.series .chapter-preview-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+    line-height: 1.4;
+  }
+  .tag-card.series .chapter-preview-excerpt {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tag-card.series .chapter-preview-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--color-text-light);
+  }
+  .tag-card.series .chapter-preview-meta i {
+    font-size: 11px;
+    margin-right: 2px;
+  }
+
+  /* 无章节：空状态（优化版：不空旷） */
+  .tag-card.series .series-empty {
+    margin-top: 4px;
+  }
+  .tag-card.series .series-empty-box {
+    background: var(--color-bg-page);
+    border-radius: 8px;
+    padding: 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .tag-card.series .series-empty-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-light);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .tag-card.series .series-empty-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .tag-card.series .series-empty-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-light);
+    letter-spacing: 0.02em;
+  }
+  .tag-card.series .series-empty-hint {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+  }
+  .tag-card.series .series-empty-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-text-light);
+  }
+  .tag-card.series .series-empty-meta i {
+    font-size: 10px;
+    margin-right: 1px;
+  }
+
+  /* ===== 标签（仅用于demo标注） ===== */
+  .card-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  .card-label.single-image { background: #E8F5E9; color: #2E7D32; }
+  .card-label.single-text { background: #E3F2FD; color: #1565C0; }
+  .card-label.series-image { background: #FFF3E0; color: #E65100; }
+  .card-label.series-text { background: #F3E5F5; color: #7B1FA2; }
+  .card-label.series-chapter { background: #FCE4EC; color: #C62828; }
+  .card-label.series-empty { background: #ECEFF1; color: #546E7A; }
+
+  @media (max-width: 900px) {
+    .card-grid { grid-template-columns: repeat(2, 1fr); }
+    body { padding: 20px; }
+  }
+  @media (max-width: 600px) {
+    .card-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ===== 列表视图（List View） ===== */
+  .card-grid.list-view {
+    grid-template-columns: 1fr;
+  }
+  .card-grid.list-view .card-image-placeholder.list-view-h {
+    height: 140px;
+  }
+  .card-grid.list-view .card-summary.clamp-2 {
+    -webkit-line-clamp: 3;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>作品卡片设计方案 v2</h1>
+  <p>
+    基于你反馈的修改：<strong>合集标签重新设计并放在最顶部</strong>、<strong>长篇连载卡片去掉图片占位符</strong>、<strong>去掉分割线和边框</strong>、<strong>更换样式</strong>。
+  </p>
+  <div class="changelog">
+    <strong>v2 修改内容：</strong><br>
+    1. 合集标签从 <code>.card-series-context</code>（普通文本行）改为 <code>.card-series-badge</code>（圆角标签样式），放在卡片最顶部<br>
+    2. 长篇连载卡片：去掉封面占位图、去掉分割线、去掉边框<br>
+    3. 长篇连载卡片改用左侧图标 + 右侧文字的新布局，章节内容用浅底色块包裹<br>
+    <strong>v3 修改内容：</strong><br>
+    4. 有/无章节连载卡片统一使用 <code>fa-book-open</code> 图标<br>
+    5. 无章节连载卡片空状态优化：改为左侧图标 + 右侧文字布局，显示"等待开篇"标签、创建时间、章节数，不再空旷
+  </div>
+</div>
+
+<!-- ===== 第一类：单篇/图片作品卡片 ===== -->
+<div class="section">
+  <div class="section-title">
+    单篇 / 图片作品卡片
+    <span class="badge">4种</span>
+  </div>
+  <div class="section-desc">
+    合集标签 <code>card-series-badge</code> 放在<strong>所有组件的最顶部</strong>（图片网格之上），以圆角标签样式呈现。
+    无合集的作品不显示此标签。
+  </div>
+
+  <div class="card-grid">
+    <!-- 卡片1：没有合集的单篇（带图片） -->
+    <div class="tag-card image">
+      <div class="card-label single-image">类型1 · 无合集 + 带图片</div>
+      <!-- 无合集标签 -->
+      <div class="card-image-grid has-overflow" style="display:flex;">
+        <div class="card-image-placeholder"><i class="fa-solid fa-image"></i></div>
+        <div class="card-image-placeholder"><i class="fa-solid fa-image"></i></div>
+        <div class="card-image-placeholder"><i class="fa-solid fa-image"></i></div>
+      </div>
+      <div class="card-image-dots">
+        <span class="active"></span><span></span><span style="opacity:0.3"></span>
+      </div>
+      <div class="card-image-title">星落无声</div>
+      <div class="card-summary clamp-2">传说在星辰坠落的地方，会留下永不磨灭的印记。我追寻着这些痕迹，走过千山万水，只为找到那颗属于我的星。</div>
+      <div class="card-tags">
+        <span class="card-tag">科幻</span><span class="card-tag">治愈</span><span class="card-tag">奇幻</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 1,284</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 56</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 342</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片2：没有合集的单篇（不带图片） -->
+    <div class="tag-card single">
+      <div class="card-label single-text">类型2 · 无合集 + 无图片</div>
+      <!-- 无合集标签 -->
+      <div class="card-title">四月是你的谎言</div>
+      <div class="card-summary clamp-2">那个春天，我遇见了她。樱花飘落的街道上，她站在光里对我说："你愿意听我弹一首曲子吗？"从那以后，我的世界开始有了颜色。</div>
+      <div class="card-tags">
+        <span class="card-tag">青春</span><span class="card-tag">治愈</span><span class="card-tag">校园</span><span class="card-tag">纯爱</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 3,721</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 203</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 1,056</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片3：有合集的单篇（带图片） -->
+    <div class="tag-card image">
+      <div class="card-label series-image">类型3 · 有合集 + 带图片</div>
+      <!-- 合集标签：最顶部 -->
+      <a class="card-series-badge">
+        <i class="fa-solid fa-layer-group"></i> 星辰系列 · 第1章
+      </a>
+      <div class="card-image-grid" style="display:flex;">
+        <div class="card-image-placeholder"><i class="fa-solid fa-image"></i></div>
+        <div class="card-image-placeholder"><i class="fa-solid fa-image"></i></div>
+      </div>
+      <div class="card-image-dots">
+        <span class="active"></span><span style="opacity:0.3"></span>
+      </div>
+      <div class="card-image-title">第一乐章：启程</div>
+      <div class="card-summary clamp-2">当第一缕阳光穿透云层，我知道新的旅程即将开始。背上行囊，踏上未知的路，每一段旅程都是生命中最美的风景。</div>
+      <div class="card-tags">
+        <span class="card-tag">奇幻</span><span class="card-tag">冒险</span><span class="card-tag">长篇</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 892</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 34</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 156</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片4：有合集的单篇（不带图片） -->
+    <div class="tag-card single">
+      <div class="card-label series-text">类型4 · 有合集 + 无图片</div>
+      <!-- 合集标签：最顶部 -->
+      <a class="card-series-badge">
+        <i class="fa-solid fa-layer-group"></i> 星辰系列 · 第2章
+      </a>
+      <div class="card-title">第二乐章：相遇</div>
+      <div class="card-summary clamp-2">在人海中相遇的概率是七十亿分之一。而我们在某个平凡的午后，在街角的咖啡馆里，奇迹般地遇见了彼此。从那一刻起，平凡的日子开始发光。</div>
+      <div class="card-tags">
+        <span class="card-tag">奇幻</span><span class="card-tag">治愈</span><span class="card-tag">日常</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 1,247</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 68</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 298</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 第二类：长篇连载卡片 ===== -->
+<div class="section">
+  <div class="section-title">
+    长篇连载卡片（新样式）
+    <span class="badge">2种</span>
+  </div>
+  <div class="section-desc">
+    新样式：<strong>无封面占位图</strong>、<strong>无分割线</strong>、<strong>无边框</strong>。
+    左侧为系列图标（圆角方块 + 书本图标），右侧为系列名称 + 状态 + 描述 + 标签。
+    有章节的在下方显示章节预览区（浅底色块），无章节的显示空状态。
+  </div>
+
+  <div class="card-grid">
+    <!-- 卡片5：有章节连载的长篇卡片 -->
+    <div class="tag-card series">
+      <div class="card-label series-chapter">类型5 · 有章节连载</div>
+
+      <!-- 系列头部：左侧图标 + 右侧信息 -->
+      <div class="series-header">
+        <div class="series-icon">
+          <i class="fa-solid fa-book-open"></i>
+        </div>
+        <div class="series-header-info">
+          <div class="series-header-top">
+            <span class="series-header-name">星辰系列</span>
+            <span class="series-header-badge">连载中</span>
+          </div>
+          <div class="series-header-desc">一个关于星辰、命运与相遇的奇幻长篇故事</div>
+          <div class="series-tags">
+            <span class="card-tag">奇幻</span>
+            <span class="card-tag">冒险</span>
+            <span class="card-tag">治愈</span>
+            <span class="card-tag">史诗</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 章节预览区 -->
+      <div class="chapter-preview">
+        <div class="chapter-preview-label">最新更新</div>
+        <div class="chapter-preview-title">第24章 星辰永恒</div>
+        <div class="chapter-preview-excerpt">当所有的星辰汇聚成河，我站在时间的尽头，终于明白——永恒不是没有尽头的长，而是每一刻都值得铭记的短暂。</div>
+        <div class="chapter-preview-meta">
+          <span><i class="fa-regular fa-file-lines"></i> 共24章</span>
+          <span><i class="fa-regular fa-clock"></i> 3天前更新</span>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 5,632</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 487</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 2,341</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片6：无章节连载的长篇卡片 -->
+    <div class="tag-card series">
+      <div class="card-label series-empty">类型6 · 无章节连载</div>
+
+      <!-- 系列头部：左侧图标 + 右侧信息 -->
+      <div class="series-header">
+        <div class="series-icon">
+          <i class="fa-solid fa-book-open"></i>
+        </div>
+        <div class="series-header-info">
+          <div class="series-header-top">
+            <span class="series-header-name">山海经异闻录</span>
+            <span class="series-header-badge">连载中</span>
+          </div>
+          <div class="series-header-desc">一部基于山海经的奇幻异闻故事集</div>
+          <div class="series-tags">
+            <span class="card-tag">奇幻</span>
+            <span class="card-tag">神话</span>
+            <span class="card-tag">志怪</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 空状态（优化版） -->
+      <div class="series-empty">
+        <div class="series-empty-box">
+          <div class="series-empty-icon">
+            <i class="fa-regular fa-pen-to-square"></i>
+          </div>
+          <div class="series-empty-info">
+            <div class="series-empty-label">等待开篇</div>
+            <div class="series-empty-hint">作者正在构思第一篇内容</div>
+            <div class="series-empty-meta">
+              <span><i class="fa-regular fa-calendar"></i> 2026年8月创建</span>
+              <span><i class="fa-regular fa-file-lines"></i> 0章</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 0</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 0</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 列表视图（List View） ===== -->
+<div class="section">
+  <div class="section-title">
+    列表视图
+    <span class="badge">6种</span>
+  </div>
+  <div class="section-desc">
+    列表模式使用 <code>.card-grid.list-view</code>（<code>grid-template-columns: 1fr</code>），单列布局。
+    图片占位高度从 90px 变为 <strong>140px</strong>，卡片宽度更宽，文本摘要可以展示更多内容。
+    所有卡片结构与 grid 模式一致，仅布局从多列变为单列。
+  </div>
+
+  <div class="card-grid list-view">
+    <!-- 卡片1：无合集 + 带图片（列表模式） -->
+    <div class="tag-card image">
+      <div class="card-label single-image">类型1 · 无合集 + 带图片 · 列表模式</div>
+      <div class="card-image-grid has-overflow" style="display:flex;">
+        <div class="card-image-placeholder list-view-h"><i class="fa-solid fa-image"></i></div>
+        <div class="card-image-placeholder list-view-h"><i class="fa-solid fa-image"></i></div>
+        <div class="card-image-placeholder list-view-h"><i class="fa-solid fa-image"></i></div>
+      </div>
+      <div class="card-image-dots">
+        <span class="active"></span><span></span><span style="opacity:0.3"></span>
+      </div>
+      <div class="card-image-title">星落无声</div>
+      <div class="card-summary clamp-2">传说在星辰坠落的地方，会留下永不磨灭的印记。我追寻着这些痕迹，走过千山万水，只为找到那颗属于我的星。</div>
+      <div class="card-tags">
+        <span class="card-tag">科幻</span><span class="card-tag">治愈</span><span class="card-tag">奇幻</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 1,284</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 56</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 342</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片2：无合集 + 无图片（列表模式） -->
+    <div class="tag-card single">
+      <div class="card-label single-text">类型2 · 无合集 + 无图片 · 列表模式</div>
+      <div class="card-title">四月是你的谎言</div>
+      <div class="card-summary clamp-2">那个春天，我遇见了她。樱花飘落的街道上，她站在光里对我说："你愿意听我弹一首曲子吗？"从那以后，我的世界开始有了颜色。我们一起走过的日子，像樱花一样绚烂而短暂，却永远铭刻在记忆深处。</div>
+      <div class="card-tags">
+        <span class="card-tag">青春</span><span class="card-tag">治愈</span><span class="card-tag">校园</span><span class="card-tag">纯爱</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 3,721</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 203</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 1,056</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片3：有合集 + 带图片（列表模式） -->
+    <div class="tag-card image">
+      <div class="card-label series-image">类型3 · 有合集 + 带图片 · 列表模式</div>
+      <a class="card-series-badge">
+        <i class="fa-solid fa-layer-group"></i> 星辰系列 · 第1章
+      </a>
+      <div class="card-image-grid" style="display:flex;">
+        <div class="card-image-placeholder list-view-h"><i class="fa-solid fa-image"></i></div>
+        <div class="card-image-placeholder list-view-h"><i class="fa-solid fa-image"></i></div>
+      </div>
+      <div class="card-image-dots">
+        <span class="active"></span><span style="opacity:0.3"></span>
+      </div>
+      <div class="card-image-title">第一乐章：启程</div>
+      <div class="card-summary clamp-2">当第一缕阳光穿透云层，我知道新的旅程即将开始。背上行囊，踏上未知的路，每一段旅程都是生命中最美的风景。</div>
+      <div class="card-tags">
+        <span class="card-tag">奇幻</span><span class="card-tag">冒险</span><span class="card-tag">长篇</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 892</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 34</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 156</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片4：有合集 + 无图片（列表模式） -->
+    <div class="tag-card single">
+      <div class="card-label series-text">类型4 · 有合集 + 无图片 · 列表模式</div>
+      <a class="card-series-badge">
+        <i class="fa-solid fa-layer-group"></i> 星辰系列 · 第2章
+      </a>
+      <div class="card-title">第二乐章：相遇</div>
+      <div class="card-summary clamp-2">在人海中相遇的概率是七十亿分之一。而我们在某个平凡的午后，在街角的咖啡馆里，奇迹般地遇见了彼此。从那一刻起，平凡的日子开始发光，每一个瞬间都值得被珍藏。</div>
+      <div class="card-tags">
+        <span class="card-tag">奇幻</span><span class="card-tag">治愈</span><span class="card-tag">日常</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 1,247</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 68</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 298</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片5：有章节连载（列表模式） -->
+    <div class="tag-card series">
+      <div class="card-label series-chapter">类型5 · 有章节连载 · 列表模式</div>
+      <div class="series-header">
+        <div class="series-icon">
+          <i class="fa-solid fa-book-open"></i>
+        </div>
+        <div class="series-header-info">
+          <div class="series-header-top">
+            <span class="series-header-name">星辰系列</span>
+            <span class="series-header-badge">连载中</span>
+          </div>
+          <div class="series-header-desc">一个关于星辰、命运与相遇的奇幻长篇故事</div>
+          <div class="series-tags">
+            <span class="card-tag">奇幻</span>
+            <span class="card-tag">冒险</span>
+            <span class="card-tag">治愈</span>
+            <span class="card-tag">史诗</span>
+          </div>
+        </div>
+      </div>
+      <div class="chapter-preview">
+        <div class="chapter-preview-label">最新更新</div>
+        <div class="chapter-preview-title">第24章 星辰永恒</div>
+        <div class="chapter-preview-excerpt">当所有的星辰汇聚成河，我站在时间的尽头，终于明白——永恒不是没有尽头的长，而是每一刻都值得铭记的短暂。</div>
+        <div class="chapter-preview-meta">
+          <span><i class="fa-regular fa-file-lines"></i> 共24章</span>
+          <span><i class="fa-regular fa-clock"></i> 3天前更新</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 5,632</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 487</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 2,341</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片6：无章节连载（列表模式） -->
+    <div class="tag-card series">
+      <div class="card-label series-empty">类型6 · 无章节连载 · 列表模式</div>
+      <div class="series-header">
+        <div class="series-icon">
+          <i class="fa-solid fa-book-open"></i>
+        </div>
+        <div class="series-header-info">
+          <div class="series-header-top">
+            <span class="series-header-name">山海经异闻录</span>
+            <span class="series-header-badge">连载中</span>
+          </div>
+          <div class="series-header-desc">一部基于山海经的奇幻异闻故事集</div>
+          <div class="series-tags">
+            <span class="card-tag">奇幻</span>
+            <span class="card-tag">神话</span>
+            <span class="card-tag">志怪</span>
+          </div>
+        </div>
+      </div>
+      <div class="series-empty">
+        <div class="series-empty-box">
+          <div class="series-empty-icon">
+            <i class="fa-regular fa-pen-to-square"></i>
+          </div>
+          <div class="series-empty-info">
+            <div class="series-empty-label">等待开篇</div>
+            <div class="series-empty-hint">作者正在构思第一篇内容</div>
+            <div class="series-empty-meta">
+              <span><i class="fa-regular fa-calendar"></i> 2026年8月创建</span>
+              <span><i class="fa-regular fa-file-lines"></i> 0章</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="card-stats">
+          <span class="card-stat"><i class="fa-regular fa-heart"></i> 0</span>
+          <span class="card-stat"><i class="fa-regular fa-comment"></i> 0</span>
+          <span class="card-stat"><i class="fa-regular fa-bookmark"></i> 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 结构说明 ===== -->
+<div class="section" style="margin-top: 60px;">
+  <div class="section-title">结构说明</div>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <div style="background: #fff; border-radius: 12px; padding: 24px;">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">单篇/图片卡片（类型1-4）</h3>
+      <ul style="font-size: 14px; line-height: 2.2; color: var(--color-text-muted); list-style: none; padding: 0;">
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>合集标签改为 <code>card-series-badge</code> 圆角标签样式</li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>合集标签放在卡片<strong>最顶部</strong>（图片网格之上）</li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>标签使用主题色填充，hover 变实心</li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>无合集的作品不显示此标签</li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>现有元素一个不删，只是新增和调整位置</li>
+      </ul>
+    </div>
+    <div style="background: #fff; border-radius: 12px; padding: 24px;">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">长篇连载卡片（类型5-6）</h3>
+      <ul style="font-size: 14px; line-height: 2.2; color: var(--color-text-muted); list-style: none; padding: 0;">
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i><strong>无封面占位图</strong></li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i><strong>无分割线</strong></li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i><strong>无边框</strong></li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>左侧圆角图标 + 右侧系列信息的新布局</li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>有章节：章节预览区用浅底色 <code>chapter-preview</code></li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>无章节：空状态显示"等待开篇" + 创建时间 + 章节数</li>
+      </ul>
+    </div>
+    <div style="background: #fff; border-radius: 12px; padding: 24px;">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">列表视图（List View）</h3>
+      <ul style="font-size: 14px; line-height: 2.2; color: var(--color-text-muted); list-style: none; padding: 0;">
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>使用 <code>.card-grid.list-view</code> → <code>grid-template-columns: 1fr</code></li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>图片占位高度从 90px 变为 <strong>140px</strong></li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>文本摘要 <code>clamp-2</code> 在列表模式下显示更多（改为 <strong>3行</strong>）</li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>卡片结构与 grid 模式完全一致，仅布局变宽</li>
+        <li><i class="fa-regular fa-circle-check" style="color: #4CAF50; margin-right: 8px;"></i>所有6种卡片类型在列表模式下都有对应展示</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
