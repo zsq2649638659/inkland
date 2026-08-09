@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Comment } from "@/lib/types";
 
