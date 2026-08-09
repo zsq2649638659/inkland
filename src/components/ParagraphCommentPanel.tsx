@@ -648,11 +648,11 @@ onReport,
       </div>
 
       {/* 屏蔽确认弹窗 */}
-      <div className={`modal-overlay${blockModal?.open ? ' active' : ''}`} onClick={() => setBlockModal(null)}>
+      <div className={`modal-overlay moderation-modal-overlay${blockModal?.open ? ' active' : ''}`} onClick={() => setBlockModal(null)}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">确认屏蔽</div>
           <div className="modal-body">
-            <p>确定要屏蔽该用户吗？屏蔽后，该用户将无法评论你的作品。</p>
+            <p>确定要屏蔽该用户吗？屏蔽后，该用户将无法与您产生任何互动。</p>
           </div>
           <div className="modal-actions">
             <button className="btn-modal btn-modal-cancel" onClick={() => setBlockModal(null)}>取消</button>
