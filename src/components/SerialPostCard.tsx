@@ -78,7 +78,14 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     | null
   >(null);
   const [moderationSubmitting, setModerationSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
   const cardMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(""), 2000);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
 
   useEffect(() => {
     if (!cardMenuOpen) return;
@@ -115,11 +122,11 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       : await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderationModal.userId });
     setModerationSubmitting(false);
     if (error && !(moderationModal.mode === "block" && (error as unknown as Record<string, unknown>).code?.toString().includes("23505"))) {
-      window.alert(moderationModal.mode === "report" ? "举报提交失败，请稍后重试。" : "屏蔽失败，请稍后重试。");
+      setToastMessage(moderationModal.mode === "report" ? "举报提交失败，请稍后重试。" : "屏蔽失败，请稍后重试。");
       return;
     }
     setModerationModal(null);
-    window.alert(moderationModal.mode === "report" ? "举报已提交，我们会尽快处理。" : "已屏蔽该用户。");
+    setToastMessage(moderationModal.mode === "report" ? "举报已提交，我们会尽快处理。" : "已屏蔽该用户。");
   };
 
   // Check follow status
@@ -353,6 +360,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
         onClose={() => setModerationModal(null)}
         onSubmit={submitModeration}
       />
+      <div className={`toast${toastMessage ? " show" : ""}`}>{toastMessage}</div>
     </article>
   );
 }
