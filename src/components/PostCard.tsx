@@ -11,6 +11,7 @@ import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
+import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Post, Comment } from "@/lib/types";
 
@@ -463,7 +464,7 @@ export default function PostCard({ post }: PostCardProps) {
         onClose={() => setModerationModal(null)}
         onSubmit={submitModeration}
       />
-      <div className={`toast${toastMessage ? " show" : ""}`}>{toastMessage}</div>
+      <CenteredToast message={toastMessage} />
     </article>
   );
 }
