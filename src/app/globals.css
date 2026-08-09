@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
 /* Logo styles - color follows theme via CSS mask */
 .logo-icon {
   display: inline-block;
