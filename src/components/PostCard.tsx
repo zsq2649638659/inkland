@@ -123,7 +123,7 @@ export default function PostCard({ post }: PostCardProps) {
   };
 
   const submitModeration = async (reason: string) => {
-    if (!moderationModal || !user || !reason.trim()) return;
+    if (!moderationModal || !user || (moderationModal.mode === "report" && !reason.trim())) return;
     setModerationSubmitting(true);
     const { error } = moderationModal.mode === "report"
       ? moderationModal.targetType === "comment"
