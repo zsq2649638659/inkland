@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 type ModerationMode = "report" | "block";
 
@@ -32,7 +33,8 @@ export default function ModerationReasonModal({ open, mode, submitting = false, 
 
   if (!open) return null;
 
-  return (
+  return createPortal(
+    (
     <div className="modal-overlay moderation-modal-overlay active" onClick={onClose}>
       <div className="modal moderation-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-title">{mode === "report" ? "举报原因" : "确认屏蔽"}</div>
@@ -78,5 +80,7 @@ export default function ModerationReasonModal({ open, mode, submitting = false, 
         </div>
       </div>
     </div>
+    ),
+    document.body,
   );
 }
