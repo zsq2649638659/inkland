@@ -7,7 +7,7 @@ function getSiteUrl() {
 export default function robots(): MetadataRoute.Robots {
   const url = getSiteUrl();
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ["/create", "/studio", "/profile", "/settings", "/notifications", "/login", "/register", "/api/"] }],
+    rules: [{ userAgent: "*", allow: "/", disallow: ["/create", "/studio", "/profile", "/settings", "/notifications", "/admin", "/login", "/register", "/api/"] }],
     sitemap: `${url.replace(/\/$/, "")}/sitemap.xml`,
   };
 }
