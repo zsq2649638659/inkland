@@ -108,14 +108,26 @@ export default function InlineCommentPanel({
                       className="comment-more-btn inline-comment-more"
                       title="更多"
                       aria-label="评论更多操作"
-                      onClick={() => setMenuId(menuId === comment.id ? null : comment.id)}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setMenuId(menuId === comment.id ? null : comment.id);
+                      }}
                     >⋮</button>
                     {menuId === comment.id && (
                       <div className="comment-popup show">
-                        <button className="comment-popup-item" onClick={() => { setMenuId(null); onBlock?.(comment.user_id); }}>
+                        <button
+                          className="comment-popup-item"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); onBlock?.(comment.user_id); setMenuId(null); }}
+                        >
                           <i className="fa-solid fa-ban" /> 屏蔽
                         </button>
-                        <button className="comment-popup-item" onClick={() => { setMenuId(null); onReport?.(comment.id, comment.user_id); }}>
+                        <button
+                          className="comment-popup-item"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); onReport?.(comment.id, comment.user_id); setMenuId(null); }}
+                        >
                           <i className="fa-solid fa-flag" /> 举报
                         </button>
                       </div>
