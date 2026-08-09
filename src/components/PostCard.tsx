@@ -320,7 +320,7 @@ export default function PostCard({ post }: PostCardProps) {
             <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
             {cardMenuOpen && (
               <div className="card-more-menu">
-                {user?.id !== post.user_id && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
+                {user?.id !== post.user_id && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
                 <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><i className="fa-solid fa-flag" /> 举报</button>
               </div>
             )}
