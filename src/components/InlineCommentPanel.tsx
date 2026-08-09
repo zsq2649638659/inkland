@@ -17,6 +17,8 @@ interface InlineCommentPanelProps {
   onCommentTextChange: (value: string) => void;
   onSubmit: () => void;
   onClose: () => void;
+  onReport?: (commentId: string, commentUserId: string) => void;
+  onBlock?: (commentUserId: string) => void;
 }
 
 function getTimeAgo(dateStr: string) {
@@ -30,8 +32,9 @@ function getTimeAgo(dateStr: string) {
 
 export default function InlineCommentPanel({
   postId, user, displayName, avatarUrl, comments, commentCount, commentText, loadingComments, submitting,
-  onCommentTextChange, onSubmit, onClose,
+  onCommentTextChange, onSubmit, onClose, onReport, onBlock,
 }: InlineCommentPanelProps) {
+  const [menuId, setMenuId] = useState<string | null>(null);
 
   return (
     <div className="inline-comment-panel comments-section" aria-label="评论区">
@@ -89,6 +92,24 @@ export default function InlineCommentPanel({
                     <span className="comment-time">{getTimeAgo(comment.created_at || "")}</span>
                   </div>
                   <p className="comment-text">{comment.content}</p>
+                  <div className="comment-actions">
+                    <button
+                      className="comment-more-btn inline-comment-more"
+                      title="更多"
+                      aria-label="评论更多操作"
+                      onClick={() => setMenuId(menuId === comment.id ? null : comment.id)}
+                    >⋮</button>
+                    {menuId === comment.id && (
+                      <div className="comment-popup show">
+                        <button className="comment-popup-item" onClick={() => { setMenuId(null); onBlock?.(comment.user_id); }}>
+                          <i className="fa-solid fa-ban" /> 屏蔽
+                        </button>
+                        <button className="comment-popup-item" onClick={() => { setMenuId(null); onReport?.(comment.id, comment.user_id); }}>
+                          <i className="fa-solid fa-flag" /> 举报
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
