@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
+import ModerationReasonModal from "@/components/ModerationReasonModal";
 import type { Comment } from "@/lib/types";
 
 export interface SerialPostCardData {
@@ -71,6 +72,12 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
+  const [moderationModal, setModerationModal] = useState<
+    | { mode: "report"; targetType: "post" | "comment"; targetId: string }
+    | { mode: "block"; userId: string }
+    | null
+  >(null);
+  const [moderationSubmitting, setModerationSubmitting] = useState(false);
   const cardMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,22 +94,32 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
 
   const goToLogin = () => router.push("/login");
 
-  const reportTarget = async (targetType: "post" | "comment", targetId: string) => {
+  const reportTarget = (targetType: "post" | "comment", targetId: string) => {
     if (!user) { goToLogin(); return; }
-    const reason = window.prompt("请填写举报原因：");
-    if (!reason?.trim()) return;
-    const { error } = targetType === "comment"
-      ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: targetId, reason: reason.trim() })
-      : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: targetId, reason: reason.trim() });
-    window.alert(error ? "举报提交失败，请稍后重试。" : "举报已提交，我们会尽快处理。");
+    setModerationModal({ mode: "report", targetType, targetId });
   };
 
-  const blockUser = async (blockedUserId: string) => {
+  const blockUser = (blockedUserId: string) => {
     if (!user) { goToLogin(); return; }
-    if (blockedUserId === user.id || !window.confirm("确定要屏蔽该用户吗？屏蔽后你将不再看到对方的内容和互动。")) return;
-    const { error } = await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: blockedUserId });
-    if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) window.alert("屏蔽失败，请稍后重试。");
-    else window.alert("已屏蔽该用户。");
+    if (blockedUserId === user.id) return;
+    setModerationModal({ mode: "block", userId: blockedUserId });
+  };
+
+  const submitModeration = async (reason: string) => {
+    if (!moderationModal || !user || !reason.trim()) return;
+    setModerationSubmitting(true);
+    const { error } = moderationModal.mode === "report"
+      ? moderationModal.targetType === "comment"
+        ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: moderationModal.targetId, reason: reason.trim() })
+        : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: moderationModal.targetId, reason: reason.trim() })
+      : await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderationModal.userId });
+    setModerationSubmitting(false);
+    if (error && !(moderationModal.mode === "block" && (error as unknown as Record<string, unknown>).code?.toString().includes("23505"))) {
+      window.alert(moderationModal.mode === "report" ? "举报提交失败，请稍后重试。" : "屏蔽失败，请稍后重试。");
+      return;
+    }
+    setModerationModal(null);
+    window.alert(moderationModal.mode === "report" ? "举报已提交，我们会尽快处理。" : "已屏蔽该用户。");
   };
 
   // Check follow status
@@ -329,6 +346,13 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           onBlock={(commentUserId) => void blockUser(commentUserId)}
         />
       )}
+      <ModerationReasonModal
+        open={!!moderationModal}
+        mode={moderationModal?.mode || "report"}
+        submitting={moderationSubmitting}
+        onClose={() => setModerationModal(null)}
+        onSubmit={submitModeration}
+      />
     </article>
   );
 }
