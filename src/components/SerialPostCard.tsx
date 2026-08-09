@@ -245,7 +245,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
             {cardMenuOpen && (
               <div className="card-more-menu">
-                {user?.id !== data.authorId && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
+                {user?.id !== data.authorId && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
                 <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><i className="fa-solid fa-flag" /> 举报</button>
               </div>
             )}
