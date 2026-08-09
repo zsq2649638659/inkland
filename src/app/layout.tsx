@@ -23,7 +23,8 @@ export const metadata: Metadata = {
     siteName: "inkland",
     locale: "zh_CN",
   },
-  twitter: { card: "summary" },
+  twitter: { card: "summary_large_image", title: "inkland — 同人创作社区", description: "一个干净、无广告、尊重阅读体验的同人创作社区。" },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
