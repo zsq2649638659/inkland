@@ -428,7 +428,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           </svg>
         </button>
         <button className="floating-btn" title="举报作品" onClick={handlePostReport}>
-          <i className="fa-solid fa-flag" />
+          <i className="fa-regular fa-flag" />
         </button>
       </div>
 
@@ -698,7 +698,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                             className="comment-popup-item"
                             onClick={() => { setCommentMenuId(null); handleReport(c.id, c.user_id); }}
                           >
-                            <i className="fa-solid fa-flag" />
+                            <i className="fa-regular fa-flag" />
                             举报
                           </button>
                           <button
@@ -781,7 +781,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                                       className="comment-popup-item"
                                       onClick={() => { setCommentMenuId(null); handleReport(reply.id, reply.user_id); }}
                                     >
-                                      <i className="fa-solid fa-flag" />
+                                      <i className="fa-regular fa-flag" />
                                       举报
                                     </button>
                                     <button
