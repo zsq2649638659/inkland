@@ -3,11 +3,14 @@
 ## 需要在 Supabase 控制台完成
 
 - 执行 `feedbacks.sql`，创建反馈表和 RLS 策略。
+- 按 [DATABASE-MIGRATIONS.md](./DATABASE-MIGRATIONS.md) 的顺序执行迁移，并记录执行结果。
+- 执行 `admin-backoffice.sql`，创建独立后台账号；部署独立 `admin-app` 后访问 `/admin/login` 核验管理员后台的审核和举报权限。
 - 执行 `storage-policies.sql`，配置 `post-images` bucket、文件大小和对象权限。
 - 执行 `private-images.sql`，配置 `private-post-images` bucket 和登录可见作品规则。
 - 在 Authentication → URL Configuration 中设置正式 Site URL 和 Redirect URLs。
 - 检查所有业务表和 `storage.objects` 是否启用 RLS，并确认草稿、私密、拒绝审核内容不会被公开查询。
 - 确认数据库自动备份、邮箱验证、密码重置邮件和管理员举报处理流程。
+- 确认公开作品只有在审核通过后才会进入公开展示；草稿、私密和拒绝内容不能被公开查询。
 
 ## 部署环境变量
 

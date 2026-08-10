@@ -10,6 +10,8 @@ import { createNotification } from "@/lib/notifications";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
+import ModerationReasonModal from "@/components/ModerationReasonModal";
+import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Post, Comment } from "@/lib/types";
 
@@ -58,9 +60,33 @@ export default function PostCard({ post }: PostCardProps) {
   const [shareTip, setShareTip] = useState(false);
   const [activeImageDot, setActiveImageDot] = useState(0);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [cardMenuOpen, setCardMenuOpen] = useState(false);
+  const [moderationModal, setModerationModal] = useState<
+    | { mode: "report"; targetType: "post" | "comment"; targetId: string }
+    | { mode: "block"; userId: string }
+    | null
+  >(null);
+  const [moderationSubmitting, setModerationSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
   const [resolvedContent, setResolvedContent] = useState(post.content || "");
   const [resolvedCover, setResolvedCover] = useState(post.cover_url || null);
   const imageScrollRef = useRef<HTMLDivElement>(null);
+  const cardMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(""), 2000);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
+
+  useEffect(() => {
+    if (!cardMenuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!cardMenuRef.current?.contains(event.target as Node)) setCardMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [cardMenuOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +116,35 @@ export default function PostCard({ post }: PostCardProps) {
 
   const goToLogin = () => {
     router.push("/login");
+  };
+
+  const reportTarget = (targetType: "post" | "comment", targetId: string, commentUserId?: string) => {
+    if (!user) { goToLogin(); return; }
+    if (targetType === "comment" && commentUserId === user.id) return;
+    setModerationModal({ mode: "report", targetType, targetId });
+  };
+
+  const blockUser = (blockedUserId: string) => {
+    if (!user) { goToLogin(); return; }
+    if (blockedUserId === user.id) return;
+    setModerationModal({ mode: "block", userId: blockedUserId });
+  };
+
+  const submitModeration = async (reason: string) => {
+    if (!moderationModal || !user || (moderationModal.mode === "report" && !reason.trim())) return;
+    setModerationSubmitting(true);
+    const { error } = moderationModal.mode === "report"
+      ? moderationModal.targetType === "comment"
+        ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: moderationModal.targetId, reason: reason.trim() })
+        : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: moderationModal.targetId, reason: reason.trim() })
+      : await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderationModal.userId });
+    setModerationSubmitting(false);
+    if (error && !(moderationModal.mode === "block" && (error as unknown as Record<string, unknown>).code?.toString().includes("23505"))) {
+      setToastMessage(moderationModal.mode === "report" ? "举报提交失败，请稍后重试。" : "屏蔽失败，请稍后重试。");
+      return;
+    }
+    setModerationModal(null);
+    setToastMessage(moderationModal.mode === "report" ? "举报已提交，我们会尽快处理。" : "已屏蔽该用户。");
   };
 
   // Check follow status
@@ -280,15 +335,22 @@ export default function PostCard({ post }: PostCardProps) {
           </div>
         </div>
 
-        {user?.id !== post.user_id && (
-          <button
-            className="card-follow-btn"
-            onClick={toggleFollow}
-            disabled={followLoading}
-          >
-            {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
-          </button>
-        )}
+        <div className="card-header-actions">
+          {user?.id !== post.user_id && (
+            <button className="card-follow-btn" onClick={toggleFollow} disabled={followLoading}>
+              {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
+            </button>
+          )}
+          <div className="card-more-wrap" ref={cardMenuRef}>
+            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
+            {cardMenuOpen && (
+              <div className="card-more-menu">
+                {user?.id !== post.user_id && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
+                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><i className="fa-solid fa-flag" /> 举报</button>
+              </div>
+            )}
+          </div>
+        </div>
 
         </div>
 
@@ -391,8 +453,18 @@ export default function PostCard({ post }: PostCardProps) {
           onCommentTextChange={setCommentText}
           onSubmit={submitComment}
           onClose={() => setShowComment(false)}
+          onReport={(commentId, commentUserId) => void reportTarget("comment", commentId, commentUserId)}
+          onBlock={(commentUserId) => void blockUser(commentUserId)}
         />
       )}
+      <ModerationReasonModal
+        open={!!moderationModal}
+        mode={moderationModal?.mode || "report"}
+        submitting={moderationSubmitting}
+        onClose={() => setModerationModal(null)}
+        onSubmit={submitModeration}
+      />
+      <CenteredToast message={toastMessage} />
     </article>
   );
 }

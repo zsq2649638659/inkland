@@ -4,7 +4,6 @@ export interface Profile {
   username?: string;
   avatar_url?: string | null;
   bio?: string | null;
-  role?: "user" | "author" | "admin";
   created_at?: string;
 }
 
