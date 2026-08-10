@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "图片审核服务尚未配置，已转入人工审核。" }, { status: 503 });
   }
   try {
-    const response = await fetch("https://api.openai.com/v1/moderations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ model: "omni-moderation-latest", input: urls.map((url) => [{ type: "image_url", image_url: { url } }]) }) });
+    const response = await fetch("https://api.openai.com/v1/moderations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ model: "omni-moderation-latest", input: urls.map((url) => ({ type: "image_url", image_url: { url } })) }) });
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 500);
       throw new Error(`moderation_http_${response.status}:${detail}`);
