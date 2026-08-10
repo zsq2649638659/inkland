@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/image";
 import { renderSafeMarkdown } from "@/lib/markdown";
 import { useMarkdownEditor } from "@/lib/useMarkdownEditor";
+import { screenImageLocally } from "@/lib/localImageScreening";
 
 function notifyStatsChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("inkland:stats-changed"));
@@ -684,7 +685,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     const fileExt = "webp";
     const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${fileExt}`;
-    const bucketName = visibility === "public" ? "post-images" : "private-post-images";
+    // 所有待审核图片先进入私有桶。审核通过后由服务端迁移到公开桶，
+    // 避免“数据库暂时不可见，但拿到图片 URL 仍可访问”的绕过方式。
+    const bucketName = "private-post-images";
 
     const { error } = await supabase.storage
       .from(bucketName)
@@ -698,16 +701,12 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       }
       return null;
     }
-    if (visibility !== "public") {
-      const { data: signedData, error: signedError } = await supabase.storage.from(bucketName).createSignedUrl(fileName, 3600);
-      if (signedError || !signedData?.signedUrl) {
-        setErrorMsg("图片已上传，但临时预览链接生成失败，请检查私有 bucket 的 SELECT 策略。");
-        return null;
-      }
-      return { name: file.name, url: signedData.signedUrl, storedUrl: privateImageMarker(fileName), bucket: bucketName, path: fileName, file: compressedFile };
+    const { data: signedData, error: signedError } = await supabase.storage.from(bucketName).createSignedUrl(fileName, 3600);
+    if (signedError || !signedData?.signedUrl) {
+      setErrorMsg("图片已上传，但临时预览链接生成失败，请检查私有 bucket 的 SELECT 策略。");
+      return null;
     }
-    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(fileName);
-    return urlData?.publicUrl ? { name: file.name, url: urlData.publicUrl, storedUrl: urlData.publicUrl, bucket: bucketName, path: fileName, file: compressedFile } : null;
+    return { name: file.name, url: signedData.signedUrl, storedUrl: privateImageMarker(fileName), bucket: bucketName, path: fileName, file: compressedFile };
   }, [supabase, visibility]);
 
   const handleVisibilityChange = useCallback(async (next: "public" | "followers_only" | "private") => {
@@ -720,7 +719,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     setUploadingImage(true);
     setErrorMsg("");
-    const targetBucket = next === "public" ? "post-images" : "private-post-images";
+    // 审核完成前无论目标可见范围是什么，都只使用私有桶。
+    const targetBucket = "private-post-images";
     const migrated: UploadedImage[] = [];
     try {
       for (const image of uploadedImages) {
@@ -734,18 +734,10 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
         const { error: uploadError } = await supabase.storage.from(targetBucket).upload(targetPath, sourceFile, { upsert: true, contentType: "image/webp" });
         if (uploadError) throw uploadError;
 
-        let url = "";
-        let storedUrl = "";
-        if (next === "public") {
-          const { data } = supabase.storage.from(targetBucket).getPublicUrl(targetPath);
-          url = data.publicUrl;
-          storedUrl = data.publicUrl;
-        } else {
-          const { data, error } = await supabase.storage.from(targetBucket).createSignedUrl(targetPath, 3600);
-          if (error || !data?.signedUrl) throw error || new Error("无法生成图片预览链接");
-          url = data.signedUrl;
-          storedUrl = privateImageMarker(targetPath);
-        }
+        const { data, error } = await supabase.storage.from(targetBucket).createSignedUrl(targetPath, 3600);
+        if (error || !data?.signedUrl) throw error || new Error("无法生成图片预览链接");
+        const url = data.signedUrl;
+        const storedUrl = privateImageMarker(targetPath);
         migrated.push({ ...image, url, storedUrl, bucket: targetBucket, path: targetPath, file: sourceFile });
       }
       const replacements = new Map<string, string>();
@@ -771,13 +763,22 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     setUploadingImage(true);
     setErrorMsg("");
     if (files.length > remaining) setErrorMsg(`单篇作品最多上传 ${MAX_UPLOAD_IMAGES} 张图片，超出的图片未添加`);
+    let addedCount = 0;
     for (const file of selectedFiles) {
       if (!file.type.startsWith("image/")) { setErrorMsg(`"${file.name}" 不是图片文件，已跳过`); continue; }
       if (file.size > 20 * 1024 * 1024) { setErrorMsg(`"${file.name}" 原文件超过 20MB，已跳过`); continue; }
+      setErrorMsg(`正在使用本地模型审核第 ${addedCount + 1} 张图片...`);
+      try {
+        await screenImageLocally(file, uploadedImages.length + addedCount);
+      } catch (error) {
+        // 浏览器预筛只是可选的体验优化，不能阻止上传，也不能代替服务端审核。
+        setErrorMsg(error instanceof Error ? `本地预筛不可用，将继续上传并交由服务端审核：${error.message}` : "本地预筛不可用，将继续上传并交由服务端审核");
+      }
       const uploaded = await uploadImageToStorage(file);
       if (uploaded) {
         setUploadedImages((prev) => [...prev, uploaded]);
         editor.insertAtCursor(`![${uploaded.name}](${uploaded.url})\n`);
+        addedCount += 1;
       }
     }
     setUploadingImage(false);
@@ -1080,6 +1081,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     let savedPostId = editPostId || undefined;
     let finalReviewStatus: string | undefined;
+    let imageScreeningUnavailable = false;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
@@ -1092,7 +1094,16 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     }
 
     if (!options?.draft && visibility !== "private" && savedPostId && finalReviewStatus === "pending") {
-      await fetch("/api/moderation/screen-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: savedPostId }) });
+      try {
+        const screeningResponse = await fetch("/api/moderation/screen-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ postId: savedPostId }),
+        });
+        imageScreeningUnavailable = !screeningResponse.ok;
+      } catch {
+        imageScreeningUnavailable = true;
+      }
       const { data: screenedPost } = await supabase.from("posts").select("review_status").eq("id", savedPostId).single();
       finalReviewStatus = screenedPost?.review_status as string | undefined;
     }
@@ -1111,7 +1122,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setSuccessMsg("作品已保存为仅自己可见");
     } else {
       setSuccessAction("publish");
-      setSuccessMsg(finalReviewStatus === "approved" ? "作品已通过系统初筛并公开发布" : "作品已进入人工审核，审核通过后会公开");
+      setSuccessMsg(
+        finalReviewStatus === "approved"
+          ? "作品已通过系统初筛并公开发布"
+          : imageScreeningUnavailable
+            ? "自动审核服务暂时不可用，作品已转入人工审核"
+            : "作品已进入人工审核，审核通过后会公开",
+      );
     }
   };
 
