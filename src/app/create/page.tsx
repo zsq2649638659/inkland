@@ -972,6 +972,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     let savedPostId = editPostId || undefined;
     let finalReviewStatus: string | undefined;
+    let imageScreeningUnavailable = false;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
@@ -1092,7 +1093,16 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     }
 
     if (!options?.draft && visibility !== "private" && savedPostId && finalReviewStatus === "pending") {
-      await fetch("/api/moderation/screen-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: savedPostId }) });
+      try {
+        const screeningResponse = await fetch("/api/moderation/screen-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ postId: savedPostId }),
+        });
+        imageScreeningUnavailable = !screeningResponse.ok;
+      } catch {
+        imageScreeningUnavailable = true;
+      }
       const { data: screenedPost } = await supabase.from("posts").select("review_status").eq("id", savedPostId).single();
       finalReviewStatus = screenedPost?.review_status as string | undefined;
     }
@@ -1111,7 +1121,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setSuccessMsg("作品已保存为仅自己可见");
     } else {
       setSuccessAction("publish");
-      setSuccessMsg(finalReviewStatus === "approved" ? "作品已通过系统初筛并公开发布" : "作品已进入人工审核，审核通过后会公开");
+      setSuccessMsg(
+        finalReviewStatus === "approved"
+          ? "作品已通过系统初筛并公开发布"
+          : imageScreeningUnavailable
+            ? "自动审核服务暂时不可用，作品已转入人工审核"
+            : "作品已进入人工审核，审核通过后会公开",
+      );
     }
   };
 
