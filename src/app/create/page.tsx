@@ -971,13 +971,16 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     if (finalSeriesName) postData.series_name = finalSeriesName;
 
     let savedPostId = editPostId || undefined;
+    let finalReviewStatus: string | undefined;
     if (editPostId) {
-      const { error } = await supabase.from("posts").update(postData).eq("id", editPostId);
+      const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
+      finalReviewStatus = updatedPost?.review_status as string | undefined;
     } else {
-      const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id").single();
+      const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id, review_status").single();
       if (error) { setErrorMsg(`发布失败: ${error.message}`); setSubmitting(false); return; }
       savedPostId = createdPost?.id;
+      finalReviewStatus = createdPost?.review_status as string | undefined;
     }
 
     await saveTags(user.id, savedPostId);
@@ -996,7 +999,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     }
     setSubmitting(false);
     setSuccessAction("publish");
-    setSuccessMsg(editPostId ? "作品已提交审核" : "作品已提交审核，通过后会公开");
+    setSuccessMsg(finalReviewStatus === "approved" ? "作品已通过系统初筛并公开发布" : "作品已进入人工审核，审核通过后会公开");
   };
 
   // ============ 保存草稿 ============
@@ -1076,13 +1079,22 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     if (finalSeriesName) postData.series_name = finalSeriesName;
 
     let savedPostId = editPostId || undefined;
+    let finalReviewStatus: string | undefined;
     if (editPostId) {
-      const { error } = await supabase.from("posts").update(postData).eq("id", editPostId);
+      const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
+      finalReviewStatus = updatedPost?.review_status as string | undefined;
     } else {
-      const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id").single();
+      const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id, review_status").single();
       if (error) { setErrorMsg(`发布失败: ${error.message}`); setSubmitting(false); return; }
       savedPostId = createdPost?.id;
+      finalReviewStatus = createdPost?.review_status as string | undefined;
+    }
+
+    if (!options?.draft && visibility !== "private" && savedPostId && finalReviewStatus === "pending") {
+      await fetch("/api/moderation/screen-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: savedPostId }) });
+      const { data: screenedPost } = await supabase.from("posts").select("review_status").eq("id", savedPostId).single();
+      finalReviewStatus = screenedPost?.review_status as string | undefined;
     }
 
     await saveTags(user.id, savedPostId);
@@ -1099,7 +1111,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setSuccessMsg("作品已保存为仅自己可见");
     } else {
       setSuccessAction("publish");
-      setSuccessMsg(editPostId ? "作品已提交审核" : "作品已提交审核，通过后会公开");
+      setSuccessMsg(finalReviewStatus === "approved" ? "作品已通过系统初筛并公开发布" : "作品已进入人工审核，审核通过后会公开");
     }
   };
 
