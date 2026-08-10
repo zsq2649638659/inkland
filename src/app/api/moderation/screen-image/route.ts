@@ -28,15 +28,34 @@ export async function POST(request: Request) {
     return Response.json({ error: "图片审核服务尚未配置，已转入人工审核。" }, { status: 503 });
   }
   try {
-    const response = await fetch("https://api.openai.com/v1/moderations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ model: "omni-moderation-latest", input: urls.map((url) => ({ type: "image_url", image_url: { url } })) }) });
-    if (!response.ok) {
-      const detail = (await response.text()).slice(0, 500);
-      throw new Error(`moderation_http_${response.status}:${detail}`);
-    }
-    const data = await response.json() as { results?: ModerationResult[]; model?: string };
-    const findings = (data.results || []).flatMap((result, image_index) => result.flagged ? Object.entries(result.categories || {}).filter(([, flagged]) => flagged).map(([category]) => ({ image_index, category })) : []);
+    const screenedImages = await Promise.all(urls.map(async (url, image_index) => {
+      const response = await fetch("https://api.openai.com/v1/moderations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: "omni-moderation-latest",
+          input: [{ type: "image_url", image_url: { url } }],
+        }),
+      });
+      if (!response.ok) {
+        const detail = (await response.text()).slice(0, 500);
+        throw new Error(`moderation_http_${response.status}:image_${image_index + 1}:${detail}`);
+      }
+      const data = await response.json() as { results?: ModerationResult[]; model?: string };
+      return { image_index, model: data.model, result: data.results?.[0] };
+    }));
+    const findings = screenedImages.flatMap(({ image_index, result }) => result?.flagged
+      ? Object.entries(result.categories || {})
+        .filter(([, flagged]) => flagged)
+        .map(([category]) => ({ image_index, category }))
+      : []);
     const outcome = findings.length ? "flagged" : "approved";
-    const { error } = await supabase.rpc("complete_image_screening", { post_id_input: postId, outcome, result: { model: data.model || "omni-moderation-latest", image_count: urls.length }, findings });
+    const { error } = await supabase.rpc("complete_image_screening", {
+      post_id_input: postId,
+      outcome,
+      result: { model: screenedImages.find((item) => item.model)?.model || "omni-moderation-latest", image_count: urls.length },
+      findings,
+    });
     if (error) throw error;
     console.log(JSON.stringify({ level: "info", route: "/api/moderation/screen-image", message: "screening_completed", outcome, image_count: urls.length, ms: Date.now() - startedAt }));
     return Response.json({ outcome, findings });
