@@ -28,22 +28,31 @@ export async function POST(request: Request) {
     return Response.json({ error: "图片审核服务尚未配置，已转入人工审核。" }, { status: 503 });
   }
   try {
-    const screenedImages = await Promise.all(urls.map(async (url, image_index) => {
-      const response = await fetch("https://api.openai.com/v1/moderations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({
-          model: "omni-moderation-latest",
-          input: [{ type: "image_url", image_url: { url } }],
-        }),
-      });
-      if (!response.ok) {
+    const screenedImages: Array<{ image_index: number; model?: string; result?: ModerationResult }> = [];
+    for (const [image_index, url] of urls.entries()) {
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+        const response = await fetch("https://api.openai.com/v1/moderations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: "omni-moderation-latest",
+            input: [{ type: "image_url", image_url: { url } }],
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json() as { results?: ModerationResult[]; model?: string };
+          screenedImages.push({ image_index, model: data.model, result: data.results?.[0] });
+          lastError = null;
+          break;
+        }
         const detail = (await response.text()).slice(0, 500);
-        throw new Error(`moderation_http_${response.status}:image_${image_index + 1}:${detail}`);
+        lastError = new Error(`moderation_http_${response.status}:image_${image_index + 1}:${detail}`);
+        if (response.status !== 429) break;
       }
-      const data = await response.json() as { results?: ModerationResult[]; model?: string };
-      return { image_index, model: data.model, result: data.results?.[0] };
-    }));
+      if (lastError) throw lastError;
+    }
     const findings = screenedImages.flatMap(({ image_index, result }) => result?.flagged
       ? Object.entries(result.categories || {})
         .filter(([, flagged]) => flagged)
