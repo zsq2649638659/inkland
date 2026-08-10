@@ -972,7 +972,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     let savedPostId = editPostId || undefined;
     let finalReviewStatus: string | undefined;
-    let imageScreeningUnavailable = false;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
@@ -1081,6 +1080,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     let savedPostId = editPostId || undefined;
     let finalReviewStatus: string | undefined;
+    let imageScreeningUnavailable = false;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
