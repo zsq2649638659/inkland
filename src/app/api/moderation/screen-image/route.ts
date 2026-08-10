@@ -1,77 +1,127 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-type ModerationResult = { flagged?: boolean; categories?: Record<string, boolean> };
+type Finding = {
+  image_index: number;
+  category: string;
+  score: number;
+  details?: string;
+  box?: number[] | null;
+};
 
-function imageUrls(content: string) {
-  return [...content.matchAll(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/g)].map((match) => match[1]).slice(0, 9);
+function contentImageSources(content: string) {
+  return [...content.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)]
+    .map((match) => match[1])
+    .slice(0, 9);
 }
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const sessionClient = await createClient();
+  const { data: { user } } = await sessionClient.auth.getUser();
   if (!user) return Response.json({ error: "请先登录。" }, { status: 401 });
-  const { postId } = await request.json().catch(() => ({})) as { postId?: string };
-  if (!postId) return Response.json({ error: "缺少作品编号。" }, { status: 400 });
-  const { data: post } = await supabase.from("posts").select("id, content, post_type, review_status").eq("id", postId).eq("user_id", user.id).maybeSingle();
-  if (!post || post.post_type !== "illustration" || post.review_status !== "pending") return Response.json({ error: "作品当前不能进行图片审核。" }, { status: 409 });
-  const urls = imageUrls(post.content || "");
-  if (!urls.length) return Response.json({ error: "没有可供审核的公开图片。" }, { status: 400 });
-  const key = process.env.OPENAI_API_KEY;
-  const recordServiceError = async (reason: string) => {
-    const { error } = await supabase.rpc("complete_image_screening", { post_id_input: postId, outcome: "service_error", result: { model: "omni-moderation-latest", reason }, findings: [] });
-    if (error) console.error(JSON.stringify({ level: "error", route: "/api/moderation/screen-image", message: "screening_state_write_failed", reason, error: error.message, ms: Date.now() - startedAt }));
-  };
-  if (!key) {
-    await recordServiceError("missing_api_key");
-    console.error(JSON.stringify({ level: "error", route: "/api/moderation/screen-image", message: "missing_api_key", ms: Date.now() - startedAt }));
-    return Response.json({ error: "图片审核服务尚未配置，已转入人工审核。" }, { status: 503 });
-  }
+
+  const body = await request.json().catch(() => ({})) as { postId?: string };
+  if (!body.postId) return Response.json({ error: "缺少作品编号。" }, { status: 400 });
+
+  let admin;
   try {
-    const screenedImages: Array<{ image_index: number; model?: string; result?: ModerationResult }> = [];
-    for (const [image_index, url] of urls.entries()) {
-      let lastError: Error | null = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
-        const response = await fetch("https://api.openai.com/v1/moderations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({
-            model: "omni-moderation-latest",
-            input: [{ type: "image_url", image_url: { url } }],
-          }),
-        });
-        if (response.ok) {
-          const data = await response.json() as { results?: ModerationResult[]; model?: string };
-          screenedImages.push({ image_index, model: data.model, result: data.results?.[0] });
-          lastError = null;
-          break;
-        }
-        const detail = (await response.text()).slice(0, 500);
-        lastError = new Error(`moderation_http_${response.status}:image_${image_index + 1}:${detail}`);
-        if (response.status !== 429) break;
-      }
-      if (lastError) throw lastError;
+    admin = createAdminClient();
+  } catch (error) {
+    console.error("moderation_admin_client_unavailable", error);
+    return Response.json({ error: "服务端审核尚未配置，作品已转入人工审核。" }, { status: 503 });
+  }
+
+  const { data: post } = await admin
+    .from("posts")
+    .select("id, user_id, content, post_type, review_status")
+    .eq("id", body.postId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!post || post.post_type !== "illustration" || post.review_status !== "pending") {
+    return Response.json({ error: "作品当前不能进行图片审核。" }, { status: 409 });
+  }
+
+  const sources = contentImageSources(post.content || "");
+  if (!sources.length) return Response.json({ error: "没有可供审核的图片。" }, { status: 400 });
+
+  const images: Array<{ index: number; url: string }> = [];
+  for (const [index, source] of sources.entries()) {
+    const privateMatch = source.match(/^private:\/\/private-post-images\/(.+)$/);
+    if (privateMatch) {
+      const { data } = await admin.storage.from("private-post-images").createSignedUrl(privateMatch[1], 600);
+      if (!data?.signedUrl) return completeAsError(admin, body.postId, "无法生成图片临时地址。");
+      images.push({ index, url: data.signedUrl });
+    } else if (/^https?:\/\//.test(source)) {
+      images.push({ index, url: source });
     }
-    const findings = screenedImages.flatMap(({ image_index, result }) => result?.flagged
-      ? Object.entries(result.categories || {})
-        .filter(([, flagged]) => flagged)
-        .map(([category]) => ({ image_index, category }))
-      : []);
-    const outcome = findings.length ? "flagged" : "approved";
-    const { error } = await supabase.rpc("complete_image_screening", {
-      post_id_input: postId,
+  }
+
+  const serviceUrl = process.env.MODERATION_SERVICE_URL?.replace(/\/$/, "");
+  const serviceSecret = process.env.MODERATION_SERVICE_SECRET;
+  if (!serviceUrl || !serviceSecret) {
+    return completeAsError(admin, body.postId, "NudeNet 服务尚未配置。");
+  }
+
+  try {
+    const response = await fetch(`${serviceUrl}/moderate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-moderation-secret": serviceSecret,
+      },
+      body: JSON.stringify({ images }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!response.ok) throw new Error(`moderation_service_http_${response.status}`);
+    const result = await response.json() as { outcome?: string; findings?: Finding[]; engine?: string; model?: string };
+    const findings = Array.isArray(result.findings) ? result.findings : [];
+    const outcome = findings.length > 0 || result.outcome === "flagged" ? "flagged" : "approved";
+    if (outcome === "approved") {
+      await promotePrivateImages(admin, body.postId, post.content || "");
+    }
+    const { error } = await admin.rpc("complete_image_screening", {
+      post_id_input: body.postId,
       outcome,
-      result: { model: screenedImages.find((item) => item.model)?.model || "omni-moderation-latest", image_count: urls.length },
+      result: { ...result, source: "modelscope_studio", image_count: images.length },
       findings,
     });
     if (error) throw error;
-    console.log(JSON.stringify({ level: "info", route: "/api/moderation/screen-image", message: "screening_completed", outcome, image_count: urls.length, ms: Date.now() - startedAt }));
+    console.log(JSON.stringify({ level: "info", route: "/api/moderation/screen-image", message: "server_screening_completed", post_id: body.postId, outcome, findings: findings.length, ms: Date.now() - startedAt }));
     return Response.json({ outcome, findings });
   } catch (error) {
-    const reason = error instanceof Error ? error.message.slice(0, 500) : "unknown_error";
-    await recordServiceError(reason);
-    console.error(JSON.stringify({ level: "error", route: "/api/moderation/screen-image", message: "screening_failed", reason, ms: Date.now() - startedAt }));
-    return Response.json({ error: "图片审核服务暂时不可用，已转入人工处理。" }, { status: 503 });
+    console.error(JSON.stringify({ level: "error", route: "/api/moderation/screen-image", message: "server_screening_failed", post_id: body.postId, error: error instanceof Error ? error.message : String(error), ms: Date.now() - startedAt }));
+    return completeAsError(admin, body.postId, "NudeNet 服务异常。");
   }
+}
+
+async function promotePrivateImages(admin: ReturnType<typeof createAdminClient>, postId: string, content: string) {
+  const paths = [...content.matchAll(/private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g)].map((match) => match[1]);
+  if (!paths.length) return;
+  let updatedContent = content;
+  for (const sourcePath of paths) {
+    const targetPath = `approved/${postId}/${sourcePath.split("/").pop()}`;
+    const { error: copyError } = await admin.storage.from("private-post-images").copy(sourcePath, targetPath, { destinationBucket: "post-images" });
+    if (copyError) throw new Error(`image_promote_copy_failed:${copyError.message}`);
+    const { data } = admin.storage.from("post-images").getPublicUrl(targetPath);
+    if (!data.publicUrl) throw new Error("image_promote_public_url_failed");
+    updatedContent = updatedContent.split(`private://private-post-images/${sourcePath}`).join(data.publicUrl);
+    await admin.storage.from("private-post-images").remove([sourcePath]);
+  }
+  const { error: updateError } = await admin.from("posts").update({ content: updatedContent }).eq("id", postId);
+  if (updateError) throw new Error(`image_promote_content_update_failed:${updateError.message}`);
+}
+
+async function completeAsError(admin: ReturnType<typeof createAdminClient>, postId: string, message: string) {
+  const { error } = await admin.rpc("complete_image_screening", {
+    post_id_input: postId,
+    outcome: "service_error",
+    result: { source: "modelscope_studio", reason: message },
+    findings: [],
+  });
+  if (error) console.error("moderation_service_error_state_write_failed", error);
+  return Response.json({ error: `${message}作品已转入人工审核。` }, { status: 503 });
 }
