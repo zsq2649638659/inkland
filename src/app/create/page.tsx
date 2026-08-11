@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/image";
 import { renderSafeMarkdown } from "@/lib/markdown";
 import { useMarkdownEditor } from "@/lib/useMarkdownEditor";
-import { screenImageLocally } from "@/lib/localImageScreening";
+import { screenImageLocally, type LocalImageScreening } from "@/lib/localImageScreening";
 
 function notifyStatsChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("inkland:stats-changed"));
@@ -52,6 +52,7 @@ interface UploadedImage {
   bucket?: string;
   path?: string;
   file?: File;
+  localScreening?: Promise<LocalImageScreening>;
 }
 
 function privateImageMarker(path: string) {
@@ -769,10 +770,10 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       if (file.size > 20 * 1024 * 1024) { setErrorMsg(`"${file.name}" 原文件超过 20MB，已跳过`); continue; }
       // 本地模型只是可选的预筛，不能阻止上传，也不能代替服务端审核。
       // 不把它放在上传链路中等待，避免用户看到漫长的“审核中”并误以为发布被卡住。
-      void screenImageLocally(file, uploadedImages.length + addedCount).catch(() => undefined);
+      const localScreening = screenImageLocally(file, uploadedImages.length + addedCount);
       const uploaded = await uploadImageToStorage(file);
       if (uploaded) {
-        setUploadedImages((prev) => [...prev, uploaded]);
+        setUploadedImages((prev) => [...prev, { ...uploaded, localScreening }]);
         editor.insertAtCursor(`![${uploaded.name}](${uploaded.url})\n`);
         addedCount += 1;
       }
@@ -1091,10 +1092,12 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     if (!options?.draft && visibility !== "private" && savedPostId && finalReviewStatus === "pending") {
       // 发布与自动审核解耦：作品先进入“已发布/审核中”状态，审核服务在后台完成。
       // 前端不再等待 ModelScope/NudeNet，也不把服务异常误报成发布失败。
+      const localResults = await Promise.all(uploadedImages.map((image) => image.localScreening?.catch(() => undefined)));
+      const clientFindings = localResults.flatMap((result) => result?.findings || []);
       void fetch("/api/moderation/screen-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId: savedPostId }),
+        body: JSON.stringify({ postId: savedPostId, clientFindings }),
         keepalive: true,
       }).catch(() => undefined);
     }
