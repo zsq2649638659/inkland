@@ -53,3 +53,8 @@
 .admin-issue-buttons button:hover:not(:disabled) { border-color:#d96555; background:#fff1ed; }
 .admin-issue-buttons button:disabled { cursor:wait; opacity:.55; }
 .admin-approve-panel .admin-detail-secondary { margin-top:4px; border-color:#c9c9d0; color:#50505a; font-weight:700; }
+.admin-image-selection-help { margin:-8px 0 16px; color:#8e8e96; font-size:10px; line-height:1.6; }
+.admin-detail-images figure { position:relative; padding:9px; border:1px solid transparent; border-radius:10px; transition:border-color .15s ease,background .15s ease; }
+.admin-detail-images figure.is-selected { border-color:#e7a99d; background:#fff8f6; }
+.admin-image-selector { display:flex; align-items:center; gap:7px; margin:0 0 8px; color:#777780; font-size:10px; cursor:pointer; }
+.admin-image-selector input { width:14px; height:14px; accent-color:var(--accent); }
