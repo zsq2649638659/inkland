@@ -10636,12 +10636,15 @@ p {
 
 #page-create .collection-option {
   display: flex;
+  box-sizing: border-box;
+  height: 80px;
+  min-height: 80px;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   text-align: left;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-sm);
+  padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-card);
@@ -11009,15 +11012,16 @@ p {
 
 /* ─── Image Upload Area ─── */
 #page-create .image-upload-workspace {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
-  align-items: start;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
   gap: var(--spacing-md);
 }
 
 #page-create .image-upload-area {
   position: relative;
   display: flex;
+  width: 100%;
   min-height: 168px;
   align-items: center;
   justify-content: center;
@@ -11063,7 +11067,8 @@ p {
 /* ─── Image Grid ─── */
 #page-create .image-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 8px;
   margin-top: 0;
 }
@@ -11155,6 +11160,12 @@ p {
 #page-create .form-textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(242, 107, 91, 0.12);
+}
+
+#page-create .image-description-textarea {
+  box-sizing: border-box;
+  height: 80px;
+  min-height: 80px;
 }
 
 #page-create.publish-article-page .title-character-count {
