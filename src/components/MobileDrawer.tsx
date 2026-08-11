@@ -31,8 +31,15 @@ export default function MobileDrawer() {
         .then(({ count }) => setNotificationCount(count || 0));
     };
     fetchCount();
+    const channel = supabase
+      .channel(`mobile-drawer-notifications:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchCount)
+      .subscribe();
     const timer = window.setInterval(fetchCount, 30_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      void supabase.removeChannel(channel);
+    };
   }, [user, supabase]);
 
   useEffect(() => {
@@ -197,15 +204,15 @@ export default function MobileDrawer() {
                 className={`sidebar-menu-item text-left ${isActive(item.page) ? "active" : ""}`}
                 onClick={() => handleNav(item.href)}
               >
-                <span className="sidebar-menu-icon" style={{ position: "relative" }}>
+                <span className="sidebar-menu-icon">
                   <i className={`fa-solid ${item.icon}`} />
-                  {"badge" in item && (item.badge as number) > 0 && (
-                    <span className="sidebar-menu-badge" style={{ position: "absolute", top: -6, right: -10, fontSize: 10, minWidth: 16, height: 16, lineHeight: "16px" }}>
-                      {formatNotificationCount(item.badge as number)}
-                    </span>
-                  )}
                 </span>
                 <span className="sidebar-menu-label">{item.label}</span>
+                {"badge" in item && (item.badge as number) > 0 && (
+                  <span className="sidebar-menu-badge">
+                    {formatNotificationCount(item.badge as number)}
+                  </span>
+                )}
               </button>
             ))}
 

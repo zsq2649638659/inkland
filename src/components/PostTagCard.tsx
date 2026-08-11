@@ -93,7 +93,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
           </Link>
         )}
         <div className="card-image-stage">
-          {isRejected && <Link href={targetHref} className="profile-review-badge"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
+          {isRejected && <Link href={targetHref} className="profile-review-badge"><i className="fa-solid fa-circle-exclamation" /> 未过审</Link>}
           <div className="card-image-link">
             <div className="card-image-placeholder">
               {allImages[activeImage] ? (
@@ -176,7 +176,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
           <i className="fa-solid fa-layer-group"></i> {seriesContext}
         </Link>
       )}
-      {isRejected && <Link href={targetHref} className="profile-review-badge profile-review-badge--inline"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
+      {isRejected && <Link href={targetHref} className="profile-review-badge profile-review-badge--inline"><i className="fa-solid fa-circle-exclamation" /> 未过审</Link>}
       <Link href={targetHref} className="no-underline">
         <div className="card-title">{post.title || "无标题"}</div>
       </Link>

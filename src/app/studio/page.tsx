@@ -265,7 +265,7 @@ export default function StudioPage() {
     { key: "all", label: "全部状态" },
     { key: "published", label: "已发布" },
     { key: "draft", label: "草稿" },
-    { key: "rejected", label: "需修改" },
+    { key: "rejected", label: "未过审" },
   ];
 
   const sortOptions: { key: SortType; label: string }[] = [
@@ -350,7 +350,7 @@ export default function StudioPage() {
   const isScheduled = (w: WorkItem) => w.status === "draft" && w.published_at && new Date(w.published_at).getTime() > Date.now();
 
   const getStatusLabel = (w: WorkItem) => {
-    if (w.review_status === "rejected") return "需修改";
+    if (w.review_status === "rejected") return "未过审";
     if (w.review_status === "pending" && w.status === "published") return "已发布（审核中，仅自己可见）";
     if (w.review_status === "pending") return "审核中";
     if (w.status === "published") return "已发布";
@@ -485,7 +485,7 @@ export default function StudioPage() {
                 <i className="fa-solid fa-circle-exclamation"></i>
               </div>
               <div className="stat-card-number">{rejectedCount}</div>
-              <div className="stat-card-label">需修改</div>
+              <div className="stat-card-label">未过审</div>
             </div>
           </div>
 
@@ -729,12 +729,6 @@ export default function StudioPage() {
                     {(w.tags || []).length > 0 && (
                       <div className="studio-card-tags" onMouseDown={handleTagDragStart} title="拖动查看全部标签">
                         {(w.tags || []).map((tag) => <span key={tag} className="studio-card-tag">{tag}</span>)}
-                      </div>
-                    )}
-                    {w.review_status === "rejected" && (
-                      <div className="studio-review-reason" role="status">
-                        <strong><i className="fa-solid fa-circle-exclamation" /> 审核打回原因</strong>
-                        <span>{w.review_reason || "作品需要修改后重新提交审核"}</span>
                       </div>
                     )}
                     <div className="card-actions">

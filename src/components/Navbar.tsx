@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/browser";
@@ -16,13 +16,39 @@ interface Suggestion {
 
 export default function Navbar() {
   const { user } = useAuth();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { open, openDrawer } = useMobileDrawer();
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [scrolled, setScrolled] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setNotificationCount(0);
+      return;
+    }
+    const fetchNotificationCount = () => {
+      void supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("read", false)
+        .then(({ count }) => setNotificationCount(count || 0));
+    };
+    fetchNotificationCount();
+    const channel = supabase
+      .channel(`navbar-notifications:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchNotificationCount)
+      .subscribe();
+    const timer = window.setInterval(fetchNotificationCount, 30_000);
+    return () => {
+      window.clearInterval(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, user]);
 
   useEffect(() => {
     const t = document.documentElement.getAttribute("data-theme");
@@ -231,9 +257,9 @@ export default function Navbar() {
 
           {/* V2: mobile menu button */}
           <button
-            className="btn-mobile-menu"
+            className={`btn-mobile-menu ${notificationCount > 0 ? "has-unread-notifications" : ""}`}
             id="btnMobileMenu"
-            aria-label="打开菜单"
+            aria-label={notificationCount > 0 ? `打开菜单，${notificationCount} 条未读消息` : "打开菜单"}
             aria-expanded={open}
             aria-controls="mobile-drawer"
             onClick={openDrawer}

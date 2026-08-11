@@ -74,15 +74,15 @@ function VisibilityOptions({
       <div className="collection-options" role="radiogroup" aria-label="可见范围">
           <button type="button" className={`collection-option ${value === "public" ? "selected" : ""}`} onClick={() => onChange("public")} disabled={disabled} role="radio" aria-checked={value === "public"}>
           <span className={`radio-circle ${value === "public" ? "selected" : ""}`}><span className="radio-dot" /></span>
-          <span className="collection-option-copy"><span className="collection-option-text">公开</span><span className="collection-option-desc">所有人可见</span></span>
+          <span className="collection-option-text">公开</span>
         </button>
         <button type="button" className={`collection-option ${value === "followers_only" ? "selected" : ""}`} onClick={() => onChange("followers_only")} disabled={disabled} role="radio" aria-checked={value === "followers_only"}>
           <span className={`radio-circle ${value === "followers_only" ? "selected" : ""}`}><span className="radio-dot" /></span>
-          <span className="collection-option-copy"><span className="collection-option-text">仅关注用户可见</span><span className="collection-option-desc">只有关注作者的人可见</span></span>
+          <span className="collection-option-text">仅关注用户可见</span>
         </button>
         <button type="button" className={`collection-option ${value === "private" ? "selected" : ""}`} onClick={() => onChange("private")} disabled={disabled} role="radio" aria-checked={value === "private"}>
           <span className={`radio-circle ${value === "private" ? "selected" : ""}`}><span className="radio-dot" /></span>
-          <span className="collection-option-copy"><span className="collection-option-text">仅自己可见</span><span className="collection-option-desc">保存为草稿，仅作者本人可见</span></span>
+          <span className="collection-option-text">仅自己可见</span>
         </button>
       </div>
       {disabled && <p className="text-xs text-muted mt-2">正在同步图片权限，完成后即可发布。</p>}
@@ -510,6 +510,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           setEditingPostSeriesName((p.series_name as string) || null);
           if (p.review_status === "rejected") {
             setReviewRejectionReason((p.review_reason as string) || "未提供原因");
+            setShowRejectionDialog(true);
           }
           if (p.post_type === "illustration") {
             setView("image");
@@ -622,6 +623,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   // ---- 编辑模式 ----
   const [editingPublishedAt, setEditingPublishedAt] = useState<string | null>(null);
   const [reviewRejectionReason, setReviewRejectionReason] = useState<string | null>(null);
+  const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   const [editingPostSeriesName, setEditingPostSeriesName] = useState<string | null>(null);
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
@@ -881,8 +883,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const renderNotice = () => (
     <>
       {errorMsg && (
-        <div className="create-notice create-notice-error" role="alert">
-          <i className="fa-solid fa-circle-exclamation" /> {errorMsg}
+        <div className="create-feedback-overlay" role="presentation">
+          <div className="create-feedback-dialog create-feedback-dialog-error" role="alertdialog" aria-modal="true" aria-labelledby="create-error-title" aria-describedby="create-error-message">
+            <span className="create-feedback-icon"><i className="fa-solid fa-circle-exclamation" /></span>
+            <strong id="create-error-title">发布失败</strong>
+            <p id="create-error-message">{errorMsg}</p>
+            <button type="button" onClick={() => setErrorMsg("")}>确认</button>
+          </div>
         </div>
       )}
       {successMsg && (
@@ -1369,12 +1376,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   const renderError = () =>
     errorMsg && (
-      <div className="create-form-error" role="alert">
-        <span className="create-form-error-icon"><i className="fa-solid fa-circle-exclamation" /></span>
-        <span className="create-form-error-copy">
-          <strong>还不能发布</strong>
-          <span>{errorMsg}</span>
-        </span>
+      <div className="create-feedback-overlay" role="presentation">
+        <div className="create-feedback-dialog create-feedback-dialog-error" role="alertdialog" aria-modal="true" aria-labelledby="create-error-title-secondary" aria-describedby="create-error-message-secondary">
+          <span className="create-feedback-icon"><i className="fa-solid fa-circle-exclamation" /></span>
+          <strong id="create-error-title-secondary">发布失败</strong>
+          <p id="create-error-message-secondary">{errorMsg}</p>
+          <button type="button" onClick={() => setErrorMsg("")}>确认</button>
+        </div>
       </div>
     );
 
@@ -1388,13 +1396,15 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   // ============ 审核未通过提示 ============
 
-  const renderRejectionBanner = () =>
-    reviewRejectionReason && (
-      <div className="bg-red-50 border border-red-300 rounded-lg p-4">
-        <p className="text-sm text-red-600 font-medium">
-          <i className="fa-solid fa-triangle-exclamation mr-2" />
-          该作品未通过审核，原因：{reviewRejectionReason}
-        </p>
+  const renderRejectionDialog = () =>
+    reviewRejectionReason && showRejectionDialog && (
+      <div className="create-feedback-overlay" role="presentation">
+        <div className="create-feedback-dialog create-feedback-dialog-review" role="dialog" aria-modal="true" aria-labelledby="review-rejection-title" aria-describedby="review-rejection-message">
+          <span className="create-feedback-icon"><i className="fa-solid fa-triangle-exclamation" /></span>
+          <strong id="review-rejection-title">作品未通过审核</strong>
+          <p id="review-rejection-message">{reviewRejectionReason}</p>
+          <button type="button" onClick={() => setShowRejectionDialog(false)}>我知道了，开始修改</button>
+        </div>
       </div>
     );
 
@@ -1451,6 +1461,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
         <div className="publish-container">
           <div className="publish-form">
             {renderNotice()}
+            {renderRejectionDialog()}
             <div className="form-section">
               <label className="form-label" htmlFor="articleTitle">作品标题 <span className="required-mark">*</span></label>
               <input
@@ -1571,8 +1582,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               disabled={uploadingImage}
               onChange={(next) => { void handleVisibilityChange(next); }}
             />
-
-            {errorMsg && !successMsg && renderError()}
 
             <div className="publish-footer">
               <Link href="/guidelines" className="publish-guidelines"><i className="fa-solid fa-shield-halved" /> 社区公约与发布规范</Link>
@@ -1750,7 +1759,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
         <div className="publish-container">
           <div className="publish-form">
             {renderNotice()}
-            {renderRejectionBanner()}
+            {renderRejectionDialog()}
 
             {/* 作品标题 */}
             <div className="form-section">
@@ -1764,28 +1773,43 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             {/* 图片上传 */}
             <div className="form-section">
               <label className="form-label">上传图片</label>
-              <div
-                className="image-upload-area"
-                onClick={triggerImageUpload}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  void processImageFiles(event.dataTransfer.files);
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") triggerImageUpload();
-                }}
-                aria-label="上传图片"
-              >
-                <i className="fa-solid fa-cloud-arrow-up image-upload-icon"></i>
-                <div className="image-upload-title">点击或拖拽上传图片</div>
-                <div className="image-upload-hint">支持 JPG / PNG / WEBP，最多上传 {MAX_UPLOAD_IMAGES} 张；上传后会自动压缩为 WebP</div>
-                <div className="image-upload-hint">已选择 {uploadedImages.length}/{MAX_UPLOAD_IMAGES} 张</div>
-                {uploadingImage && (
-                  <div className="image-upload-hint" style={{ marginTop: 8 }}>
-                    <i className="fa-solid fa-spinner fa-spin"></i> 上传中...
+              <div className="image-upload-workspace">
+                <div
+                  className="image-upload-area"
+                  onClick={triggerImageUpload}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    void processImageFiles(event.dataTransfer.files);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") triggerImageUpload();
+                  }}
+                  aria-label="上传图片"
+                >
+                  <i className={`fa-solid ${uploadingImage ? "fa-spinner fa-spin" : "fa-cloud-arrow-up"} image-upload-icon`}></i>
+                  <div className="image-upload-title">{uploadingImage ? "上传中..." : "点击或拖拽上传图片"}</div>
+                </div>
+                {uploadedImages.length > 0 && (
+                  <div className="image-grid">
+                    {uploadedImages.map((img, i) => (
+                      <div key={i} className="image-grid-item">
+                        <img src={img.url} alt={img.name} />
+                        <div className="image-grid-item-overlay">
+                          <button
+                            type="button"
+                            className="image-grid-item-delete"
+                            onClick={(event) => { event.stopPropagation(); setUploadedImages((prev) => prev.filter((_, j) => j !== i)); }}
+                            title="删除图片"
+                            aria-label={`删除图片 ${i + 1}`}
+                          >
+                            <i className="fa-solid fa-trash-can"></i>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1797,24 +1821,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 multiple
                 onChange={handleFileSelect}
               />
-              {uploadedImages.length > 0 && (
-                <div className="image-grid">
-                  {uploadedImages.map((img, i) => (
-                    <div key={i} className="image-grid-item">
-                      <img src={img.url} alt={img.name} />
-                      <div className="image-grid-item-overlay">
-                        <button
-                          className="image-grid-item-delete"
-                          onClick={() => setUploadedImages((prev) => prev.filter((_, j) => j !== i))}
-                          title="删除图片"
-                        >
-                          <i className="fa-solid fa-trash-can"></i>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* 图片说明 */}
