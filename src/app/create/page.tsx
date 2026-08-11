@@ -1827,7 +1827,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             <div className="form-section">
               <label className="form-label">图片说明</label>
               <textarea
-                className="form-textarea"
+                className="form-textarea image-description-textarea"
                 placeholder="分享一些关于图片的看法或说明（选填）"
                 maxLength={2000}
                 value={imageDesc}
