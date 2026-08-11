@@ -767,13 +767,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     for (const file of selectedFiles) {
       if (!file.type.startsWith("image/")) { setErrorMsg(`"${file.name}" 不是图片文件，已跳过`); continue; }
       if (file.size > 20 * 1024 * 1024) { setErrorMsg(`"${file.name}" 原文件超过 20MB，已跳过`); continue; }
-      setErrorMsg(`正在使用本地模型审核第 ${addedCount + 1} 张图片...`);
-      try {
-        await screenImageLocally(file, uploadedImages.length + addedCount);
-      } catch (error) {
-        // 浏览器预筛只是可选的体验优化，不能阻止上传，也不能代替服务端审核。
-        setErrorMsg(error instanceof Error ? `本地预筛不可用，将继续上传并交由服务端审核：${error.message}` : "本地预筛不可用，将继续上传并交由服务端审核");
-      }
+      // 本地模型只是可选的预筛，不能阻止上传，也不能代替服务端审核。
+      // 不把它放在上传链路中等待，避免用户看到漫长的“审核中”并误以为发布被卡住。
+      void screenImageLocally(file, uploadedImages.length + addedCount).catch(() => undefined);
       const uploaded = await uploadImageToStorage(file);
       if (uploaded) {
         setUploadedImages((prev) => [...prev, uploaded]);
@@ -1081,7 +1077,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     let savedPostId = editPostId || undefined;
     let finalReviewStatus: string | undefined;
-    let imageScreeningUnavailable = false;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
@@ -1094,18 +1089,14 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     }
 
     if (!options?.draft && visibility !== "private" && savedPostId && finalReviewStatus === "pending") {
-      try {
-        const screeningResponse = await fetch("/api/moderation/screen-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ postId: savedPostId }),
-        });
-        imageScreeningUnavailable = !screeningResponse.ok;
-      } catch {
-        imageScreeningUnavailable = true;
-      }
-      const { data: screenedPost } = await supabase.from("posts").select("review_status").eq("id", savedPostId).single();
-      finalReviewStatus = screenedPost?.review_status as string | undefined;
+      // 发布与自动审核解耦：作品先进入“已发布/审核中”状态，审核服务在后台完成。
+      // 前端不再等待 ModelScope/NudeNet，也不把服务异常误报成发布失败。
+      void fetch("/api/moderation/screen-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: savedPostId }),
+        keepalive: true,
+      }).catch(() => undefined);
     }
 
     await saveTags(user.id, savedPostId);
@@ -1122,13 +1113,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setSuccessMsg("作品已保存为仅自己可见");
     } else {
       setSuccessAction("publish");
-      setSuccessMsg(
-        finalReviewStatus === "approved"
-          ? "作品已通过系统初筛并公开发布"
-          : imageScreeningUnavailable
-            ? "自动审核服务暂时不可用，作品已转入人工审核"
-            : "作品已进入人工审核，审核通过后会公开",
-      );
+      setSuccessMsg(finalReviewStatus === "approved" ? "作品已发布" : "作品已发布，正在自动审核；审核完成前仅自己可见");
     }
   };
 
@@ -2013,207 +1998,3 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             </div>
 
             <div className="form-section">
-              <label className="form-label" htmlFor="seriesDescription">连载简介</label>
-              <textarea
-                id="seriesDescription"
-                className="form-textarea"
-                placeholder="连载简介（选填）"
-                maxLength={1000}
-                value={newSeriesDesc}
-                onChange={(e) => setNewSeriesDesc(e.target.value)}
-              />
-            </div>
-
-            <div className="form-section">
-              <label className="form-label" htmlFor="seriesTagInput">标签</label>
-              <div className="tag-input-wrapper" onClick={() => document.getElementById("seriesTagInput")?.focus()}>
-                {newSeriesTags.map((tag) => (
-                  <span key={tag} className="tag-chip">
-                    {tag}
-                    <button
-                      type="button"
-                      className="tag-chip-remove"
-                      aria-label={`删除标签 ${tag}`}
-                      onClick={() => setNewSeriesTags(newSeriesTags.filter((item) => item !== tag))}
-                    >
-                      <i className="fa-solid fa-xmark" />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  id="seriesTagInput"
-                  type="text"
-                  className="tag-input-field"
-                  placeholder="输入标签，按回车添加"
-                  maxLength={20}
-                  value={newSeriesTagInput}
-                  onChange={(e) => setNewSeriesTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      const tag = newSeriesTagInput.trim();
-                      if (tag && !newSeriesTags.includes(tag)) {
-                        setNewSeriesTags([...newSeriesTags, tag]);
-                        setNewSeriesTagInput("");
-                      }
-                    }
-                  }}
-                />
-              </div>
-              <div className="tag-suggestions">
-                <span className="tag-suggestion-label">近期使用标签</span>
-                {recommendedTags.map((tag) => (
-                  <button
-                    type="button"
-                    key={tag}
-                    className="tag-suggestion-chip"
-                    onClick={() => { if (!newSeriesTags.includes(tag)) setNewSeriesTags([...newSeriesTags, tag]); }}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-section">
-              <span className="form-label">作品类型</span>
-              <div className="radio-options" role="radiogroup" aria-label="作品类型">
-                {[
-                  { value: "original" as const, label: "原创" },
-                  { value: "fanfic" as const, label: "同人" },
-                ].map((option) => (
-                  <label key={option.value} className={`radio-option ${newSeriesType === option.value ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="seriesType"
-                      value={option.value}
-                      checked={newSeriesType === option.value}
-                      onChange={() => setNewSeriesType(option.value)}
-                    />
-                    <span
-                      className={`radio-circle ${newSeriesType === option.value ? "selected" : ""}`}
-                      onClick={() => setNewSeriesType(option.value)}
-                      style={newSeriesType === option.value ? { borderColor: "var(--color-primary)" } : undefined}
-                    >
-                      <span
-                        className="radio-dot"
-                        style={{ transform: newSeriesType === option.value ? "scale(1)" : "scale(0)" }}
-                      />
-                    </span>
-                    <span className="radio-option-text">{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {renderError()}
-
-            <div className="publish-footer">
-              <Link href="/settings" className="publish-guidelines">
-                <i className="fa-solid fa-shield-halved" /> 社区公约与发布规范
-              </Link>
-              <button type="button" className="btn-publish" onClick={createSeries} disabled={submitting}>
-                <i className={`fa-solid ${submitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
-                {submitting ? "发布中..." : (editingSeries ? "保存修改" : "发布长篇")}
-              </button>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // ---- 长篇连载 - 章节管理 ----
-  if (view === "series-detail" && currentSeries) {
-    return (
-      <div className="min-h-screen bg-paper">
-        <header className="sticky top-0 z-50 bg-card border-b border-rule">
-          <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-            <button className="btn-ghost" onClick={() => router.push(`/studio/series/${encodeURIComponent(currentSeries.name)}`)}>
-              <i className="fa-solid fa-arrow-left mr-1" />返回
-            </button>
-            <span className="text-sm font-medium text-warm">章节管理</span>
-            <button className="submit-btn" onClick={() => { setTitle(""); editor.setContent(""); setTags([]); setUploadedImages([]); setSeriesNameFromUrl(null); setView("chapter-create"); }}>
-              <i className="fa-solid fa-plus mr-1" />新增章节
-            </button>
-          </div>
-        </header>
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="mb-6 p-4 rounded-xl bg-card border border-rule">
-            <h3 className="font-bold text-lg text-warm">{currentSeries.name}</h3>
-            <p className="text-sm text-muted mt-1">
-              {currentSeries.series_type === "fanfic" ? "同人" : "原创"} · {currentSeries.status === "ongoing" ? "连载中" : "已完结"} · {chapterList.length} 章
-            </p>
-          </div>
-          {chapterList.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted mb-4">暂无章节</p>
-              <button className="submit-btn" onClick={() => { setTitle(""); editor.setContent(""); setTags([]); setUploadedImages([]); setSeriesNameFromUrl(null); setView("chapter-create"); }}>
-                <i className="fa-solid fa-plus mr-1" />新增第一章
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {chapterList.map((ch) => (
-                <div key={ch.id} className="flex items-center gap-4 p-3 rounded-lg bg-card border border-rule">
-                  <span className="text-sm text-muted font-mono w-10 text-center">第{ch.chapter_number}章</span>
-                  <Link href={`/read/${ch.id}`} className="flex-1 text-sm text-warm no-underline hover:text-accent truncate font-medium">
-                    {ch.title}
-                  </Link>
-                  <span className="text-xs text-muted">{ch.word_count?.toLocaleString() || 0}字</span>
-                  <span className="text-xs text-muted">{ch.created_at ? new Date(ch.created_at).toLocaleDateString("zh-CN") : ""}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // ---- 长篇连载 - 新增章节 ----
-  if (view === "chapter-create") {
-    const targetSeriesName = seriesNameFromUrl || currentSeries?.name;
-    const displayChapterNum = seriesNameFromUrl ? chapterNumberFromUrl : chapterList.length + 1;
-
-    return (
-      <div className="min-h-screen bg-paper">
-        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-        <PublishHeader
-          title={seriesNameFromUrl ? `新建章节 - ${seriesNameFromUrl}` : "新增章节"}
-          onSubmit={submitChapter}
-          submitting={submitting}
-        />
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="space-y-5">
-            {targetSeriesName && (
-              <div className="text-sm text-muted">
-                <i className="fa-solid fa-book-open mr-1 text-accent" />
-                {targetSeriesName} · 第 {displayChapterNum} 章
-              </div>
-            )}
-            <input
-              type="text" placeholder="章节标题（必填）" className="input-field text-lg font-medium"
-              style={{ padding: "14px 16px" }} value={title} onChange={(e) => setTitle(e.target.value)}
-            />
-            {renderEditor("请输入章节内容...")}
-            <TagInput
-              tags={tags} setTags={setTags} inputVal={tagInput} setInputVal={setTagInput}
-              recommended={recommendedTags} wrapperClass="tag-chapter-input"
-            />
-            {renderError()}
-            <div className="flex items-center justify-between pt-4 border-t border-rule">
-              <div className="text-xs text-muted">发布即同意 <Link href="/guidelines" className="text-accent">社区公约</Link></div>
-              <button className="submit-btn" onClick={submitChapter} disabled={submitting}>
-                <i className="fa-solid fa-paper-plane mr-1" />{submitting ? "发布中..." : "发布"}
-              </button>
-            </div>
-          </div>
-        </main>
-        <div className="h-16" />
-      </div>
-    );
-  }
-
-  return null;
-}
