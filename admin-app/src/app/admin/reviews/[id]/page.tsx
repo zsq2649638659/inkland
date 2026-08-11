@@ -12,16 +12,24 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
   if (!post) notFound();
   const service = createAdminServiceClient();
   let reviewPost = post;
-  if (service && post.content) {
-    const privateSources = [...post.content.matchAll(/private:\/\/private-post-images\/([^\s)]+)/g)].map((match) => match[1]);
+  let imageAccessError: string | null = null;
+  if (post.content) {
+    const privateSources = [...new Set([...post.content.matchAll(/private:\/\/private-post-images\/([^\s)]+)/g)].map((match) => match[1]))];
     let content = post.content;
     for (const sourcePath of privateSources) {
-      const { data } = await service.storage.from("private-post-images").createSignedUrl(sourcePath, 3600);
-      if (data?.signedUrl) content = content.split(`private://private-post-images/${sourcePath}`).join(data.signedUrl);
+      const storageClient = service || supabase;
+      const { data, error } = await storageClient.storage.from("private-post-images").createSignedUrl(sourcePath, 3600);
+      if (data?.signedUrl) {
+        content = content.split(`private://private-post-images/${sourcePath}`).join(data.signedUrl);
+      } else {
+        imageAccessError = service
+          ? `无法生成审核图片临时地址：${error?.message || "未知存储错误"}`
+          : "后台部署缺少 SUPABASE_SERVICE_ROLE_KEY，无法读取私有审核图片。";
+      }
     }
     reviewPost = { ...post, content };
   }
   const { data: reviewCase } = await supabase.from("moderation_review_cases").select("id, status, priority, route_reason, screening_status, screening_sources, screening_result, rules_version, submission_number, created_at").eq("post_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
   const { data: findings } = reviewCase ? await supabase.from("moderation_findings").select("id, source, category, severity, location_type, start_offset, end_offset, image_index, quoted_text, details, metadata").eq("review_case_id", reviewCase.id).order("created_at", { ascending: true }) : { data: [] };
-  return <ReviewDetailClient post={reviewPost as never} reviewCase={reviewCase as never} findings={(findings || []) as never[]} />;
+  return <ReviewDetailClient post={reviewPost as never} reviewCase={reviewCase as never} findings={(findings || []) as never[]} imageAccessError={imageAccessError} />;
 }
