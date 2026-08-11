@@ -68,6 +68,8 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
   const rawImageTitle = post.title?.trim() || "";
   const imageTitle = ["图片分享", "Image Title"].includes(rawImageTitle) ? "" : rawImageTitle;
   const hasImageCopy = Boolean(imageTitle || plainText);
+  const isRejected = cp.review_status === "rejected";
+  const targetHref = isRejected ? `/create?editPost=${post.id}` : `/read/${post.id}`;
 
   const authorAvatar = showAuthorAvatar && post.author ? (
     <div className="card-author">
@@ -84,13 +86,14 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
   if (hasImage) {
     const hasMultipleImages = allImages.length > 1;
     return (
-      <div className="tag-card image" data-type="image" style={style}>
+      <div className={`tag-card image${isRejected ? " review-rejected" : ""}`} data-type="image" style={style}>
         {seriesContext && (
           <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
             <i className="fa-solid fa-layer-group"></i> {seriesContext}
           </Link>
         )}
         <div className="card-image-stage">
+          {isRejected && <Link href={targetHref} className="profile-review-badge"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
           <div className="card-image-link">
             <div className="card-image-placeholder">
               {allImages[activeImage] ? (
@@ -108,7 +111,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
           </div>
           {hasImageCopy && (
             <div className="card-image-overlay">
-              <Link href={`/read/${post.id}`} className="no-underline card-image-copy">
+              <Link href={targetHref} className="no-underline card-image-copy">
                 {imageTitle && <div className="card-image-title">{imageTitle}</div>}
                 {plainText && <div className="card-summary clamp-2">{plainText}</div>}
               </Link>
@@ -167,13 +170,14 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
   }
 
   return (
-    <div className="tag-card single" data-type="single" style={style}>
+    <div className={`tag-card single${isRejected ? " review-rejected" : ""}`} data-type="single" style={style}>
       {seriesContext && (
         <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
           <i className="fa-solid fa-layer-group"></i> {seriesContext}
         </Link>
       )}
-      <Link href={`/read/${post.id}`} className="no-underline">
+      {isRejected && <Link href={targetHref} className="profile-review-badge profile-review-badge--inline"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
+      <Link href={targetHref} className="no-underline">
         <div className="card-title">{post.title || "无标题"}</div>
       </Link>
       <div className="card-summary clamp-2">{plainText}</div>

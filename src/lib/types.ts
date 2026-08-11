@@ -4,7 +4,6 @@ export interface Profile {
   username?: string;
   avatar_url?: string | null;
   bio?: string | null;
-  role?: "user" | "author" | "admin";
   created_at?: string;
 }
 
@@ -17,6 +16,8 @@ export interface Post {
   visibility?: "public" | "followers_only" | "private";
   word_count?: number;
   status?: "draft" | "published";
+  review_status?: "pending" | "approved" | "rejected" | string;
+  review_reason?: string | null;
   rating?: "all" | "r15" | "r18";
   post_type?: "novel" | "illustration" | "comic" | "ramble" | "cosplay" | "other" | "serial" | "article";
   series_name?: string | null;

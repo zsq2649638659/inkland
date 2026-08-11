@@ -58,9 +58,9 @@ interface FollowUser {
 // 判断帖子是否有图片
 const hasImages = (post: Post): boolean => {
   const cp = post as unknown as Record<string, unknown>;
-  if (cp.cover_url && !(cp.cover_url as string).startsWith("private://")) return true;
+  if (cp.cover_url) return true;
   const content = (cp.content as string) || "";
-  return /!\[.*?\]\((?!private:\/\/).*?\)/g.test(content);
+  return /!\[.*?\]\(.*?\)/g.test(content);
 };
 
 // 查询系列下所有章节的点赞/评论/收藏总数
@@ -145,9 +145,9 @@ export default function ProfilePage() {
     setLoading(true);
     setError("");
 
-    let q = supabase
+    const q = supabase
       .from("posts")
-      .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, status, user_id, post_tags(tags(name))")
+      .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, status, review_status, review_reason, user_id, post_tags(tags(name))")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -155,7 +155,23 @@ export default function ProfilePage() {
     const { data, error: err } = await q;
     if (err) { setError(`加载失败: ${err.message}`); setLoading(false); return; }
 
-    const raw = (data as unknown as Post[]).sort((a, b) => {
+    const privatePrefix = "private://private-post-images/";
+    const resolvePrivateUrl = async (url?: string | null) => {
+      if (!url?.startsWith(privatePrefix)) return url || null;
+      const { data: signed } = await supabase.storage.from("private-post-images").createSignedUrl(url.slice(privatePrefix.length), 3600);
+      return signed?.signedUrl || url;
+    };
+    const resolvedPosts = await Promise.all((data as unknown as Post[]).map(async (post) => {
+      let content = post.content || "";
+      const privateUrls = [...new Set([...content.matchAll(/private:\/\/private-post-images\/([^\s)]+)/g)].map((match) => match[0]))];
+      const replacements = await Promise.all(privateUrls.map(async (url) => ({ url, signedUrl: await resolvePrivateUrl(url) })));
+      for (const replacement of replacements) {
+        if (replacement.signedUrl) content = content.split(replacement.url).join(replacement.signedUrl);
+      }
+      return { ...post, content, cover_url: await resolvePrivateUrl(post.cover_url) };
+    }));
+
+    const raw = resolvedPosts.sort((a, b) => {
       const da = new Date(a.published_at || a.created_at || "").getTime();
       const db = new Date(b.published_at || b.created_at || "").getTime();
       return db - da;
