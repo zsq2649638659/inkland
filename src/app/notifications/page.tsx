@@ -19,6 +19,13 @@ interface NotificationItem {
   content: string;
   read: boolean;
   created_at: string;
+  template_key?: string | null;
+  metadata?: {
+    action_url?: string;
+    action_label?: string;
+    issue_type?: string;
+    affected_image_indexes?: number[];
+  } | null;
   // joined fields
   actor_nickname?: string | null;
   actor_avatar_url?: string | null;
@@ -52,9 +59,23 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     if (!user) return;
-    const timer = window.setInterval(loadUnreadByType, 30_000);
-    return () => window.clearInterval(timer);
-  }, [user]);
+    const refresh = () => {
+      void loadUnreadByType();
+      void loadNotifications();
+    };
+    const timer = window.setInterval(refresh, 30_000);
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, refresh)
+      .subscribe();
+    const handleVisibility = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      void supabase.removeChannel(channel);
+    };
+  }, [user, filterType]);
 
   const loadUnreadByType = async () => {
     if (!user) return;
@@ -187,9 +208,11 @@ export default function NotificationsPage() {
     // Navigate based on type
     if (n.post_id && (n.type === "comment" || n.type === "like" || n.type === "bookmark" || n.type === "reply")) {
       const commentAnchor = n.type === "comment" || n.type === "reply" ? "#comments" : "";
-      window.location.href = `/read/${n.post_id}${commentAnchor}`;
+      window.location.assign(`/read/${n.post_id}${commentAnchor}`);
     } else if (n.type === "follow" && n.actor_id) {
-      window.location.href = `/user/${n.actor_id}`;
+      window.location.assign(`/user/${n.actor_id}`);
+    } else if (n.type === "system" && n.metadata?.action_url?.startsWith("/")) {
+      window.location.assign(n.metadata.action_url);
     }
   };
 
@@ -275,6 +298,7 @@ export default function NotificationsPage() {
 
   const getNotificationTitle = (notification: NotificationItem): ReactNode => {
     if (notification.type === "system") {
+      if (notification.template_key === "post_review_rejected") return "作品需要修改";
       const activity = notification.content.match(/「([^」]+)」/);
       if (notification.content.includes("活动") && activity) {
         return <>活动提醒：<span className="highlight"><a href={`/search?q=${encodeURIComponent(activity[1])}`} onClick={(event) => event.stopPropagation()}>「{activity[1]}」</a></span> 投稿即将截止</>;
@@ -430,6 +454,19 @@ export default function NotificationsPage() {
                         <span className="notification-timestamp">{formatTime(n.created_at)}</span>
                       </div>
                       <div className="notification-desc">{getNotificationDescription(n)}</div>
+                      {n.type === "system" && n.metadata?.action_url?.startsWith("/") && (
+                        <button
+                          type="button"
+                          className="notification-action-link"
+                          onClick={async (event) => {
+                            event.stopPropagation();
+                            if (!n.read) await markAsRead(n.id);
+                            window.location.assign(n.metadata?.action_url || "/notifications");
+                          }}
+                        >
+                          {n.metadata.action_label || "查看详情"} <i className="fa-solid fa-arrow-right" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
