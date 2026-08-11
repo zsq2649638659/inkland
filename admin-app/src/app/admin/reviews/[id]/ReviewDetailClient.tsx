@@ -25,6 +25,9 @@ const riskLabels: Record<string, string> = {
   penis_exposed: "阴茎裸露",
   vagina_exposed: "阴道裸露",
   keyword: "命中违规词",
+  porn: "成人色情内容",
+  hentai: "成人漫画内容",
+  sexy: "性暗示内容",
 };
 const issueTypes = [
   "内容评级与实际内容不符",
@@ -40,12 +43,20 @@ function riskLabel(category?: string | null) {
   return riskLabels[category.toLowerCase()] || category.replaceAll("_", " ");
 }
 
-export default function ReviewDetailClient({ post, reviewCase, findings }: { post: Post; reviewCase: ReviewCase; findings: Finding[] }) {
+export default function ReviewDetailClient({ post, reviewCase, findings, imageAccessError }: { post: Post; reviewCase: ReviewCase; findings: Finding[]; imageAccessError?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [brokenImages, setBrokenImages] = useState<number[]>([]);
   const images = [...(post.content || "").matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]);
   const plainText = (post.content || "").replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").trim();
   const imageFindings = findings.filter((finding) => finding.location_type === "image");
+  const groupedFindings = findings.reduce<Array<{ key: string; title: string; items: Finding[] }>>((groups, finding) => {
+    const key = finding.location_type === "image" ? `image-${finding.image_index ?? 0}` : `text-${finding.id}`;
+    const existing = groups.find((group) => group.key === key);
+    if (existing) existing.items.push(finding);
+    else groups.push({ key, title: finding.location_type === "image" ? `图片 ${(finding.image_index ?? 0) + 1}` : "文字内容", items: [finding] });
+    return groups;
+  }, []);
 
   const reject = async (issueType: string) => {
     setBusy(true);
@@ -64,6 +75,7 @@ export default function ReviewDetailClient({ post, reviewCase, findings }: { pos
   };
 
   const approve = async () => {
+    if (!window.confirm("确认该作品没有违规并立即公开发布吗？")) return;
     setBusy(true);
     setMessage("");
     const response = await fetch("/api/admin/review", {
@@ -86,25 +98,14 @@ export default function ReviewDetailClient({ post, reviewCase, findings }: { pos
         <span className="admin-detail-status">待审核</span>
       </header>
 
-      <div className="admin-detail-layout">
-        <article className="admin-detail-content">
-          <div className="admin-detail-kicker">PRE-PUBLISH REVIEW · {labels[post.post_type || ""] || "作品"}</div>
-          <h1>{post.title || "无标题"}</h1>
-          <div className="admin-detail-meta">作者：{post.author?.nickname || "未知作者"} · 提交于 {post.created_at ? new Date(post.created_at).toLocaleString("zh-CN") : "未知时间"} · 第 {post.review_submission_number || 1} 次提交</div>
+      <div className="admin-review-heading">
+        <div className="admin-detail-kicker">PRE-PUBLISH REVIEW · {labels[post.post_type || ""] || "作品"}</div>
+        <h1>{post.title || "无标题"}</h1>
+        <div className="admin-detail-meta">作者：{post.author?.nickname || "未知作者"} · 提交于 {post.created_at ? new Date(post.created_at).toLocaleString("zh-CN") : "未知时间"} · 第 {post.review_submission_number || 1} 次提交</div>
+      </div>
 
-          <section className="admin-evidence-document">
-            <div className="admin-document-label">完整作品内容</div>
-            <h2>{images.length ? `全部图片（${images.length} 张）` : "正文"}</h2>
-            {plainText ? <div className="admin-long-content">{plainText}</div> : null}
-            {images.length ? <div className="admin-detail-images">{images.map((url, index) => {
-              const risks = imageFindings.filter((finding) => finding.image_index === index || finding.image_index === index + 1);
-              return <figure key={`${url}-${index}`}><img src={url} alt={`作品图片 ${index + 1}`} /><figcaption>图片 {index + 1}{risks.length ? ` · 系统提示：${risks.map((risk) => riskLabel(risk.category)).join("、")}` : ""}</figcaption></figure>;
-            })}</div> : null}
-            {!plainText && !images.length ? <p className="admin-detail-empty">作品内容已不存在或无法读取。</p> : null}
-          </section>
-        </article>
-
-        <aside className="admin-detail-aside">
+      <div className="admin-review-layout">
+        <aside className="admin-review-summary-column">
           <section className="admin-detail-panel">
             <h2>系统审核结果</h2>
             <p>{reviewCase?.route_reason || post.review_reason || "未取得自动审核结果，需人工确认。"}</p>
@@ -112,20 +113,41 @@ export default function ReviewDetailClient({ post, reviewCase, findings }: { pos
               <dt>审核状态</dt>
               <dd>{reviewCase?.screening_status === "completed" ? "已完成自动审核，等待人工决定" : reviewCase?.screening_status === "failed" ? "自动审核异常，等待人工处理" : "等待人工审核"}</dd>
               <dt>审核来源</dt>
-              <dd>{reviewCase?.screening_sources?.map((source) => source === "nudenet_modelscope" ? "NudeNet 图片模型" : source === "keyword" ? "违规词库" : source).join("、") || "未记录"}</dd>
+              <dd>{reviewCase?.screening_sources?.map((source) => source === "nudenet_modelscope" ? "NudeNet 图片模型" : source === "nsfwjs_client" ? "NSFWJS 漫画辅助模型" : source === "keyword" ? "违规词库" : source).join("、") || "未记录"}</dd>
               <dt>规则/模型</dt>
               <dd>{reviewCase?.rules_version || "未记录"}</dd>
             </dl>
           </section>
 
-          <section className="admin-detail-panel">
-            <h2>风险标记</h2>
-            {findings.length ? <div className="admin-risk-list">{findings.map((finding) => <div className="admin-risk-item" key={finding.id}>
-              <strong>{riskLabel(finding.category)}</strong>
-              <span>{finding.location_type === "image" ? `图片 ${(finding.image_index ?? 0) + 1}` : finding.quoted_text || "文本内容"}{finding.details ? ` · ${finding.details}` : ""}</span>
+          <section className="admin-detail-panel admin-risk-panel">
+            <div className="admin-panel-title-row"><h2>风险标记</h2><span>{findings.length} 项</span></div>
+            {groupedFindings.length ? <div className="admin-risk-list">{groupedFindings.map((group) => <div className="admin-risk-item" key={group.key}>
+              <strong>{group.title}</strong>
+              <div className="admin-risk-tags">{group.items.map((finding) => <span key={finding.id}>{riskLabel(finding.category)}</span>)}</div>
+              {group.items.some((finding) => finding.details) ? <small>{group.items.find((finding) => finding.details)?.details}</small> : null}
             </div>)}</div> : <p>系统没有提供具体风险位置。请结合完整内容人工判断。</p>}
           </section>
+        </aside>
 
+        <article className="admin-detail-content admin-review-main">
+          <section className="admin-evidence-document">
+            <div className="admin-document-label">完整作品内容</div>
+            <h2>{images.length ? `全部图片（${images.length} 张）` : "正文"}</h2>
+            {imageAccessError ? <div className="admin-image-access-error" role="alert">{imageAccessError}</div> : null}
+            {plainText ? <div className="admin-long-content">{plainText}</div> : null}
+            {images.length ? <div className="admin-detail-images">{images.map((url, index) => {
+              const risks = imageFindings.filter((finding) => finding.image_index === index);
+              const unavailable = url.startsWith("private://") || brokenImages.includes(index);
+              return <figure key={`${url}-${index}`}>
+                {unavailable ? <div className="admin-image-unavailable"><strong>图片 {index + 1} 暂时无法显示</strong><span>请检查后台私有图片访问配置后重新加载页面。</span></div> : <a href={url} target="_blank" rel="noreferrer" title="打开原图"><img src={url} alt={`作品图片 ${index + 1}`} onError={() => setBrokenImages((items) => items.includes(index) ? items : [...items, index])} /></a>}
+                <figcaption>图片 {index + 1}{risks.length ? ` · 系统提示：${risks.map((risk) => riskLabel(risk.category)).join("、")}` : ""}</figcaption>
+              </figure>;
+            })}</div> : null}
+            {!plainText && !images.length ? <p className="admin-detail-empty">作品内容已不存在或无法读取。</p> : null}
+          </section>
+        </article>
+
+        <aside className="admin-review-action-column">
           <section className="admin-detail-panel admin-reject-panel">
             <h2>标记问题并打回</h2>
             <p>请选择问题类型，点击后将立即打回作者修改。</p>
