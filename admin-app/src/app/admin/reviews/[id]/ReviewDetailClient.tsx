@@ -50,6 +50,8 @@ export default function ReviewDetailClient({ post, reviewCase, findings, imageAc
   const images = [...(post.content || "").matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]);
   const plainText = (post.content || "").replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").trim();
   const imageFindings = findings.filter((finding) => finding.location_type === "image");
+  const defaultRiskImages = [...new Set(imageFindings.map((finding) => finding.image_index).filter((index): index is number => typeof index === "number"))];
+  const [selectedImageIndexes, setSelectedImageIndexes] = useState<number[]>(defaultRiskImages);
   const groupedFindings = findings.reduce<Array<{ key: string; title: string; items: Finding[] }>>((groups, finding) => {
     const key = finding.location_type === "image" ? `image-${finding.image_index ?? 0}` : `text-${finding.id}`;
     const existing = groups.find((group) => group.key === key);
@@ -64,11 +66,12 @@ export default function ReviewDetailClient({ post, reviewCase, findings, imageAc
     const response = await fetch("/api/admin/review", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postId: post.id, decision: "rejected", reason: issueType }),
+      body: JSON.stringify({ postId: post.id, decision: "rejected", reason: issueType, affectedImageIndexes: selectedImageIndexes }),
     });
     setBusy(false);
     if (!response.ok) {
-      setMessage("打回操作失败，请稍后重试。");
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      setMessage(result?.error || "打回操作失败，请稍后重试。");
       return;
     }
     window.location.assign("/admin?view=reviews");
@@ -135,14 +138,16 @@ export default function ReviewDetailClient({ post, reviewCase, findings, imageAc
             <h2>{images.length ? `全部图片（${images.length} 张）` : "正文"}</h2>
             {imageAccessError ? <div className="admin-image-access-error" role="alert">{imageAccessError}</div> : null}
             {plainText ? <div className="admin-long-content">{plainText}</div> : null}
-            {images.length ? <div className="admin-detail-images">{images.map((url, index) => {
+            {images.length ? <><div className="admin-image-selection-help">勾选需要作者修改的图片；机器标出的风险图片已默认选中。</div><div className="admin-detail-images">{images.map((url, index) => {
               const risks = imageFindings.filter((finding) => finding.image_index === index);
               const unavailable = url.startsWith("private://") || brokenImages.includes(index);
-              return <figure key={`${url}-${index}`}>
+              const selected = selectedImageIndexes.includes(index);
+              return <figure key={`${url}-${index}`} className={selected ? "is-selected" : ""}>
+                <label className="admin-image-selector"><input type="checkbox" checked={selected} onChange={() => setSelectedImageIndexes((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current, index].sort((a, b) => a - b))} />通知作者：第 {index + 1} 张需要修改</label>
                 {unavailable ? <div className="admin-image-unavailable"><strong>图片 {index + 1} 暂时无法显示</strong><span>请检查后台私有图片访问配置后重新加载页面。</span></div> : <a href={url} target="_blank" rel="noreferrer" title="打开原图"><img src={url} alt={`作品图片 ${index + 1}`} onError={() => setBrokenImages((items) => items.includes(index) ? items : [...items, index])} /></a>}
                 <figcaption>图片 {index + 1}{risks.length ? ` · 系统提示：${risks.map((risk) => riskLabel(risk.category)).join("、")}` : ""}</figcaption>
               </figure>;
-            })}</div> : null}
+            })}</div></> : null}
             {!plainText && !images.length ? <p className="admin-detail-empty">作品内容已不存在或无法读取。</p> : null}
           </section>
         </article>
