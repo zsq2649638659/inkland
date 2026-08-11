@@ -73,15 +73,12 @@ function VisibilityOptions({
       <span className="form-label">可见范围</span>
       <div className="collection-options" role="radiogroup" aria-label="可见范围">
           <button type="button" className={`collection-option ${value === "public" ? "selected" : ""}`} onClick={() => onChange("public")} disabled={disabled} role="radio" aria-checked={value === "public"}>
-          <span className={`radio-circle ${value === "public" ? "selected" : ""}`}><span className="radio-dot" /></span>
           <span className="collection-option-text">公开</span>
         </button>
         <button type="button" className={`collection-option ${value === "followers_only" ? "selected" : ""}`} onClick={() => onChange("followers_only")} disabled={disabled} role="radio" aria-checked={value === "followers_only"}>
-          <span className={`radio-circle ${value === "followers_only" ? "selected" : ""}`}><span className="radio-dot" /></span>
           <span className="collection-option-text">仅关注用户可见</span>
         </button>
         <button type="button" className={`collection-option ${value === "private" ? "selected" : ""}`} onClick={() => onChange("private")} disabled={disabled} role="radio" aria-checked={value === "private"}>
-          <span className={`radio-circle ${value === "private" ? "selected" : ""}`}><span className="radio-dot" /></span>
           <span className="collection-option-text">仅自己可见</span>
         </button>
       </div>
@@ -1536,9 +1533,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                     role="radio"
                     aria-checked={collectionMode === option.value}
                   >
-                    <span className={`radio-circle ${collectionMode === option.value ? "selected" : ""}`}>
-                      <span className="radio-dot" />
-                    </span>
                     <span className="collection-option-copy">
                       <span className="collection-option-text">{option.title}</span>
                       <span className="collection-option-desc">{option.desc}</span>
@@ -1897,9 +1891,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                     role="radio"
                     aria-checked={collectionMode === option.value}
                   >
-                    <span className={`radio-circle ${collectionMode === option.value ? "selected" : ""}`}>
-                      <span className="radio-dot" />
-                    </span>
                     <span className="collection-option-copy">
                       <span className="collection-option-text">{option.title}</span>
                       <span className="collection-option-desc">{option.desc}</span>
@@ -2076,29 +2067,21 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   { value: "original" as const, label: "原创" },
                   { value: "fanfic" as const, label: "同人" },
                 ].map((option) => (
-                  <label key={option.value} className={`radio-option ${newSeriesType === option.value ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="seriesType"
-                      value={option.value}
-                      checked={newSeriesType === option.value}
-                      onChange={() => setNewSeriesType(option.value)}
-                    />
-                    <span
-                      className={`radio-circle ${newSeriesType === option.value ? "selected" : ""}`}
-                      onClick={() => setNewSeriesType(option.value)}
-                      style={newSeriesType === option.value ? { borderColor: "var(--color-primary)" } : undefined}
-                    >
-                      <span
-                        className="radio-dot"
-                        style={{ transform: newSeriesType === option.value ? "scale(1)" : "scale(0)" }}
-                      />
-                    </span>
+                  <button
+                    type="button"
+                    key={option.value}
+                    className={`radio-option ${newSeriesType === option.value ? "selected" : ""}`}
+                    onClick={() => setNewSeriesType(option.value)}
+                    role="radio"
+                    aria-checked={newSeriesType === option.value}
+                  >
                     <span className="radio-option-text">{option.label}</span>
-                  </label>
+                  </button>
                 ))}
               </div>
             </div>
+
+            <VisibilityOptions value={visibility} onChange={setVisibility} disabled={submitting} />
 
             {renderError()}
 
