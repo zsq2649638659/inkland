@@ -66,6 +66,7 @@ export async function POST(request: Request) {
     return completeAsError(admin, body.postId, "NudeNet 服务尚未配置。");
   }
 
+  let stage = "call_moderation_service";
   try {
     const response = await fetch(`${serviceUrl}/moderate`, {
       method: "POST",
@@ -77,12 +78,15 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(120_000),
     });
     if (!response.ok) throw new Error(`moderation_service_http_${response.status}`);
+    stage = "parse_moderation_result";
     const result = await response.json() as { outcome?: string; findings?: Finding[]; engine?: string; model?: string };
     const findings = Array.isArray(result.findings) ? result.findings : [];
     const outcome = findings.length > 0 || result.outcome === "flagged" ? "flagged" : "approved";
     if (outcome === "approved") {
+      stage = "promote_approved_images";
       await promotePrivateImages(admin, body.postId, post.content || "");
     }
+    stage = "write_screening_result";
     const { error } = await admin.rpc("complete_image_screening", {
       post_id_input: body.postId,
       outcome,
@@ -93,8 +97,18 @@ export async function POST(request: Request) {
     console.log(JSON.stringify({ level: "info", route: "/api/moderation/screen-image", message: "server_screening_completed", post_id: body.postId, outcome, findings: findings.length, ms: Date.now() - startedAt }));
     return Response.json({ outcome, findings });
   } catch (error) {
-    console.error(JSON.stringify({ level: "error", route: "/api/moderation/screen-image", message: "server_screening_failed", post_id: body.postId, error: error instanceof Error ? error.message : String(error), ms: Date.now() - startedAt }));
+    console.error(JSON.stringify({ level: "error", route: "/api/moderation/screen-image", message: "server_screening_failed", post_id: body.postId, stage, error: serializeError(error), ms: Date.now() - startedAt }));
     return completeAsError(admin, body.postId, "NudeNet 服务异常。");
+  }
+}
+
+function serializeError(error: unknown) {
+  if (error instanceof Error) return { name: error.name, message: error.message, stack: error.stack };
+  if (typeof error === "string") return { message: error };
+  try {
+    return { value: JSON.parse(JSON.stringify(error)) };
+  } catch {
+    return { message: String(error) };
   }
 }
 
@@ -125,3 +139,4 @@ async function completeAsError(admin: ReturnType<typeof createAdminClient>, post
   if (error) console.error("moderation_service_error_state_write_failed", error);
   return Response.json({ error: `${message}作品已转入人工审核。` }, { status: 503 });
 }
+
