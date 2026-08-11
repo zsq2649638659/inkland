@@ -105,6 +105,16 @@ export async function POST(request: Request) {
   }
 }
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) return { name: error.name, message: error.message, stack: error.stack };
+  if (typeof error === "string") return { message: error };
+  try {
+    return { value: JSON.parse(JSON.stringify(error)) };
+  } catch {
+    return { message: String(error) };
+  }
+}
+
 async function promotePrivateImages(admin: ReturnType<typeof createAdminClient>, postId: string, content: string) {
   const paths = [...content.matchAll(/private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g)].map((match) => match[1]);
   if (!paths.length) return;
