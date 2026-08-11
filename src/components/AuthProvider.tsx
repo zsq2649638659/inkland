@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import type { User } from "@supabase/supabase-js";
 
@@ -15,6 +15,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,17 +23,18 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   signOut: async () => {},
+  refreshProfile: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const userIdRef = useRef<string | null>(null);
 
   // 根据 user 拉取 profile（带异常保护）
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string) => {
     try {
       const { data } = await supabase
         .from("profiles")
@@ -45,12 +47,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return null;
     }
-  };
+  }, [supabase]);
+
+  const refreshProfile = useCallback(async () => {
+    const userId = userIdRef.current;
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+    setProfile(await fetchProfile(userId));
+  }, [fetchProfile]);
 
   useEffect(() => {
     let active = true;
-    let initialized = false;
-
     const hydrateSession = async (session: { user?: User | null } | null) => {
       const u = session?.user || null;
       // 如果同一个人（相同 user ID），不更新 user 对象引用，避免触发下游 useEffect
@@ -106,11 +115,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       active = false;
-      initialized = true;
       clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile, supabase]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -118,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

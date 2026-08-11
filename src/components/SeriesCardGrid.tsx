@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { getThumbnailUrl } from "@/lib/image";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 interface SeriesCardGridProps {
   series: {
@@ -27,7 +28,7 @@ interface SeriesCardGridProps {
 
 export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCardGridProps) {
   const author = series.author;
-  const avatarUrl = author?.avatar_url || `https://placehold.co/20x20/FDDCD8/F26B5B?text=${encodeURIComponent(author?.nickname?.[0] || "?")}`;
+  const avatarUrl = author?.avatar_url;
 
   return (
     <div className="rounded-xl bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
@@ -72,7 +73,9 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
         {showAuthor && author && (
           <div className="flex items-center gap-1.5">
             <Link href={series.user_id ? `/user/${series.user_id}` : "#"} className="flex-shrink-0">
-              <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover hover:opacity-80 transition-opacity" />
+              <span className="w-5 h-5 rounded-full overflow-hidden inline-flex hover:opacity-80 transition-opacity">
+                {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <DefaultAvatar name={author.nickname || "?"} style={{ width:"100%", height:"100%" }} />}
+              </span>
             </Link>
             <Link href={series.user_id ? `/user/${series.user_id}` : "#"} className="text-xs text-muted hover:text-accent no-underline truncate">
               {author.nickname || "匿名用户"}

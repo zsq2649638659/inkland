@@ -9,6 +9,8 @@ import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
 import type { Comment } from "@/lib/types";
+import DefaultAvatar from "@/components/DefaultAvatar";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 export interface SerialPostCardData {
   chapterId: string;
@@ -61,6 +63,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const supabase = createClient();
   const { user, profile } = useAuth();
   const router = useRouter();
+  const dialog = useAppDialog();
 
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -112,7 +115,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     const url = `${window.location.origin}/read/${data.chapterId}`;
     try {
       await navigator.clipboard.writeText(url);
-      alert("链接已复制到剪贴板");
+      dialog.toast("链接已复制到剪贴板");
     } catch {
       const input = document.createElement("input");
       input.value = url;
@@ -120,7 +123,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       input.select();
       document.execCommand("copy");
       document.body.removeChild(input);
-      alert("链接已复制到剪贴板");
+      dialog.toast("链接已复制到剪贴板");
     }
   };
 
@@ -190,7 +193,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             {data.authorAvatar ? (
               <img src={data.authorAvatar} alt="" />
             ) : (
-              avatarChar
+              <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%", borderRadius:"inherit" }} />
             )}
           </div>
         </Link>
