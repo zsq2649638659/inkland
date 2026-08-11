@@ -76,8 +76,11 @@ export async function POST(request: Request) {
       body: JSON.stringify({ images }),
       signal: AbortSignal.timeout(120_000),
     });
-    if (!response.ok) throw new Error(`moderation_service_http_${response.status}`);
-    const result = await response.json() as { outcome?: string; findings?: Finding[]; engine?: string; model?: string };
+    const responseText = await response.text();
+    if (!response.ok) {
+      throw new Error(`moderation_service_http_${response.status}:${responseText.slice(0, 1200)}`);
+    }
+    const result = JSON.parse(responseText) as { outcome?: string; findings?: Finding[]; engine?: string; model?: string };
     const findings = Array.isArray(result.findings) ? result.findings : [];
     const outcome = findings.length > 0 || result.outcome === "flagged" ? "flagged" : "approved";
     if (outcome === "approved") {
