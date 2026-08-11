@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 export default function MobileDrawer() {
   const { open, closeDrawer } = useMobileDrawer();
@@ -168,7 +169,7 @@ export default function MobileDrawer() {
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="" />
                 ) : (
-                  avatarChar
+                  <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%", borderRadius:"inherit" }} />
                 )}
               </div>
               <div className="sidebar-user-info">

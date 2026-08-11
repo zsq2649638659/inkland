@@ -11,6 +11,8 @@ import SeriesCardGrid from "@/components/SeriesCardGrid";
 import { SkeletonProfile } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import type { Post } from "@/lib/types";
+import { useAppDialog } from "@/components/AppDialogProvider";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 interface FollowUser {
   id: string;
@@ -82,6 +84,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const activeTab = searchParams.get("tab") || "works";
   const supabase = createClient();
   const { user: currentUser } = useAuth();
+  const dialog = useAppDialog();
   const [posts, setPosts] = useState<Post[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesInfo[]>([]);
   const [profile, setProfile] = useState<{ nickname: string; avatar_url: string | null; bio: string | null } | null>(null);
@@ -433,11 +436,11 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     setBlockDialog("success");
   };
 
-  const handleReport = () => {
+  const handleReport = async () => {
     setMoreOpen(false);
-    const reason = prompt("请填写举报原因：");
+    const reason = await dialog.prompt({ title:"举报用户", message:"请填写举报原因，管理员会结合账号内容进行核查。", placeholder:"请尽量描述具体情况…", confirmLabel:"提交举报", required:true });
     if (!reason || !reason.trim()) return;
-    alert("举报已提交，管理员会尽快处理。");
+    dialog.toast("举报已提交，管理员会尽快处理");
   };
 
   const handleRemoveFollower = async (targetUserId: string) => {
@@ -573,11 +576,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                 {(activeTab === "followers" ? followers : following).map((u) => (
                   <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-rule hover:border-accent transition-colors">
                     <Link href={`/user/${u.id}`} className="flex items-center gap-3 flex-1 min-w-0 no-underline">
-                      <img
-                        src={u.avatar_url || `https://placehold.co/40x40/FDDCD8/F26B5B?text=${encodeURIComponent(u.nickname?.[0] || "?")}`}
-                        className="w-10 h-10 rounded-full object-cover"
-                        alt=""
-                      />
+                      <span className="w-10 h-10 rounded-full overflow-hidden inline-flex flex-shrink-0">
+                        {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : <DefaultAvatar name={u.nickname || "?"} style={{ width:"100%", height:"100%" }} />}
+                      </span>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-warm">{u.nickname}</div>
                         {u.bio && <div className="text-xs text-muted truncate">{u.bio}</div>}

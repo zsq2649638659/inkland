@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
@@ -11,9 +10,9 @@ import DefaultAvatar from "@/components/DefaultAvatar";
 
 export default function EditProfilePage() {
   const supabase = createClient();
-  const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hydratedUserRef = useRef<string | null>(null);
 
   const [nickname, setNickname] = useState(profile?.nickname || "");
   const [bio, setBio] = useState(profile?.bio || "");
@@ -27,6 +26,15 @@ export default function EditProfilePage() {
   const [nicknameEditOpen, setNicknameEditOpen] = useState(false);
   const [emailEditOpen, setEmailEditOpen] = useState(false);
   const [emailValue, setEmailValue] = useState(user?.email || "");
+
+  useEffect(() => {
+    if (!user || !profile || hydratedUserRef.current === user.id) return;
+    hydratedUserRef.current = user.id;
+    setNickname(profile.nickname || "");
+    setBio(profile.bio || "");
+    setAvatarUrl(profile.avatar_url || "");
+    setEmailValue(user.email || "");
+  }, [profile, user]);
 
   // 未登录状态
   if (!user) {
@@ -115,6 +123,7 @@ export default function EditProfilePage() {
     if (updateErr) {
       setError(`保存失败: ${updateErr.message}`);
     } else {
+      await refreshProfile();
       setSuccess("保存成功！");
       setNicknameEditOpen(false);
       setEmailEditOpen(false);

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Post } from "@/lib/types";
 import { getThumbnailUrl } from "@/lib/image";
 
@@ -95,11 +96,9 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
         {showAuthor && (
           <div className="flex items-center gap-1.5 min-w-0">
             <Link href={`/user/${post.user_id}`}>
-              <img
-                src={author?.avatar_url || `https://placehold.co/20x20/FDDCD8/F26B5B?text=${encodeURIComponent(avatarChar)}`}
-                className="w-5 h-5 rounded-full object-cover flex-shrink-0 hover:opacity-80 transition-opacity"
-                alt=""
-              />
+              <span className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity inline-flex">
+                {author?.avatar_url ? <img src={author.avatar_url} className="w-full h-full object-cover" alt="" /> : <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%" }} />}
+              </span>
             </Link>
             <Link href={`/user/${post.user_id}`} className="text-xs text-muted hover:text-accent no-underline truncate">
               {author?.nickname || author?.username || "匿名用户"}

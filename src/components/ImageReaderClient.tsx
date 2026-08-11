@@ -10,6 +10,7 @@ import EmojiPicker from "@/components/EmojiPicker";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { createNotification } from "@/lib/notifications";
 import type { Post, Comment } from "@/lib/types";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface ImageItem {
   url: string;
@@ -24,6 +25,7 @@ interface ImageReaderClientProps {
 export default function ImageReaderClient({ post, images: initialImages }: ImageReaderClientProps) {
   const supabase = createClient();
   const { user, profile } = useAuth();
+  const dialog = useAppDialog();
   const [darkMode, setDarkMode] = useState(false);
   const [fontSize, setFontSize] = useState(18);
   const [readerWidth, setReaderWidth] = useState("800");
@@ -372,7 +374,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
 
   const handleDeleteComment = async (commentId: string) => {
     if (!user) return;
-    if (!confirm("确定要删除这条评论吗？")) return;
+    if (!await dialog.confirm({ title:"删除评论", message:"确定要删除这条评论吗？删除后无法恢复。", confirmLabel:"删除评论", variant:"danger" })) return;
     const { error } = await supabase.from("comments").delete().eq("id", commentId).eq("user_id", user.id);
     if (!error) {
       await loadComments();

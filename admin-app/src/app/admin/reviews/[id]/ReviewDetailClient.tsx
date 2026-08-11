@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useAdminDialog } from "@/components/AdminDialogProvider";
 
 type NamedUser = { nickname?: string | null } | null;
 type Finding = { id: string; source?: string | null; category?: string | null; location_type?: string | null; image_index?: number | null; quoted_text?: string | null; details?: string | null };
@@ -44,6 +45,7 @@ function riskLabel(category?: string | null) {
 }
 
 export default function ReviewDetailClient({ post, reviewCase, findings, imageAccessError }: { post: Post; reviewCase: ReviewCase; findings: Finding[]; imageAccessError?: string | null }) {
+  const dialog = useAdminDialog();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [brokenImages, setBrokenImages] = useState<number[]>([]);
@@ -78,7 +80,7 @@ export default function ReviewDetailClient({ post, reviewCase, findings, imageAc
   };
 
   const approve = async () => {
-    if (!window.confirm("确认该作品没有违规并立即公开发布吗？")) return;
+    if (!await dialog.confirm({ title:"确认无违规并放行", message:"该作品将立即公开发布。请确认你已经完整查看作品内容和风险标记。", confirmLabel:"确认放行" })) return;
     setBusy(true);
     setMessage("");
     const response = await fetch("/api/admin/review", {

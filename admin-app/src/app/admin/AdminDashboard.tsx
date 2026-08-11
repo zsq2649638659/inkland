@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin-browser";
+import { useAdminDialog } from "@/components/AdminDialogProvider";
 
 type PostItem = { id: string; title: string; post_type: string | null; created_at: string; review_reason?: string | null; author?: { nickname?: string } | null };
 type ReportItem = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string; reporter?: { nickname?: string } | null; source?: "content" | "comment" };
@@ -59,6 +60,7 @@ export default function AdminDashboard({ initialPosts, initialReports, initialFe
   adminEmail: string;
 }) {
   const router = useRouter();
+  const dialog = useAdminDialog();
   const [supabase] = useState(() => createAdminClient());
   const [posts, setPosts] = useState(initialPosts);
   const [reports, setReports] = useState(initialReports);
@@ -147,7 +149,7 @@ export default function AdminDashboard({ initialPosts, initialReports, initialFe
   };
 
   const removeRule = async (rule: ModerationRule) => {
-    if (!window.confirm(`确定删除规则“${rule.pattern}”吗？删除后不影响已有审核记录。`)) return;
+    if (!await dialog.confirm({ title:"删除审核规则", message:`确定删除规则“${rule.pattern}”吗？删除后不影响已有审核记录。`, confirmLabel:"删除规则", variant:"danger" })) return;
     setBusy(rule.id); setMessage("");
     const response = await fetch(`/api/admin/moderation-rules?id=${encodeURIComponent(rule.id)}`, { method: "DELETE" });
     const payload = await response.json().catch(() => null) as { error?: string } | null;

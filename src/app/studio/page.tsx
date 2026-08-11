@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
 import { SkeletonStudio } from "@/components/Skeleton";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 type FilterType = "all" | "novel" | "illustration" | "serial";
 type StatusFilter = "all" | "published" | "draft" | "rejected";
@@ -48,6 +49,7 @@ interface SeriesWorkItem {
 export default function StudioPage() {
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
+  const dialog = useAppDialog();
   const [works, setWorks] = useState<WorkItem[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesWorkItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,24 +166,24 @@ export default function StudioPage() {
   };
 
   const handleDelete = async (work: WorkItem) => {
-    if (!confirm("确定要删除这篇作品吗？此操作不可撤销。")) return;
+    if (!await dialog.confirm({ title:"删除作品", message:`确定要删除《${work.title || "未命名作品"}》吗？删除后无法恢复。`, confirmLabel:"删除作品", variant:"danger" })) return;
     if (work.post_type === "serial" && work.series_name) {
       const { error: postsError } = await supabase
         .from("posts")
         .delete()
         .eq("user_id", user?.id)
         .eq("series_name", work.series_name);
-      if (postsError) { alert(`删除连载章节失败: ${postsError.message}`); return; }
+      if (postsError) { await dialog.alert({ title:"删除失败", message:`删除连载章节失败：${postsError.message}`, variant:"danger" }); return; }
       const { error: seriesError } = await supabase
         .from("series")
         .delete()
         .eq("id", work.id)
         .eq("user_id", user?.id);
-      if (seriesError) { alert(`删除合集失败: ${seriesError.message}`); return; }
+      if (seriesError) { await dialog.alert({ title:"删除失败", message:`删除合集失败：${seriesError.message}`, variant:"danger" }); return; }
       setSeriesList((prev) => prev.filter((s) => s.id !== work.id));
     } else {
       const { error } = await supabase.from("posts").delete().eq("id", work.id).eq("user_id", user?.id);
-      if (error) { alert(`删除失败: ${error.message}`); return; }
+      if (error) { await dialog.alert({ title:"删除失败", message:error.message, variant:"danger" }); return; }
     }
     setWorks((prev) => prev.filter((w) => w.id !== work.id));
     window.dispatchEvent(new Event("inkland:stats-changed"));
@@ -378,7 +380,7 @@ export default function StudioPage() {
   const batchPublish = async () => {
     if (selectedIds.size === 0) return;
     const { error } = await supabase.from("posts").update({ status: "published", published_at: new Date().toISOString() }).in("id", Array.from(selectedIds));
-    if (error) { alert(`批量发布失败: ${error.message}`); return; }
+    if (error) { await dialog.alert({ title:"批量发布失败", message:error.message, variant:"danger" }); return; }
     setWorks((prev) => prev.map((w) => selectedIds.has(w.id) ? { ...w, status: "published" } : w));
     setBatchMode(false);
     setSelectedIds(new Set());
@@ -388,21 +390,21 @@ export default function StudioPage() {
   const batchDelete = async () => {
     if (selectedIds.size === 0) return;
     if (!user) return;
-    if (!confirm(`确定要删除选中的 ${selectedIds.size} 篇作品吗？此操作不可撤销。`)) return;
+    if (!await dialog.confirm({ title:"批量删除作品", message:`即将删除选中的 ${selectedIds.size} 篇作品，删除后无法恢复。`, confirmLabel:`删除 ${selectedIds.size} 篇作品`, variant:"danger" })) return;
     const selectedWorks = allWorks.filter((w) => selectedIds.has(w.id));
     const selectedSeries = selectedWorks.filter((w) => w.post_type === "serial" && w.series_name);
     const selectedPosts = selectedWorks.filter((w) => w.post_type !== "serial");
     if (selectedPosts.length > 0) {
       const { error } = await supabase.from("posts").delete().in("id", selectedPosts.map((w) => w.id)).eq("user_id", user.id);
-      if (error) { alert(`批量删除失败: ${error.message}`); return; }
+      if (error) { await dialog.alert({ title:"批量删除失败", message:error.message, variant:"danger" }); return; }
     }
     for (const seriesWork of selectedSeries) {
       const { error: postsError } = await supabase.from("posts").delete().eq("user_id", user.id).eq("series_name", seriesWork.series_name);
-      if (postsError) { alert(`批量删除连载章节失败: ${postsError.message}`); return; }
+      if (postsError) { await dialog.alert({ title:"批量删除失败", message:`删除连载章节失败：${postsError.message}`, variant:"danger" }); return; }
     }
     if (selectedSeries.length > 0) {
       const { error } = await supabase.from("series").delete().in("id", selectedSeries.map((w) => w.id)).eq("user_id", user.id);
-      if (error) { alert(`批量删除合集失败: ${error.message}`); return; }
+      if (error) { await dialog.alert({ title:"批量删除失败", message:`删除合集失败：${error.message}`, variant:"danger" }); return; }
       setSeriesList((prev) => prev.filter((s) => !selectedSeries.some((w) => w.id === s.id)));
     }
     setWorks((prev) => prev.filter((w) => !selectedIds.has(w.id)));

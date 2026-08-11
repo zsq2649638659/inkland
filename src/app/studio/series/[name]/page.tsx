@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { SkeletonLine } from "@/components/Skeleton";
 import { useAuth } from "@/components/AuthProvider";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface ChapterInfo {
   id: string;
@@ -36,6 +37,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
   const decodedName = decodeURIComponent(name);
   const supabase = createClient();
   const { user } = useAuth();
+  const dialog = useAppDialog();
   const [series, setSeries] = useState<SeriesInfo | null>(null);
   const [chapters, setChapters] = useState<ChapterInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,13 +130,13 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
       })
       .eq("id", series.id);
 
-    if (error) { alert("保存失败: " + error.message); return; }
+    if (error) { await dialog.alert({ title:"保存失败", message:error.message, variant:"danger" }); return; }
     setSeries({ ...series, description: editDesc, tags: editTags });
     setEditSeries(false);
   };
 
   const handleDeleteChapter = async (chId: string) => {
-    if (!confirm("确定要删除这一章吗？")) return;
+    if (!await dialog.confirm({ title:"删除章节", message:"确定要删除这一章吗？删除后无法恢复。", confirmLabel:"删除章节", variant:"danger" })) return;
     await supabase.from("posts").delete().eq("id", chId);
     setChapters((prev) => prev.filter((c) => c.id !== chId));
   };

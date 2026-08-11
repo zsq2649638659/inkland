@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
+import DefaultAvatar from "@/components/DefaultAvatar";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 interface FollowUser {
   id: string;
@@ -23,6 +25,7 @@ interface UserCardProps {
 
 export default function UserCard({ user, currentUserId, isFollowingTab, isFollowed, onUpdate }: UserCardProps) {
   const supabase = createClient();
+  const dialog = useAppDialog();
   const [moreOpen, setMoreOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -45,24 +48,24 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
 
   const handleBlock = async () => {
     setMoreOpen(false);
-    if (!confirm("确定要屏蔽该用户吗？屏蔽后你将不再看到该用户的评论和作品。")) return;
+    if (!await dialog.confirm({ title:"屏蔽用户", message:`屏蔽 ${user.nickname} 后，你将不再看到对方的评论和作品。`, confirmLabel:"确认屏蔽", variant:"danger" })) return;
     const { error } = await supabase.from("blocked_users").insert({
       user_id: currentUserId,
       blocked_user_id: user.id,
     });
     if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) {
-      alert("操作失败: " + error.message);
+      await dialog.alert({ title:"屏蔽失败", message:error.message, variant:"danger" });
       return;
     }
     onUpdate();
-    alert("已屏蔽该用户");
+    dialog.toast("已屏蔽该用户");
   };
 
-  const handleReport = () => {
+  const handleReport = async () => {
     setMoreOpen(false);
-    const reason = prompt("请填写举报原因：");
+    const reason = await dialog.prompt({ title:"举报用户", message:`请说明举报 ${user.nickname} 的原因。`, placeholder:"请尽量描述具体情况…", confirmLabel:"提交举报", required:true });
     if (!reason || !reason.trim()) return;
-    alert("举报已提交，管理员会尽快处理。");
+    dialog.toast("举报已提交，管理员会尽快处理");
   };
 
   // 按钮文字
@@ -71,11 +74,11 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
   return (
     <div className={`user-card${moreOpen ? " show-popup" : ""}`}>
       <Link href={`/user/${user.id}`} className="no-underline" style={{ display: 'flex', alignItems: 'center', gap: 'inherit', flex: 1, minWidth: 0 }}>
-        <div className="user-avatar" style={user.avatar_url ? undefined : { background: 'linear-gradient(135deg, #F26B5B, #E8877A)' }}>
+        <div className="user-avatar">
           {user.avatar_url ? (
             <img src={user.avatar_url} alt="" />
           ) : (
-            user.nickname?.[0] || "?"
+            <DefaultAvatar name={user.nickname || "?"} style={{ width:"100%", height:"100%", borderRadius:"inherit" }} />
           )}
         </div>
         <div className="user-info">

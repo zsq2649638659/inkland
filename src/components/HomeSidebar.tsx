@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 type SidebarStats = {
   following: number | null;
@@ -262,7 +263,7 @@ export default function HomeSidebar() {
             {profile?.avatar_url ? (
               <img src={profile.avatar_url} alt="" />
             ) : (
-              avatarChar
+              <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%", borderRadius:"inherit" }} />
             )}
           </div>
         </Link>
