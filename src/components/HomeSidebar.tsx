@@ -128,8 +128,15 @@ export default function HomeSidebar() {
         .then(({ count }) => setNotificationCount(count || 0));
     };
     fetchNotificationCount();
+    const channel = supabase
+      .channel(`sidebar-notifications:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchNotificationCount)
+      .subscribe();
     const timer = window.setInterval(fetchNotificationCount, 30_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      void supabase.removeChannel(channel);
+    };
   }, [user, supabase]);
 
   const isActive = (page: string) => {
