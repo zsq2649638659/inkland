@@ -767,13 +767,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     for (const file of selectedFiles) {
       if (!file.type.startsWith("image/")) { setErrorMsg(`"${file.name}" 不是图片文件，已跳过`); continue; }
       if (file.size > 20 * 1024 * 1024) { setErrorMsg(`"${file.name}" 原文件超过 20MB，已跳过`); continue; }
-      setErrorMsg(`正在使用本地模型审核第 ${addedCount + 1} 张图片...`);
-      try {
-        await screenImageLocally(file, uploadedImages.length + addedCount);
-      } catch (error) {
-        // 浏览器预筛只是可选的体验优化，不能阻止上传，也不能代替服务端审核。
-        setErrorMsg(error instanceof Error ? `本地预筛不可用，将继续上传并交由服务端审核：${error.message}` : "本地预筛不可用，将继续上传并交由服务端审核");
-      }
+      // 本地模型只是可选的预筛，不能阻止上传，也不能代替服务端审核。
+      // 不把它放在上传链路中等待，避免用户看到漫长的“审核中”并误以为发布被卡住。
+      void screenImageLocally(file, uploadedImages.length + addedCount).catch(() => undefined);
       const uploaded = await uploadImageToStorage(file);
       if (uploaded) {
         setUploadedImages((prev) => [...prev, uploaded]);
@@ -1081,7 +1077,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     let savedPostId = editPostId || undefined;
     let finalReviewStatus: string | undefined;
-    let imageScreeningUnavailable = false;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
       if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
@@ -1094,18 +1089,14 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     }
 
     if (!options?.draft && visibility !== "private" && savedPostId && finalReviewStatus === "pending") {
-      try {
-        const screeningResponse = await fetch("/api/moderation/screen-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ postId: savedPostId }),
-        });
-        imageScreeningUnavailable = !screeningResponse.ok;
-      } catch {
-        imageScreeningUnavailable = true;
-      }
-      const { data: screenedPost } = await supabase.from("posts").select("review_status").eq("id", savedPostId).single();
-      finalReviewStatus = screenedPost?.review_status as string | undefined;
+      // 发布与自动审核解耦：作品先进入“已发布/审核中”状态，审核服务在后台完成。
+      // 前端不再等待 ModelScope/NudeNet，也不把服务异常误报成发布失败。
+      void fetch("/api/moderation/screen-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: savedPostId }),
+        keepalive: true,
+      }).catch(() => undefined);
     }
 
     await saveTags(user.id, savedPostId);
@@ -1122,13 +1113,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setSuccessMsg("作品已保存为仅自己可见");
     } else {
       setSuccessAction("publish");
-      setSuccessMsg(
-        finalReviewStatus === "approved"
-          ? "作品已通过系统初筛并公开发布"
-          : imageScreeningUnavailable
-            ? "自动审核服务暂时不可用，作品已转入人工审核"
-            : "作品已进入人工审核，审核通过后会公开",
-      );
+      setSuccessMsg(finalReviewStatus === "approved" ? "作品已发布" : "作品已发布，正在自动审核；审核完成前仅自己可见");
     }
   };
 
