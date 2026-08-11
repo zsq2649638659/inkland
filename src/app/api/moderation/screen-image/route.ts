@@ -7,7 +7,10 @@ type Finding = {
   score: number;
   details?: string;
   box?: number[] | null;
+  source?: "nudenet_modelscope" | "nsfwjs_client";
 };
+
+const CLIENT_THRESHOLDS: Record<string, number> = { porn: 0.45, hentai: 0.45, sexy: 0.7 };
 
 function contentImageSources(content: string) {
   return [...content.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)]
@@ -23,7 +26,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await sessionClient.auth.getUser();
   if (!user) return Response.json({ error: "请先登录。" }, { status: 401 });
 
-  const body = await request.json().catch(() => ({})) as { postId?: string };
+  const body = await request.json().catch(() => ({})) as { postId?: string; clientFindings?: Finding[] };
   if (!body.postId) return Response.json({ error: "缺少作品编号。" }, { status: 400 });
 
   let admin;
@@ -60,6 +63,19 @@ export async function POST(request: Request) {
     }
   }
 
+  // 浏览器模型的结果只允许把作品升级为人工审核，绝不能据此自动放行。
+  // 服务端重新校验类别、图片序号和阈值，避免任意内容被写入审核记录。
+  const clientFindings = Array.isArray(body.clientFindings)
+    ? body.clientFindings.slice(0, 27).flatMap((finding) => {
+      const category = typeof finding.category === "string" ? finding.category.toLowerCase() : "";
+      const score = Number(finding.score);
+      const imageIndex = Number(finding.image_index);
+      const threshold = CLIENT_THRESHOLDS[category];
+      if (!threshold || !Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex >= images.length || !Number.isFinite(score) || score < threshold || score > 1) return [];
+      return [{ image_index: imageIndex, category, score, source: "nsfwjs_client" as const, details: "浏览器辅助模型检测到潜在风险；该结果仅用于转人工复核" }];
+    })
+    : [];
+
   const serviceUrl = process.env.MODERATION_SERVICE_URL?.replace(/\/$/, "");
   const serviceSecret = process.env.MODERATION_SERVICE_SECRET;
   if (!serviceUrl || !serviceSecret) {
@@ -77,13 +93,13 @@ export async function POST(request: Request) {
       body: JSON.stringify({ images }),
       signal: AbortSignal.timeout(120_000),
     });
+    if (!response.ok) throw new Error(`moderation_service_http_${response.status}`);
     stage = "parse_moderation_result";
-    const responseText = await response.text();
-    if (!response.ok) {
-      throw new Error(`moderation_service_http_${response.status}:${responseText.slice(0, 1200)}`);
-    }
-    const result = JSON.parse(responseText) as { outcome?: string; findings?: Finding[]; engine?: string; model?: string };
-    const findings = Array.isArray(result.findings) ? result.findings : [];
+    const result = await response.json() as { outcome?: string; findings?: Finding[]; engine?: string; model?: string };
+    const serverFindings = Array.isArray(result.findings)
+      ? result.findings.map((finding) => ({ ...finding, source: "nudenet_modelscope" as const }))
+      : [];
+    const findings = [...serverFindings, ...clientFindings];
     const outcome = findings.length > 0 || result.outcome === "flagged" ? "flagged" : "approved";
     if (outcome === "approved") {
       stage = "promote_approved_images";
@@ -93,7 +109,7 @@ export async function POST(request: Request) {
     const { error } = await admin.rpc("complete_image_screening", {
       post_id_input: body.postId,
       outcome,
-      result: { ...result, source: "modelscope_studio", image_count: images.length },
+      result: { ...result, source: "modelscope_studio", image_count: images.length, client_auxiliary_findings: clientFindings.length },
       findings,
     });
     if (error) throw error;
