@@ -213,6 +213,8 @@ export default function NotificationsPage() {
       window.location.assign(`/user/${n.actor_id}`);
     } else if (n.type === "system" && n.metadata?.action_url?.startsWith("/")) {
       window.location.assign(n.metadata.action_url);
+    } else if (n.type === "system" && n.post_id && n.content.includes("未通过本次审核")) {
+      window.location.assign(`/create?editPost=${n.post_id}`);
     }
   };
 
@@ -298,7 +300,7 @@ export default function NotificationsPage() {
 
   const getNotificationTitle = (notification: NotificationItem): ReactNode => {
     if (notification.type === "system") {
-      if (notification.template_key === "post_review_rejected") return "作品需要修改";
+      if (notification.template_key === "post_review_rejected" || notification.content.includes("未通过本次审核")) return "作品未通过审核";
       const activity = notification.content.match(/「([^」]+)」/);
       if (notification.content.includes("活动") && activity) {
         return <>活动提醒：<span className="highlight"><a href={`/search?q=${encodeURIComponent(activity[1])}`} onClick={(event) => event.stopPropagation()}>「{activity[1]}」</a></span> 投稿即将截止</>;
@@ -454,17 +456,17 @@ export default function NotificationsPage() {
                         <span className="notification-timestamp">{formatTime(n.created_at)}</span>
                       </div>
                       <div className="notification-desc">{getNotificationDescription(n)}</div>
-                      {n.type === "system" && n.metadata?.action_url?.startsWith("/") && (
+                      {n.type === "system" && (n.metadata?.action_url?.startsWith("/") || (n.post_id && n.content.includes("未通过本次审核"))) && (
                         <button
                           type="button"
                           className="notification-action-link"
                           onClick={async (event) => {
                             event.stopPropagation();
                             if (!n.read) await markAsRead(n.id);
-                            window.location.assign(n.metadata?.action_url || "/notifications");
+                            window.location.assign(n.metadata?.action_url || `/create?editPost=${n.post_id}`);
                           }}
                         >
-                          {n.metadata.action_label || "查看详情"} <i className="fa-solid fa-arrow-right" />
+                          {n.metadata?.action_label || "查看问题并修改"} <i className="fa-solid fa-arrow-right" />
                         </button>
                       )}
                     </div>
