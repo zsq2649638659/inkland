@@ -3,11 +3,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useAdminDialog } from "@/components/AdminDialogProvider";
 
 type NamedUser = { nickname?: string | null } | null;
 type Finding = { id: string; source?: string | null; category?: string | null; location_type?: string | null; image_index?: number | null; quoted_text?: string | null; details?: string | null };
 type ReviewCase = { route_reason?: string | null; screening_status?: string | null; screening_sources?: string[] | null; rules_version?: string | null } | null;
-type Post = { id: string; title?: string | null; content?: string | null; author_note?: string | null; post_type?: string | null; series_name?: string | null; chapter_number?: number | null; review_reason?: string | null; created_at?: string | null; review_submission_number?: number | null; author?: NamedUser };
+type Post = { id: string; title?: string | null; content?: string | null; post_type?: string | null; review_reason?: string | null; created_at?: string | null; review_submission_number?: number | null; author?: NamedUser };
 
 const labels: Record<string, string> = { illustration: "图片作品", novel: "小说", article: "文章", serial: "连载章节" };
 const riskLabels: Record<string, string> = {
@@ -44,11 +45,12 @@ function riskLabel(category?: string | null) {
 }
 
 export default function ReviewDetailClient({ post, reviewCase, findings, imageAccessError }: { post: Post; reviewCase: ReviewCase; findings: Finding[]; imageAccessError?: string | null }) {
+  const dialog = useAdminDialog();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [brokenImages, setBrokenImages] = useState<number[]>([]);
   const images = [...(post.content || "").matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]);
-  const plainText = (post.content || "").replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").replace(/<!--\s*作者的话：([\s\S]*?)\s*-->/g, "").trim();
+  const plainText = (post.content || "").replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").trim();
   const imageFindings = findings.filter((finding) => finding.location_type === "image");
   const defaultRiskImages = [...new Set(imageFindings.map((finding) => finding.image_index).filter((index): index is number => typeof index === "number"))];
   const [selectedImageIndexes, setSelectedImageIndexes] = useState<number[]>(defaultRiskImages);
@@ -78,6 +80,7 @@ export default function ReviewDetailClient({ post, reviewCase, findings, imageAc
   };
 
   const approve = async () => {
+    if (!await dialog.confirm({ title:"确认无违规并放行", message:"该作品将立即公开发布。请确认你已经完整查看作品内容和风险标记。", confirmLabel:"确认放行" })) return;
     setBusy(true);
     setMessage("");
     const response = await fetch("/api/admin/review", {
@@ -101,9 +104,9 @@ export default function ReviewDetailClient({ post, reviewCase, findings, imageAc
       </header>
 
       <div className="admin-review-heading">
-        <div className="admin-detail-kicker">PRE-PUBLISH REVIEW · {post.post_type === "serial" ? "连载章节（章节标题/正文）" : labels[post.post_type || ""] || "作品"}</div>
+        <div className="admin-detail-kicker">PRE-PUBLISH REVIEW · {labels[post.post_type || ""] || "作品"}</div>
         <h1>{post.title || "无标题"}</h1>
-        <div className="admin-detail-meta">作者：{post.author?.nickname || "未知作者"}{post.series_name ? ` · ${post.series_name} · 第${post.chapter_number || "?"}章` : ""} · 提交于 {post.created_at ? new Date(post.created_at).toLocaleString("zh-CN") : "未知时间"} · 第 {post.review_submission_number || 1} 次提交</div>
+        <div className="admin-detail-meta">作者：{post.author?.nickname || "未知作者"} · 提交于 {post.created_at ? new Date(post.created_at).toLocaleString("zh-CN") : "未知时间"} · 第 {post.review_submission_number || 1} 次提交</div>
       </div>
 
       <div className="admin-review-layout">
@@ -133,11 +136,10 @@ export default function ReviewDetailClient({ post, reviewCase, findings, imageAc
 
         <article className="admin-detail-content admin-review-main">
           <section className="admin-evidence-document">
-            <div className="admin-document-label">{post.post_type === "serial" ? "连载章节内容" : "完整作品内容"}</div>
+            <div className="admin-document-label">完整作品内容</div>
             <h2>{images.length ? `全部图片（${images.length} 张）` : "正文"}</h2>
             {imageAccessError ? <div className="admin-image-access-error" role="alert">{imageAccessError}</div> : null}
             {plainText ? <div className="admin-long-content">{plainText}</div> : null}
-            {post.author_note ? <section className="admin-author-note"><h3>作者的话</h3><p>{post.author_note}</p></section> : null}
             {images.length ? <><div className="admin-image-selection-help">勾选需要作者修改的图片；机器标出的风险图片已默认选中。</div><div className="admin-detail-images">{images.map((url, index) => {
               const risks = imageFindings.filter((finding) => finding.image_index === index);
               const unavailable = url.startsWith("private://") || brokenImages.includes(index);

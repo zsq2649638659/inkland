@@ -8,7 +8,7 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const { supabase, user } = await getAdminContext();
   if (!user) redirect("/admin/login");
-  const { data: post } = await supabase.from("posts").select("id, title, content, author_note, post_type, series_name, chapter_number, status, review_status, review_reason, created_at, current_version_number, review_submission_number, author:profiles!posts_user_id_fkey(nickname)").eq("id", id).eq("review_status", "pending").maybeSingle();
+  const { data: post } = await supabase.from("posts").select("id, title, content, post_type, status, review_status, review_reason, created_at, current_version_number, review_submission_number, author:profiles!posts_user_id_fkey(nickname)").eq("id", id).eq("review_status", "pending").maybeSingle();
   if (!post) notFound();
   const service = createAdminServiceClient();
   let reviewPost = post;
