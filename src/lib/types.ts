@@ -23,7 +23,6 @@ export interface Post {
   series_name?: string | null;
   chapter_number?: number | null;
   chapter_title?: string | null;
-  author_note?: string | null;
   created_at?: string;
   updated_at?: string;
   published_at?: string | null;

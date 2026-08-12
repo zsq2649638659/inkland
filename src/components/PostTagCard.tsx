@@ -1,15 +1,13 @@
 "use client";
 
-import { useRef, useEffect, useState, type CSSProperties, type MouseEvent } from "react";
+import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { Post } from "@/lib/types";
 import { getThumbnailUrl } from "@/lib/image";
-import ImageLightbox from "@/components/ImageLightbox";
 
 interface PostTagCardProps {
   post: Post;
-  style?: CSSProperties;
+  style?: React.CSSProperties;
   showAuthorAvatar?: boolean;
 }
 
@@ -32,7 +30,6 @@ function getAllImages(content?: string): string[] {
 }
 
 export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCardProps) {
-  const router = useRouter();
   const cp = post as unknown as Record<string, unknown>;
   const content = (cp.content as string) || "";
   const contentImages = getAllImages(content);
@@ -49,7 +46,6 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
   const [activeImage, setActiveImage] = useState(0);
   const tagsRef = useRef<HTMLDivElement>(null);
   const [isTagsOverflow, setIsTagsOverflow] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Overflow detection for tags horizontal scroll
   useEffect(() => {
@@ -74,11 +70,6 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
   const hasImageCopy = Boolean(imageTitle || plainText);
   const isRejected = cp.review_status === "rejected";
   const targetHref = isRejected ? `/create?editPost=${post.id}` : `/read/${post.id}`;
-  const navigateCard = (event: MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
-    if (target.closest("a, button")) return;
-    router.push(targetHref);
-  };
 
   const authorAvatar = showAuthorAvatar && post.author ? (
     <div className="card-author">
@@ -95,15 +86,15 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
   if (hasImage) {
     const hasMultipleImages = allImages.length > 1;
     return (
-      <div className={`tag-card image${isRejected ? " review-rejected" : ""}`} data-type="image" style={style} onClick={navigateCard} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") router.push(targetHref); }}>
+      <div className={`tag-card image${isRejected ? " review-rejected" : ""}`} data-type="image" style={style}>
         {seriesContext && (
           <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
             <i className="fa-solid fa-layer-group"></i> {seriesContext}
           </Link>
         )}
         <div className="card-image-stage">
-          {isRejected && <Link href={targetHref} className="profile-review-badge"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
-          <button type="button" className="card-image-link" onClick={() => setLightboxOpen(true)} aria-label={`查看${allImages.length}张图片`}>
+          {isRejected && <Link href={targetHref} className="profile-review-badge"><i className="fa-solid fa-circle-exclamation" /> 未过审</Link>}
+          <div className="card-image-link">
             <div className="card-image-placeholder">
               {allImages[activeImage] ? (
                 <img
@@ -117,7 +108,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
                 <i className="fa-solid fa-image" />
               )}
             </div>
-          </button>
+          </div>
           {hasImageCopy && (
             <div className="card-image-overlay">
               <Link href={targetHref} className="no-underline card-image-copy">
@@ -174,19 +165,18 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
           </div>
           {authorAvatar}
         </div>
-        {lightboxOpen && <ImageLightbox post={post} images={allImages} initialIndex={activeImage} onClose={() => setLightboxOpen(false)} />}
       </div>
     );
   }
 
   return (
-    <div className={`tag-card single${isRejected ? " review-rejected" : ""}`} data-type="single" style={style} onClick={navigateCard} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") router.push(targetHref); }}>
+    <div className={`tag-card single${isRejected ? " review-rejected" : ""}`} data-type="single" style={style}>
       {seriesContext && (
         <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
           <i className="fa-solid fa-layer-group"></i> {seriesContext}
         </Link>
       )}
-      {isRejected && <Link href={targetHref} className="profile-review-badge profile-review-badge--inline"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
+      {isRejected && <Link href={targetHref} className="profile-review-badge profile-review-badge--inline"><i className="fa-solid fa-circle-exclamation" /> 未过审</Link>}
       <Link href={targetHref} className="no-underline">
         <div className="card-title">{post.title || "无标题"}</div>
       </Link>

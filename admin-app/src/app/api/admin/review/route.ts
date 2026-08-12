@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const db = service || supabase;
   const { data: post, error: postError } = await db
     .from("posts")
-    .select("id, user_id, title, review_status, review_submission_number, pending_visibility, visibility")
+    .select("id, user_id, title, review_status, review_submission_number")
     .eq("id", body.postId)
     .maybeSingle();
   if (postError || !post) return NextResponse.json({ error: "没有找到待审核作品" }, { status: 404 });
@@ -52,10 +52,6 @@ export async function POST(request: Request) {
       reviewed_at: reviewedAt,
       reviewed_by: user.id,
       status: rejected ? "draft" : "published",
-      ...(rejected ? {} : {
-        visibility: post.pending_visibility || post.visibility || "public",
-        pending_visibility: null,
-      }),
     }).eq("id", body.postId).eq("review_status", "pending").select("id").maybeSingle();
     if (error || !updatedPost) return NextResponse.json({ error: "审核写入失败，请刷新后重试" }, { status: 500 });
   }
@@ -66,17 +62,20 @@ export async function POST(request: Request) {
       : "";
     const content = `你的作品《${post.title || "无标题"}》未通过本次审核。问题类型：${reason}。${imageText}请修改后重新提交审核。`;
     const submissionNumber = post.review_submission_number || 1;
-    const { data: existingNotification } = await db
+    const { data: existingNotification, error: existingNotificationError } = await db
       .from("notifications")
       .select("id")
       .eq("user_id", post.user_id)
-      .eq("template_key", "post_review_rejected")
-      .eq("related_entity_id", post.id)
-      .contains("metadata", { submission_number: submissionNumber })
+      .eq("type", "system")
+      .eq("post_id", post.id)
+      .eq("content", content)
       .limit(1)
       .maybeSingle();
+    if (existingNotificationError) {
+      console.error("Failed to check existing rejection notification", existingNotificationError);
+    }
     if (!existingNotification) {
-      const { error: notificationError } = await db.from("notifications").insert({
+      const richNotification = {
         user_id: post.user_id,
         type: "system",
         actor_id: null,
@@ -95,10 +94,23 @@ export async function POST(request: Request) {
         },
         delivery_status: "sent",
         sent_at: reviewedAt,
-      });
+      };
+      const { error: notificationError } = await db.from("notifications").insert(richNotification);
       if (notificationError) {
-        console.error("Failed to create rejection notification", notificationError);
-        return NextResponse.json({ error: "作品已打回，但系统通知发送失败，请不要重复操作并检查通知表配置" }, { status: 500 });
+        console.error("Failed to create rich rejection notification; trying core fields", notificationError);
+        const { error: fallbackError } = await db.from("notifications").insert({
+          user_id: post.user_id,
+          type: "system",
+          actor_id: null,
+          post_id: post.id,
+          content,
+          read: false,
+          created_at: reviewedAt,
+        });
+        if (fallbackError) {
+          console.error("Failed to create fallback rejection notification", fallbackError);
+          return NextResponse.json({ error: "作品已打回，但系统通知发送失败，请不要重复操作并检查通知表配置" }, { status: 500 });
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
@@ -8,9 +8,9 @@ import { useAuth } from "@/components/AuthProvider";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
-import ModerationReasonModal from "@/components/ModerationReasonModal";
-import CenteredToast from "@/components/CenteredToast";
 import type { Comment } from "@/lib/types";
+import DefaultAvatar from "@/components/DefaultAvatar";
+import { useAppDialog } from "@/components/AppDialogProvider";
 
 export interface SerialPostCardData {
   chapterId: string;
@@ -63,6 +63,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const supabase = createClient();
   const { user, profile } = useAuth();
   const router = useRouter();
+  const dialog = useAppDialog();
 
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -72,63 +73,11 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const [commentCount, setCommentCount] = useState(data.commentCount || 0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [cardMenuOpen, setCardMenuOpen] = useState(false);
-  const [moderationModal, setModerationModal] = useState<
-    | { mode: "report"; targetType: "post" | "comment"; targetId: string }
-    | { mode: "block"; userId: string }
-    | null
-  >(null);
-  const [moderationSubmitting, setModerationSubmitting] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const cardMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!toastMessage) return;
-    const timer = window.setTimeout(() => setToastMessage(""), 2000);
-    return () => window.clearTimeout(timer);
-  }, [toastMessage]);
-
-  useEffect(() => {
-    if (!cardMenuOpen) return;
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (!cardMenuRef.current?.contains(event.target as Node)) setCardMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
-  }, [cardMenuOpen]);
 
   const plainExcerpt = useMemo(() => stripMarkdown(data.content), [data.content]);
   const avatarChar = data.authorNickname?.[0] || "?";
 
   const goToLogin = () => router.push("/login");
-
-  const reportTarget = (targetType: "post" | "comment", targetId: string) => {
-    if (!user) { goToLogin(); return; }
-    setModerationModal({ mode: "report", targetType, targetId });
-  };
-
-  const blockUser = (blockedUserId: string) => {
-    if (!user) { goToLogin(); return; }
-    if (blockedUserId === user.id) return;
-    setModerationModal({ mode: "block", userId: blockedUserId });
-  };
-
-  const submitModeration = async (reason: string) => {
-    if (!moderationModal || !user || (moderationModal.mode === "report" && !reason.trim())) return;
-    setModerationSubmitting(true);
-    const { error } = moderationModal.mode === "report"
-      ? moderationModal.targetType === "comment"
-        ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: moderationModal.targetId, reason: reason.trim() })
-        : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: moderationModal.targetId, reason: reason.trim() })
-      : await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderationModal.userId });
-    setModerationSubmitting(false);
-    if (error && !(moderationModal.mode === "block" && (error as unknown as Record<string, unknown>).code?.toString().includes("23505"))) {
-      setToastMessage(moderationModal.mode === "report" ? "举报提交失败，请稍后重试。" : "屏蔽失败，请稍后重试。");
-      return;
-    }
-    setModerationModal(null);
-    setToastMessage(moderationModal.mode === "report" ? "举报已提交，我们会尽快处理。" : "已屏蔽该用户。");
-  };
 
   // Check follow status
   useEffect(() => {
@@ -166,7 +115,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     const url = `${window.location.origin}/read/${data.chapterId}`;
     try {
       await navigator.clipboard.writeText(url);
-      setToastMessage("链接已复制到剪贴板");
+      dialog.toast("链接已复制到剪贴板");
     } catch {
       const input = document.createElement("input");
       input.value = url;
@@ -174,7 +123,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       input.select();
       document.execCommand("copy");
       document.body.removeChild(input);
-      setToastMessage("链接已复制到剪贴板");
+      dialog.toast("链接已复制到剪贴板");
     }
   };
 
@@ -236,16 +185,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   };
 
   return (
-    <article
-      className="card"
-      role="link"
-      tabIndex={0}
-      onClick={(event) => {
-        const target = event.target as HTMLElement;
-        if (!target.closest("a, button")) router.push(`/read/${data.chapterId}`);
-      }}
-      onKeyDown={(event) => { if (event.key === "Enter") router.push(`/read/${data.chapterId}`); }}
-    >
+    <article className="card">
       {/* V2: card-header — avatar + author info */}
       <div className="card-header">
         <Link href={`/user/${data.authorId}`} className="flex-shrink-0">
@@ -253,7 +193,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             {data.authorAvatar ? (
               <img src={data.authorAvatar} alt="" />
             ) : (
-              avatarChar
+              <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%", borderRadius:"inherit" }} />
             )}
           </div>
         </Link>
@@ -269,22 +209,15 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           </div>
         </div>
 
-        <div className="card-header-actions">
-          {user?.id !== data.authorId && (
-            <button className="card-follow-btn" onClick={toggleFollow} disabled={followLoading}>
-              {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
-            </button>
-          )}
-          <div className="card-more-wrap" ref={cardMenuRef}>
-            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
-            {cardMenuOpen && (
-              <div className="card-more-menu">
-                {user?.id !== data.authorId && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
-                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><i className="fa-solid fa-flag" /> 举报</button>
-              </div>
-            )}
-          </div>
-        </div>
+        {user?.id !== data.authorId && (
+          <button
+            className="card-follow-btn"
+            onClick={toggleFollow}
+            disabled={followLoading}
+          >
+            {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
+          </button>
+        )}
 
         </div>
 
@@ -359,18 +292,8 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           onCommentTextChange={setCommentText}
           onSubmit={submitComment}
           onClose={() => setShowComment(false)}
-          onReport={(commentId) => void reportTarget("comment", commentId)}
-          onBlock={(commentUserId) => void blockUser(commentUserId)}
         />
       )}
-      <ModerationReasonModal
-        open={!!moderationModal}
-        mode={moderationModal?.mode || "report"}
-        submitting={moderationSubmitting}
-        onClose={() => setModerationModal(null)}
-        onSubmit={submitModeration}
-      />
-      <CenteredToast message={toastMessage} />
     </article>
   );
 }
