@@ -12199,3 +12199,26 @@ p {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* Keep the series publish action visible after generic create-page rules. */
+#page-create.publish-series-page .btn-publish {
+  justify-content: center;
+  min-height: 48px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+#page-create.publish-series-page .btn-publish:hover:not(:disabled) {
+  background: var(--color-primary-dark, #e85a4f);
+}
+
+#page-create.publish-series-page .btn-publish:disabled {
+  background: var(--color-primary);
+  color: #fff;
+  cursor: wait;
+  opacity: 0.65;
+}
