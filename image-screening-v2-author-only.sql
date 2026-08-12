@@ -199,6 +199,14 @@ BEGIN
     WHERE keyword.rule_type = 'keyword'
       AND keyword.enabled = TRUE
       AND position(lower(keyword.pattern) IN lower(combined_text)) > 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.moderation_rules whitelist
+        WHERE whitelist.rule_type = 'whitelist'
+          AND whitelist.enabled = TRUE
+          AND whitelist.category = keyword.category
+          AND lower(whitelist.pattern) = lower(keyword.pattern)
+      )
   LOOP
     IF review_case_id IS NULL THEN
       INSERT INTO public.moderation_review_cases (
