@@ -2598,7 +2598,10 @@ p {
 .publish-article-page .collection-option-copy {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
+  text-align: center;
 }
 
 .publish-article-page .collection-option-text {
@@ -10600,6 +10603,16 @@ p {
   background: var(--color-card);
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+#page-create .collection-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
 }
 
 #page-create .collection-option:hover {
