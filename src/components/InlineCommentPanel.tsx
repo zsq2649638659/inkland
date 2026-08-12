@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Comment } from "@/lib/types";
 
@@ -17,6 +18,8 @@ interface InlineCommentPanelProps {
   onCommentTextChange: (value: string) => void;
   onSubmit: () => void;
   onClose: () => void;
+  onReport?: (commentId: string, commentUserId: string) => void;
+  onBlock?: (commentUserId: string) => void;
 }
 
 function getTimeAgo(dateStr: string) {
@@ -30,8 +33,19 @@ function getTimeAgo(dateStr: string) {
 
 export default function InlineCommentPanel({
   postId, user, displayName, avatarUrl, comments, commentCount, commentText, loadingComments, submitting,
-  onCommentTextChange, onSubmit, onClose,
+  onCommentTextChange, onSubmit, onClose, onReport, onBlock,
 }: InlineCommentPanelProps) {
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const commentMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuId) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!commentMenuRef.current?.contains(event.target as Node)) setMenuId(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [menuId]);
 
   return (
     <div className="inline-comment-panel comments-section" aria-label="评论区">
@@ -89,6 +103,36 @@ export default function InlineCommentPanel({
                     <span className="comment-time">{getTimeAgo(comment.created_at || "")}</span>
                   </div>
                   <p className="comment-text">{comment.content}</p>
+                  <div className="comment-actions" ref={menuId === comment.id ? commentMenuRef : undefined}>
+                    <button
+                      className="comment-more-btn inline-comment-more"
+                      title="更多"
+                      aria-label="评论更多操作"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setMenuId(menuId === comment.id ? null : comment.id);
+                      }}
+                    >⋮</button>
+                    {menuId === comment.id && (
+                      <div className="comment-popup show">
+                        <button
+                          className="comment-popup-item"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); onBlock?.(comment.user_id); setMenuId(null); }}
+                        >
+                          <i className="fa-solid fa-ban" /> 屏蔽
+                        </button>
+                        <button
+                          className="comment-popup-item"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); onReport?.(comment.id, comment.user_id); setMenuId(null); }}
+                        >
+                          <i className="fa-solid fa-flag" /> 举报
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
