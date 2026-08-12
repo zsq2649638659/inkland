@@ -73,19 +73,15 @@ function VisibilityOptions({
       <span className="form-label">可见范围</span>
       <div className="collection-options" role="radiogroup" aria-label="可见范围">
           <button type="button" className={`collection-option ${value === "public" ? "selected" : ""}`} onClick={() => onChange("public")} disabled={disabled} role="radio" aria-checked={value === "public"}>
-          <span className={`radio-circle ${value === "public" ? "selected" : ""}`}><span className="radio-dot" /></span>
           <span className="collection-option-copy"><span className="collection-option-text">公开</span><span className="collection-option-desc">所有人可见</span></span>
         </button>
         <button type="button" className={`collection-option ${value === "followers_only" ? "selected" : ""}`} onClick={() => onChange("followers_only")} disabled={disabled} role="radio" aria-checked={value === "followers_only"}>
-          <span className={`radio-circle ${value === "followers_only" ? "selected" : ""}`}><span className="radio-dot" /></span>
           <span className="collection-option-copy"><span className="collection-option-text">仅关注用户可见</span><span className="collection-option-desc">只有关注作者的人可见</span></span>
         </button>
         <button type="button" className={`collection-option ${value === "private" ? "selected" : ""}`} onClick={() => onChange("private")} disabled={disabled} role="radio" aria-checked={value === "private"}>
-          <span className={`radio-circle ${value === "private" ? "selected" : ""}`}><span className="radio-dot" /></span>
           <span className="collection-option-copy"><span className="collection-option-text">仅自己可见</span><span className="collection-option-desc">保存为草稿，仅作者本人可见</span></span>
         </button>
       </div>
-      {disabled && <p className="text-xs text-muted mt-2">正在同步图片权限，完成后即可发布。</p>}
     </div>
   );
 }
@@ -491,7 +487,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       const loadPost = async () => {
         const { data } = await supabase
           .from("posts")
-          .select("id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility")
+          .select("id, title, content, author_note, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility")
           .eq("id", editPost)
           .single();
         if (data) {
@@ -507,6 +503,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             setScheduleMonth(localSchedule.slice(0, 7));
           }
           editor.setContent(p.content as string || "");
+          setAuthorNote((p.author_note as string) || "");
           setEditingPostSeriesName((p.series_name as string) || null);
           if (p.review_status === "rejected") {
             setReviewRejectionReason((p.review_reason as string) || "未提供原因");
@@ -625,6 +622,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [editingPostSeriesName, setEditingPostSeriesName] = useState<string | null>(null);
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
+  const [authorNote, setAuthorNote] = useState("");
 
   const wordCount = editor.content.replace(/\s/g, "").length;
   const [recommendedTags, setRecommendedTags] = useState<string[]>([]);
@@ -1282,10 +1280,15 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
         ? Math.max(...chapterList.map((c) => c.chapter_number)) + 1
         : 1;
 
+    const moderationContent = [
+      editor.content.trim(),
+      authorNote.trim() ? `\n\n<!-- 作者的话：${authorNote.trim()} -->` : "",
+    ].join("");
     const { error } = await supabase.from("posts").insert({
       user_id: user.id,
       title: title.trim(),
-      content: editor.content.trim(),
+      content: moderationContent,
+      author_note: authorNote.trim() || null,
       word_count: editor.content.replace(/\s/g, "").length,
       status: "published",
       // 章节也必须先经过 posts 的文字关键词初筛；不能依赖默认的 approved。
@@ -1299,12 +1302,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     // 如果 chapter_number 列不存在，去掉重试
     if (error) {
-      if (error.message?.includes("chapter_number")) {
+      if (error.message?.includes("chapter_number") || error.message?.includes("author_note")) {
         // 列不存在，去掉 chapter_number 和 chapter_title 重试
         const { error: err2 } = await supabase.from("posts").insert({
           user_id: user.id,
           title: title.trim(),
-          content: editor.content.trim(),
+          content: moderationContent,
+          ...(error.message?.includes("author_note") ? {} : { author_note: authorNote.trim() || null }),
           word_count: editor.content.replace(/\s/g, "").length,
           status: "published",
           review_status: "pending",
@@ -1330,6 +1334,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setView("series-detail");
       setTitle("");
       editor.setContent("");
+      setAuthorNote("");
       setTags([]);
     }
   };
@@ -1529,9 +1534,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                     role="radio"
                     aria-checked={collectionMode === option.value}
                   >
-                    <span className={`radio-circle ${collectionMode === option.value ? "selected" : ""}`}>
-                      <span className="radio-dot" />
-                    </span>
                     <span className="collection-option-copy">
                       <span className="collection-option-text">{option.title}</span>
                       <span className="collection-option-desc">{option.desc}</span>
@@ -1785,13 +1787,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               >
                 <i className="fa-solid fa-cloud-arrow-up image-upload-icon"></i>
                 <div className="image-upload-title">点击或拖拽上传图片</div>
-                <div className="image-upload-hint">支持 JPG / PNG / WEBP，最多上传 {MAX_UPLOAD_IMAGES} 张；上传后会自动压缩为 WebP</div>
-                <div className="image-upload-hint">已选择 {uploadedImages.length}/{MAX_UPLOAD_IMAGES} 张</div>
-                {uploadingImage && (
-                  <div className="image-upload-hint" style={{ marginTop: 8 }}>
-                    <i className="fa-solid fa-spinner fa-spin"></i> 上传中...
-                  </div>
-                )}
+                {uploadingImage && <i className="fa-solid fa-spinner fa-spin" aria-label="上传中" />}
               </div>
               <input
                 ref={fileInputRef}
@@ -1895,9 +1891,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                     role="radio"
                     aria-checked={collectionMode === option.value}
                   >
-                    <span className={`radio-circle ${collectionMode === option.value ? "selected" : ""}`}>
-                      <span className="radio-dot" />
-                    </span>
                     <span className="collection-option-copy">
                       <span className="collection-option-text">{option.title}</span>
                       <span className="collection-option-desc">{option.desc}</span>
@@ -2074,26 +2067,16 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   { value: "original" as const, label: "原创" },
                   { value: "fanfic" as const, label: "同人" },
                 ].map((option) => (
-                  <label key={option.value} className={`radio-option ${newSeriesType === option.value ? "selected" : ""}`}>
-                    <input
-                      type="radio"
-                      name="seriesType"
-                      value={option.value}
-                      checked={newSeriesType === option.value}
-                      onChange={() => setNewSeriesType(option.value)}
-                    />
-                    <span
-                      className={`radio-circle ${newSeriesType === option.value ? "selected" : ""}`}
-                      onClick={() => setNewSeriesType(option.value)}
-                      style={newSeriesType === option.value ? { borderColor: "var(--color-primary)" } : undefined}
-                    >
-                      <span
-                        className="radio-dot"
-                        style={{ transform: newSeriesType === option.value ? "scale(1)" : "scale(0)" }}
-                      />
-                    </span>
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`radio-option ${newSeriesType === option.value ? "selected" : ""}`}
+                    onClick={() => setNewSeriesType(option.value)}
+                    role="radio"
+                    aria-checked={newSeriesType === option.value}
+                  >
                     <span className="radio-option-text">{option.label}</span>
-                  </label>
+                  </button>
                 ))}
               </div>
             </div>
@@ -2118,7 +2101,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   // ---- 长篇连载 - 章节管理 ----
   if (view === "series-detail" && currentSeries) {
     return (
-      <div className="min-h-screen bg-paper">
+      <div className="min-h-screen bg-paper chapter-create-page">
         <header className="sticky top-0 z-50 bg-card border-b border-rule">
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
             <button className="btn-ghost" onClick={() => router.push(`/studio/series/${encodeURIComponent(currentSeries.name)}`)}>
@@ -2176,19 +2159,27 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           onSubmit={submitChapter}
           submitting={submitting}
         />
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          <div className="space-y-5">
+        <main className="chapter-create-shell max-w-4xl mx-auto px-4 py-6">
+          <div className="chapter-create-form space-y-5">
             {targetSeriesName && (
-              <div className="text-sm text-muted">
+              <div className="chapter-series-info text-sm text-muted">
                 <i className="fa-solid fa-book-open mr-1 text-accent" />
-                {targetSeriesName} · 第 {displayChapterNum} 章
+                <strong>{targetSeriesName}</strong><span>第 {displayChapterNum} 章</span><span className="chapter-series-status">正在连载</span>
               </div>
             )}
-            <input
-              type="text" placeholder="章节标题（必填）" className="input-field text-lg font-medium"
-              style={{ padding: "14px 16px" }} value={title} onChange={(e) => setTitle(e.target.value)}
-            />
-            {renderEditor("请输入章节内容...")}
+            <section className="chapter-form-section chapter-title-section"><label className="form-label" htmlFor="chapterTitle">章节标题</label><div className="chapter-title-row"><span>第</span><span className="chapter-number-display">{displayChapterNum}</span><span>章</span><input id="chapterTitle" type="text" placeholder="章节标题（必填）" className="input-field text-lg font-medium" value={title} onChange={(e) => setTitle(e.target.value)} /></div></section>
+            <section className="chapter-form-section chapter-editor-section"><label className="form-label">正文内容</label>{renderEditor("请输入章节内容...")}</section>
+            <section className="chapter-form-section chapter-author-note-field">
+              <label className="form-label" htmlFor="chapterAuthorNote">作者的话（可选）</label>
+              <textarea
+                id="chapterAuthorNote"
+                className="form-textarea"
+                value={authorNote}
+                onChange={(event) => setAuthorNote(event.target.value)}
+                placeholder="想对读者说的话，也会一起经过文字审核"
+                maxLength={2000}
+              />
+            </section>
             <TagInput
               tags={tags} setTags={setTags} inputVal={tagInput} setInputVal={setTagInput}
               recommended={recommendedTags} wrapperClass="tag-chapter-input"

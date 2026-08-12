@@ -30,6 +30,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [hasMore, setHasMore] = useState(false);
   const [hasNewPosts, setHasNewPosts] = useState(false);
+  const [requestTimedOut, setRequestTimedOut] = useState(false);
   const latestPostTimeRef = useRef<string>("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -112,8 +113,7 @@ export default function HomePage() {
     setLoading(true);
     setError("");
 
-    const postSelect = `id, title, content, cover_url, word_count, post_type, created_at, series_name, chapter_number,
-         user_id,
+    const postSelect = `id, user_id, title, content, cover_url, word_count, post_type, created_at, series_name, chapter_number,
          author:profiles!posts_user_id_fkey(nickname, avatar_url),
          post_tags(tags(name))`;
     const { data: blockedRows } = user
@@ -397,7 +397,17 @@ export default function HomePage() {
   ];
 
   const hasContent = posts.length > 0 || serialCards.length > 0;
-  const feedLoading = authLoading || loading;
+  const waitingForFeed = authLoading || loading;
+  const feedLoading = waitingForFeed && !requestTimedOut;
+  useEffect(() => {
+    if (!waitingForFeed) return;
+    const timeoutId = window.setTimeout(() => {
+      setRequestTimedOut(true);
+      setLoading(false);
+      setError("数据服务连接超时，请检查 Supabase 配置或网络后重试。");
+    }, 8000);
+    return () => window.clearTimeout(timeoutId);
+  }, [waitingForFeed]);
   const sortedFeedItems = [
     ...serialCards.map((card) => ({ type: "serial" as const, createdAt: card.createdAt, card })),
     ...posts.map((post) => ({ type: "post" as const, createdAt: post.created_at || "", post })),
