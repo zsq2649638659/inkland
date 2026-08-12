@@ -113,8 +113,7 @@ export default function HomePage() {
     setLoading(true);
     setError("");
 
-    const postSelect = `id, title, content, cover_url, word_count, post_type, created_at, series_name, chapter_number,
-         user_id,
+    const postSelect = `id, user_id, title, content, cover_url, word_count, post_type, created_at, series_name, chapter_number,
          author:profiles!posts_user_id_fkey(nickname, avatar_url),
          post_tags(tags(name))`;
     const { data: blockedRows } = user

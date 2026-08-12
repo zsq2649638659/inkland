@@ -16,11 +16,14 @@ export interface Post {
   visibility?: "public" | "followers_only" | "private";
   word_count?: number;
   status?: "draft" | "published";
+  review_status?: "pending" | "approved" | "rejected" | string;
+  review_reason?: string | null;
   rating?: "all" | "r15" | "r18";
   post_type?: "novel" | "illustration" | "comic" | "ramble" | "cosplay" | "other" | "serial" | "article";
   series_name?: string | null;
   chapter_number?: number | null;
   chapter_title?: string | null;
+  author_note?: string | null;
   created_at?: string;
   updated_at?: string;
   published_at?: string | null;

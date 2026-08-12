@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
@@ -13,6 +13,7 @@ import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import ImageLightbox from "@/components/ImageLightbox";
 import type { Post, Comment } from "@/lib/types";
 
 interface PostCardProps {
@@ -59,6 +60,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [loadingComments, setLoadingComments] = useState(false);
   const [shareTip, setShareTip] = useState(false);
   const [activeImageDot, setActiveImageDot] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [moderationModal, setModerationModal] = useState<
@@ -310,8 +312,22 @@ export default function PostCard({ post }: PostCardProps) {
     return new Date(dateStr).toLocaleDateString("zh-CN");
   };
 
+  const navigateCard = (event: MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("a, button, input, textarea, select")) return;
+    router.push(`/read/${post.id}`);
+  };
+
   return (
-    <article className="card">
+    <article
+      className="card"
+      onClick={navigateCard}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && event.target === event.currentTarget) router.push(`/read/${post.id}`);
+      }}
+      role="link"
+      tabIndex={0}
+    >
       {/* V2: card-header — avatar + author info + follow button */}
       <div className="card-header">
         <Link href={`/user/${post.user_id}`} className="flex-shrink-0">
@@ -380,7 +396,7 @@ export default function PostCard({ post }: PostCardProps) {
             onScroll={handleImageScroll}
           >
             {allImages.map((img, i) => (
-              <div key={i} className="card-image-item">
+              <button key={i} type="button" className="card-image-item card-image-item-button" onClick={() => { setActiveImageDot(i); setLightboxOpen(true); }} aria-label={`查看第${i + 1}张图片`}>
                 <img
                   src={getThumbnailUrl(img, { width: 400, height: 300, resize: "cover" })}
                   alt=""
@@ -390,7 +406,7 @@ export default function PostCard({ post }: PostCardProps) {
                   onLoad={() => setLoadedImages(prev => new Set(prev).add(i))}
                   className={loadedImages.has(i) ? "loaded" : ""}
                 />
-              </div>
+              </button>
             ))}
           </div>
           {allImages.length > 1 && (
@@ -402,6 +418,8 @@ export default function PostCard({ post }: PostCardProps) {
           )}
         </div>
       )}
+
+      {lightboxOpen && <ImageLightbox post={{ ...post, content: resolvedContent, cover_url: resolvedCover }} images={allImages} initialIndex={activeImageDot} onClose={() => setLightboxOpen(false)} />}
 
       {/* V2: 标签 */}
       {post.tags && post.tags.length > 0 && (

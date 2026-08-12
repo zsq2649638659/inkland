@@ -166,7 +166,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     const url = `${window.location.origin}/read/${data.chapterId}`;
     try {
       await navigator.clipboard.writeText(url);
-      alert("链接已复制到剪贴板");
+      setToastMessage("链接已复制到剪贴板");
     } catch {
       const input = document.createElement("input");
       input.value = url;
@@ -174,7 +174,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       input.select();
       document.execCommand("copy");
       document.body.removeChild(input);
-      alert("链接已复制到剪贴板");
+      setToastMessage("链接已复制到剪贴板");
     }
   };
 
@@ -236,7 +236,16 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   };
 
   return (
-    <article className="card">
+    <article
+      className="card"
+      role="link"
+      tabIndex={0}
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (!target.closest("a, button")) router.push(`/read/${data.chapterId}`);
+      }}
+      onKeyDown={(event) => { if (event.key === "Enter") router.push(`/read/${data.chapterId}`); }}
+    >
       {/* V2: card-header — avatar + author info */}
       <div className="card-header">
         <Link href={`/user/${data.authorId}`} className="flex-shrink-0">
