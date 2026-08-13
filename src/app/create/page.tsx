@@ -1284,7 +1284,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       editor.content.trim(),
       authorNote.trim() ? `\n\n<!-- 作者的话：${authorNote.trim()} -->` : "",
     ].join("");
-    const { error } = await supabase.from("posts").insert({
+    const chapterData = {
       user_id: user.id,
       title: title.trim(),
       content: moderationContent,
@@ -1298,24 +1298,35 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       series_name: targetSeriesName,
       chapter_number: nextChapter,
       chapter_title: title.trim(),
-    });
+    };
+    const { error } = editPostId
+      ? await supabase.from("posts").update(chapterData).eq("id", editPostId).eq("user_id", user.id)
+      : await supabase.from("posts").insert(chapterData);
 
-    // 如果 chapter_number 列不存在，去掉重试
+    // 兼容尚未部署作者话/章节字段的数据库，但不能因单个缺失字段丢掉其他章节信息。
     if (error) {
-      if (error.message?.includes("chapter_number") || error.message?.includes("author_note")) {
-        // 列不存在，去掉 chapter_number 和 chapter_title 重试
-        const { error: err2 } = await supabase.from("posts").insert({
+      const missingAuthorNote = error.message?.includes("author_note");
+      const missingChapterFields = error.message?.includes("chapter_number") || error.message?.includes("chapter_title");
+      if (missingChapterFields || missingAuthorNote) {
+        const fallbackChapterData = {
           user_id: user.id,
           title: title.trim(),
           content: moderationContent,
-          ...(error.message?.includes("author_note") ? {} : { author_note: authorNote.trim() || null }),
+          ...(missingAuthorNote ? {} : { author_note: authorNote.trim() || null }),
           word_count: editor.content.replace(/\s/g, "").length,
           status: "published",
           review_status: "pending",
           published_at: new Date().toISOString(),
           post_type: "serial",
           series_name: targetSeriesName,
-        });
+          ...(missingChapterFields ? {} : {
+            chapter_number: nextChapter,
+            chapter_title: title.trim(),
+          }),
+        };
+        const { error: err2 } = editPostId
+          ? await supabase.from("posts").update(fallbackChapterData).eq("id", editPostId).eq("user_id", user.id)
+          : await supabase.from("posts").insert(fallbackChapterData);
         if (err2) { setErrorMsg(`发布失败: ${err2.message}`); setSubmitting(false); return; }
       } else {
         setErrorMsg(`发布失败: ${error.message}`);
