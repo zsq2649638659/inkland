@@ -154,22 +154,7 @@ function EditorToolbar({
   );
 }
 
-function ArticleToolbar({
-  onBold, onItalic, onUnderline, onStrikethrough,
-  onLink, onClear, onAlignLeft, onAlignCenter, onAlignRight, onAlignJustify, onHr,
-}: {
-  onBold: () => void;
-  onItalic: () => void;
-  onUnderline: () => void;
-  onStrikethrough: () => void;
-  onLink: () => void;
-  onClear: () => void;
-  onAlignLeft: () => void;
-  onAlignCenter: () => void;
-  onAlignRight: () => void;
-  onAlignJustify: () => void;
-  onHr: () => void;
-}) {
+function ArticleToolbar({ onCommand, onLink, onFormat, onImport, onPreview }: { onCommand: (command: string, value?: string) => void; onLink: () => void; onFormat: () => void; onImport: () => void; onPreview: () => void }) {
   const button = (icon: string, label: string, onClick: () => void) => (
     <button type="button" className="tb-btn" aria-label={label} title={label} onMouseDown={(event) => event.preventDefault()} onClick={onClick}>
       <i className={`fa-solid ${icon}`} aria-hidden="true" />
@@ -179,33 +164,20 @@ function ArticleToolbar({
   return (
     <div className="editor-toolbar" role="toolbar" aria-label="格式化工具栏">
       <div className="tb-group">
-        {button("fa-rotate-left", "撤销", () => undefined)}
-        {button("fa-rotate-right", "重做", () => undefined)}
+        {button("fa-rotate-left", "撤销", () => onCommand("undo"))}
+        {button("fa-rotate-right", "重做", () => onCommand("redo"))}
       </div>
-      <span className="tb-divider" aria-hidden="true" />
-      <div className="tb-group">
-        {button("fa-bold", "加粗", onBold)}
-        {button("fa-italic", "斜体", onItalic)}
-        {button("fa-underline", "下划线", onUnderline)}
-        {button("fa-strikethrough", "删除线", onStrikethrough)}
-      </div>
-      <span className="tb-divider" aria-hidden="true" />
-      <div className="tb-group">
-        {button("fa-link", "超链接", onLink)}
-        {button("fa-eraser", "清除格式", onClear)}
-      </div>
-      <span className="tb-divider" aria-hidden="true" />
-      <div className="tb-group">
-        {button("fa-align-left", "左对齐", onAlignLeft)}
-        {button("fa-align-center", "居中对齐", onAlignCenter)}
-        {button("fa-align-right", "右对齐", onAlignRight)}
-        {button("fa-align-justify", "两端对齐", onAlignJustify)}
-      </div>
-      <span className="tb-divider" aria-hidden="true" />
-      <div className="tb-group">
-        {button("fa-minus", "分割线", onHr)}
-      </div>
+      <span className="tb-divider" />
+      <div className="tb-group">{button("fa-bold", "加粗", () => onCommand("bold"))}{button("fa-italic", "斜体", () => onCommand("italic"))}{button("fa-underline", "下划线", () => onCommand("underline"))}{button("fa-strikethrough", "删除线", () => onCommand("strikeThrough"))}</div>
+      <span className="tb-divider" />
+      <div className="tb-group">{button("fa-link", "插入链接", onLink)}{button("fa-align-left", "左对齐", () => onCommand("justifyLeft"))}{button("fa-align-center", "居中", () => onCommand("justifyCenter"))}{button("fa-align-right", "右对齐", () => onCommand("justifyRight"))}{button("fa-minus", "分割线", () => onCommand("insertHorizontalRule"))}</div>
+      <span className="tb-divider" />
+      <div className="tb-group">{button("fa-wand-magic-sparkles", "一键排版", onFormat)}</div>
       <span className="tb-spacer" />
+      <div className="tb-group">
+        {button("fa-file-import", "导入文档", onImport)}
+        {button("fa-eye", "预览", onPreview)}
+      </div>
     </div>
   );
 }
@@ -236,7 +208,8 @@ function htmlToMarkdown(html: string): string {
     }
     if (tag === "li") return content;
     if (tag === "pre") return `\n\`\`\`\n${element.textContent || ""}\n\`\`\`\n`;
-    if (["p", "div", "h1", "h2", "h3"].includes(tag)) return `${content}\n`;
+    if (["p", "div"].includes(tag)) return `${content}\n\n`;
+    if (["h1", "h2", "h3"].includes(tag)) return `${content}\n`;
     return content;
   };
 
@@ -246,13 +219,20 @@ function htmlToMarkdown(html: string): string {
 function ArticleEditorSurface({
   value,
   onChange,
+  previewTitle,
+  onPreview,
 }: {
   value: string;
   onChange: (value: string) => void;
+  previewTitle?: string;
+  onPreview?: () => void;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("https://");
+  const [importError, setImportError] = useState("");
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -263,7 +243,17 @@ function ArticleEditorSurface({
     }
   }, [value]);
 
+  useEffect(() => {
+    if (!previewOpen) return;
+    const closePreview = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+    };
+    document.addEventListener("keydown", closePreview);
+    return () => document.removeEventListener("keydown", closePreview);
+  }, [previewOpen]);
+
   const exec = (command: string, commandValue?: string) => {
+    if (command === "createLink" && !commandValue) return;
     surfaceRef.current?.focus();
     document.execCommand(command, false, commandValue);
     if (surfaceRef.current) onChange(htmlToMarkdown(surfaceRef.current.innerHTML));
@@ -271,22 +261,28 @@ function ArticleEditorSurface({
 
   return (
     <div className="editor-wrap">
-      <ArticleToolbar
-        onBold={() => exec("bold")}
-        onItalic={() => exec("italic")}
-        onUnderline={() => exec("underline")}
-        onStrikethrough={() => exec("strikeThrough")}
-        onLink={() => {
-          setLinkUrl("https://");
-          setLinkDialogOpen(true);
-        }}
-        onClear={() => exec("removeFormat")}
-        onAlignLeft={() => exec("justifyLeft")}
-        onAlignCenter={() => exec("justifyCenter")}
-        onAlignRight={() => exec("justifyRight")}
-        onAlignJustify={() => exec("justifyFull")}
-        onHr={() => exec("insertHorizontalRule")}
-      />
+      <input ref={importRef} type="file" accept=".txt,.text,.md,.markdown,.log,.csv,text/plain,text/markdown,text/csv" hidden onChange={async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const extension = file.name.toLowerCase().split(".").pop() || "";
+        const allowedExtensions = new Set(["txt", "text", "md", "markdown", "log", "csv"]);
+        if (!allowedExtensions.has(extension)) {
+          setImportError("仅支持 TXT、Markdown、LOG 和 CSV 文本文件");
+          event.target.value = "";
+          return;
+        }
+        const text = await file.text();
+        setImportError("");
+        onChange(text);
+        event.target.value = "";
+      }} />
+      <ArticleToolbar onCommand={exec} onLink={() => { setLinkUrl("https://"); setLinkDialogOpen(true); }} onImport={() => importRef.current?.click()} onPreview={() => { if (onPreview) onPreview(); else setPreviewOpen(true); }} onFormat={() => {
+        const plain = surfaceRef.current?.innerText || value.replace(/[#*_~>`\[\]()]/g, "");
+        const paragraphs = plain.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+        const html = paragraphs.map((line) => `<p>${line.replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char] || char))}</p>`).join("");
+        if (surfaceRef.current) surfaceRef.current.innerHTML = html;
+        onChange(paragraphs.join("\n\n"));
+      }} />
       <div className="editor-body">
         <div
           ref={surfaceRef}
@@ -296,6 +292,13 @@ function ArticleEditorSurface({
           role="textbox"
           aria-multiline="true"
           onInput={(event) => onChange(htmlToMarkdown(event.currentTarget.innerHTML))}
+          onPaste={(event) => {
+            event.preventDefault();
+            const plainText = event.clipboardData.getData("text/plain");
+            if (!plainText) return;
+            document.execCommand("insertText", false, plainText);
+            if (surfaceRef.current) onChange(htmlToMarkdown(surfaceRef.current.innerHTML));
+          }}
           onKeyDown={(event) => {
             if (event.key === "Tab") {
               event.preventDefault();
@@ -304,6 +307,8 @@ function ArticleEditorSurface({
           }}
         />
       </div>
+      {importError && <div className="editor-import-error" role="alert"><i className="fa-solid fa-circle-exclamation" />{importError}</div>}
+      {previewOpen && <div className={`modal-overlay active ${previewTitle ? "chapter-preview-overlay" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }}><div className={`modal editor-preview-modal ${previewTitle ? "chapter-preview-modal" : ""}`} role="dialog" aria-modal="true"><button type="button" className="modal-close chapter-preview-close" onClick={() => setPreviewOpen(false)} aria-label="关闭"><i className="fa-solid fa-xmark" /></button>{previewTitle ? <><h1 className="chapter-preview-title">{previewTitle}</h1><div className="editor-preview chapter-preview-body active" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(value) }} /></> : <><div className="modal-title-row"><h2 className="modal-title">内容预览</h2></div><div className="editor-preview active" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(value) }} /></>}</div></div>}
       <div className="editor-footer">
         <span><i className="fa-solid fa-check" /> 草稿已保存</span>
         <span className="char-count">{value.replace(/\s/g, "").length} 字</span>
@@ -485,11 +490,24 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       // 加载已有作品进行编辑
       setEditPostId(editPost);
       const loadPost = async () => {
-        const { data } = await supabase
+        let { data, error: loadError } = await supabase
           .from("posts")
           .select("id, title, content, author_note, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility")
           .eq("id", editPost)
           .single();
+        if (loadError?.message.includes("author_note")) {
+          const fallback = await supabase
+            .from("posts")
+            .select("id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility")
+            .eq("id", editPost)
+            .single();
+          data = fallback.data ? { ...fallback.data, author_note: null } : null;
+          loadError = fallback.error;
+        }
+        if (loadError || !data) {
+          setErrorMsg(`加载作品失败：${loadError?.message || "未找到该作品"}`);
+          return;
+        }
         if (data) {
           const p = data as unknown as Record<string, unknown>;
           const savedPublishedAt = (p.published_at as string) || null;
@@ -505,6 +523,25 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           editor.setContent(p.content as string || "");
           setAuthorNote((p.author_note as string) || "");
           setEditingPostSeriesName((p.series_name as string) || null);
+          if (p.post_type === "serial") {
+            const editingSeriesName = (p.series_name as string) || null;
+            let editingChapterNumber = (p.chapter_number as number) || null;
+            if (!editingChapterNumber && editingSeriesName) {
+              const { data: previousChapters } = await supabase
+                .from("posts")
+                .select("chapter_number")
+                .eq("series_name", editingSeriesName)
+                .eq("post_type", "serial")
+                .not("chapter_number", "is", null)
+                .gt("chapter_number", 0)
+                .order("chapter_number", { ascending: false })
+                .limit(1);
+              const latestNumber = previousChapters?.[0]?.chapter_number as number | undefined;
+              editingChapterNumber = (latestNumber || 0) + 1;
+            }
+            setSeriesNameFromUrl(editingSeriesName);
+            setChapterNumberFromUrl(editingChapterNumber || 1);
+          }
           if (p.review_status === "rejected") {
             setReviewRejectionReason((p.review_reason as string) || "未提供原因");
           }
@@ -533,6 +570,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               textOnly = textOnly.substring(titleText.length).trim();
             }
             setImageDesc(textOnly);
+          } else if (p.post_type === "serial") {
+            setView("chapter-create");
           } else {
             setView("text");
           }
@@ -613,6 +652,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [newSeriesTags, setNewSeriesTags] = useState<string[]>([]);
   const [newSeriesTagInput, setNewSeriesTagInput] = useState("");
   const [newSeriesType, setNewSeriesType] = useState<"fanfic" | "original">("original");
+  const [newSeriesAudience, setNewSeriesAudience] = useState<"male" | "female" | null>(null);
+  const [newSeriesGenre, setNewSeriesGenre] = useState("");
   const [editingSeries, setEditingSeries] = useState(false);
   const [editingSeriesId, setEditingSeriesId] = useState<string | null>(null);
 
@@ -623,6 +664,18 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
   const [authorNote, setAuthorNote] = useState("");
+  const [chapterTitleMode, setChapterTitleMode] = useState<"numbered" | "free">("numbered");
+  const [chapterNumberOverride, setChapterNumberOverride] = useState<number | null>(null);
+  const chapterPublishRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!publishMenuOpen || view !== "chapter-create") return;
+    const closeChapterPublishMenu = (event: PointerEvent) => {
+      if (!chapterPublishRef.current?.contains(event.target as Node)) setPublishMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeChapterPublishMenu);
+    return () => document.removeEventListener("pointerdown", closeChapterPublishMenu);
+  }, [publishMenuOpen, view]);
 
   const wordCount = editor.content.replace(/\s/g, "").length;
   const [recommendedTags, setRecommendedTags] = useState<string[]>([]);
@@ -1226,6 +1279,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   const createSeries = async () => {
     if (!newSeriesName.trim()) { setErrorMsg("请填写连载名称"); return; }
+    if (newSeriesName.trim().length > 20) { setErrorMsg("连载名称不能超过20个字"); return; }
+    if (!newSeriesDesc.trim()) { setErrorMsg("请填写连载简介"); return; }
+    if (!newSeriesAudience) { setErrorMsg("请先选择男频或女频"); return; }
+    if (!newSeriesGenre) { setErrorMsg("请选择作品类型"); return; }
+    if (newSeriesDesc.length > 500) { setErrorMsg("连载简介不能超过500个字"); return; }
     setSubmitting(true);
     setErrorMsg("");
 
@@ -1236,9 +1294,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       name: newSeriesName.trim(),
       description: newSeriesDesc || null,
       cover_url: null,
-      tags: newSeriesTags,
+      tags: Array.from(new Set([newSeriesAudience === "male" ? "男频" : "女频", newSeriesGenre, ...newSeriesTags])),
       status: "ongoing" as const,
-      series_type: newSeriesType,
+      series_type: newSeriesGenre === "同人" ? "fanfic" : "original",
       review_status: "pending" as const,
     };
 
@@ -1261,9 +1319,10 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   // ============ 新增章节 ============
 
-  const submitChapter = async () => {
+  const submitChapter = async (options?: { scheduledAt?: string; draft?: boolean }) => {
     if (!title.trim()) { setErrorMsg("请填写章节标题"); return; }
     if (!editor.content.trim()) { setErrorMsg("请填写章节内容"); return; }
+    if (authorNote.length > 500) { setErrorMsg("作者的话不能超过500个字"); return; }
 
     const targetSeriesName = seriesNameFromUrl || currentSeries?.name;
     if (!targetSeriesName) return;
@@ -1274,26 +1333,27 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
 
-    const nextChapter = seriesNameFromUrl
+    const nextChapter = chapterNumberOverride ?? (seriesNameFromUrl
       ? chapterNumberFromUrl
       : chapterList.length > 0
         ? Math.max(...chapterList.map((c) => c.chapter_number)) + 1
-        : 1;
+        : 1);
 
     const moderationContent = [
       editor.content.trim(),
       authorNote.trim() ? `\n\n<!-- 作者的话：${authorNote.trim()} -->` : "",
     ].join("");
+    const scheduledAt = options?.scheduledAt;
     const chapterData = {
       user_id: user.id,
       title: title.trim(),
       content: moderationContent,
       author_note: authorNote.trim() || null,
       word_count: editor.content.replace(/\s/g, "").length,
-      status: "published",
+      status: options?.draft || scheduledAt ? "draft" : "published",
       // 章节也必须先经过 posts 的文字关键词初筛；不能依赖默认的 approved。
-      review_status: "pending",
-      published_at: new Date().toISOString(),
+      review_status: options?.draft ? "approved" : "pending",
+      published_at: options?.draft ? null : (scheduledAt || new Date().toISOString()),
       post_type: "serial",
       series_name: targetSeriesName,
       chapter_number: nextChapter,
@@ -1314,9 +1374,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           content: moderationContent,
           ...(missingAuthorNote ? {} : { author_note: authorNote.trim() || null }),
           word_count: editor.content.replace(/\s/g, "").length,
-          status: "published",
-          review_status: "pending",
-          published_at: new Date().toISOString(),
+          status: options?.draft || scheduledAt ? "draft" : "published",
+          review_status: options?.draft ? "approved" : "pending",
+          published_at: options?.draft ? null : (scheduledAt || new Date().toISOString()),
           post_type: "serial",
           series_name: targetSeriesName,
           ...(missingChapterFields ? {} : {
@@ -1349,6 +1409,37 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setTags([]);
     }
   };
+
+  const openChapterPreview = (seriesName: string, chapterNumber: number) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("inkland:chapter-preview", JSON.stringify({
+      seriesName,
+      chapterNumber,
+      title: title.trim(),
+      titleMode: chapterTitleMode,
+      content: editor.content,
+      authorNote: authorNote.trim(),
+      wordCount: editor.content.replace(/\s/g, "").length,
+    }));
+    window.open("/create/chapter-preview", "_blank", "noopener,noreferrer");
+  };
+
+  const renderChapterPublishModal = () => publishModal && (
+    <div className="publish-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) setPublishModal(null); }}>
+      <div className="publish-modal" role="dialog" aria-modal="true" aria-labelledby="chapter-publish-modal-title">
+        <div className="publish-modal-header"><div className={`publish-modal-icon publish-modal-icon-${publishModal}`}><i className={`fa-solid ${publishModal === "schedule" ? "fa-clock" : "fa-bookmark"}`} /></div><button type="button" className="publish-modal-close" aria-label="关闭弹窗" onClick={() => setPublishModal(null)}><i className="fa-solid fa-xmark" /></button></div>
+        <div className="publish-modal-copy"><h2 id="chapter-publish-modal-title">{publishModal === "schedule" ? "定时发布" : "保存为草稿"}</h2><p>{publishModal === "schedule" ? "选择章节公开的日期和时间。" : "当前章节标题、正文和作者的话都会保留，之后可以继续编辑。"}</p></div>
+        {publishModal === "schedule" && <div className="publish-modal-field"><span className="publish-schedule-label">公开日期和时间</span><input type="datetime-local" value={scheduleValue} min={toLocalDateTimeValue(new Date(Date.now() + 60_000).toISOString())} onChange={(event) => setScheduleValue(event.target.value)} /></div>}
+        <div className="publish-modal-actions"><button type="button" className="publish-modal-button publish-modal-button-primary" disabled={submitting} onClick={() => {
+          if (publishModal === "schedule") {
+            const date = new Date(scheduleValue);
+            if (!scheduleValue || Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) { setErrorMsg("公开时间必须晚于当前时间"); return; }
+            setErrorMsg(""); setPublishModal(null); setPublishMenuOpen(false);
+          } else { setPublishModal(null); setPublishMenuOpen(false); void submitChapter({ draft: true }); }
+        }}>{submitting ? "处理中..." : publishModal === "schedule" ? "完成选择" : "保存草稿"}</button></div>
+      </div>
+    </div>
+  );
 
   // ============ 渲染 HTML ============
 
@@ -2002,10 +2093,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 type="text"
                 className="form-input"
                 placeholder="连载名称（必填）"
-                maxLength={80}
+                maxLength={20}
                 value={newSeriesName}
                 onChange={(e) => setNewSeriesName(e.target.value)}
               />
+              <div className={`series-field-count ${newSeriesName.length >= 18 ? "warning" : ""}`}>{newSeriesName.length} / 20</div>
             </div>
 
             <div className="form-section">
@@ -2013,11 +2105,28 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               <textarea
                 id="seriesDescription"
                 className="form-textarea"
-                placeholder="连载简介（选填）"
-                maxLength={1000}
+                placeholder="连载简介（必填）"
+                maxLength={500}
+                required
+                aria-required="true"
                 value={newSeriesDesc}
                 onChange={(e) => setNewSeriesDesc(e.target.value)}
               />
+              <div className={`series-field-count ${newSeriesDesc.length >= 450 ? "warning" : ""}`}>{newSeriesDesc.length} / 500</div>
+            </div>
+
+            <div className="form-section series-type-section">
+              <span className="form-label">作品类型</span>
+              <div className="radio-options series-audience-options" role="radiogroup" aria-label="作品频道">
+                {[{ value: "male" as const, label: "男频" }, { value: "female" as const, label: "女频" }].map((option) => (
+                  <button key={option.value} type="button" className={`radio-option ${newSeriesAudience === option.value ? "selected" : ""}`} onClick={() => { setNewSeriesAudience(option.value); setNewSeriesGenre(""); setNewSeriesType("original"); }} role="radio" aria-checked={newSeriesAudience === option.value}><span className="radio-option-text">{option.label}</span></button>
+                ))}
+              </div>
+              {newSeriesAudience && <div className="series-genre-options" role="radiogroup" aria-label="作品分类">
+                {(newSeriesAudience === "male" ? ["玄幻","奇幻","武侠","仙侠","都市","种田","现实","军事","历史","游戏","体育","科幻","同人","灵异"] : ["古言","仙侠","现言","玄幻","悬疑","科幻","游戏","年代","快穿","民国","同人"]).map((genre) => (
+                  <button key={genre} type="button" className={newSeriesGenre === genre ? "selected" : ""} onClick={() => { setNewSeriesGenre(genre); setNewSeriesType(genre === "同人" ? "fanfic" : "original"); }} role="radio" aria-checked={newSeriesGenre === genre}>{genre}</button>
+                ))}
+              </div>}
             </div>
 
             <div className="form-section">
@@ -2066,27 +2175,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                     onClick={() => { if (!newSeriesTags.includes(tag)) setNewSeriesTags([...newSeriesTags, tag]); }}
                   >
                     {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-section">
-              <span className="form-label">作品类型</span>
-              <div className="radio-options" role="radiogroup" aria-label="作品类型">
-                {[
-                  { value: "original" as const, label: "原创" },
-                  { value: "fanfic" as const, label: "同人" },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={`radio-option ${newSeriesType === option.value ? "selected" : ""}`}
-                    onClick={() => setNewSeriesType(option.value)}
-                    role="radio"
-                    aria-checked={newSeriesType === option.value}
-                  >
-                    <span className="radio-option-text">{option.label}</span>
                   </button>
                 ))}
               </div>
@@ -2160,51 +2248,88 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   // ---- 长篇连载 - 新增章节 ----
   if (view === "chapter-create") {
     const targetSeriesName = seriesNameFromUrl || currentSeries?.name;
-    const displayChapterNum = seriesNameFromUrl ? chapterNumberFromUrl : chapterList.length + 1;
+    const displayChapterNum = chapterNumberOverride ?? (seriesNameFromUrl ? chapterNumberFromUrl : chapterList.length + 1);
+    const isEditingChapter = Boolean(editPostId);
 
     return (
-      <div className="min-h-screen bg-paper">
+      <div className="min-h-screen bg-paper publish-article-page chapter-create-page" id="page-create">
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-        <PublishHeader
-          title={seriesNameFromUrl ? `新建章节 - ${seriesNameFromUrl}` : "新增章节"}
-          onSubmit={submitChapter}
-          submitting={submitting}
-        />
-        <main className="chapter-create-shell max-w-4xl mx-auto px-4 py-6">
-          <div className="chapter-create-form space-y-5">
-            {targetSeriesName && (
-              <div className="chapter-series-info text-sm text-muted">
-                <i className="fa-solid fa-book-open mr-1 text-accent" />
-                <strong>{targetSeriesName}</strong><span>第 {displayChapterNum} 章</span><span className="chapter-series-status">正在连载</span>
+        <main className="chapter-container">
+          {targetSeriesName && (
+            <div className="serial-info-card">
+              <div className="serial-info-body">
+                <div className="serial-info-name">{targetSeriesName}</div>
+                <div className="serial-info-meta">
+                  <span className="serial-info-status"><i className="fa-solid fa-circle" /> 连载中</span>
+                  <span className="dot" />
+                  <span><i className="fa-solid fa-layer-group" /> {isEditingChapter ? `正在编辑第 ${displayChapterNum} 章` : `即将更新第 ${displayChapterNum} 章`}</span>
+                </div>
               </div>
-            )}
-            <section className="chapter-form-section chapter-title-section"><label className="form-label" htmlFor="chapterTitle">章节标题</label><div className="chapter-title-row"><span>第</span><span className="chapter-number-display">{displayChapterNum}</span><span>章</span><input id="chapterTitle" type="text" placeholder="章节标题（必填）" className="input-field text-lg font-medium" value={title} onChange={(e) => setTitle(e.target.value)} /></div></section>
-            <section className="chapter-form-section chapter-editor-section"><label className="form-label">正文内容</label>{renderEditor("请输入章节内容...")}</section>
-            <section className="chapter-form-section chapter-author-note-field">
-              <label className="form-label" htmlFor="chapterAuthorNote">作者的话（可选）</label>
+            </div>
+          )}
+            <section className="form-section chapter-title-section">
+              <div className="form-section-header chapter-title-header">
+                <label className="form-label" htmlFor="chapterTitle">章节标题</label>
+                <button type="button" className="chapter-title-mode-button" aria-pressed={chapterTitleMode === "free"} onClick={() => setChapterTitleMode((mode) => mode === "numbered" ? "free" : "numbered")}>
+                  <i className="fa-solid fa-repeat" aria-hidden="true" />
+                  {chapterTitleMode === "numbered" ? "切换为无序号标题" : "切换为章节序号标题"}
+                </button>
+              </div>
+              <div className={`chapter-title-row ${chapterTitleMode === "free" ? "is-free-title" : ""}`}>
+                {chapterTitleMode === "numbered" && <>
+                  <span className="chapter-title-prefix">第</span>
+                  <input className="chapter-number-input" type="text" inputMode="numeric" pattern="[0-9]*" aria-label="章节序号" value={displayChapterNum} onChange={(event) => {
+                    const digits = event.target.value.replace(/\D/g, "");
+                    const nextNumber = Number.parseInt(digits, 10);
+                    if (Number.isFinite(nextNumber) && nextNumber > 0) setChapterNumberOverride(nextNumber);
+                  }} />
+                  <span className="chapter-title-prefix chapter-title-prefix--spacer">章</span>
+                </>}
+                <input id="chapterTitle" type="text" placeholder="章节标题（30字以内）" className="chapter-name-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={30} />
+              </div>
+            </section>
+            <section className="form-section chapter-editor-section">
+              <div className="form-section-header"><label className="form-label">正文内容</label></div>
+              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} onPreview={() => openChapterPreview(targetSeriesName || "未命名连载", displayChapterNum)} />
+            </section>
+            <section className="form-section chapter-author-note-field">
+              <div className="form-section-header"><label className="form-label" htmlFor="chapterAuthorNote">作者的话</label></div>
               <textarea
                 id="chapterAuthorNote"
-                className="form-textarea"
+                className="author-note-input"
                 value={authorNote}
                 onChange={(event) => setAuthorNote(event.target.value)}
-                placeholder="想对读者说的话，也会一起经过文字审核"
-                maxLength={2000}
+                placeholder="在这里写下你想对读者说的话..."
+                maxLength={500}
+                rows={3}
               />
+              <div className={`author-note-footer ${authorNote.length >= 450 ? "warning" : ""}`}>{authorNote.length} / 500</div>
             </section>
-            <TagInput
-              tags={tags} setTags={setTags} inputVal={tagInput} setInputVal={setTagInput}
-              recommended={recommendedTags} wrapperClass="tag-chapter-input"
-            />
             {renderError()}
-            <div className="flex items-center justify-between pt-4 border-t border-rule">
-              <div className="text-xs text-muted">发布即同意 <Link href="/guidelines" className="text-accent">社区公约</Link></div>
-              <button className="submit-btn" onClick={submitChapter} disabled={submitting}>
-                <i className="fa-solid fa-paper-plane mr-1" />{submitting ? "发布中..." : "发布"}
-              </button>
+            <div className="publish-action-bar">
+              <div className="publish-actions-right">
+                {scheduleValue && <div className="scheduled-summary" role="status">
+                  <i className="fa-regular fa-clock" />
+                  <span>定时于 {new Date(scheduleValue).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 发布</span>
+                  <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><i className="fa-solid fa-xmark" /></button>
+                </div>}
+                <div className="publish-dropdown" ref={chapterPublishRef}>
+                  <div className="btn-publish-split">
+                  <button type="button" className="btn-publish" onClick={() => void submitChapter(scheduleValue ? { scheduledAt: new Date(scheduleValue).toISOString() } : undefined)} disabled={submitting}>
+                    <i className={`fa-solid ${submitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                    {submitting ? "保存中..." : isEditingChapter ? "保存修改" : "立即发布"}
+                  </button>
+                  <button type="button" className="btn-publish-arrow" aria-label="更多发布选项" aria-expanded={publishMenuOpen} onClick={() => setPublishMenuOpen((open) => !open)}><i className={`fa-solid fa-chevron-down ${publishMenuOpen ? "up" : ""}`} /></button>
+                  </div>
+                  {publishMenuOpen && <div className="publish-dropdown-menu show">
+                    <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("schedule"); }}><i className="fa-solid fa-clock" />定时发布</button>
+                    <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("draft"); }}><i className="fa-solid fa-bookmark" />保存为草稿</button>
+                  </div>}
+                </div>
+              </div>
             </div>
-          </div>
+            {renderChapterPublishModal()}
         </main>
-        <div className="h-16" />
       </div>
     );
   }
