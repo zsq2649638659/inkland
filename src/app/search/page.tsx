@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonSearchResults } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 type SearchFilter = "tags" | "users" | "works" | "posts";
 
@@ -372,14 +373,7 @@ function SearchContent() {
                 <div className="user-cards-grid">
                   {users.map((u) => (
                     <div key={u.id} className="user-card">
-                      <div
-                        className="user-avatar"
-                        style={{
-                          background: u.avatar_url
-                            ? undefined
-                            : `hsl(${(u.nickname || "?").charCodeAt(0) * 37 % 360}, 60%, 55%)`,
-                        }}
-                      >
+                      <div className="user-avatar">
                         {u.avatar_url ? (
                           <img
                             src={u.avatar_url}
@@ -394,7 +388,7 @@ function SearchContent() {
                             }}
                           />
                         ) : (
-                          (u.nickname || "?")[0]
+                          <DefaultAvatar name={u.nickname || "?"} />
                         )}
                       </div>
                       <div className="user-info">
