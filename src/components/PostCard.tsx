@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback, type MouseEvent } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, type CSSProperties, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
@@ -62,6 +62,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [activeImageDot, setActiveImageDot] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [imageAspectRatios, setImageAspectRatios] = useState<Record<number, number>>({});
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [moderationModal, setModerationModal] = useState<
     | { mode: "report"; targetType: "post" | "comment"; targetId: string }
@@ -394,6 +395,7 @@ export default function PostCard({ post }: PostCardProps) {
             className={`card-image-scroll ${allImages.length > 1 ? "has-overflow" : ""}`}
             ref={imageScrollRef}
             onScroll={handleImageScroll}
+            style={{ "--active-image-ratio": imageAspectRatios[activeImageDot] || 4 / 3 } as CSSProperties}
           >
             {allImages.map((img, i) => (
               <button key={i} type="button" className="card-image-item card-image-item-button" onClick={() => { setActiveImageDot(i); setLightboxOpen(true); }} aria-label={`查看第${i + 1}张图片`}>
@@ -403,7 +405,13 @@ export default function PostCard({ post }: PostCardProps) {
                   loading={i === 0 ? "eager" : "lazy"}
                   decoding="async"
                   fetchPriority={i === 0 ? "high" : "auto"}
-                  onLoad={() => setLoadedImages(prev => new Set(prev).add(i))}
+                  onLoad={(event) => {
+                    setLoadedImages(prev => new Set(prev).add(i));
+                    const image = event.currentTarget;
+                    if (image.naturalWidth && image.naturalHeight) {
+                      setImageAspectRatios((current) => ({ ...current, [i]: image.naturalWidth / image.naturalHeight }));
+                    }
+                  }}
                   className={loadedImages.has(i) ? "loaded" : ""}
                 />
               </button>
