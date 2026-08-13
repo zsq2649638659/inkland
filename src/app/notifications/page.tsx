@@ -218,6 +218,15 @@ export default function NotificationsPage() {
     }
   };
 
+  const getSystemActionUrl = (notification: NotificationItem): string | null => {
+    if (notification.type !== "system") return null;
+    if (notification.metadata?.action_url?.startsWith("/")) return notification.metadata.action_url;
+    if (notification.post_id && (notification.template_key === "post_review_rejected" || notification.content.includes("未通过本次审核"))) {
+      return `/create?editPost=${notification.post_id}`;
+    }
+    return null;
+  };
+
   if (authLoading) {
     return <div className="min-h-screen bg-paper pb-20 lg:pb-0"><div className="main-container"><HomeSidebar /><div className="content-area"><SkeletonNotification /></div></div></div>;
   }
@@ -336,22 +345,31 @@ export default function NotificationsPage() {
     ) : <span className="highlight">{work}</span>;
   };
 
-  const renderSystemDescription = (content: string) => {
+  const renderSystemDescription = (notification: NotificationItem) => {
+    const { content } = notification;
     const activity = content.match(/「([^」]+)」/);
     const guideline = content.match(/《([^》]+)》/);
     const match = activity || guideline;
     if (!match) return content;
-    const href = activity ? `/search?q=${encodeURIComponent(match[1])}` : "/settings";
+    const editUrl = getSystemActionUrl(notification);
+    const href = editUrl || (activity ? `/search?q=${encodeURIComponent(match[1])}` : "/settings");
     const start = match.index || 0;
     const label = match[0];
-    return <>{content.slice(0, start)}<a href={href} onClick={(event) => event.stopPropagation()}>{label}</a>{content.slice(start + label.length)}</>;
+    return <>{content.slice(0, start)}<Link href={href} onClick={async (event) => {
+      event.stopPropagation();
+      if (!notification.read) {
+        event.preventDefault();
+        await markAsRead(notification.id);
+        window.location.assign(href);
+      }
+    }}>{label}</Link>{content.slice(start + label.length)}</>;
   };
 
   const getNotificationDescription = (notification: NotificationItem): ReactNode => {
     // 关注类型
     if (notification.type === "follow") return <>{renderActor(notification)} 关注了你</>;
     // 系统通知类型
-    if (notification.type === "system") return renderSystemDescription(notification.content);
+    if (notification.type === "system") return renderSystemDescription(notification);
 
     // 互动类型：点赞/评论/收藏/回复
     const actionLabels: Record<string, string> = {
@@ -456,19 +474,6 @@ export default function NotificationsPage() {
                         <span className="notification-timestamp">{formatTime(n.created_at)}</span>
                       </div>
                       <div className="notification-desc">{getNotificationDescription(n)}</div>
-                      {n.type === "system" && (n.metadata?.action_url?.startsWith("/") || (n.post_id && n.content.includes("未通过本次审核"))) && (
-                        <button
-                          type="button"
-                          className="notification-action-link"
-                          onClick={async (event) => {
-                            event.stopPropagation();
-                            if (!n.read) await markAsRead(n.id);
-                            window.location.assign(n.metadata?.action_url || `/create?editPost=${n.post_id}`);
-                          }}
-                        >
-                          {n.metadata?.action_label || "查看问题并修改"} <i className="fa-solid fa-arrow-right" />
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))}

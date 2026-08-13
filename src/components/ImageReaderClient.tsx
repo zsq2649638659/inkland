@@ -426,7 +426,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       {/* Content Wrapper - 居中显示 */}
       <div
         ref={contentRef}
-        className="content-wrapper"
+        className="content-wrapper image-reader-page"
         style={{
           maxWidth: readerWidth === "auto" ? "var(--content-width, 800px)" : `${readerWidth}px`,
           color: darkMode ? "#b8a090" : themeColors[currentTheme].text,
