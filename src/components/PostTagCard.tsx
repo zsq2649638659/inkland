@@ -11,6 +11,7 @@ interface PostTagCardProps {
   post: Post;
   style?: CSSProperties;
   showAuthorAvatar?: boolean;
+  imageTagsInOverlay?: boolean;
 }
 
 function getPlainText(content?: string, maxLen = 120): string {
@@ -31,7 +32,7 @@ function getAllImages(content?: string): string[] {
   return [...matches].map((m) => m[1]).filter((url) => !url.startsWith("private://"));
 }
 
-export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCardProps) {
+export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsInOverlay = false }: PostTagCardProps) {
   const router = useRouter();
   const cp = post as unknown as Record<string, unknown>;
   const content = (cp.content as string) || "";
@@ -71,7 +72,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
   const seriesContext = seriesName ? (chapterNumber ? `${seriesName} · 第${chapterNumber}章` : seriesName) : null;
   const rawImageTitle = post.title?.trim() || "";
   const imageTitle = ["图片分享", "Image Title"].includes(rawImageTitle) ? "" : rawImageTitle;
-  const hasImageCopy = Boolean(imageTitle || plainText);
+  const hasImageCopy = Boolean(imageTitle || plainText || (imageTagsInOverlay && tags.length > 0));
   const isRejected = cp.review_status === "rejected";
   const targetHref = isRejected ? `/create?editPost=${post.id}` : `/read/${post.id}`;
   const navigateCard = (event: MouseEvent<HTMLDivElement>) => {
@@ -124,16 +125,29 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
                 {imageTitle && <div className="card-image-title">{imageTitle}</div>}
                 {plainText && <div className="card-summary clamp-2">{plainText}</div>}
               </Link>
+              {imageTagsInOverlay && tags.length > 0 && (
+                <div className={`card-tags card-image-tags${isTagsOverflow ? " has-overflow" : ""}`} ref={tagsRef}>
+                  {tags.map((tag) => {
+                    const tagName = typeof tag === "string" ? tag : tag.name;
+                    return <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`} className="card-tag">{tagName}</Link>;
+                  })}
+                </div>
+              )}
             </div>
           )}
           {hasMultipleImages && (
+            <span className="card-image-count" aria-label={`共 ${allImages.length} 张图片`}>
+              <i className="fa-regular fa-images" /> {allImages.length}
+            </span>
+          )}
+          {hasMultipleImages && !imageTagsInOverlay && (
             <div className="card-image-dots" aria-label={`共 ${allImages.length} 张图片，当前第 ${activeImage + 1} 张`}>
               {allImages.map((_, idx) => (
                 <span key={idx} className={idx === activeImage ? "active" : ""} />
               ))}
             </div>
           )}
-          {hasMultipleImages && (
+          {hasMultipleImages && !imageTagsInOverlay && (
             <>
               <button
                 type="button"
@@ -154,7 +168,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar }: PostTagCa
             </>
           )}
         </div>
-        {tags.length > 0 && (
+        {!imageTagsInOverlay && tags.length > 0 && (
           <div className={`card-tags${isTagsOverflow ? " has-overflow" : ""}`} ref={tagsRef}>
             {tags.map((tag) => {
               const tagName = typeof tag === "string" ? tag : tag.name;

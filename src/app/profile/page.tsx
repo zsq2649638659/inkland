@@ -710,7 +710,7 @@ export default function ProfilePage() {
                   return true;
                 })
                 .map((post) => (
-                  <PostTagCard key={post.id} post={post} style={{ order: workOrder.get(`post:${post.id}`) ?? 9999 }} />
+                  <PostTagCard key={post.id} post={post} style={{ order: workOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />
                 ))}
             </div>
           )}
@@ -867,7 +867,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 ))}
-                {filteredLikes.map((post) => <PostTagCard key={post.id} post={post} style={{ order: likeOrder.get(`post:${post.id}`) ?? 9999 }} />)}
+                {filteredLikes.map((post) => <PostTagCard key={post.id} post={post} style={{ order: likeOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
               </div>
             );
           })()}
@@ -1024,7 +1024,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 ))}
-                {filteredBookmarks.map((post) => <PostTagCard key={post.id} post={post} style={{ order: bookmarkOrder.get(`post:${post.id}`) ?? 9999 }} />)}
+                {filteredBookmarks.map((post) => <PostTagCard key={post.id} post={post} style={{ order: bookmarkOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
               </div>
             );
           })()}

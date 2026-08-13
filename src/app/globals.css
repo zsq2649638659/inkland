@@ -8356,6 +8356,55 @@ p {
   overflow: hidden;
 }
 
+/* Profile card refinements: image geometry intentionally remains unchanged. */
+#page-profile .card-image-arrow,
+#page-profile .card-image-dots { display: none !important; }
+#page-profile .tag-card.image .card-image-overlay {
+  padding: 24px 16px;
+  transition: opacity 0.2s ease, pointer-events 0s linear 0.2s;
+}
+#page-profile .card-image-title { font-size: 16px; }
+#page-profile .tag-card.image .card-image-copy .card-summary { font-size: 13px; }
+#page-profile .tag-card.single .card-summary.clamp-2 { -webkit-line-clamp: 5; }
+#page-profile .series-header-desc { -webkit-line-clamp: 2; }
+#page-profile .card-image-count {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(20, 18, 18, 0.62);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+#page-profile .card-image-stage:hover .card-image-count { opacity: 1; }
+#page-profile .tag-card.image .card-image-overlay .card-image-tags {
+  width: 100%;
+  margin: 10px 0 0;
+  pointer-events: auto;
+}
+#page-profile .tag-card.image .card-image-overlay .card-tag {
+  color: rgba(255, 255, 255, 0.92);
+  background: #6b6b6b;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+#page-profile .tag-card.image .card-image-overlay .card-tag:hover,
+#page-profile .tag-card.image .card-image-overlay .card-tag:focus-visible {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
 
 /* ===== 章节预览区 ===== */
 #page-user .chapter-preview,
