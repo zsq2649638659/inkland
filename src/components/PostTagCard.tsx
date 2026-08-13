@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Post } from "@/lib/types";
 import { getThumbnailUrl } from "@/lib/image";
 import ImageLightbox from "@/components/ImageLightbox";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 interface PostTagCardProps {
   post: Post;
@@ -87,7 +88,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
         {post.author.avatar_url ? (
           <img src={post.author.avatar_url} alt={post.author.nickname} />
         ) : (
-          <i className="fa-solid fa-user" />
+          <DefaultAvatar name={post.author.nickname || "?"} />
         )}
       </div>
     </div>
