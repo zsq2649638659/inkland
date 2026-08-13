@@ -7,18 +7,21 @@ interface DefaultAvatarProps {
 }
 
 export default function DefaultAvatar({ name, className, style }: DefaultAvatarProps) {
-  const char = (name || "?")[0].toUpperCase();
+  const char = Array.from(name.trim() || "?")[0].toUpperCase();
   return (
     <span
       className={className}
       style={{
+        ...style,
         display: "flex",
+        width: "100%",
+        height: "100%",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #FDDCD8, #F26B5B)",
-        color: "#fff",
+        borderRadius: "50%",
+        background: "var(--color-bg-secondary, #e8e4e0)",
+        color: "var(--color-gray-900)",
         fontWeight: 700,
-        ...style,
       }}
       aria-hidden="true"
     >
