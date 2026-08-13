@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/browser";
 import PostTagCard from "@/components/PostTagCard";
 import { SkeletonCollectionDetail } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 type CollectionInfo = {
   name: string;
@@ -136,7 +137,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
             </div>
             {collection.description && <p className="collection-description">{collection.description}</p>}
             <div className="collection-meta-row">
-              <span className="collection-author"><span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : collection.nickname.slice(0, 1)}</span><span>作者：{collection.nickname}</span></span>
+              <span className="collection-author"><span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : <DefaultAvatar name={collection.nickname} />}</span><span>作者：{collection.nickname}</span></span>
               <span className="collection-meta-sep">|</span>
               <span className="collection-stat-item"><span className="collection-stat-label">作品数</span><span className="collection-stat-value">{posts.length}</span></span>
               <span className="collection-meta-sep">|</span>
