@@ -418,22 +418,6 @@ p {
 }
 
 /* 审核结果反馈：通知、个人主页和创作中心 */
-#page-notifications .notification-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 7px 12px;
-  border: 1px solid var(--color-primary);
-  border-radius: 999px;
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-#page-notifications .notification-action-link:hover { color: #fff; background: var(--color-primary); }
 #page-profile .tag-card.review-rejected { box-shadow: inset 0 0 0 1px rgba(239,68,68,.22); }
 #page-profile .profile-review-badge {
   position: absolute;
@@ -545,9 +529,7 @@ p {
   top: 0;
   z-index: 1000;
   height: var(--navbar-height);
-  background: rgba(250, 249, 247, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--color-bg-page, #FAF9F7);
   border-bottom: 1px solid transparent;
   transition: border-color 0.3s ease;
 }
@@ -918,7 +900,9 @@ p {
 
 /* ===== Main Layout ===== */
 .main-container {
+  width: 100%;
   max-width: var(--max-width);
+  box-sizing: border-box;
   margin: 0 auto;
   padding: var(--spacing-lg);
   display: flex;
@@ -4645,6 +4629,10 @@ p {
   margin-right: -8px;
 }
 
+.image-reader-page .work-content p {
+  text-indent: 0;
+}
+
 .work-content p:last-child {
   margin-bottom: 0;
 }
@@ -6629,7 +6617,7 @@ p {
 }
 
 [data-theme="dark"] .navbar {
-  background: rgba(26, 26, 26, 0.85);
+  background: #1A1A1A;
 }
 [data-theme="dark"] .navbar.scrolled {
   border-bottom-color: #333333;
