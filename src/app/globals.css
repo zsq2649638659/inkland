@@ -12283,6 +12283,33 @@ p {
 #page-create.chapter-create-page .publish-modal-button-primary:hover { border-color: var(--color-primary-hover); background: var(--color-primary-hover); }
 
 /* Dedicated chapter detail preview. */
+.unified-editor-toolbar { gap: 4px !important; }
+.unified-editor-toolbar > .tb-btn,
+.unified-editor-toolbar > .editor-font-size-control { flex: 0 0 auto; }
+.unified-editor-toolbar .tb-btn { width: 40px !important; height: 40px !important; flex: 0 0 40px; font-size: 16px !important; }
+.editor-font-size-control { position: relative; }
+.editor-font-size-popover { position: absolute; top: calc(100% + 10px); right: 0; z-index: 30; display: flex; width: 170px; align-items: center; gap: 0; padding: 10px 12px; border: 0; border-radius: 8px; color: var(--color-text); background: var(--color-card); box-shadow: 0 7px 22px rgba(26,26,26,.1); }
+.editor-font-size-popover .font-size-letter { position: relative; z-index: 2; display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; font-family: Arial,sans-serif; font-weight: 400; line-height: 1; }
+.editor-font-size-popover .font-size-small { border-radius: 999px 0 0 999px; background: #f3f3f3; font-size: 11px; }
+.editor-font-size-popover .font-size-large { border-radius: 0 999px 999px 0; background: #f3f3f3; font-size: 17px; }
+.editor-font-size-track { position: relative; display: flex; height: 20px; min-width: 0; flex: 1; align-items: center; background: #f3f3f3; }
+.editor-font-size-ticks { position: absolute; inset: 0 6px; display: flex; align-items: center; justify-content: space-evenly; pointer-events: none; }
+.editor-font-size-ticks i { width: 1px; height: 7px; background: #d8d8d8; }
+.editor-font-size-popover input { position: relative; z-index: 2; width: 100%; height: 20px; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; cursor: pointer; }
+.editor-font-size-popover input::-webkit-slider-runnable-track { height: 20px; background: transparent; }
+.editor-font-size-popover input::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -2px; border: 0; border-radius: 50%; appearance: none; -webkit-appearance: none; background: #fff; box-shadow: 0 3px 8px rgba(26,26,26,.12); }
+.editor-font-size-popover input::-moz-range-track { height: 20px; border: 0; background: transparent; }
+.editor-font-size-popover input::-moz-range-thumb { width: 24px; height: 24px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(26,26,26,.12); }
+#page-create.chapter-create-page .editor-content,
+#page-create.publish-article-page .editor-content { font-size: 16px; line-height: 1.5; }
+#page-create.chapter-create-page .editor-content p,
+#page-create.publish-article-page .editor-content p { margin: 0 0 16px; line-height: 1.5; }
+#page-create .editor-wrap-expanded { position: fixed; inset: 0; z-index: 1200; display: flex; flex-direction: column; border: 0; border-radius: 0; background: var(--color-card); }
+#page-create .editor-wrap-expanded .editor-toolbar { flex: 0 0 auto; padding: 10px max(12px,calc((100vw - 920px)/2)); }
+#page-create .editor-wrap-expanded .editor-body { display: flex; min-height: 0; flex: 1; justify-content: center; overflow: auto; background: var(--color-bg-page); }
+#page-create .editor-wrap-expanded .editor-content { width: min(100%,920px); min-height: 100%; max-height: none; padding: 42px 56px 80px; background: var(--color-card); }
+#page-create .editor-wrap-expanded .editor-footer { flex: 0 0 auto; padding-right: max(16px,calc((100vw - 920px)/2)); padding-left: max(16px,calc((100vw - 920px)/2)); }
+
 .chapter-static-preview-page { min-height: 100vh; padding: 26px 20px 72px; background: var(--color-bg-page); }
 .chapter-static-preview-toolbar { display: flex; width: min(100%, 800px); align-items: center; justify-content: space-between; gap: 16px; margin: 0 auto 18px; }
 .chapter-static-preview-toolbar div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
@@ -12314,6 +12341,11 @@ p {
   #page-create.chapter-create-page .publish-dropdown,
   #page-create.chapter-create-page .btn-publish-split { width: 100%; }
   #page-create.chapter-create-page .btn-publish { flex: 1; justify-content: center; }
+  #page-create .unified-editor-toolbar { align-content: flex-start; flex-wrap: wrap; gap: 4px !important; padding: 6px 8px; overflow: visible; }
+  #page-create .unified-editor-toolbar .tb-btn { width: 40px !important; height: 40px !important; flex: 0 0 40px; font-size: 16px !important; }
+  #page-create .editor-font-size-popover { position: fixed; top: auto; right: 12px; bottom: 72px; left: auto; width: 170px; }
+  #page-create .editor-wrap-expanded .editor-toolbar { padding: 6px 8px; }
+  #page-create .editor-wrap-expanded .editor-content { padding: 24px 20px 64px; }
   .chapter-static-preview-page { padding: 18px 12px 48px; }
   .chapter-static-preview-content { padding: 30px 22px; }
 }

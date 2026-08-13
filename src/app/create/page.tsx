@@ -154,7 +154,19 @@ function EditorToolbar({
   );
 }
 
-function ArticleToolbar({ onCommand, onLink, onFormat, onImport, onPreview }: { onCommand: (command: string, value?: string) => void; onLink: () => void; onFormat: () => void; onImport: () => void; onPreview: () => void }) {
+function ArticleToolbar({ onCommand, onLink, onFormat, onImport, onPreview, editorTools = false, expanded = false, onToggleExpanded, fontSize = 16, onFontSizeChange }: { onCommand: (command: string, value?: string) => void; onLink: () => void; onFormat: () => void; onImport: () => void; onPreview: () => void; editorTools?: boolean; expanded?: boolean; onToggleExpanded?: () => void; fontSize?: number; onFontSizeChange?: (value: number) => void }) {
+  const [fontSizeOpen, setFontSizeOpen] = useState(false);
+  const fontSizeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!fontSizeOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!fontSizeRef.current?.contains(event.target as Node)) setFontSizeOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [fontSizeOpen]);
+
   const button = (icon: string, label: string, onClick: () => void) => (
     <button type="button" className="tb-btn" aria-label={label} title={label} onMouseDown={(event) => event.preventDefault()} onClick={onClick}>
       <i className={`fa-solid ${icon}`} aria-hidden="true" />
@@ -162,22 +174,26 @@ function ArticleToolbar({ onCommand, onLink, onFormat, onImport, onPreview }: { 
   );
 
   return (
-    <div className="editor-toolbar" role="toolbar" aria-label="格式化工具栏">
-      <div className="tb-group">
-        {button("fa-rotate-left", "撤销", () => onCommand("undo"))}
-        {button("fa-rotate-right", "重做", () => onCommand("redo"))}
-      </div>
-      <span className="tb-divider" />
-      <div className="tb-group">{button("fa-bold", "加粗", () => onCommand("bold"))}{button("fa-italic", "斜体", () => onCommand("italic"))}{button("fa-underline", "下划线", () => onCommand("underline"))}{button("fa-strikethrough", "删除线", () => onCommand("strikeThrough"))}</div>
-      <span className="tb-divider" />
-      <div className="tb-group">{button("fa-link", "插入链接", onLink)}{button("fa-align-left", "左对齐", () => onCommand("justifyLeft"))}{button("fa-align-center", "居中", () => onCommand("justifyCenter"))}{button("fa-align-right", "右对齐", () => onCommand("justifyRight"))}{button("fa-minus", "分割线", () => onCommand("insertHorizontalRule"))}</div>
-      <span className="tb-divider" />
-      <div className="tb-group">{button("fa-wand-magic-sparkles", "一键排版", onFormat)}</div>
-      <span className="tb-spacer" />
-      <div className="tb-group">
-        {button("fa-file-import", "导入文档", onImport)}
-        {button("fa-eye", "预览", onPreview)}
-      </div>
+    <div className={`editor-toolbar ${editorTools ? "unified-editor-toolbar" : ""}`} role="toolbar" aria-label="格式化工具栏">
+      {button("fa-rotate-left", "撤销", () => onCommand("undo"))}
+      {button("fa-rotate-right", "重做", () => onCommand("redo"))}
+      {button("fa-bold", "加粗", () => onCommand("bold"))}
+      {button("fa-italic", "斜体", () => onCommand("italic"))}
+      {button("fa-underline", "下划线", () => onCommand("underline"))}
+      {button("fa-strikethrough", "删除线", () => onCommand("strikeThrough"))}
+      {button("fa-link", "插入链接", onLink)}
+      {button("fa-align-left", "左对齐", () => onCommand("justifyLeft"))}
+      {button("fa-align-center", "居中", () => onCommand("justifyCenter"))}
+      {button("fa-align-right", "右对齐", () => onCommand("justifyRight"))}
+      {button("fa-minus", "分割线", () => onCommand("insertHorizontalRule"))}
+      {button("fa-wand-magic-sparkles", "一键排版", onFormat)}
+      {button("fa-file-import", "导入文档", onImport)}
+      {button("fa-eye", "预览", onPreview)}
+      {editorTools && <div className="editor-font-size-control" ref={fontSizeRef}>
+        <button type="button" className={`tb-btn ${fontSizeOpen ? "active" : ""}`} aria-label="调节字号" title="调节字号" aria-expanded={fontSizeOpen} onClick={() => setFontSizeOpen((open) => !open)}><i className="fa-solid fa-font" /></button>
+        {fontSizeOpen && <div className="editor-font-size-popover" role="dialog" aria-label="调节正文字号"><span className="font-size-letter font-size-small" aria-hidden="true">A</span><span className="editor-font-size-track"><span className="editor-font-size-ticks" aria-hidden="true"><i /><i /><i /><i /></span><input type="range" min="12" max="26" step="1" value={fontSize} aria-label="正文字号" onChange={(event) => onFontSizeChange?.(Number(event.target.value))} /></span><span className="font-size-letter font-size-large" aria-hidden="true">A</span></div>}
+      </div>}
+      {editorTools && <button type="button" className={`tb-btn ${expanded ? "active" : ""}`} aria-label={expanded ? "退出专注模式" : "放大编辑器"} title={expanded ? "退出专注模式" : "放大编辑器"} onClick={onToggleExpanded}><i className={`fa-solid ${expanded ? "fa-compress" : "fa-expand"}`} /></button>}
     </div>
   );
 }
@@ -221,11 +237,13 @@ function ArticleEditorSurface({
   onChange,
   previewTitle,
   onPreview,
+  editorTools = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   previewTitle?: string;
   onPreview?: () => void;
+  editorTools?: boolean;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -233,6 +251,8 @@ function ArticleEditorSurface({
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("https://");
   const [importError, setImportError] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [editorFontSize, setEditorFontSize] = useState(16);
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -252,6 +272,15 @@ function ArticleEditorSurface({
     return () => document.removeEventListener("keydown", closePreview);
   }, [previewOpen]);
 
+  useEffect(() => {
+    if (!expanded) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const exitExpanded = (event: KeyboardEvent) => { if (event.key === "Escape") setExpanded(false); };
+    document.addEventListener("keydown", exitExpanded);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", exitExpanded); };
+  }, [expanded]);
+
   const exec = (command: string, commandValue?: string) => {
     if (command === "createLink" && !commandValue) return;
     surfaceRef.current?.focus();
@@ -260,7 +289,7 @@ function ArticleEditorSurface({
   };
 
   return (
-    <div className="editor-wrap">
+    <div className={`editor-wrap ${expanded ? "editor-wrap-expanded" : ""}`}>
       <input ref={importRef} type="file" accept=".txt,.text,.md,.markdown,.log,.csv,text/plain,text/markdown,text/csv" hidden onChange={async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -276,7 +305,7 @@ function ArticleEditorSurface({
         onChange(text);
         event.target.value = "";
       }} />
-      <ArticleToolbar onCommand={exec} onLink={() => { setLinkUrl("https://"); setLinkDialogOpen(true); }} onImport={() => importRef.current?.click()} onPreview={() => { if (onPreview) onPreview(); else setPreviewOpen(true); }} onFormat={() => {
+      <ArticleToolbar editorTools={editorTools} expanded={expanded} onToggleExpanded={() => setExpanded((current) => !current)} fontSize={editorFontSize} onFontSizeChange={setEditorFontSize} onCommand={exec} onLink={() => { setLinkUrl("https://"); setLinkDialogOpen(true); }} onImport={() => importRef.current?.click()} onPreview={() => { if (onPreview) onPreview(); else setPreviewOpen(true); }} onFormat={() => {
         const plain = surfaceRef.current?.innerText || value.replace(/[#*_~>`\[\]()]/g, "");
         const paragraphs = plain.split(/\n+/).map((line) => line.trim()).filter(Boolean);
         const html = paragraphs.map((line) => `<p>${line.replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char] || char))}</p>`).join("");
@@ -291,6 +320,7 @@ function ArticleEditorSurface({
           suppressContentEditableWarning
           role="textbox"
           aria-multiline="true"
+          style={editorTools ? { fontSize: `${editorFontSize}px` } : undefined}
           onInput={(event) => onChange(htmlToMarkdown(event.currentTarget.innerHTML))}
           onPaste={(event) => {
             event.preventDefault();
@@ -1579,7 +1609,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
             <div className="form-section">
               <label className="form-label">正文</label>
-              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} />
+              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} editorTools />
             </div>
 
             <div className="form-section">
@@ -2290,7 +2320,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             </section>
             <section className="form-section chapter-editor-section">
               <div className="form-section-header"><label className="form-label">正文内容</label></div>
-              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} onPreview={() => openChapterPreview(targetSeriesName || "未命名连载", displayChapterNum)} />
+              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} editorTools onPreview={() => openChapterPreview(targetSeriesName || "未命名连载", displayChapterNum)} />
             </section>
             <section className="form-section chapter-author-note-field">
               <div className="form-section-header"><label className="form-label" htmlFor="chapterAuthorNote">作者的话</label></div>
