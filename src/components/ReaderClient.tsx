@@ -528,9 +528,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
                 {post.author?.avatar_url ? (
                   <img src={post.author.avatar_url} alt={authorName} />
                 ) : (
-                  <div className="author-avatar-placeholder">
-                    <i className="fa-solid fa-user" />
-                  </div>
+                  <DefaultAvatar name={authorName} className="author-avatar-placeholder" />
                 )}
               </div>
               <Link href={`/user/${post.author?.nickname || ""}`} className="author-name">

@@ -10,6 +10,7 @@ import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
+import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Comment } from "@/lib/types";
 
 export interface SerialPostCardData {
@@ -98,7 +99,6 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   }, [cardMenuOpen]);
 
   const plainExcerpt = useMemo(() => stripMarkdown(data.content), [data.content]);
-  const avatarChar = data.authorNickname?.[0] || "?";
 
   const goToLogin = () => router.push("/login");
 
@@ -253,7 +253,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             {data.authorAvatar ? (
               <img src={data.authorAvatar} alt="" />
             ) : (
-              avatarChar
+              <DefaultAvatar name={data.authorNickname || "?"} />
             )}
           </div>
         </Link>

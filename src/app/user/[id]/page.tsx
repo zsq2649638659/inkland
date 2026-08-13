@@ -478,7 +478,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             {profile?.avatar_url ? (
               <img src={profile.avatar_url} alt={displayName} />
             ) : (
-              <i className="fa-solid fa-user-astronaut" />
+              <DefaultAvatar name={displayName} />
             )}
           </div>
           <div className="profile-info">

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 interface Suggestion {
   name: string;
@@ -206,7 +207,7 @@ export default function Navbar() {
                         {s.subtitle ? (
                           <img src={s.subtitle} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                         ) : (
-                          <i className="fa-solid fa-user" />
+                          <DefaultAvatar name={s.name} />
                         )}
                       </div>
                       <div className="search-dropdown-item-body">
