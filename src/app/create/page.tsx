@@ -154,7 +154,7 @@ function EditorToolbar({
   );
 }
 
-function ArticleToolbar({ onCommand, onLink, onFormat, onImport, onPreview, editorTools = false, expanded = false, onToggleExpanded, fontSize = 16, onFontSizeChange }: { onCommand: (command: string, value?: string) => void; onLink: () => void; onFormat: () => void; onImport: () => void; onPreview: () => void; editorTools?: boolean; expanded?: boolean; onToggleExpanded?: () => void; fontSize?: number; onFontSizeChange?: (value: number) => void }) {
+function ArticleToolbar({ onCommand, onFormat, onImport, onPreview, editorTools = false, expanded = false, onToggleExpanded, fontSize = 16, onFontSizeChange }: { onCommand: (command: string, value?: string) => void; onFormat: () => void; onImport: () => void; onPreview: () => void; editorTools?: boolean; expanded?: boolean; onToggleExpanded?: () => void; fontSize?: number; onFontSizeChange?: (value: number) => void }) {
   const [fontSizeOpen, setFontSizeOpen] = useState(false);
   const fontSizeRef = useRef<HTMLDivElement>(null);
 
@@ -181,7 +181,6 @@ function ArticleToolbar({ onCommand, onLink, onFormat, onImport, onPreview, edit
       {button("fa-italic", "斜体", () => onCommand("italic"))}
       {button("fa-underline", "下划线", () => onCommand("underline"))}
       {button("fa-strikethrough", "删除线", () => onCommand("strikeThrough"))}
-      {button("fa-link", "插入链接", onLink)}
       {button("fa-align-left", "左对齐", () => onCommand("justifyLeft"))}
       {button("fa-align-center", "居中", () => onCommand("justifyCenter"))}
       {button("fa-align-right", "右对齐", () => onCommand("justifyRight"))}
@@ -248,8 +247,6 @@ function ArticleEditorSurface({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("https://");
   const [importError, setImportError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [editorFontSize, setEditorFontSize] = useState(16);
@@ -305,7 +302,7 @@ function ArticleEditorSurface({
         onChange(text);
         event.target.value = "";
       }} />
-      <ArticleToolbar editorTools={editorTools} expanded={expanded} onToggleExpanded={() => setExpanded((current) => !current)} fontSize={editorFontSize} onFontSizeChange={setEditorFontSize} onCommand={exec} onLink={() => { setLinkUrl("https://"); setLinkDialogOpen(true); }} onImport={() => importRef.current?.click()} onPreview={() => { if (onPreview) onPreview(); else setPreviewOpen(true); }} onFormat={() => {
+      <ArticleToolbar editorTools={editorTools} expanded={expanded} onToggleExpanded={() => setExpanded((current) => !current)} fontSize={editorFontSize} onFontSizeChange={setEditorFontSize} onCommand={exec} onImport={() => importRef.current?.click()} onPreview={() => { if (onPreview) onPreview(); else setPreviewOpen(true); }} onFormat={() => {
         const plain = surfaceRef.current?.innerText || value.replace(/[#*_~>`\[\]()]/g, "");
         const paragraphs = plain.split(/\n+/).map((line) => line.trim()).filter(Boolean);
         const html = paragraphs.map((line) => `<p>${line.replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char] || char))}</p>`).join("");
@@ -343,41 +340,6 @@ function ArticleEditorSurface({
         <span><i className="fa-solid fa-check" /> 草稿已保存</span>
         <span className="char-count">{value.replace(/\s/g, "").length} 字</span>
       </div>
-      {linkDialogOpen && (
-        <div className="modal-overlay active" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setLinkDialogOpen(false);
-        }}>
-          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="link-dialog-title">
-            <h2 id="link-dialog-title" className="modal-title">插入超链接</h2>
-            <div className="modal-body">
-              <label htmlFor="link-url-input" className="sr-only">链接地址</label>
-              <input
-                id="link-url-input"
-                className="sidebar-dialog-input"
-                type="url"
-                value={linkUrl}
-                onChange={(event) => setLinkUrl(event.target.value)}
-                placeholder="https://example.com"
-                autoFocus
-              />
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn-modal btn-modal-cancel" onClick={() => setLinkDialogOpen(false)}>取消</button>
-              <button
-                type="button"
-                className="btn-modal btn-modal-primary"
-                onClick={() => {
-                  if (linkUrl.trim()) exec("createLink", linkUrl.trim());
-                  setLinkDialogOpen(false);
-                }}
-                disabled={!linkUrl.trim()}
-              >
-                插入链接
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1450,6 +1412,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       content: editor.content,
       authorNote: authorNote.trim(),
       wordCount: editor.content.replace(/\s/g, "").length,
+      returnUrl: `${window.location.pathname}${window.location.search}`,
     }));
     window.location.assign("/create/chapter-preview");
   };
@@ -2290,7 +2253,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               <div className="serial-info-body">
                 <div className="serial-info-name">{targetSeriesName}</div>
                 <div className="serial-info-meta">
-                  <span className="serial-info-status"><i className="fa-solid fa-circle" /> 连载中</span>
+                  <span className="serial-info-status"><span className="serial-info-status-label">连载中</span></span>
                   <span className="dot" />
                   <span><i className="fa-solid fa-layer-group" /> {isEditingChapter ? `正在编辑第 ${displayChapterNum} 章` : `即将更新第 ${displayChapterNum} 章`}</span>
                 </div>

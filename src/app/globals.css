@@ -12237,6 +12237,8 @@ p {
 #page-create.chapter-create-page .serial-info-body { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: var(--spacing-lg); }
 #page-create.chapter-create-page .serial-info-name { color: var(--color-text); font-size: var(--font-size-lg); font-weight: 700; line-height: 1.3; }
 #page-create.chapter-create-page .serial-info-meta { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--spacing-md); color: var(--color-text-muted); font-size: var(--font-size-sm); }
+#page-create.chapter-create-page .serial-info-status { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--radius-full); color: #16a34a; background: #22c55e1a; font-size: var(--font-size-xs); font-weight: 600; line-height: 1.5; letter-spacing: .02em; }
+#page-create.chapter-create-page .serial-info-status-label { color: currentColor; font-size: 6px; }
 #page-create.chapter-create-page .form-section { margin-bottom: var(--spacing-lg); }
 #page-create.chapter-create-page .form-section-header { margin-bottom: var(--spacing-sm); }
 #page-create.chapter-create-page .chapter-title-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -12305,7 +12307,7 @@ p {
 #page-create.chapter-create-page .editor-content p,
 #page-create.publish-article-page .editor-content p { margin: 0 0 16px; line-height: 1.5; }
 #page-create .editor-wrap-expanded { position: fixed; inset: 0; z-index: 1200; display: flex; flex-direction: column; border: 0; border-radius: 0; background: var(--color-card); }
-#page-create .editor-wrap-expanded .editor-toolbar { flex: 0 0 auto; padding: 10px max(12px,calc((100vw - 920px)/2)); }
+#page-create .editor-wrap-expanded .editor-toolbar { flex: 0 0 auto; justify-content: center; padding: 10px max(12px,calc((100vw - 920px)/2)); }
 #page-create .editor-wrap-expanded .editor-body { display: flex; min-height: 0; flex: 1; justify-content: center; overflow: auto; background: var(--color-bg-page); }
 #page-create .editor-wrap-expanded .editor-content { width: min(100%,920px); min-height: 100%; max-height: none; padding: 42px 56px 80px; background: var(--color-card); }
 #page-create .editor-wrap-expanded .editor-footer { flex: 0 0 auto; padding-right: max(16px,calc((100vw - 920px)/2)); padding-left: max(16px,calc((100vw - 920px)/2)); }

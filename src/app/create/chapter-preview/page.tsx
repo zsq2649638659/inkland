@@ -12,6 +12,7 @@ interface ChapterPreviewData {
   content: string;
   authorNote: string;
   wordCount: number;
+  returnUrl?: string;
 }
 
 export default function ChapterPreviewPage() {
@@ -40,7 +41,7 @@ export default function ChapterPreviewPage() {
     <main className="chapter-static-preview-page">
       <div className="chapter-static-preview-toolbar">
         <div><span>章节发布效果预览</span><strong>{preview.seriesName}</strong></div>
-        <button type="button" onClick={() => window.close()}><i className="fa-solid fa-arrow-left" />返回编辑</button>
+        <button type="button" onClick={() => router.push(preview.returnUrl || `/create?seriesName=${encodeURIComponent(preview.seriesName)}`)}><i className="fa-solid fa-arrow-left" />返回编辑</button>
       </div>
       <article className="content-wrapper chapter-static-preview-content">
         <h1 className="work-title">{displayTitle}</h1>
