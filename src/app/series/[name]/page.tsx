@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { SkeletonSeriesDetail } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 interface ChapterInfo {
   id: string;
@@ -245,7 +246,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                   {seriesInfo.author.avatar_url ? (
                     <img src={seriesInfo.author.avatar_url} alt="" />
                   ) : (
-                    <i className="fa-solid fa-user" />
+                    <DefaultAvatar name={seriesInfo.author.nickname || "?"} />
                   )}
                 </Link>
                 <Link href={`/user/${seriesInfo.user_id}`} className="hero-author-name" style={{ textDecoration: "none" }}>
