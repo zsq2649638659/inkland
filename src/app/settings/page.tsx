@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
+import DefaultAvatar from "@/components/DefaultAvatar";
 
 type SettingsTab = "password" | "blocked" | "notifications" | "about" | "contact";
 
@@ -23,7 +24,7 @@ export default function SettingsPage() {
   const [feedbackTypeOpen, setFeedbackTypeOpen] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const feedbackSelectRef = useRef<HTMLDivElement>(null);
-  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; blockedUserId: string; name: string; bio: string; color: string; textColor: string; initial: string }>>([]);
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; blockedUserId: string; name: string; bio: string }>>([]);
   const [blockedLoading, setBlockedLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -127,9 +128,6 @@ export default function SettingsPage() {
           blockedUserId: row.blocked_user_id as string,
           name,
           bio: `屏蔽于 ${new Date(row.created_at as string).toLocaleDateString("zh-CN")}`,
-          color: "linear-gradient(135deg, #E8E4E0, #B8B0A8)",
-          textColor: "#5C554E",
-          initial: name.slice(0, 1),
         };
       }));
       setBlockedLoading(false);
@@ -230,7 +228,7 @@ export default function SettingsPage() {
             <div className="user-cards-grid">
               {blockedLoading ? <p className="text-sm text-muted">正在加载…</p> : blockedUsers.map((u) => (
                 <div className="user-card" key={u.id}>
-                  <div className="user-avatar" style={{ background: u.color, color: u.textColor }}>{u.initial}</div>
+                  <div className="user-avatar"><DefaultAvatar name={u.name} /></div>
                   <div className="user-info">
                     <div className="user-name">{u.name}</div>
                     <div className="user-bio">{u.bio}</div>
