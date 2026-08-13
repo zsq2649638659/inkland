@@ -308,8 +308,7 @@ export default function StudioPage() {
       .replace(/!\[[^\]]*\]\(([^)]+)\)/g, "")
       .replace(/[#>*_`~-]/g, "")
       .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 48);
+      .trim();
   };
 
   const handleTagDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -353,7 +352,7 @@ export default function StudioPage() {
 
   const getStatusLabel = (w: WorkItem) => {
     if (w.review_status === "rejected") return "未过审";
-    if (w.review_status === "pending" && w.status === "published") return "已发布（审核中，仅自己可见）";
+    if (w.review_status === "pending" && w.status === "published") return "已发布";
     if (w.review_status === "pending") return "审核中";
     if (w.status === "published") return "已发布";
     if (isScheduled(w)) return "定时发布";
@@ -694,36 +693,21 @@ export default function StudioPage() {
                       const isPlaceholderTitle = isImage && ["图片分享", "Image Title"].includes(w.title?.trim());
                       const displayTitle = isPlaceholderTitle ? "" : w.title?.trim();
                       return <>
-                    {!isImage && <div className="card-meta">
+                    <div className="card-meta">
                       <span className="card-type-label">
                         <i className={`fa-solid ${getTypeIcon(w.post_type)}`}></i>
                         {getTypeLabel(w.post_type)}
                       </span>
                       <span className={`card-status ${getStatusClass(w)}`}>
-                        <span className="status-dot"></span>
                         {getStatusLabel(w)}
                       </span>
-                    </div>}
+                    </div>
                     {isImage && imageUrls[0] && (
                       <div className="studio-work-preview">
                         <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
-                        <div className="card-meta studio-preview-meta">
-                          <span className="card-type-label">
-                            <i className={`fa-solid ${getTypeIcon(w.post_type)}`}></i>
-                            {getTypeLabel(w.post_type)}
-                          </span>
-                          <span className={`card-status ${getStatusClass(w)}`}>
-                            <span className="status-dot"></span>
-                            {getStatusLabel(w)}
-                          </span>
-                        </div>
                         <span className="studio-image-count">{imageUrls.length} 张图片</span>
                       </div>
                     )}
-                    {isImage && !imageUrls[0] && <div className="card-meta">
-                      <span className="card-type-label"><i className={`fa-solid ${getTypeIcon(w.post_type)}`}></i>{getTypeLabel(w.post_type)}</span>
-                      <span className={`card-status ${getStatusClass(w)}`}><span className="status-dot"></span>{getStatusLabel(w)}</span>
-                    </div>}
                     {!isImage && displayTitle ? <div className="card-title">{displayTitle}</div> : (
                       !isImage && <div className="card-title card-title-placeholder">{getExcerpt(w.content) || "无标题"}</div>
                     )}
