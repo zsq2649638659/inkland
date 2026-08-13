@@ -12285,7 +12285,7 @@ p {
 #page-create.chapter-create-page .publish-modal-button-primary:hover { border-color: var(--color-primary-hover); background: var(--color-primary-hover); }
 
 /* Dedicated chapter detail preview. */
-.unified-editor-toolbar { gap: 4px !important; }
+.unified-editor-toolbar { justify-content: space-between; gap: 0 !important; }
 .unified-editor-toolbar > .tb-btn,
 .unified-editor-toolbar > .editor-font-size-control { flex: 0 0 auto; }
 .unified-editor-toolbar .tb-btn { width: 40px !important; height: 40px !important; flex: 0 0 40px; font-size: 16px !important; }
@@ -12307,7 +12307,7 @@ p {
 #page-create.chapter-create-page .editor-content p,
 #page-create.publish-article-page .editor-content p { margin: 0 0 16px; line-height: 1.5; }
 #page-create .editor-wrap-expanded { position: fixed; inset: 0; z-index: 1200; display: flex; flex-direction: column; border: 0; border-radius: 0; background: var(--color-card); }
-#page-create .editor-wrap-expanded .editor-toolbar { flex: 0 0 auto; justify-content: center; padding: 10px max(12px,calc((100vw - 920px)/2)); }
+#page-create .editor-wrap-expanded .editor-toolbar { flex: 0 0 auto; justify-content: space-between; padding: 10px max(12px,calc((100vw - 920px)/2)); }
 #page-create .editor-wrap-expanded .editor-body { display: flex; min-height: 0; flex: 1; justify-content: center; overflow: auto; background: var(--color-bg-page); }
 #page-create .editor-wrap-expanded .editor-content { width: min(100%,920px); min-height: 100%; max-height: none; padding: 42px 56px 80px; background: var(--color-card); }
 #page-create .editor-wrap-expanded .editor-footer { flex: 0 0 auto; padding-right: max(16px,calc((100vw - 920px)/2)); padding-left: max(16px,calc((100vw - 920px)/2)); }
@@ -12319,6 +12319,9 @@ p {
 .chapter-static-preview-toolbar strong { color: var(--color-text); font-size: 14px; }
 .chapter-static-preview-toolbar button,
 .chapter-static-preview-empty button { display: inline-flex; min-height: 40px; align-items: center; gap: 7px; padding: 0 16px; border: 1px solid var(--color-border); border-radius: var(--radius-full); color: var(--color-text-muted); background: var(--color-card); font-family: var(--font-family); cursor: pointer; }
+.chapter-static-preview-toolbar button { transition: color .2s ease, border-color .2s ease, background-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.chapter-static-preview-toolbar button:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); box-shadow: 0 5px 14px rgba(242,107,91,.14); transform: translateY(-1px); }
+.chapter-static-preview-toolbar button:active { box-shadow: none; transform: translateY(0); }
 .chapter-static-preview-content { margin-top: 0; }
 .chapter-static-preview-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin: -8px 0 34px; color: var(--color-text-muted); font-size: 13px; }
 .chapter-static-preview-meta span { display: inline-flex; align-items: center; gap: 6px; }
@@ -12343,13 +12346,18 @@ p {
   #page-create.chapter-create-page .publish-dropdown,
   #page-create.chapter-create-page .btn-publish-split { width: 100%; }
   #page-create.chapter-create-page .btn-publish { flex: 1; justify-content: center; }
-  #page-create .unified-editor-toolbar { align-content: flex-start; flex-wrap: wrap; gap: 4px !important; padding: 6px 8px; overflow: visible; }
+  #page-create .unified-editor-toolbar { align-content: flex-start; flex-wrap: wrap; gap: 0 !important; padding: 6px 8px; overflow: visible; }
   #page-create .unified-editor-toolbar .tb-btn { width: 40px !important; height: 40px !important; flex: 0 0 40px; font-size: 16px !important; }
   #page-create .editor-font-size-popover { position: fixed; top: auto; right: 12px; bottom: 72px; left: auto; width: 170px; }
   #page-create .editor-wrap-expanded .editor-toolbar { padding: 6px 8px; }
   #page-create .editor-wrap-expanded .editor-content { padding: 24px 20px 64px; }
   .chapter-static-preview-page { padding: 18px 12px 48px; }
   .chapter-static-preview-content { padding: 30px 22px; }
+}
+
+@media (max-width: 600px) {
+  #page-create .unified-editor-toolbar,
+  #page-create .editor-wrap-expanded .editor-toolbar { justify-content: flex-start; }
 }
 
 /* Accessibility: Reduce motion */
