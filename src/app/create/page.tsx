@@ -1421,7 +1421,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       authorNote: authorNote.trim(),
       wordCount: editor.content.replace(/\s/g, "").length,
     }));
-    window.open("/create/chapter-preview", "_blank", "noopener,noreferrer");
+    window.location.assign("/create/chapter-preview");
   };
 
   const renderChapterPublishModal = () => publishModal && (
