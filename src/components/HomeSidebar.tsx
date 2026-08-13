@@ -171,7 +171,7 @@ export default function HomeSidebar() {
       { icon: "fa-bell", label: "我的消息", href: "/notifications" },
     ];
     return (
-      <aside className="sidebar hidden lg:block" aria-label="侧边导航加载中" aria-busy="true">
+      <aside className="sidebar" aria-label="侧边导航加载中" aria-busy="true">
         <div className="sidebar-card">
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">
@@ -216,7 +216,7 @@ export default function HomeSidebar() {
   // 未登录状态 UI - 完全按照设计稿 home-unlogged.html
   if (!user) {
     return (
-      <aside className="sidebar hidden lg:block">
+      <aside className="sidebar">
         <div className="sidebar-card">
           <div className="sidebar-user sidebar-user-unauth">
             <div className="sidebar-user-avatar">
@@ -254,7 +254,7 @@ export default function HomeSidebar() {
 
   return (
     <>
-      <aside className="sidebar hidden lg:block">
+      <aside className="sidebar">
       <div className="sidebar-card">
         {/* User info */}
         <div className="sidebar-user">
