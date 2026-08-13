@@ -1,5 +1,7 @@
 "use client";
 
+// Personal center release marker: keeps the GitHub-to-Vercel deployment trigger explicit.
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import HomeSidebar from "@/components/HomeSidebar";
