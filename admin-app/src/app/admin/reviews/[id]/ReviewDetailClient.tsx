@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- 审核页需要展示作品原图。 */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 /* ==================== 类型 ==================== */
 
@@ -134,10 +134,36 @@ type ManualFindingDraft = {
 };
 
 type ManualMark = {
+  clientId: string;
   field_name: string;
   paragraph_index: number | null;
   start_offset: number;
   end_offset: number;
+};
+
+type SystemRange = {
+  start: number;
+  end: number;
+  findingId: string;
+};
+
+type SelectionContext = {
+  container: HTMLElement;
+  fieldName: string;
+  paragraphIndex: number | null;
+  imageIndex: number | null;
+  ocrNoteIndex: number | null;
+  startOffset: number;
+  endOffset: number;
+  text: string;
+};
+
+type SelectionInfo = {
+  text: string;
+  x: number;
+  y: number;
+  contexts: SelectionContext[];
+  alreadyMarked: boolean;
 };
 
 /* ==================== 文案映射 ==================== */
@@ -230,40 +256,46 @@ function formatDate(value?: string | null) {
 
 /* ==================== 高亮 ==================== */
 
-function MarkedText({ text, terms, marks, manualMarkClass }: {
+function MarkedText({ text, systemRanges = [], marks, manualMarkClass, onManualMarkClick, onManualMarkDoubleClick, onSystemMarkClick }: {
   text: string;
-  terms: string[];
+  systemRanges?: SystemRange[];
   marks: ManualMark[];
   manualMarkClass?: string;
+  onManualMarkClick?: (clientId: string, element: HTMLElement) => void;
+  onManualMarkDoubleClick?: (clientId: string) => void;
+  onSystemMarkClick?: (findingId: string) => void;
 }) {
   if (!text) return <>{text}</>;
-  const ranges: Array<{ start: number; end: number; kind: "system" | "manual" }> = [];
-  const uniqueTerms = [...new Set(terms.filter(Boolean))];
-  const lower = text.toLowerCase();
-  for (const term of uniqueTerms) {
-    const needle = term.toLowerCase();
-    let index = lower.indexOf(needle);
-    while (index !== -1) {
-      ranges.push({ start: index, end: index + term.length, kind: "system" });
-      index = lower.indexOf(needle, index + 1);
-    }
+  const ranges: Array<{ start: number; end: number; kind: "system" | "manual"; findingId?: string; clientId?: string }> = [];
+  for (const range of systemRanges) {
+    const start = Math.max(0, Math.min(range.start, text.length));
+    const end = Math.max(start, Math.min(range.end, text.length));
+    if (end > start) ranges.push({ start, end, kind: "system", findingId: range.findingId });
   }
   for (const mark of marks) {
     const start = Math.max(0, Math.min(mark.start_offset, text.length));
     const end = Math.max(start, Math.min(mark.end_offset, text.length));
-    if (end > start) ranges.push({ start, end, kind: "manual" });
+    if (end > start) ranges.push({ start, end, kind: "manual", clientId: mark.clientId });
   }
   if (!ranges.length) return <>{text}</>;
 
   ranges.sort((a, b) => a.start - b.start || a.end - b.end);
-  const merged: Array<{ start: number; end: number; kinds: Set<"system" | "manual"> }> = [];
+  const merged: Array<{ start: number; end: number; kinds: Set<"system" | "manual">; findingIds: string[]; clientIds: string[] }> = [];
   for (const range of ranges) {
     const last = merged[merged.length - 1];
     if (last && range.start <= last.end) {
       last.end = Math.max(last.end, range.end);
       last.kinds.add(range.kind);
+      if (range.findingId && !last.findingIds.includes(range.findingId)) last.findingIds.push(range.findingId);
+      if (range.clientId && !last.clientIds.includes(range.clientId)) last.clientIds.push(range.clientId);
     } else {
-      merged.push({ start: range.start, end: range.end, kinds: new Set([range.kind]) });
+      merged.push({
+        start: range.start,
+        end: range.end,
+        kinds: new Set([range.kind]),
+        findingIds: range.findingId ? [range.findingId] : [],
+        clientIds: range.clientId ? [range.clientId] : [],
+      });
     }
   }
 
@@ -272,8 +304,26 @@ function MarkedText({ text, terms, marks, manualMarkClass }: {
   merged.forEach((range, index) => {
     if (range.start > cursor) nodes.push(<span key={`t-${index}`}>{text.slice(cursor, range.start)}</span>);
     const isManual = range.kinds.has("manual");
+    const isSystem = range.kinds.has("system");
+    const className = isManual
+      ? manualMarkClass || "admin-manual-mark"
+      : isSystem ? "admin-system-mark" : undefined;
     nodes.push(
-      <mark key={`m-${index}`} className={isManual ? manualMarkClass || "admin-manual-mark" : undefined}>
+      <mark
+        key={`m-${index}`}
+        className={className}
+        onClick={isManual && onManualMarkClick && range.clientIds[0]
+          ? (event) => onManualMarkClick(range.clientIds[0] as string, event.currentTarget as HTMLElement)
+          : isSystem && onSystemMarkClick && range.findingIds[0]
+            ? () => onSystemMarkClick(range.findingIds[0] as string)
+            : undefined}
+        onDoubleClick={isManual && onManualMarkDoubleClick && range.clientIds[0]
+          ? (event) => {
+              event.preventDefault();
+              onManualMarkDoubleClick(range.clientIds[0] as string);
+            }
+          : undefined}
+      >
         {text.slice(range.start, range.end)}
       </mark>,
     );
@@ -290,27 +340,89 @@ function textOffsetInContainer(container: HTMLElement, node: Node, nodeOffset: n
   return measure.toString().length;
 }
 
-function selectionContextFromRange(range: Range) {
-  const ancestor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
-    ? range.commonAncestorContainer.parentElement
-    : range.commonAncestorContainer as Element;
-  const container = ancestor instanceof Element ? ancestor.closest("[data-mark-field]") : null;
-  if (!(container instanceof HTMLElement)) return null;
-  const readInt = (value: string | undefined) => {
-    if (!value) return null;
-    const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-  const fieldName = container.dataset.markField || "content";
-  return {
-    container,
-    fieldName,
-    paragraphIndex: fieldName === "content" ? readInt(container.dataset.markIndex) : null,
-    imageIndex: readInt(container.dataset.markImageIndex),
-    ocrNoteIndex: readInt(container.dataset.markOcrIndex),
-    startOffset: textOffsetInContainer(container, range.startContainer, range.startOffset),
-    endOffset: textOffsetInContainer(container, range.endContainer, range.endOffset),
-  };
+function readDatasetInt(value: string | undefined) {
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function systemRangesInText(text: string, findings: Array<Pick<Finding, "id" | "quoted_text">>) {
+  const ranges: SystemRange[] = [];
+  const lower = text.toLowerCase();
+  for (const finding of findings) {
+    const needle = finding.quoted_text;
+    if (!needle) continue;
+    const needleLower = needle.toLowerCase();
+    let index = lower.indexOf(needleLower);
+    while (index !== -1) {
+      ranges.push({ start: index, end: index + needle.length, findingId: finding.id });
+      index = lower.indexOf(needleLower, index + 1);
+    }
+  }
+  return ranges;
+}
+
+function selectionContextsFromRange(range: Range) {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  let node = walker.nextNode();
+  while (node) {
+    if (range.intersectsNode(node)) textNodes.push(node as Text);
+    node = walker.nextNode();
+  }
+
+  const grouped = new Map<HTMLElement, { min: number; max: number }>();
+  for (const textNode of textNodes) {
+    if (!textNode.data.trim()) continue;
+    const container = textNode.parentElement?.closest("[data-mark-field]");
+    if (!(container instanceof HTMLElement)) continue;
+    let start = 0;
+    let end = textNode.data.length;
+    if (textNode === range.startContainer && textNode === range.endContainer) {
+      start = range.startOffset;
+      end = range.endOffset;
+    } else if (textNode === range.startContainer) {
+      start = range.startOffset;
+    } else if (textNode === range.endContainer) {
+      end = range.endOffset;
+    }
+    if (start >= end) continue;
+    const absoluteStart = textOffsetInContainer(container, textNode, start);
+    const absoluteEnd = textOffsetInContainer(container, textNode, end);
+    if (!(container.textContent || "").slice(absoluteStart, absoluteEnd).trim()) continue;
+    const entry = grouped.get(container);
+    if (entry) {
+      entry.min = Math.min(entry.min, absoluteStart);
+      entry.max = Math.max(entry.max, absoluteEnd);
+    } else {
+      grouped.set(container, { min: Math.min(absoluteStart, absoluteEnd), max: Math.max(absoluteStart, absoluteEnd) });
+    }
+  }
+
+  const contexts: SelectionContext[] = [];
+  grouped.forEach(({ min, max }, container) => {
+    const fieldName = container.dataset.markField || "content";
+    contexts.push({
+      container,
+      fieldName,
+      paragraphIndex: fieldName === "content" ? readDatasetInt(container.dataset.markIndex) : null,
+      imageIndex: readDatasetInt(container.dataset.markImageIndex),
+      ocrNoteIndex: readDatasetInt(container.dataset.markOcrIndex),
+      startOffset: min,
+      endOffset: max,
+      text: (container.textContent || "").slice(min, max).trim(),
+    });
+  });
+  return contexts;
+}
+
+function manualRangesIntersect(item: ManualFindingDraft, context: SelectionContext) {
+  if (item.field_name !== context.fieldName) return false;
+  if ((item.paragraph_index ?? null) !== (context.paragraphIndex ?? null)) return false;
+  if ((item.image_index ?? null) !== (context.imageIndex ?? null)) return false;
+  if ((item.ocr_note_index ?? null) !== (context.ocrNoteIndex ?? null)) return false;
+  if (item.start_offset === null || item.end_offset === null) return false;
+  return Math.max(item.start_offset, context.startOffset) < Math.min(item.end_offset, context.endOffset);
 }
 
 /* ==================== 主组件 ==================== */
@@ -332,7 +444,13 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   const [rejectReason, setRejectReason] = useState("");
   const [manualFindings, setManualFindings] = useState<ManualFindingDraft[]>([]);
   const [selectedIssueTypes, setSelectedIssueTypes] = useState<string[]>([]);
-  const [selectionInfo, setSelectionInfo] = useState<{ text: string; x: number; y: number; alreadyMarked: boolean } | null>(null);
+  const [selectionInfo, setSelectionInfo] = useState<SelectionInfo | null>(null);
+  const [cancelMarkInfo, setCancelMarkInfo] = useState<{ clientId: string; x: number; y: number } | null>(null);
+  const [rejectView, setRejectView] = useState<"issues" | "preview">("issues");
+  const [rejectPreviewLines, setRejectPreviewLines] = useState<Array<{ type: string; text: string }>>([]);
+  const rejectPanelRef = useRef<HTMLElement | null>(null);
+  const rejectBtnRef = useRef<HTMLButtonElement | null>(null);
+  const rejectPreviewSlotRef = useRef<HTMLDivElement | null>(null);
 
   const noteStripped = useMemo(() => (version.content || "").replace(/<!--\s*作者的话：[\s\S]*?-->/g, ""), [version.content]);
   const imageUrls = useMemo(() => [...noteStripped.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]), [noteStripped]);
@@ -341,31 +459,32 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
     [noteStripped],
   );
 
-  const titleTerms = findings.filter((f) => f.field_name === "title" && f.quoted_text).map((f) => f.quoted_text as string);
-  const authorNoteTerms = findings.filter((f) => f.field_name === "author_note" && f.quoted_text).map((f) => f.quoted_text as string);
-  const paragraphTerms = (paragraphIndex: number) => findings
-    .filter((f) => f.quoted_text && (f.location_type === "text_range" || f.location_type === "paragraph") && (
+  const confirmedFindings = findings.filter((f) => confirmedIds.includes(f.id) || (f.status === "confirmed" && !dismissedIds.includes(f.id)));
+  const titleSystemRanges = systemRangesInText(version.title || "无标题", confirmedFindings.filter((f) => f.field_name === "title"));
+  const noteSystemRanges = systemRangesInText(version.author_note || "", confirmedFindings.filter((f) => f.field_name === "author_note"));
+  const paragraphSystemRanges = (paragraphIndex: number, paragraph: string) => systemRangesInText(paragraph, confirmedFindings.filter((f) =>
+    f.quoted_text && (f.location_type === "text_range" || f.location_type === "paragraph") && (
       (f.field_name === "content" && (f.paragraph_index ?? 0) === paragraphIndex) || !f.field_name
-    ))
-    .map((f) => f.quoted_text as string);
+    )
+  ));
 
   const titleManualMarks = useMemo(() => manualFindings
     .filter((item) => item.field_name === "title")
-    .map((item) => ({ field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 })),
+    .map((item) => ({ clientId: item.clientId, field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 })),
   [manualFindings]);
 
   const noteManualMarks = useMemo(() => manualFindings
     .filter((item) => item.field_name === "author_note")
-    .map((item) => ({ field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 })),
+    .map((item) => ({ clientId: item.clientId, field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 })),
   [manualFindings]);
 
   const paragraphManualMarks = (paragraphIndex: number) => manualFindings
     .filter((item) => item.field_name === "content" && (item.paragraph_index ?? 0) === paragraphIndex)
-    .map((item) => ({ field_name: item.field_name, paragraph_index: paragraphIndex, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 }));
+    .map((item) => ({ clientId: item.clientId, field_name: item.field_name, paragraph_index: paragraphIndex, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 }));
 
   const ocrManualMarks = (imageIndex: number, noteIndex: number) => manualFindings
     .filter((item) => item.field_name === "image_ocr" && (item.image_index ?? 0) === imageIndex && (item.ocr_note_index ?? 0) === noteIndex)
-    .map((item) => ({ field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 }));
+    .map((item) => ({ clientId: item.clientId, field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 }));
 
   const statusOf = (finding: Finding) => {
     if (confirmedIds.includes(finding.id)) return "confirmed";
@@ -420,8 +539,8 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
       setSelectionInfo(null);
       return;
     }
-    const context = selectionContextFromRange(range);
-    if (!context) {
+    const contexts = selectionContextsFromRange(range);
+    if (!contexts.length) {
       setSelectionInfo(null);
       return;
     }
@@ -430,55 +549,80 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
       setSelectionInfo(null);
       return;
     }
-    const minOffset = Math.min(context.startOffset, context.endOffset);
-    const maxOffset = Math.max(context.startOffset, context.endOffset);
-    const existing = findManualAtRange(
+    const alreadyMarked = contexts.some((context) => findManualAtRange(
       context.fieldName,
       context.paragraphIndex,
-      minOffset,
-      maxOffset,
+      context.startOffset,
+      context.endOffset,
       context.imageIndex,
       context.ocrNoteIndex,
-    );
-    setSelectionInfo({ text, x: rect.left + rect.width / 2, y: rect.top - 8, alreadyMarked: Boolean(existing) });
+    ));
+    setSelectionInfo({ text, x: rect.left + rect.width / 2, y: rect.top - 8, contexts, alreadyMarked });
   };
 
   const markSelection = () => {
     if (!selectionInfo) return;
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) return;
-    const range = selection.getRangeAt(0);
-    const context = selectionContextFromRange(range);
-    if (!context) return;
-    const { container, fieldName, paragraphIndex, imageIndex, ocrNoteIndex, startOffset, endOffset } = context;
-    const text = container.textContent || "";
-    const minOffset = Math.min(startOffset, endOffset);
-    const maxOffset = Math.max(startOffset, endOffset);
-    const quoted = text.slice(minOffset, maxOffset).trim();
-    if (!quoted) {
-      window.getSelection()?.removeAllRanges();
-      setSelectionInfo(null);
-      return;
+    const drafts: ManualFindingDraft[] = [];
+    for (const context of selectionInfo.contexts) {
+      const isOcr = context.fieldName === "image_ocr";
+      const existing = findManualAtRange(
+        context.fieldName,
+        context.paragraphIndex,
+        context.startOffset,
+        context.endOffset,
+        context.imageIndex,
+        context.ocrNoteIndex,
+      );
+      if (existing || !context.text) continue;
+      drafts.push({
+        clientId: makeClientId(),
+        location_type: isOcr ? "image_ocr" : "text_range",
+        field_name: context.fieldName,
+        paragraph_index: context.paragraphIndex,
+        start_offset: context.startOffset,
+        end_offset: context.endOffset,
+        image_index: isOcr ? context.imageIndex : null,
+        ocr_note_index: isOcr ? context.ocrNoteIndex : null,
+        quoted_text: context.text.slice(0, 500),
+        details: null,
+      });
     }
-
-    const isOcr = fieldName === "image_ocr";
-    const existing = findManualAtRange(fieldName, paragraphIndex, minOffset, maxOffset, imageIndex, ocrNoteIndex);
-    setManualFindings((prev) => existing
-      ? prev.filter((item) => item.clientId !== existing.clientId)
-      : [...prev, {
-          clientId: makeClientId(),
-          location_type: isOcr ? "image_ocr" : "text_range",
-          field_name: fieldName,
-          paragraph_index: paragraphIndex,
-          start_offset: minOffset,
-          end_offset: maxOffset,
-          image_index: isOcr ? imageIndex : null,
-          ocr_note_index: isOcr ? ocrNoteIndex : null,
-          quoted_text: quoted.slice(0, 500),
-          details: null,
-        }]);
+    if (drafts.length) setManualFindings((prev) => [...prev, ...drafts]);
     window.getSelection()?.removeAllRanges();
     setSelectionInfo(null);
+  };
+
+  const cancelSelectionMarks = () => {
+    if (!selectionInfo) return;
+    const removed = new Set<string>();
+    for (const context of selectionInfo.contexts) {
+      manualFindings.forEach((item) => {
+        if (manualRangesIntersect(item, context)) removed.add(item.clientId);
+      });
+    }
+    if (removed.size) setManualFindings((prev) => prev.filter((item) => !removed.has(item.clientId)));
+    window.getSelection()?.removeAllRanges();
+    setSelectionInfo(null);
+  };
+
+  const handleManualMarkClick = (clientId: string, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const x = Math.min(Math.max(rect.left + rect.width / 2, 90), window.innerWidth - 90);
+    const y = Math.min(Math.max(rect.top - 10, 70), window.innerHeight - 60);
+    setCancelMarkInfo({ clientId, x, y });
+    setSelectionInfo(null);
+  };
+
+  const handleManualMarkDoubleClick = (clientId: string) => {
+    removeManualFinding(clientId);
+    setCancelMarkInfo(null);
+    setSelectionInfo(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const handleSystemMarkClick = (findingId: string) => {
+    const finding = findings.find((item) => item.id === findingId);
+    if (finding) toggleConfirm(finding);
   };
 
   const toggleImageMark = (imageIndex: number, url: string) => {
@@ -523,13 +667,70 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
     const handleDocumentPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       const bubble = document.querySelector(".admin-mark-bubble");
-      if (bubble?.contains(target)) return;
+      const cancelBubble = document.querySelector(".admin-cancel-mark-bubble");
+      if (bubble?.contains(target) || cancelBubble?.contains(target)) return;
       if (target instanceof Element && target.closest("[data-mark-field]")) return;
       setSelectionInfo(null);
+      setCancelMarkInfo(null);
     };
     document.addEventListener("pointerdown", handleDocumentPointerDown);
     return () => document.removeEventListener("pointerdown", handleDocumentPointerDown);
   }, []);
+
+  useLayoutEffect(() => {
+    if (rejectView !== "issues") return;
+    const panel = rejectPanelRef.current;
+    const button = rejectBtnRef.current;
+    const slot = rejectPreviewSlotRef.current;
+    if (!panel || !button || !slot) return;
+    panel.style.height = "auto";
+    panel.style.height = `${Math.ceil(panel.getBoundingClientRect().height)}px`;
+    const panelRect = panel.getBoundingClientRect();
+    const buttonTop = button.getBoundingClientRect().top;
+    const panelCss = getComputedStyle(panel);
+    const preview = slot.closest(".admin-reject-preview");
+    const previewCss = preview ? getComputedStyle(preview) : null;
+    const padBottom = (parseFloat(panelCss.paddingBottom) || 0) + (parseFloat(panelCss.borderBottomWidth) || 0)
+      + (previewCss ? (parseFloat(previewCss.paddingBottom) || 0) + (parseFloat(previewCss.borderBottomWidth) || 0) : 0);
+    const slotHeight = Math.max(32, Math.ceil(panelRect.bottom - padBottom - buttonTop));
+    slot.style.height = `${slotHeight}px`;
+  }, [rejectView, manualFindings.length, selectedIssueTypes.length, rejectReason]);
+
+  const openRejectPreview = () => {
+    const reason = rejectReason.trim();
+    if (selectedIssueTypes.length === 0) {
+      setMessage("请先勾选至少一项问题类型。");
+      return;
+    }
+    if (confirmedIds.length === 0 && manualFindings.length === 0 && !reason) {
+      setMessage("请先确认一项系统标记、添加一项人工标记，或填写打回说明。");
+      return;
+    }
+    const lines: Array<{ type: string; text: string }> = [];
+    confirmedFindings.forEach((finding) => lines.push({ type: "系统标记", text: riskLabel(finding.category) }));
+    manualFindings.forEach((item) => lines.push({
+      type: "人工标记",
+      text: `${manualFindingLabel(item)}：${item.quoted_text || "（无引用文本）"}`,
+    }));
+    if (selectedIssueTypes.length) lines.push({ type: "问题类型", text: selectedIssueTypes.join("、") });
+    if (reason) lines.push({ type: "打回说明", text: reason });
+    setRejectPreviewLines(lines);
+    setRejectView("preview");
+    setMessage("");
+  };
+
+  const confirmReject = () => {
+    setRejectView("issues");
+    void reject();
+  };
+
+  const rejectBasisReady = confirmedIds.length > 0 || manualFindings.length > 0 || rejectReason.trim().length > 0;
+  const canReject = rejectBasisReady && selectedIssueTypes.length > 0;
+  const rejectRuleText = !rejectBasisReady
+    ? "请先框选标记问题，或确认系统标记，或填写打回说明。"
+    : selectedIssueTypes.length === 0
+      ? "已具备打回依据，请至少勾选一项问题类型。"
+      : "已就绪：系统标记、人工标记或打回说明 + 问题类型均可作为打回依据。";
 
   const reject = async () => {
     const reason = rejectReason.trim();
@@ -631,7 +832,16 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
         <div className="admin-detail-kicker">
           POST-PUBLISH REVIEW · {typeLabels[version.post_type || post.post_type || ""] || "作品"} · 冻结版本 v{version.version_number ?? 1}
         </div>
-        <h1><MarkedText text={version.title || "无标题"} terms={titleTerms} marks={titleManualMarks} /></h1>
+        <h1>
+          <MarkedText
+            text={version.title || "无标题"}
+            systemRanges={titleSystemRanges}
+            marks={titleManualMarks}
+            onManualMarkClick={handleManualMarkClick}
+            onManualMarkDoubleClick={handleManualMarkDoubleClick}
+            onSystemMarkClick={handleSystemMarkClick}
+          />
+        </h1>
         <div className="admin-detail-meta">
           作者：{post.author?.nickname || "未知作者"}
           {version.post_type === "serial" && version.series_name ? ` · 连载《${version.series_name}》` : ""}
@@ -702,7 +912,14 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
           <section className="admin-evidence-document">
             <div className="admin-document-label">FROZEN VERSION · 审核中固定版本</div>
             <h2 id="field-title" data-mark-field="title" onMouseUp={handleDocumentMouseUp}>
-              <MarkedText text={version.title || "无标题"} terms={titleTerms} marks={titleManualMarks} />
+              <MarkedText
+                text={version.title || "无标题"}
+                systemRanges={titleSystemRanges}
+                marks={titleManualMarks}
+                onManualMarkClick={handleManualMarkClick}
+                onManualMarkDoubleClick={handleManualMarkDoubleClick}
+                onSystemMarkClick={handleSystemMarkClick}
+              />
             </h2>
             {imageAccessError ? <div className="admin-image-access-error" role="alert">{imageAccessError}</div> : null}
 
@@ -713,7 +930,14 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
                   <div className="admin-paragraph" id={`para-${index + 1}`} key={`para-${index + 1}`}>
                     <span className="admin-paragraph-num">{index + 1}</span>
                     <div className="admin-long-content" data-mark-field="content" data-mark-index={index + 1} onMouseUp={handleDocumentMouseUp}>
-                      <MarkedText text={paragraph} terms={paragraphTerms(index + 1)} marks={paragraphManualMarks(index + 1)} />
+                      <MarkedText
+                        text={paragraph}
+                        systemRanges={paragraphSystemRanges(index + 1, paragraph)}
+                        marks={paragraphManualMarks(index + 1)}
+                        onManualMarkClick={handleManualMarkClick}
+                        onManualMarkDoubleClick={handleManualMarkDoubleClick}
+                        onSystemMarkClick={handleSystemMarkClick}
+                      />
                     </div>
                   </div>
                 ))}
@@ -724,7 +948,14 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
               <div className="admin-field-block" id="field-author-note">
                 <h3>作者的话</h3>
                 <div className="admin-long-content" data-mark-field="author_note" onMouseUp={handleDocumentMouseUp}>
-                  <MarkedText text={version.author_note} terms={authorNoteTerms} marks={noteManualMarks} />
+                  <MarkedText
+                    text={version.author_note}
+                    systemRanges={noteSystemRanges}
+                    marks={noteManualMarks}
+                    onManualMarkClick={handleManualMarkClick}
+                    onManualMarkDoubleClick={handleManualMarkDoubleClick}
+                    onSystemMarkClick={handleSystemMarkClick}
+                  />
                 </div>
               </div>
             ) : null}
@@ -782,7 +1013,12 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
                                   onClick={(event) => event.stopPropagation()}
                                   onMouseUp={handleDocumentMouseUp}
                                 >
-                                  <MarkedText text={ocrText} terms={[]} marks={ocrManualMarks(index, noteIndex)} />
+                                  <MarkedText
+                                    text={ocrText}
+                                    marks={ocrManualMarks(index, noteIndex)}
+                                    onManualMarkClick={handleManualMarkClick}
+                                    onManualMarkDoubleClick={handleManualMarkDoubleClick}
+                                  />
                                 </div>
                               );
                             })}
@@ -801,8 +1037,22 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
           </section>
           {selectionInfo ? (
             <div className="admin-mark-bubble" style={{ left: selectionInfo.x, top: selectionInfo.y }}>
-              <span>{selectionInfo.text.length > 14 ? `${selectionInfo.text.slice(0, 14)}…` : selectionInfo.text}</span>
-              <button type="button" onClick={markSelection}>{selectionInfo.alreadyMarked ? "取消标记" : "标记"}</button>
+              <button type="button" onClick={markSelection}>标记</button>
+              <button type="button" disabled={!selectionInfo.alreadyMarked} onClick={cancelSelectionMarks}>取消标记</button>
+            </div>
+          ) : null}
+          {cancelMarkInfo ? (
+            <div className="admin-cancel-mark-bubble" style={{ left: cancelMarkInfo.x, top: cancelMarkInfo.y }}>
+              <span>取消这条人工标记？</span>
+              <button
+                type="button"
+                onClick={() => {
+                  removeManualFinding(cancelMarkInfo.clientId);
+                  setCancelMarkInfo(null);
+                }}
+              >
+                取消标记
+              </button>
             </div>
           ) : null}
         </article>
@@ -881,30 +1131,62 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
             )}
           </section>
 
-          <section className="admin-detail-panel admin-reject-panel">
-            <h2>标记问题并打回</h2>
-            <p>先勾选问题类型（可多选），再确认系统标记、人工标记或填写说明后打回。</p>
-            <div className="admin-issue-buttons">
-              {issueTypes.map((issueType) => (
-                <button
-                  key={issueType}
-                  type="button"
-                  disabled={busy}
-                  className={selectedIssueTypes.includes(issueType) ? "is-selected" : undefined}
-                  onClick={() => toggleIssueType(issueType)}
-                >
-                  {issueType}
-                </button>
-              ))}
+          <section className="admin-detail-panel admin-reject-panel" ref={rejectPanelRef}>
+            <div className="admin-panel-title-row">
+              <h2>标记问题并打回</h2>
+              <span>人工标记 {manualFindings.length} 项</span>
             </div>
-            <label className="admin-field">
-              打回说明（选填）
-              <textarea value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="补充需要作者修改的说明" maxLength={200} />
-            </label>
-            <button className="admin-detail-danger" type="button" disabled={busy} onClick={() => void reject()}>
-              {busy ? "处理中…" : "标记问题并打回"}
-            </button>
-            <small>先勾选至少一项问题类型；再确认系统标记、添加人工标记或填写说明作为打回依据。</small>
+            <div className="admin-reject-issue-view" style={rejectView === "preview" ? { display: "none" } : undefined}>
+              <h3 className="admin-reject-section-title">问题类型（{selectedIssueTypes.length} 项）</h3>
+              <div className="admin-issue-buttons">
+                {issueTypes.map((issueType) => (
+                  <button
+                    key={issueType}
+                    type="button"
+                    disabled={busy}
+                    className={selectedIssueTypes.includes(issueType) ? "is-selected" : undefined}
+                    onClick={() => toggleIssueType(issueType)}
+                  >
+                    {issueType}
+                  </button>
+                ))}
+              </div>
+              <label className="admin-field">
+                打回说明（选填）
+                <textarea value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="补充需要作者修改的说明" maxLength={200} />
+              </label>
+              <div className="admin-reject-bottom">
+                <p className={`admin-reject-rule${canReject ? " is-ready" : ""}`}>{rejectRuleText}</p>
+                <button ref={rejectBtnRef} className="admin-detail-danger admin-reject-submit" type="button" disabled={busy || !canReject} onClick={openRejectPreview}>
+                  {busy ? "处理中…" : "标记问题并打回"}
+                </button>
+              </div>
+            </div>
+            <div className="admin-reject-preview" style={rejectView === "preview" ? undefined : { display: "none" }}>
+              <h3 className="admin-preview-title">打回内容预览（将发送给作者）</h3>
+              <div className="admin-preview-lines">
+                {rejectPreviewLines.slice(0, 4).map((line, index) => (
+                  <div className="admin-preview-line" key={`${line.type}-${index}`}>
+                    <span><b>[{line.type}]</b> {line.text}</span>
+                  </div>
+                ))}
+                {rejectPreviewLines.length > 4 ? (
+                  <div className="admin-preview-line admin-preview-more">
+                    <span>… 还有 {rejectPreviewLines.length - 4} 项（打回时将全部发送）</span>
+                  </div>
+                ) : null}
+              </div>
+              <div className="admin-reject-bottom admin-preview-actions-slot" ref={rejectPreviewSlotRef}>
+                <div className="admin-preview-actions">
+                  <button className="admin-preview-confirm" type="button" disabled={busy} onClick={confirmReject}>
+                    确认打回
+                  </button>
+                  <button className="admin-preview-cancel" type="button" disabled={busy} onClick={() => setRejectView("issues")}>
+                    返回修改
+                  </button>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="admin-detail-panel admin-approve-panel">
