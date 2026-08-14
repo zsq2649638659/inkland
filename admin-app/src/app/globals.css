@@ -24,6 +24,45 @@
 @media (max-width:700px) { .admin-sidebar { display:none; } .admin-topbar { height:60px; padding:0 16px; } .admin-mobile-menu { display:block; } .admin-breadcrumb { margin-right:auto; } .admin-top-actions { gap:8px; } .admin-search { width:36px; padding:8px; border:0; } .admin-search input { display:none; } .admin-live { display:none; } .admin-content { padding:27px 16px 40px; } .admin-page-title { align-items:flex-start; flex-direction:column; margin-bottom:24px; } .admin-page-title h1 { font-size:24px; } .admin-stat-grid { grid-template-columns:1fr 1fr; gap:10px; } .admin-stat-card { min-height:110px; padding:15px; } .admin-stat-card strong { font-size:26px; } .admin-stat-icon { display:none; } .admin-card-heading { padding-left:16px; padding-right:16px; } .admin-filter-row { padding-left:16px; padding-right:16px; overflow:auto; } .admin-table-head { display:none; } .admin-table-row { display:flex; align-items:flex-start; flex-wrap:wrap; gap:9px; padding:14px 16px; } .admin-work-cell { width:calc(100% - 42px); } .admin-author-cell { margin-left:42px; } .admin-date-cell { margin-left:auto; } .admin-row-actions { margin-left:auto; } .admin-side-stack { grid-template-columns:1fr; } .admin-inbox-row { align-items:flex-start; flex-wrap:wrap; padding:12px 0; } .admin-inbox-row .admin-btn { width:100%; } .admin-toast { right:16px; bottom:16px; left:16px; text-align:center; } }
 @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important; } }
 
+/* 审核详情页按打回流程 v4.3 原型对齐（仅作用于作品审核详情页） */
+.admin-review-detail-page .admin-detail-top,
+.admin-review-detail-page .admin-review-heading,
+.admin-review-detail-page .admin-review-layout { width:min(1200px,100%); }
+.admin-review-detail-page .admin-detail-top { margin-bottom:18px; }
+.admin-review-detail-page .admin-review-heading { margin-bottom:16px; }
+.admin-review-detail-page .admin-review-heading h1 { margin:8px 0 6px; font-size:26px; letter-spacing:-.03em; }
+.admin-review-detail-page .admin-review-layout { grid-template-columns:minmax(230px,248px) minmax(480px,1fr) 330px; gap:16px; }
+.admin-review-detail-page .admin-review-summary-column,
+.admin-review-detail-page .admin-review-action-column { top:16px; gap:12px; max-height:calc(100vh - 32px); padding-right:4px; }
+.admin-review-detail-page .admin-detail-panel { padding:12px 14px; border-radius:8px; }
+.admin-review-detail-page .admin-detail-panel h2 { margin:0 0 10px; font-size:14px; }
+.admin-review-detail-page .admin-detail-panel p { margin:0 0 12px; }
+.admin-review-detail-page .admin-detail-panel dt { margin-top:9px; }
+.admin-review-detail-page .admin-detail-panel dd { margin-top:3px; }
+.admin-review-detail-page .admin-evidence-document { padding:14px 16px 18px; border-radius:8px; }
+.admin-review-detail-page .admin-evidence-document h2 { margin:8px 0 14px; font-size:17px; }
+.admin-review-detail-page .admin-detail-images { gap:14px; margin-top:16px; }
+.admin-review-detail-page .admin-finding-list { gap:8px; }
+.admin-review-detail-page .admin-finding-item { gap:5px; padding:9px 10px; border-radius:7px; }
+.admin-review-detail-page .admin-finding-item.is-confirmed,
+.admin-review-detail-page .admin-manual-findings .admin-finding-item.is-confirmed { border-color:#e7d0a8; background:#fff8ec; }
+.admin-review-detail-page .admin-issue-buttons { grid-template-columns:1fr 1fr; gap:8px; }
+.admin-review-detail-page .admin-issue-buttons button { min-height:38px; padding:8px 9px; border-radius:7px; font-size:10px; line-height:1.35; }
+.admin-review-detail-page .admin-reject-panel .admin-panel-title-row span { background:#f8e7c4; color:#8a641f; }
+.admin-review-detail-page .admin-reject-section-title { margin-top:10px; }
+@media (max-width:1200px) {
+  .admin-review-detail-page .admin-review-layout { grid-template-columns:230px minmax(0,1fr) 290px; }
+}
+@media (max-width:980px) {
+  .admin-review-detail-page .admin-review-layout { grid-template-columns:1fr; }
+  .admin-review-detail-page .admin-review-summary-column,
+  .admin-review-detail-page .admin-review-action-column { position:static; max-height:none; overflow:visible; }
+  .admin-review-detail-page .admin-review-summary-column { grid-template-columns:1fr 1fr; }
+  .admin-review-detail-page .admin-review-action-column { grid-template-columns:1fr 1fr; }
+  .admin-review-detail-page .admin-evidence-document { padding:14px 14px 16px; }
+  .admin-review-detail-page .admin-detail-images { grid-template-columns:1fr; }
+}
+
 /* 第一版功能原型：账户操作与真实链接导航 */
 .admin-nav-item { text-decoration:none; }
 .admin-sidebar-user { position:relative; }
