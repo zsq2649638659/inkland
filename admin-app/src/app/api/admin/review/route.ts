@@ -96,16 +96,35 @@ export async function POST(request: Request) {
   }
 
   const rejected = body.decision === "rejected";
-  const reason = rejected ? (body.reason?.trim().slice(0, 200) || "") : null;
+  let reason = rejected ? (body.reason?.trim().slice(0, 200) || "") : null;
   const confirmedFindingIds = normalizeIds(body.confirmedFindingIds);
   const dismissedFindingIds = normalizeIds(body.dismissedFindingIds);
   const manualFindings = normalizeManualFindings(body.manualFindings);
 
-  if (rejected && !reason) {
-    return NextResponse.json({ error: "打回作品时必须选择问题类型" }, { status: 400 });
+  if (rejected && confirmedFindingIds.length === 0 && manualFindings.length === 0 && !reason) {
+    return NextResponse.json({ error: "打回作品时必须至少确认一项系统标记、添加一项人工标记，或填写打回原因" }, { status: 400 });
   }
-  if (rejected && confirmedFindingIds.length === 0 && manualFindings.length === 0) {
-    return NextResponse.json({ error: "打回作品时必须至少确认一项系统标记或添加一项人工标记" }, { status: 400 });
+  if (rejected) {
+    // 只有打回说明时，自动生成一条人工标记，作者端能收到可读的修改意见。
+    if (manualFindings.length === 0 && confirmedFindingIds.length === 0 && reason) {
+      manualFindings.push({
+        category: "其他需要修改的问题",
+        severity: "review",
+        location_type: "text_range",
+        field_name: "content",
+        paragraph_index: null,
+        start_offset: null,
+        end_offset: null,
+        image_index: null,
+        quoted_text: null,
+        details: reason,
+      });
+    }
+    if (!reason) {
+      reason = manualFindings.length > 0
+        ? manualFindings[0].category || "审核未通过，请按标记的问题修改后重新提交。"
+        : "审核未通过，请按标记的问题修改后重新提交。";
+    }
   }
 
   const service = createAdminServiceClient();
@@ -149,7 +168,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "打回作品时必须选择问题类型" }, { status: 400 });
     }
     console.error("admin_decide_post_review_failed", error);
-    return NextResponse.json({ error: "审核写入失败，请稍后重试" }, { status: 500 });
+    const extra = [error.details, error.hint, error.code]
+      .filter((item): item is string => typeof item === "string" && item.length > 0)
+      .join(" | ")
+      .slice(0, 500);
+    const readable = `审核写入失败：${message}${extra ? `（${extra}）` : ""}`.slice(0, 600);
+    return NextResponse.json({ error: readable }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, ...(data || {}) });
