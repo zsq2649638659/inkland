@@ -1,117 +1,121 @@
 import { NextResponse } from "next/server";
 import { createAdminServiceClient, getAdminContext } from "@/lib/supabase/admin-server";
 
-type ReviewBody = {
-  postId?: string;
-  decision?: string;
-  reason?: string | null;
-  affectedImageIndexes?: number[];
+type ManualFinding = {
+  category?: string;
+  severity?: "review" | "high";
+  location_type?: string;
+  field_name?: string;
+  paragraph_index?: number | null;
+  start_offset?: number | null;
+  end_offset?: number | null;
+  image_index?: number | null;
+  quoted_text?: string | null;
+  details?: string | null;
 };
 
-function normalizeImageIndexes(value: unknown) {
+type ReviewBody = {
+  reviewCaseId?: string;
+  decision?: "approved" | "rejected";
+  reason?: string | null;
+  confirmedFindingIds?: string[];
+  dismissedFindingIds?: string[];
+  manualFindings?: ManualFinding[];
+};
+
+function normalizeIds(value: unknown, max = 50) {
   if (!Array.isArray(value)) return [];
-  return [...new Set(value.filter((item): item is number => Number.isInteger(item) && item >= 0 && item < 9))].sort((a, b) => a - b);
+  return [...new Set(value.filter((item): item is string => typeof item === "string" && /^[0-9a-f-]{36}$/i.test(item)))].slice(0, max);
+}
+
+function normalizeManualFindings(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 20).flatMap((item): ManualFinding[] => {
+    if (!item || typeof item !== "object") return [];
+    const finding = item as Record<string, unknown>;
+    const category = typeof finding.category === "string" ? finding.category.trim().slice(0, 100) : "";
+    if (!category) return [];
+    const severity = finding.severity === "high" ? "high" : "review";
+    const locationType = finding.location_type === "image" || finding.location_type === "image_ocr" ? finding.location_type : "text_range";
+    const fieldName = ["title", "content", "author_note", "image", "image_ocr"].includes(String(finding.field_name || ""))
+      ? String(finding.field_name)
+      : locationType === "image" ? "image" : "content";
+    const paragraphIndex = Number.isInteger(finding.paragraph_index) && Number(finding.paragraph_index) > 0 ? Number(finding.paragraph_index) : null;
+    const startOffset = Number.isInteger(finding.start_offset) && Number(finding.start_offset) >= 0 ? Number(finding.start_offset) : null;
+    const endOffset = Number.isInteger(finding.end_offset) && Number(finding.end_offset) >= 0 ? Number(finding.end_offset) : null;
+    const imageIndex = Number.isInteger(finding.image_index) && Number(finding.image_index) >= 0 ? Number(finding.image_index) : null;
+    if (fieldName === "image" && imageIndex === null) return [];
+    return [{
+      category,
+      severity,
+      location_type: locationType,
+      field_name: fieldName,
+      paragraph_index: paragraphIndex,
+      start_offset: startOffset,
+      end_offset: endOffset,
+      image_index: imageIndex,
+      quoted_text: typeof finding.quoted_text === "string" ? finding.quoted_text.slice(0, 500) : null,
+      details: typeof finding.details === "string" ? finding.details.trim().slice(0, 2000) || null : null,
+    }];
+  });
 }
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAdminContext();
   if (!user) return NextResponse.json({ error: "请先登录管理员后台" }, { status: 401 });
+
   const body = await request.json().catch(() => null) as ReviewBody | null;
-  if (!body?.postId || !["approved", "rejected"].includes(body.decision || "")) return NextResponse.json({ error: "审核参数无效" }, { status: 400 });
+  if (!body?.reviewCaseId || !["approved", "rejected"].includes(body.decision || "")) {
+    return NextResponse.json({ error: "审核参数无效" }, { status: 400 });
+  }
+
   const rejected = body.decision === "rejected";
-  const reason = rejected ? body.reason?.trim() : null;
-  if (rejected && !reason) return NextResponse.json({ error: "打回作品时必须选择问题类型" }, { status: 400 });
+  const reason = rejected ? (body.reason?.trim().slice(0, 200) || "") : null;
+  const confirmedFindingIds = normalizeIds(body.confirmedFindingIds);
+  const dismissedFindingIds = normalizeIds(body.dismissedFindingIds);
+  const manualFindings = normalizeManualFindings(body.manualFindings);
 
-  const service = createAdminServiceClient();
-  const db = service || supabase;
-  const { data: post, error: postError } = await db
-    .from("posts")
-    .select("id, user_id, title, review_status, review_submission_number, pending_visibility, visibility")
-    .eq("id", body.postId)
-    .maybeSingle();
-  if (postError || !post) return NextResponse.json({ error: "没有找到待审核作品" }, { status: 404 });
-  const retryingRejectedNotification = rejected && post.review_status === "rejected";
-  if (post.review_status !== "pending" && !retryingRejectedNotification) return NextResponse.json({ error: "该作品已经处理，请刷新审核列表" }, { status: 409 });
+  if (rejected && !reason) {
+    return NextResponse.json({ error: "打回作品时必须选择问题类型" }, { status: 400 });
+  }
+  if (rejected && confirmedFindingIds.length === 0 && manualFindings.length === 0) {
+    return NextResponse.json({ error: "打回作品时必须至少确认一项系统标记或添加一项人工标记" }, { status: 400 });
+  }
 
-  let affectedImageIndexes = normalizeImageIndexes(body.affectedImageIndexes);
-  if (rejected && affectedImageIndexes.length === 0) {
-    const { data: reviewCase } = await db.from("moderation_review_cases").select("id").eq("post_id", body.postId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (reviewCase) {
-      const { data: imageFindings } = await db.from("moderation_findings").select("image_index").eq("review_case_id", reviewCase.id).eq("location_type", "image");
-      affectedImageIndexes = normalizeImageIndexes((imageFindings || []).map((item) => item.image_index));
+  const db = createAdminServiceClient() || supabase;
+  const { data, error } = await db.rpc("admin_decide_post_review", {
+    review_case_id: body.reviewCaseId,
+    admin_id: user.id,
+    decision: body.decision,
+    reason,
+    confirmed_finding_ids: confirmedFindingIds,
+    dismissed_finding_ids: dismissedFindingIds,
+    manual_findings: manualFindings,
+  });
+
+  if (error) {
+    const message = String(error.message || "");
+    if (message.includes("review_case_not_found")) {
+      return NextResponse.json({ error: "没有找到对应的审核案件，请刷新审核列表" }, { status: 404 });
     }
-  }
-
-  const reviewedAt = new Date().toISOString();
-  const affectedText = affectedImageIndexes.length ? `（涉及${affectedImageIndexes.map((index) => `第${index + 1}张图片`).join("、")}）` : "";
-  const reviewReason = rejected ? `${reason}${affectedText}` : null;
-  if (!retryingRejectedNotification) {
-    const { data: updatedPost, error } = await db.from("posts").update({
-      review_status: rejected ? "rejected" : "approved",
-      review_reason: reviewReason,
-      reviewed_at: reviewedAt,
-      reviewed_by: user.id,
-      status: rejected ? "draft" : "published",
-      ...(rejected ? {} : {
-        visibility: post.pending_visibility || post.visibility || "public",
-        pending_visibility: null,
-      }),
-    }).eq("id", body.postId).eq("review_status", "pending").select("id").maybeSingle();
-    if (error || !updatedPost) return NextResponse.json({ error: "审核写入失败，请刷新后重试" }, { status: 500 });
-  }
-
-  if (rejected) {
-    const imageText = affectedImageIndexes.length
-      ? `涉及图片：${affectedImageIndexes.map((index) => `第${index + 1}张`).join("、")}。`
-      : "";
-    const content = `你的作品《${post.title || "无标题"}》未通过本次审核。问题类型：${reason}。${imageText}请修改后重新提交审核。`;
-    const submissionNumber = post.review_submission_number || 1;
-    const { data: existingNotification } = await db
-      .from("notifications")
-      .select("id")
-      .eq("user_id", post.user_id)
-      .eq("template_key", "post_review_rejected")
-      .eq("related_entity_id", post.id)
-      .contains("metadata", { submission_number: submissionNumber })
-      .limit(1)
-      .maybeSingle();
-    if (!existingNotification) {
-      const { error: notificationError } = await db.from("notifications").insert({
-        user_id: post.user_id,
-        type: "system",
-        actor_id: null,
-        post_id: post.id,
-        content,
-        read: false,
-        template_key: "post_review_rejected",
-        related_entity_type: "post",
-        related_entity_id: post.id,
-        metadata: {
-          action_url: `/create?editPost=${post.id}`,
-          action_label: "查看问题并修改",
-          issue_type: reason,
-          affected_image_indexes: affectedImageIndexes,
-          submission_number: submissionNumber,
-        },
-        delivery_status: "sent",
-        sent_at: reviewedAt,
-      });
-      if (notificationError) {
-        console.error("Failed to create rejection notification", notificationError);
-        return NextResponse.json({ error: "作品已打回，但系统通知发送失败，请不要重复操作并检查通知表配置" }, { status: 500 });
-      }
+    if (message.includes("review_case_not_actionable")) {
+      return NextResponse.json({ error: "该审核案件已经处理，请刷新审核列表" }, { status: 409 });
     }
+    if (message.includes("post_version_not_found")) {
+      return NextResponse.json({ error: "审核版本已不存在，请刷新审核列表" }, { status: 409 });
+    }
+    if (message.includes("post_not_found")) {
+      return NextResponse.json({ error: "作品已不存在，请刷新审核列表" }, { status: 404 });
+    }
+    if (message.includes("confirmed_finding_required")) {
+      return NextResponse.json({ error: "打回作品时必须至少确认一项问题标记" }, { status: 400 });
+    }
+    if (message.includes("reject_reason_required")) {
+      return NextResponse.json({ error: "打回作品时必须选择问题类型" }, { status: 400 });
+    }
+    console.error("admin_decide_post_review_failed", error);
+    return NextResponse.json({ error: "审核写入失败，请稍后重试" }, { status: 500 });
   }
 
-  if (!retryingRejectedNotification) {
-    await db.from("admin_audit_logs").insert({
-      admin_id: user.id,
-      action: rejected ? "reject_post" : "approve_post",
-      target_type: "post",
-      target_id: body.postId,
-      note: reason,
-      metadata: { affected_image_indexes: affectedImageIndexes },
-    });
-  }
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, ...(data || {}) });
 }
