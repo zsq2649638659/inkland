@@ -50,6 +50,12 @@ const stripMarkdown = (text: string): string => {
     .trim();
 };
 
+const formatChapterPreviewTitle = (series: SeriesInfo): string => {
+  const title = series.latestChapterTitle?.trim() || "";
+  if (series.latestChapterNumber === null) return title;
+  return `第${series.latestChapterNumber}章${title ? ` ${title}` : ""}`;
+};
+
 interface FollowUser {
   id: string;
   nickname: string;
@@ -671,7 +677,7 @@ export default function ProfilePage() {
                     {series.totalChapters > 0 ? (
                       <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
                         <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{series.latestChapterTitle || ""}</div>
+                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
                         <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
                       </div></Link>
                     ) : (
@@ -759,7 +765,7 @@ export default function ProfilePage() {
                     {series.totalChapters > 0 ? (
                       <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
                         <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{series.latestChapterTitle || ""}</div>
+                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
                         <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
                       </div></Link>
                     ) : (
@@ -838,7 +844,7 @@ export default function ProfilePage() {
                     {series.totalChapters > 0 ? (
                       <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
                         <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{series.latestChapterTitle || ""}</div>
+                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
                         <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
                       </div></Link>
                     ) : (
@@ -916,7 +922,7 @@ export default function ProfilePage() {
                     {series.totalChapters > 0 ? (
                       <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
                         <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{series.latestChapterTitle || ""}</div>
+                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
                         <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
                       </div></Link>
                     ) : (
@@ -995,7 +1001,7 @@ export default function ProfilePage() {
                     {series.totalChapters > 0 ? (
                       <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
                         <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{series.latestChapterTitle || ""}</div>
+                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
                         <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
                       </div></Link>
                     ) : (
