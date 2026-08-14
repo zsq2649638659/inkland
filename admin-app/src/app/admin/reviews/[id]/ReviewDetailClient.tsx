@@ -128,6 +128,7 @@ type ManualFindingDraft = {
   start_offset: number | null;
   end_offset: number | null;
   image_index: number | null;
+  ocr_note_index: number | null;
   quoted_text: string | null;
   details: string | null;
 };
@@ -282,6 +283,36 @@ function MarkedText({ text, terms, marks, manualMarkClass }: {
   return <>{nodes}</>;
 }
 
+function textOffsetInContainer(container: HTMLElement, node: Node, nodeOffset: number) {
+  const measure = document.createRange();
+  measure.selectNodeContents(container);
+  measure.setEnd(node, nodeOffset);
+  return measure.toString().length;
+}
+
+function selectionContextFromRange(range: Range) {
+  const ancestor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+    ? range.commonAncestorContainer.parentElement
+    : range.commonAncestorContainer as Element;
+  const container = ancestor instanceof Element ? ancestor.closest("[data-mark-field]") : null;
+  if (!(container instanceof HTMLElement)) return null;
+  const readInt = (value: string | undefined) => {
+    if (!value) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const fieldName = container.dataset.markField || "content";
+  return {
+    container,
+    fieldName,
+    paragraphIndex: fieldName === "content" ? readInt(container.dataset.markIndex) : null,
+    imageIndex: readInt(container.dataset.markImageIndex),
+    ocrNoteIndex: readInt(container.dataset.markOcrIndex),
+    startOffset: textOffsetInContainer(container, range.startContainer, range.startOffset),
+    endOffset: textOffsetInContainer(container, range.endContainer, range.endOffset),
+  };
+}
+
 /* ==================== 主组件 ==================== */
 
 export default function ReviewDetailClient({ post, version, reviewCase, findings, historyCases, historyVersions, imageAccessError }: {
@@ -301,7 +332,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   const [rejectReason, setRejectReason] = useState("");
   const [manualFindings, setManualFindings] = useState<ManualFindingDraft[]>([]);
   const [selectedIssueTypes, setSelectedIssueTypes] = useState<string[]>([]);
-  const [selectionInfo, setSelectionInfo] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [selectionInfo, setSelectionInfo] = useState<{ text: string; x: number; y: number; alreadyMarked: boolean } | null>(null);
 
   const noteStripped = useMemo(() => (version.content || "").replace(/<!--\s*作者的话：[\s\S]*?-->/g, ""), [version.content]);
   const imageUrls = useMemo(() => [...noteStripped.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]), [noteStripped]);
@@ -331,6 +362,10 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   const paragraphManualMarks = (paragraphIndex: number) => manualFindings
     .filter((item) => item.field_name === "content" && (item.paragraph_index ?? 0) === paragraphIndex)
     .map((item) => ({ field_name: item.field_name, paragraph_index: paragraphIndex, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 }));
+
+  const ocrManualMarks = (imageIndex: number, noteIndex: number) => manualFindings
+    .filter((item) => item.field_name === "image_ocr" && (item.image_index ?? 0) === imageIndex && (item.ocr_note_index ?? 0) === noteIndex)
+    .map((item) => ({ field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 }));
 
   const statusOf = (finding: Finding) => {
     if (confirmedIds.includes(finding.id)) return "confirmed";
@@ -364,9 +399,11 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
     setSelectedIssueTypes((prev) => prev.includes(issueType) ? prev.filter((item) => item !== issueType) : [...prev, issueType]);
   };
 
-  const findManualAtRange = (fieldName: string, paragraphIndex: number | null, startOffset: number, endOffset: number) => manualFindings.find((item) =>
+  const findManualAtRange = (fieldName: string, paragraphIndex: number | null, startOffset: number, endOffset: number, imageIndex: number | null, ocrNoteIndex: number | null) => manualFindings.find((item) =>
     item.field_name === fieldName
     && (item.paragraph_index ?? null) === (paragraphIndex ?? null)
+    && (item.image_index ?? null) === (imageIndex ?? null)
+    && (item.ocr_note_index ?? null) === (ocrNoteIndex ?? null)
     && item.start_offset !== null && item.end_offset !== null
     && Math.max(item.start_offset, startOffset) < Math.min(item.end_offset, endOffset)
   );
@@ -383,11 +420,8 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
       setSelectionInfo(null);
       return;
     }
-    const ancestor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
-      ? range.commonAncestorContainer.parentElement
-      : range.commonAncestorContainer as Element;
-    const container = ancestor instanceof Element ? ancestor.closest("[data-mark-field]") : null;
-    if (!container) {
+    const context = selectionContextFromRange(range);
+    if (!context) {
       setSelectionInfo(null);
       return;
     }
@@ -396,7 +430,17 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
       setSelectionInfo(null);
       return;
     }
-    setSelectionInfo({ text, x: rect.left + rect.width / 2, y: rect.top - 8 });
+    const minOffset = Math.min(context.startOffset, context.endOffset);
+    const maxOffset = Math.max(context.startOffset, context.endOffset);
+    const existing = findManualAtRange(
+      context.fieldName,
+      context.paragraphIndex,
+      minOffset,
+      maxOffset,
+      context.imageIndex,
+      context.ocrNoteIndex,
+    );
+    setSelectionInfo({ text, x: rect.left + rect.width / 2, y: rect.top - 8, alreadyMarked: Boolean(existing) });
   };
 
   const markSelection = () => {
@@ -404,60 +448,32 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return;
     const range = selection.getRangeAt(0);
-    const ancestor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
-      ? range.commonAncestorContainer.parentElement
-      : range.commonAncestorContainer as Element;
-    const container = ancestor instanceof Element ? ancestor.closest("[data-mark-field]") : null;
-    if (!(container instanceof HTMLElement)) return;
-    const fieldName = container.dataset.markField || "content";
-    const paragraphIndex = fieldName === "content" && container.dataset.markIndex
-      ? Number.parseInt(container.dataset.markIndex, 10)
-      : null;
+    const context = selectionContextFromRange(range);
+    if (!context) return;
+    const { container, fieldName, paragraphIndex, imageIndex, ocrNoteIndex, startOffset, endOffset } = context;
     const text = container.textContent || "";
-
-    const offsetOf = (node: Node, nodeOffset: number) => {
-      let startNode: Node = node;
-      let startNodeOffset = nodeOffset;
-      if (node.nodeType !== Node.TEXT_NODE) {
-        const firstText = document.createTreeWalker(node, NodeFilter.SHOW_TEXT).nextNode();
-        if (!firstText) return 0;
-        startNode = firstText;
-        startNodeOffset = 0;
-      }
-      let offset = 0;
-      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-      let current = walker.nextNode();
-      while (current) {
-        const length = (current as Text).length;
-        if (current === startNode) return offset + startNodeOffset;
-        offset += length;
-        current = walker.nextNode();
-      }
-      return offset;
-    };
-
-    const startOffset = offsetOf(range.startContainer, range.startOffset);
-    const endOffset = offsetOf(range.endContainer, range.endOffset);
-    const quoted = text.slice(Math.min(startOffset, endOffset), Math.max(startOffset, endOffset)).trim();
+    const minOffset = Math.min(startOffset, endOffset);
+    const maxOffset = Math.max(startOffset, endOffset);
+    const quoted = text.slice(minOffset, maxOffset).trim();
     if (!quoted) {
       window.getSelection()?.removeAllRanges();
       setSelectionInfo(null);
       return;
     }
 
-    const minOffset = Math.min(startOffset, endOffset);
-    const maxOffset = Math.max(startOffset, endOffset);
-    const existing = findManualAtRange(fieldName, paragraphIndex, minOffset, maxOffset);
+    const isOcr = fieldName === "image_ocr";
+    const existing = findManualAtRange(fieldName, paragraphIndex, minOffset, maxOffset, imageIndex, ocrNoteIndex);
     setManualFindings((prev) => existing
       ? prev.filter((item) => item.clientId !== existing.clientId)
       : [...prev, {
           clientId: makeClientId(),
-          location_type: "text_range",
+          location_type: isOcr ? "image_ocr" : "text_range",
           field_name: fieldName,
           paragraph_index: paragraphIndex,
           start_offset: minOffset,
           end_offset: maxOffset,
-          image_index: null,
+          image_index: isOcr ? imageIndex : null,
+          ocr_note_index: isOcr ? ocrNoteIndex : null,
           quoted_text: quoted.slice(0, 500),
           details: null,
         }]);
@@ -477,6 +493,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
         start_offset: null,
         end_offset: null,
         image_index: imageIndex,
+        ocr_note_index: null,
         quoted_text: url.split("/").pop() || `图片 ${imageIndex + 1}`,
         details: null,
       }];
@@ -752,13 +769,20 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
                         </figcaption>
                         {ocrNotes.length > 0 && (
                           <div className="admin-ocr-note">
-                            {ocrNotes.map((note) => {
+                            {ocrNotes.map((note, noteIndex) => {
                               const confidence = ocrConfidence(note);
+                              const ocrText = `图片文字：${note.quoted_text || "（无引用文本）"}${confidence !== null ? `（置信度 ${Math.round(confidence * 100)}%）` : ""}${note.details ? ` · ${note.details}` : ""}`;
                               return (
-                                <div key={note.id}>
-                                  图片文字：{note.quoted_text || "（无引用文本）"}
-                                  {confidence !== null ? `（置信度 ${Math.round(confidence * 100)}%）` : ""}
-                                  {note.details ? ` · ${note.details}` : ""}
+                                <div
+                                  key={note.id}
+                                  className="admin-ocr-line"
+                                  data-mark-field="image_ocr"
+                                  data-mark-image-index={index}
+                                  data-mark-ocr-index={noteIndex}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onMouseUp={handleDocumentMouseUp}
+                                >
+                                  <MarkedText text={ocrText} terms={[]} marks={ocrManualMarks(index, noteIndex)} />
                                 </div>
                               );
                             })}
@@ -778,7 +802,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
           {selectionInfo ? (
             <div className="admin-mark-bubble" style={{ left: selectionInfo.x, top: selectionInfo.y }}>
               <span>{selectionInfo.text.length > 14 ? `${selectionInfo.text.slice(0, 14)}…` : selectionInfo.text}</span>
-              <button type="button" onClick={markSelection}>标记</button>
+              <button type="button" onClick={markSelection}>{selectionInfo.alreadyMarked ? "取消标记" : "标记"}</button>
             </div>
           ) : null}
         </article>
