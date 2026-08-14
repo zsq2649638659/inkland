@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- 审核页需要展示作品原图。 */
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 /* ==================== 类型 ==================== */
 
@@ -122,13 +122,21 @@ type HistoryVersion = {
 
 type ManualFindingDraft = {
   clientId: string;
-  category: string;
   location_type: string;
   field_name: string;
   paragraph_index: number | null;
+  start_offset: number | null;
+  end_offset: number | null;
   image_index: number | null;
   quoted_text: string | null;
   details: string | null;
+};
+
+type ManualMark = {
+  field_name: string;
+  paragraph_index: number | null;
+  start_offset: number;
+  end_offset: number;
 };
 
 /* ==================== 文案映射 ==================== */
@@ -221,37 +229,54 @@ function formatDate(value?: string | null) {
 
 /* ==================== 高亮 ==================== */
 
-function Highlight({ text, terms }: { text: string; terms: string[] }) {
+function MarkedText({ text, terms, marks, manualMarkClass }: {
+  text: string;
+  terms: string[];
+  marks: ManualMark[];
+  manualMarkClass?: string;
+}) {
   if (!text) return <>{text}</>;
+  const ranges: Array<{ start: number; end: number; kind: "system" | "manual" }> = [];
   const uniqueTerms = [...new Set(terms.filter(Boolean))];
-  if (!uniqueTerms.length) return <>{text}</>;
-
   const lower = text.toLowerCase();
-  const ranges: Array<[number, number]> = [];
   for (const term of uniqueTerms) {
     const needle = term.toLowerCase();
     let index = lower.indexOf(needle);
     while (index !== -1) {
-      ranges.push([index, index + term.length]);
+      ranges.push({ start: index, end: index + term.length, kind: "system" });
       index = lower.indexOf(needle, index + 1);
     }
   }
+  for (const mark of marks) {
+    const start = Math.max(0, Math.min(mark.start_offset, text.length));
+    const end = Math.max(start, Math.min(mark.end_offset, text.length));
+    if (end > start) ranges.push({ start, end, kind: "manual" });
+  }
   if (!ranges.length) return <>{text}</>;
 
-  ranges.sort((a, b) => a[0] - b[0]);
-  const merged: Array<[number, number]> = [];
+  ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: Array<{ start: number; end: number; kinds: Set<"system" | "manual"> }> = [];
   for (const range of ranges) {
     const last = merged[merged.length - 1];
-    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
-    else merged.push([range[0], range[1]]);
+    if (last && range.start <= last.end) {
+      last.end = Math.max(last.end, range.end);
+      last.kinds.add(range.kind);
+    } else {
+      merged.push({ start: range.start, end: range.end, kinds: new Set([range.kind]) });
+    }
   }
 
   const nodes: ReactNode[] = [];
   let cursor = 0;
-  merged.forEach(([start, end], index) => {
-    if (start > cursor) nodes.push(<span key={`t-${index}`}>{text.slice(cursor, start)}</span>);
-    nodes.push(<mark key={`m-${index}`}>{text.slice(start, end)}</mark>);
-    cursor = end;
+  merged.forEach((range, index) => {
+    if (range.start > cursor) nodes.push(<span key={`t-${index}`}>{text.slice(cursor, range.start)}</span>);
+    const isManual = range.kinds.has("manual");
+    nodes.push(
+      <mark key={`m-${index}`} className={isManual ? manualMarkClass || "admin-manual-mark" : undefined}>
+        {text.slice(range.start, range.end)}
+      </mark>,
+    );
+    cursor = range.end;
   });
   if (cursor < text.length) nodes.push(<span key="t-end">{text.slice(cursor)}</span>);
   return <>{nodes}</>;
@@ -275,12 +300,8 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   const [dismissedIds, setDismissedIds] = useState<string[]>(() => findings.filter((f) => f.status === "dismissed").map((f) => f.id));
   const [rejectReason, setRejectReason] = useState("");
   const [manualFindings, setManualFindings] = useState<ManualFindingDraft[]>([]);
-  const [manualField, setManualField] = useState<"title" | "content" | "author_note" | "image" | "image_ocr">("content");
-  const [manualParagraph, setManualParagraph] = useState("");
-  const [manualImage, setManualImage] = useState("");
-  const [manualCategory, setManualCategory] = useState(issueTypes[issueTypes.length - 1]);
-  const [manualQuoted, setManualQuoted] = useState("");
-  const [manualDetails, setManualDetails] = useState("");
+  const [selectedIssueTypes, setSelectedIssueTypes] = useState<string[]>([]);
+  const [selectionInfo, setSelectionInfo] = useState<{ text: string; x: number; y: number } | null>(null);
 
   const noteStripped = useMemo(() => (version.content || "").replace(/<!--\s*作者的话：[\s\S]*?-->/g, ""), [version.content]);
   const imageUrls = useMemo(() => [...noteStripped.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]), [noteStripped]);
@@ -296,6 +317,20 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
       (f.field_name === "content" && (f.paragraph_index ?? 0) === paragraphIndex) || !f.field_name
     ))
     .map((f) => f.quoted_text as string);
+
+  const titleManualMarks = useMemo(() => manualFindings
+    .filter((item) => item.field_name === "title")
+    .map((item) => ({ field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 })),
+  [manualFindings]);
+
+  const noteManualMarks = useMemo(() => manualFindings
+    .filter((item) => item.field_name === "author_note")
+    .map((item) => ({ field_name: item.field_name, paragraph_index: null, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 })),
+  [manualFindings]);
+
+  const paragraphManualMarks = (paragraphIndex: number) => manualFindings
+    .filter((item) => item.field_name === "content" && (item.paragraph_index ?? 0) === paragraphIndex)
+    .map((item) => ({ field_name: item.field_name, paragraph_index: paragraphIndex, start_offset: item.start_offset ?? 0, end_offset: item.end_offset ?? 0 }));
 
   const statusOf = (finding: Finding) => {
     if (confirmedIds.includes(finding.id)) return "confirmed";
@@ -323,62 +358,213 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const addManualFinding = () => {
-    const paragraph = manualField === "content" ? Number.parseInt(manualParagraph, 10) : null;
-    const imageInput = manualField === "image" || manualField === "image_ocr" ? Number.parseInt(manualImage, 10) : null;
-    if (manualField === "content" && (!Number.isInteger(paragraph) || (paragraph ?? 0) < 1)) {
-      setMessage("正文标记请填写段落编号（从 1 开始）。");
+  const makeClientId = () => `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const toggleIssueType = (issueType: string) => {
+    setSelectedIssueTypes((prev) => prev.includes(issueType) ? prev.filter((item) => item !== issueType) : [...prev, issueType]);
+  };
+
+  const findManualAtRange = (fieldName: string, paragraphIndex: number | null, startOffset: number, endOffset: number) => manualFindings.find((item) =>
+    item.field_name === fieldName
+    && (item.paragraph_index ?? null) === (paragraphIndex ?? null)
+    && item.start_offset !== null && item.end_offset !== null
+    && Math.max(item.start_offset, startOffset) < Math.min(item.end_offset, endOffset)
+  );
+
+  const handleDocumentMouseUp = () => {
+    const selection = window.getSelection();
+    const range = selection && !selection.isCollapsed ? selection.getRangeAt(0) : null;
+    if (!range) {
+      setSelectionInfo(null);
       return;
     }
-    if ((manualField === "image" || manualField === "image_ocr") && (!Number.isInteger(imageInput) || (imageInput ?? 0) < 1)) {
-      setMessage("图片标记请填写图片序号（从 1 开始）。");
+    const text = selection?.toString().trim() || "";
+    if (!text || text.length > 500) {
+      setSelectionInfo(null);
       return;
     }
-    setManualFindings((prev) => [...prev, {
-      clientId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      category: manualCategory,
-      location_type: manualField === "image_ocr" ? "image_ocr" : manualField === "image" ? "image" : "text_range",
-      field_name: manualField,
-      paragraph_index: paragraph,
-      image_index: imageInput !== null ? imageInput - 1 : null,
-      quoted_text: manualQuoted.trim() || null,
-      details: manualDetails.trim() || null,
-    }]);
-    setManualQuoted("");
-    setManualDetails("");
-    setMessage("");
+    const ancestor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+      ? range.commonAncestorContainer.parentElement
+      : range.commonAncestorContainer as Element;
+    const container = ancestor instanceof Element ? ancestor.closest("[data-mark-field]") : null;
+    if (!container) {
+      setSelectionInfo(null);
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    if (!rect || (!rect.width && !rect.height)) {
+      setSelectionInfo(null);
+      return;
+    }
+    setSelectionInfo({ text, x: rect.left + rect.width / 2, y: rect.top - 8 });
+  };
+
+  const markSelection = () => {
+    if (!selectionInfo) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
+    const range = selection.getRangeAt(0);
+    const ancestor = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+      ? range.commonAncestorContainer.parentElement
+      : range.commonAncestorContainer as Element;
+    const container = ancestor instanceof Element ? ancestor.closest("[data-mark-field]") : null;
+    if (!(container instanceof HTMLElement)) return;
+    const fieldName = container.dataset.markField || "content";
+    const paragraphIndex = fieldName === "content" && container.dataset.markIndex
+      ? Number.parseInt(container.dataset.markIndex, 10)
+      : null;
+    const text = container.textContent || "";
+
+    const offsetOf = (node: Node, nodeOffset: number) => {
+      let startNode: Node = node;
+      let startNodeOffset = nodeOffset;
+      if (node.nodeType !== Node.TEXT_NODE) {
+        const firstText = document.createTreeWalker(node, NodeFilter.SHOW_TEXT).nextNode();
+        if (!firstText) return 0;
+        startNode = firstText;
+        startNodeOffset = 0;
+      }
+      let offset = 0;
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      let current = walker.nextNode();
+      while (current) {
+        const length = (current as Text).length;
+        if (current === startNode) return offset + startNodeOffset;
+        offset += length;
+        current = walker.nextNode();
+      }
+      return offset;
+    };
+
+    const startOffset = offsetOf(range.startContainer, range.startOffset);
+    const endOffset = offsetOf(range.endContainer, range.endOffset);
+    const quoted = text.slice(Math.min(startOffset, endOffset), Math.max(startOffset, endOffset)).trim();
+    if (!quoted) {
+      window.getSelection()?.removeAllRanges();
+      setSelectionInfo(null);
+      return;
+    }
+
+    const minOffset = Math.min(startOffset, endOffset);
+    const maxOffset = Math.max(startOffset, endOffset);
+    const existing = findManualAtRange(fieldName, paragraphIndex, minOffset, maxOffset);
+    setManualFindings((prev) => existing
+      ? prev.filter((item) => item.clientId !== existing.clientId)
+      : [...prev, {
+          clientId: makeClientId(),
+          location_type: "text_range",
+          field_name: fieldName,
+          paragraph_index: paragraphIndex,
+          start_offset: minOffset,
+          end_offset: maxOffset,
+          image_index: null,
+          quoted_text: quoted.slice(0, 500),
+          details: null,
+        }]);
+    window.getSelection()?.removeAllRanges();
+    setSelectionInfo(null);
+  };
+
+  const toggleImageMark = (imageIndex: number, url: string) => {
+    setManualFindings((prev) => {
+      const existing = prev.find((item) => item.field_name === "image" && (item.image_index ?? 0) === imageIndex);
+      if (existing) return prev.filter((item) => item.clientId !== existing.clientId);
+      return [...prev, {
+        clientId: makeClientId(),
+        location_type: "image",
+        field_name: "image",
+        paragraph_index: null,
+        start_offset: null,
+        end_offset: null,
+        image_index: imageIndex,
+        quoted_text: url.split("/").pop() || `图片 ${imageIndex + 1}`,
+        details: null,
+      }];
+    });
   };
 
   const removeManualFinding = (clientId: string) => {
     setManualFindings((prev) => prev.filter((item) => item.clientId !== clientId));
   };
 
+  const manualFindingLabel = (item: ManualFindingDraft) => {
+    if (item.field_name === "title") return "标题";
+    if (item.field_name === "author_note") return "作者的话";
+    if (item.field_name === "image") return `图片 ${(item.image_index ?? 0) + 1}`;
+    if (item.field_name === "image_ocr") return `图片内文字 · 图片 ${(item.image_index ?? 0) + 1}`;
+    return `正文 · 段落 ${item.paragraph_index ?? "?"}`;
+  };
+
+  const toggleImageMarkKeyboard = (index: number, url: string) => (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleImageMark(index, url);
+    }
+  };
+
+  useEffect(() => {
+    const handleDocumentPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      const bubble = document.querySelector(".admin-mark-bubble");
+      if (bubble?.contains(target)) return;
+      if (target instanceof Element && target.closest("[data-mark-field]")) return;
+      setSelectionInfo(null);
+    };
+    document.addEventListener("pointerdown", handleDocumentPointerDown);
+    return () => document.removeEventListener("pointerdown", handleDocumentPointerDown);
+  }, []);
+
   const reject = async () => {
     const reason = rejectReason.trim();
+    if (selectedIssueTypes.length === 0) {
+      setMessage("请先勾选至少一项问题类型。");
+      return;
+    }
     if (confirmedIds.length === 0 && manualFindings.length === 0 && !reason) {
       setMessage("请先确认一项系统标记、添加一项人工标记，或填写打回说明。");
       return;
     }
     setBusy(true);
     setMessage("");
+    const category = selectedIssueTypes[0];
+    const issueText = selectedIssueTypes.join("、");
+    const finalReason = reason ? `${issueText}。${reason}` : `${issueText}。`;
+    const submittedFindings = manualFindings.map((item) => ({
+      category,
+      severity: "high",
+      location_type: item.location_type,
+      field_name: item.field_name,
+      paragraph_index: item.paragraph_index,
+      start_offset: item.start_offset,
+      end_offset: item.end_offset,
+      image_index: item.image_index,
+      quoted_text: item.quoted_text,
+      details: item.details ? `${issueText}。${item.details}` : `${issueText}。`,
+    }));
+    if (confirmedIds.length === 0 && submittedFindings.length === 0) {
+      submittedFindings.push({
+        category,
+        severity: "high",
+        location_type: "text_range",
+        field_name: "content",
+        paragraph_index: null,
+        start_offset: null,
+        end_offset: null,
+        image_index: null,
+        quoted_text: null,
+        details: `${issueText}。${reason}`,
+      });
+    }
     const response = await fetch("/api/admin/review", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         reviewCaseId: reviewCase?.id,
         decision: "rejected",
-        reason: reason || (manualFindings.length ? manualFindings[0].category : "审核未通过，请按标记的问题修改后重新提交。"),
+        reason: finalReason,
         confirmedFindingIds: confirmedIds,
         dismissedFindingIds: dismissedIds,
-        manualFindings: manualFindings.map((item) => ({
-          category: item.category,
-          location_type: item.location_type,
-          field_name: item.field_name,
-          paragraph_index: item.paragraph_index,
-          image_index: item.image_index,
-          quoted_text: item.quoted_text,
-          details: item.details,
-        })),
+        manualFindings: submittedFindings,
       }),
     });
     const payload = await response.json().catch(() => null) as { error?: string } | null;
@@ -428,7 +614,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
         <div className="admin-detail-kicker">
           POST-PUBLISH REVIEW · {typeLabels[version.post_type || post.post_type || ""] || "作品"} · 冻结版本 v{version.version_number ?? 1}
         </div>
-        <h1><Highlight text={version.title || "无标题"} terms={titleTerms} /></h1>
+        <h1><MarkedText text={version.title || "无标题"} terms={titleTerms} marks={titleManualMarks} /></h1>
         <div className="admin-detail-meta">
           作者：{post.author?.nickname || "未知作者"}
           {version.post_type === "serial" && version.series_name ? ` · 连载《${version.series_name}》` : ""}
@@ -498,7 +684,9 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
         <article className="admin-detail-content admin-review-main">
           <section className="admin-evidence-document">
             <div className="admin-document-label">FROZEN VERSION · 审核中固定版本</div>
-            <h2 id="field-title"><Highlight text={version.title || "无标题"} terms={titleTerms} /></h2>
+            <h2 id="field-title" data-mark-field="title" onMouseUp={handleDocumentMouseUp}>
+              <MarkedText text={version.title || "无标题"} terms={titleTerms} marks={titleManualMarks} />
+            </h2>
             {imageAccessError ? <div className="admin-image-access-error" role="alert">{imageAccessError}</div> : null}
 
             {paragraphs.length > 0 && (
@@ -507,8 +695,8 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
                 {paragraphs.map((paragraph, index) => (
                   <div className="admin-paragraph" id={`para-${index + 1}`} key={`para-${index + 1}`}>
                     <span className="admin-paragraph-num">{index + 1}</span>
-                    <div className="admin-long-content">
-                      <Highlight text={paragraph} terms={paragraphTerms(index + 1)} />
+                    <div className="admin-long-content" data-mark-field="content" data-mark-index={index + 1} onMouseUp={handleDocumentMouseUp}>
+                      <MarkedText text={paragraph} terms={paragraphTerms(index + 1)} marks={paragraphManualMarks(index + 1)} />
                     </div>
                   </div>
                 ))}
@@ -518,8 +706,8 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
             {version.author_note ? (
               <div className="admin-field-block" id="field-author-note">
                 <h3>作者的话</h3>
-                <div className="admin-long-content">
-                  <Highlight text={version.author_note} terms={authorNoteTerms} />
+                <div className="admin-long-content" data-mark-field="author_note" onMouseUp={handleDocumentMouseUp}>
+                  <MarkedText text={version.author_note} terms={authorNoteTerms} marks={noteManualMarks} />
                 </div>
               </div>
             ) : null}
@@ -532,21 +720,31 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
                     const risks = imageFindingsByIndex(index);
                     const unavailable = url.startsWith("private://") || brokenImages.includes(index);
                     const ocrNotes = findings.filter((f) => f.location_type === "image_ocr" && (f.image_index ?? 0) === index);
+                    const isManuallyMarked = manualFindings.some((item) => item.field_name === "image" && (item.image_index ?? 0) === index);
                     return (
-                      <figure key={`${url}-${index}`} id={`img-${index}`} className={risks.length ? "is-flagged" : undefined}>
+                      <figure
+                        key={`${url}-${index}`}
+                        id={`img-${index}`}
+                        className={[risks.length ? "is-flagged" : "", isManuallyMarked ? "is-manual-marked" : ""].filter(Boolean).join(" ")}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isManuallyMarked}
+                        title={isManuallyMarked ? "取消标记这张图片" : "标记这张图片"}
+                        onClick={() => toggleImageMark(index, url)}
+                        onKeyDown={toggleImageMarkKeyboard(index, url)}
+                      >
+                        <span className="admin-image-mark-badge">已标记</span>
                         {unavailable ? (
                           <div className="admin-image-unavailable">
                             <strong>图片 {index + 1} 暂时无法显示</strong>
                             <span>请检查后台私有图片访问配置后重新加载页面。</span>
                           </div>
                         ) : (
-                          <a href={url} target="_blank" rel="noreferrer" title="打开原图">
-                            <img
-                              src={url}
-                              alt={`作品图片 ${index + 1}`}
-                              onError={() => setBrokenImages((items) => items.includes(index) ? items : [...items, index])}
-                            />
-                          </a>
+                          <img
+                            src={url}
+                            alt={`作品图片 ${index + 1}${isManuallyMarked ? "（已人工标记）" : ""}`}
+                            onError={() => setBrokenImages((items) => items.includes(index) ? items : [...items, index])}
+                          />
                         )}
                         <figcaption>
                           图片 {index + 1}
@@ -577,6 +775,12 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
               <p className="admin-detail-empty">版本内容已不存在或无法读取。</p>
             ) : null}
           </section>
+          {selectionInfo ? (
+            <div className="admin-mark-bubble" style={{ left: selectionInfo.x, top: selectionInfo.y }}>
+              <span>{selectionInfo.text.length > 14 ? `${selectionInfo.text.slice(0, 14)}…` : selectionInfo.text}</span>
+              <button type="button" onClick={markSelection}>标记</button>
+            </div>
+          ) : null}
         </article>
 
         <aside className="admin-review-action-column">
@@ -629,77 +833,46 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
               <h2>添加人工标记</h2>
               {manualFindings.length ? <span>{manualFindings.length} 项</span> : null}
             </div>
-            <div className="admin-manual-form">
-              <label className="admin-field">
-                标记位置
-                <select value={manualField} onChange={(event) => setManualField(event.target.value as typeof manualField)}>
-                  <option value="content">正文段落</option>
-                  <option value="title">标题</option>
-                  <option value="author_note">作者的话</option>
-                  <option value="image">图片</option>
-                  <option value="image_ocr">图片内文字</option>
-                </select>
-              </label>
-              <div className="admin-field-row">
-                {manualField === "content" && (
-                  <label className="admin-field">
-                    段落编号
-                    <input type="number" min={1} max={Math.max(paragraphs.length, 1)} value={manualParagraph} onChange={(event) => setManualParagraph(event.target.value)} placeholder={`1-${Math.max(paragraphs.length, 1)}`} />
-                  </label>
-                )}
-                {(manualField === "image" || manualField === "image_ocr") && (
-                  <label className="admin-field">
-                    图片序号
-                    <input type="number" min={1} max={Math.max(imageUrls.length, 1)} value={manualImage} onChange={(event) => setManualImage(event.target.value)} placeholder={`1-${Math.max(imageUrls.length, 1)}`} />
-                  </label>
-                )}
-                <label className="admin-field">
-                  问题类型
-                  <select value={manualCategory} onChange={(event) => setManualCategory(event.target.value)}>
-                    {issueTypes.map((issueType) => <option key={issueType}>{issueType}</option>)}
-                  </select>
-                </label>
-              </div>
-              {manualField !== "image" && manualField !== "image_ocr" && (
-                <label className="admin-field">
-                  引用文本（选填）
-                  <input value={manualQuoted} onChange={(event) => setManualQuoted(event.target.value)} placeholder="标记的具体文字，便于作者定位" maxLength={500} />
-                </label>
-              )}
-              <label className="admin-field">
-                说明（选填）
-                <textarea value={manualDetails} onChange={(event) => setManualDetails(event.target.value)} placeholder="补充需要作者修改的细节" maxLength={2000} />
-              </label>
-              <button type="button" className="admin-btn admin-btn-primary" disabled={busy} onClick={addManualFinding}>添加到问题清单</button>
-            </div>
-            {manualFindings.length > 0 && (
+            <p>在中间作品内容里框选标题、正文、作者的话等文字，或直接点击图片进行标记；标记时无需选择问题类型。</p>
+            {manualFindings.length ? (
               <div className="admin-finding-list admin-manual-findings">
                 {manualFindings.map((item) => (
                   <div className="admin-finding-item is-confirmed" key={item.clientId}>
                     <div className="admin-finding-head">
-                      <strong>
-                        {item.field_name === "title" ? "标题" : item.field_name === "author_note" ? "作者的话" : item.field_name === "image" ? `图片 ${(item.image_index ?? 0) + 1}` : item.field_name === "image_ocr" ? `图片内文字 · 图片 ${(item.image_index ?? 0) + 1}` : `正文 · 段落 ${item.paragraph_index ?? "?"}`}
-                      </strong>
+                      <strong>{manualFindingLabel(item)}</strong>
                       <span className="admin-finding-status is-confirmed">已确认</span>
                     </div>
                     <div className="admin-finding-tags">
-                      <span>{item.category}</span>
                       <span className="is-source">管理员</span>
                     </div>
                     {item.quoted_text ? <blockquote>{item.quoted_text}</blockquote> : null}
-                    {item.details ? <small>{item.details}</small> : null}
                     <div className="admin-finding-actions">
                       <button className="is-muted" type="button" onClick={() => removeManualFinding(item.clientId)}>移除</button>
                     </div>
                   </div>
                 ))}
               </div>
+            ) : (
+              <div className="admin-manual-empty">还没有人工标记。框选正文文字试试，气泡会出现在选中文字上方。</div>
             )}
           </section>
 
           <section className="admin-detail-panel admin-reject-panel">
             <h2>标记问题并打回</h2>
-            <p>确认系统标记、添加人工标记后直接打回；也可以填写说明作为打回原因。</p>
+            <p>先勾选问题类型（可多选），再确认系统标记、人工标记或填写说明后打回。</p>
+            <div className="admin-issue-buttons">
+              {issueTypes.map((issueType) => (
+                <button
+                  key={issueType}
+                  type="button"
+                  disabled={busy}
+                  className={selectedIssueTypes.includes(issueType) ? "is-selected" : undefined}
+                  onClick={() => toggleIssueType(issueType)}
+                >
+                  {issueType}
+                </button>
+              ))}
+            </div>
             <label className="admin-field">
               打回说明（选填）
               <textarea value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="补充需要作者修改的说明" maxLength={200} />
@@ -707,7 +880,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
             <button className="admin-detail-danger" type="button" disabled={busy} onClick={() => void reject()}>
               {busy ? "处理中…" : "标记问题并打回"}
             </button>
-            <small>至少确认一项系统标记、添加一项人工标记，或填写打回说明。</small>
+            <small>先勾选至少一项问题类型；再确认系统标记、添加人工标记或填写说明作为打回依据。</small>
           </section>
 
           <section className="admin-detail-panel admin-approve-panel">
