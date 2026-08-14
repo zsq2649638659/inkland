@@ -273,7 +273,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   const [brokenImages, setBrokenImages] = useState<number[]>([]);
   const [confirmedIds, setConfirmedIds] = useState<string[]>(() => findings.filter((f) => f.status === "confirmed").map((f) => f.id));
   const [dismissedIds, setDismissedIds] = useState<string[]>(() => findings.filter((f) => f.status === "dismissed").map((f) => f.id));
-  const [selectedIssueType, setSelectedIssueType] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [manualFindings, setManualFindings] = useState<ManualFindingDraft[]>([]);
   const [manualField, setManualField] = useState<"title" | "content" | "author_note" | "image" | "image_ocr">("content");
   const [manualParagraph, setManualParagraph] = useState("");
@@ -354,12 +354,9 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   };
 
   const reject = async () => {
-    if (!selectedIssueType) {
-      setMessage("打回作品前请先选择问题类型。");
-      return;
-    }
-    if (confirmedIds.length === 0 && manualFindings.length === 0) {
-      setMessage("打回作品前请至少确认一项系统标记，或添加一项人工标记。");
+    const reason = rejectReason.trim();
+    if (confirmedIds.length === 0 && manualFindings.length === 0 && !reason) {
+      setMessage("请先确认一项系统标记、添加一项人工标记，或填写打回说明。");
       return;
     }
     setBusy(true);
@@ -370,7 +367,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
       body: JSON.stringify({
         reviewCaseId: reviewCase?.id,
         decision: "rejected",
-        reason: selectedIssueType,
+        reason: reason || (manualFindings.length ? manualFindings[0].category : "审核未通过，请按标记的问题修改后重新提交。"),
         confirmedFindingIds: confirmedIds,
         dismissedFindingIds: dismissedIds,
         manualFindings: manualFindings.map((item) => ({
@@ -702,24 +699,15 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
 
           <section className="admin-detail-panel admin-reject-panel">
             <h2>标记问题并打回</h2>
-            <p>选择问题类型后点击打回，系统会把已确认的问题清单发给作者。</p>
-            <div className="admin-issue-buttons">
-              {issueTypes.map((issueType) => (
-                <button
-                  key={issueType}
-                  type="button"
-                  className={selectedIssueType === issueType ? "is-selected" : ""}
-                  disabled={busy}
-                  onClick={() => setSelectedIssueType(issueType)}
-                >
-                  {issueType}
-                </button>
-              ))}
-            </div>
+            <p>确认系统标记、添加人工标记后直接打回；也可以填写说明作为打回原因。</p>
+            <label className="admin-field">
+              打回说明（选填）
+              <textarea value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="补充需要作者修改的说明" maxLength={200} />
+            </label>
             <button className="admin-detail-danger" type="button" disabled={busy} onClick={() => void reject()}>
               {busy ? "处理中…" : "标记问题并打回"}
             </button>
-            <small>打回前必须至少确认一项系统标记或添加一项人工标记。</small>
+            <small>至少确认一项系统标记、添加一项人工标记，或填写打回说明。</small>
           </section>
 
           <section className="admin-detail-panel admin-approve-panel">
