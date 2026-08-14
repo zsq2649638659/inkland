@@ -822,7 +822,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   const imageFindingsByIndex = (index: number) => findings.filter((f) => (f.location_type === "image" || f.location_type === "image_ocr") && (f.image_index ?? 0) === index);
 
   return (
-    <main className="admin-detail-shell">
+    <main className="admin-review-detail-page admin-detail-shell">
       <header className="admin-detail-top">
         <Link href="/admin?view=reviews" className="admin-back-link">← 返回作品审核</Link>
         <span className="admin-detail-status">{statusLabels[reviewCase?.status || ""] || "待人工审核"}</span>
@@ -857,10 +857,18 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
         <aside className="admin-review-summary-column">
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row">
-              <h2>审核信息</h2>
+              <h2>作品信息</h2>
               <span>{reviewCase?.priority === "high" ? "高风险" : "普通"}</span>
             </div>
             <dl>
+              <dt>作者</dt>
+              <dd>{post.author?.nickname || "未知作者"}</dd>
+              <dt>类型</dt>
+              <dd>{typeLabels[version.post_type || post.post_type || ""] || "作品"}</dd>
+              <dt>提交版本</dt>
+              <dd>v{version.version_number ?? 1} · 第 {reviewCase?.submission_number || 1} 次提交</dd>
+              <dt>评级</dt>
+              <dd>{post.content_rating || "未评级"}</dd>
               <dt>审核状态</dt>
               <dd>{statusLabels[reviewCase?.status || ""] || reviewCase?.status || "待人工审核"}</dd>
               <dt>自动审核状态</dt>
@@ -876,6 +884,79 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
               <dt>可见范围</dt>
               <dd>{post.pending_visibility || version.visibility || "public"}</dd>
             </dl>
+          </section>
+
+          <section className="admin-detail-panel">
+            <div className="admin-panel-title-row">
+              <h2>系统标记与风险</h2>
+              <span>{findings.length} 项</span>
+            </div>
+            <p>确认需要作者修改的标记；其余可以忽略。已确认标记会进入打回问题清单。</p>
+            {findings.length ? (
+              <div className="admin-finding-list">
+                {findings.map((finding) => {
+                  const status = statusOf(finding);
+                  const confidence = ocrConfidence(finding);
+                  return (
+                    <div className={`admin-finding-item ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`} key={finding.id}>
+                      <div className="admin-finding-head">
+                        <strong>{locationTitle(finding)}</strong>
+                        <span className={`admin-finding-status ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`}>
+                          {findingStatusLabels[status] || "待确认"}
+                        </span>
+                      </div>
+                      <div className="admin-finding-tags">
+                        <span>{riskLabel(finding.category)}</span>
+                        <span className="is-source">{sourceLabel(finding.source)}</span>
+                        {confidence !== null && <span>OCR 置信度 {Math.round(confidence * 100)}%</span>}
+                      </div>
+                      {finding.quoted_text ? <blockquote>{finding.quoted_text}</blockquote> : null}
+                      {finding.details ? <small>{finding.details}</small> : null}
+                      <div className="admin-finding-actions">
+                        <button className={status === "confirmed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleConfirm(finding)}>
+                          {status === "confirmed" ? "取消确认" : "确认"}
+                        </button>
+                        <button className={status === "dismissed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleDismiss(finding)}>
+                          {status === "dismissed" ? "取消忽略" : "忽略"}
+                        </button>
+                        <button className="is-muted" type="button" onClick={() => scrollTo(finding)}>定位</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p>系统没有自动标记。可直接放行，或使用下方人工标记添加问题。</p>
+            )}
+          </section>
+
+          <section className="admin-detail-panel">
+            <div className="admin-panel-title-row">
+              <h2>添加人工标记</h2>
+              {manualFindings.length ? <span>{manualFindings.length} 项</span> : null}
+            </div>
+            <p>在中间作品内容里框选标题、正文、作者的话等文字，或直接点击图片进行标记；标记时无需选择问题类型。</p>
+            {manualFindings.length ? (
+              <div className="admin-finding-list admin-manual-findings">
+                {manualFindings.map((item) => (
+                  <div className="admin-finding-item is-confirmed" key={item.clientId}>
+                    <div className="admin-finding-head">
+                      <strong>{manualFindingLabel(item)}</strong>
+                      <span className="admin-finding-status is-confirmed">已确认</span>
+                    </div>
+                    <div className="admin-finding-tags">
+                      <span className="is-source">管理员</span>
+                    </div>
+                    {item.quoted_text ? <blockquote>{item.quoted_text}</blockquote> : null}
+                    <div className="admin-finding-actions">
+                      <button className="is-muted" type="button" onClick={() => removeManualFinding(item.clientId)}>移除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="admin-manual-empty">还没有人工标记。框选正文文字试试，气泡会出现在选中文字上方。</div>
+            )}
           </section>
 
           <section className="admin-detail-panel">
@@ -1058,79 +1139,6 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
         </article>
 
         <aside className="admin-review-action-column">
-          <section className="admin-detail-panel">
-            <div className="admin-panel-title-row">
-              <h2>系统标记与风险</h2>
-              <span>{findings.length} 项</span>
-            </div>
-            <p>确认需要作者修改的标记；其余可以忽略。已确认标记会进入打回问题清单。</p>
-            {findings.length ? (
-              <div className="admin-finding-list">
-                {findings.map((finding) => {
-                  const status = statusOf(finding);
-                  const confidence = ocrConfidence(finding);
-                  return (
-                    <div className={`admin-finding-item ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`} key={finding.id}>
-                      <div className="admin-finding-head">
-                        <strong>{locationTitle(finding)}</strong>
-                        <span className={`admin-finding-status ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`}>
-                          {findingStatusLabels[status] || "待确认"}
-                        </span>
-                      </div>
-                      <div className="admin-finding-tags">
-                        <span>{riskLabel(finding.category)}</span>
-                        <span className="is-source">{sourceLabel(finding.source)}</span>
-                        {confidence !== null && <span>OCR 置信度 {Math.round(confidence * 100)}%</span>}
-                      </div>
-                      {finding.quoted_text ? <blockquote>{finding.quoted_text}</blockquote> : null}
-                      {finding.details ? <small>{finding.details}</small> : null}
-                      <div className="admin-finding-actions">
-                        <button className={status === "confirmed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleConfirm(finding)}>
-                          {status === "confirmed" ? "取消确认" : "确认"}
-                        </button>
-                        <button className={status === "dismissed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleDismiss(finding)}>
-                          {status === "dismissed" ? "取消忽略" : "忽略"}
-                        </button>
-                        <button className="is-muted" type="button" onClick={() => scrollTo(finding)}>定位</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p>系统没有自动标记。可直接放行，或使用下方人工标记添加问题。</p>
-            )}
-          </section>
-
-          <section className="admin-detail-panel">
-            <div className="admin-panel-title-row">
-              <h2>添加人工标记</h2>
-              {manualFindings.length ? <span>{manualFindings.length} 项</span> : null}
-            </div>
-            <p>在中间作品内容里框选标题、正文、作者的话等文字，或直接点击图片进行标记；标记时无需选择问题类型。</p>
-            {manualFindings.length ? (
-              <div className="admin-finding-list admin-manual-findings">
-                {manualFindings.map((item) => (
-                  <div className="admin-finding-item is-confirmed" key={item.clientId}>
-                    <div className="admin-finding-head">
-                      <strong>{manualFindingLabel(item)}</strong>
-                      <span className="admin-finding-status is-confirmed">已确认</span>
-                    </div>
-                    <div className="admin-finding-tags">
-                      <span className="is-source">管理员</span>
-                    </div>
-                    {item.quoted_text ? <blockquote>{item.quoted_text}</blockquote> : null}
-                    <div className="admin-finding-actions">
-                      <button className="is-muted" type="button" onClick={() => removeManualFinding(item.clientId)}>移除</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="admin-manual-empty">还没有人工标记。框选正文文字试试，气泡会出现在选中文字上方。</div>
-            )}
-          </section>
-
           <section className="admin-detail-panel admin-reject-panel" ref={rejectPanelRef}>
             <div className="admin-panel-title-row">
               <h2>标记问题并打回</h2>
