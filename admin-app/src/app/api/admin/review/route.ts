@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminServiceClient, getAdminContext } from "@/lib/supabase/admin-server";
+import { healBrokenPrivateImageMarkers } from "@/lib/review-images";
 
 type ManualFinding = {
   category?: string;
@@ -60,6 +61,31 @@ function normalizeManualFindings(value: unknown) {
   });
 }
 
+async function healApprovedReviewCaseImages(service: ReturnType<typeof createAdminServiceClient>, reviewCaseId: string) {
+  if (!service) return;
+  const { data: reviewCase } = await service
+    .from("moderation_review_cases")
+    .select("post_id, post_version_id")
+    .eq("id", reviewCaseId)
+    .maybeSingle();
+  if (!reviewCase?.post_id || !reviewCase.post_version_id) return;
+
+  const { data: version } = await service
+    .from("post_versions")
+    .select("content")
+    .eq("id", reviewCase.post_version_id)
+    .maybeSingle();
+  const content = version?.content;
+  if (!content) return;
+
+  const healed = await healBrokenPrivateImageMarkers(service, content, reviewCase.post_id);
+  if (healed === content) return;
+
+  const { error: postError } = await service.from("posts").update({ content: healed }).eq("id", reviewCase.post_id);
+  const { error: versionError } = await service.from("post_versions").update({ content: healed }).eq("id", reviewCase.post_version_id);
+  if (postError || versionError) throw new Error(`image_marker_heal_failed:${postError?.message || versionError?.message}`);
+}
+
 export async function POST(request: Request) {
   const { supabase, user } = await getAdminContext();
   if (!user) return NextResponse.json({ error: "请先登录管理员后台" }, { status: 401 });
@@ -82,7 +108,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "打回作品时必须至少确认一项系统标记或添加一项人工标记" }, { status: 400 });
   }
 
-  const db = createAdminServiceClient() || supabase;
+  const service = createAdminServiceClient();
+  const db = service || supabase;
+  if (!rejected) {
+    try {
+      await healApprovedReviewCaseImages(service, body.reviewCaseId);
+    } catch (error) {
+      console.error("review_image_heal_failed", error);
+      return NextResponse.json({ error: "审核图片地址修复失败，请刷新后重试" }, { status: 500 });
+    }
+  }
   const { data, error } = await db.rpc("admin_decide_post_review", {
     review_case_id: body.reviewCaseId,
     admin_id: user.id,

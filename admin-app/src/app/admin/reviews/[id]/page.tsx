@@ -1,30 +1,40 @@
 import { notFound, redirect } from "next/navigation";
 import { createAdminServiceClient, getAdminContext } from "@/lib/supabase/admin-server";
+import { findPublicApprovedImageUrl, privateImageSourcePaths } from "@/lib/review-images";
 import ReviewDetailClient from "./ReviewDetailClient";
 
 export const metadata = { title: "作品审核详情 — Inkland 管理后台", robots: { index: false, follow: false } };
 
 type AdminContextClient = Awaited<ReturnType<typeof getAdminContext>>["supabase"];
 
-async function signPrivateImageUrls(service: ReturnType<typeof createAdminServiceClient> | null, fallback: AdminContextClient, content: string): Promise<{ content: string; imageAccessError: string | null }> {
-  const privateSources = [...new Set([...content.matchAll(/private:\/\/private-post-images\/([^\s)]+)/g)].map((match) => match[1]))];
+async function signPrivateImageUrls(service: ReturnType<typeof createAdminServiceClient> | null, fallback: AdminContextClient, content: string, postId: string): Promise<{ content: string; imageAccessError: string | null }> {
+  const privateSources = privateImageSourcePaths(content);
   if (!privateSources.length) return { content, imageAccessError: null };
   const storageClient = service || fallback;
   let updated = content;
+  let recoveredCount = 0;
+  const failures: string[] = [];
+
   for (const sourcePath of privateSources) {
     const { data, error } = await storageClient.storage.from("private-post-images").createSignedUrl(sourcePath, 3600);
     if (data?.signedUrl) {
       updated = updated.split(`private://private-post-images/${sourcePath}`).join(data.signedUrl);
+      continue;
+    }
+    const publicUrl = await findPublicApprovedImageUrl(storageClient, postId, sourcePath);
+    if (publicUrl) {
+      updated = updated.split(`private://private-post-images/${sourcePath}`).join(publicUrl);
+      recoveredCount += 1;
     } else {
-      return {
-        content: updated,
-        imageAccessError: service
-          ? `无法生成审核图片临时地址：${error?.message || "未知存储错误"}`
-          : "后台部署缺少 SUPABASE_SERVICE_ROLE_KEY，无法读取私有审核图片。",
-      };
+      failures.push(error?.message || "未知存储错误");
     }
   }
-  return { content: updated, imageAccessError: null };
+
+  const notes: string[] = [];
+  if (recoveredCount > 0) notes.push(`有 ${recoveredCount} 张图片的私有原件已被清理，已自动改用公开发布地址。`);
+  if (!service && failures.length) notes.push("后台部署缺少 SUPABASE_SERVICE_ROLE_KEY，部分私有图片无法读取。");
+  else if (failures.length) notes.push(`无法生成审核图片临时地址：${failures[0]}`);
+  return { content: updated, imageAccessError: notes.length ? notes.join(" ") : null };
 }
 
 export default async function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -52,8 +62,8 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
 
   if (!version || !post) notFound();
 
-  const signed = await signPrivateImageUrls(service, supabase, version.content || "");
-  const signedPostContent = post.content ? (await signPrivateImageUrls(service, supabase, post.content)).content : post.content;
+  const signed = await signPrivateImageUrls(service, supabase, version.content || "", reviewCase.post_id);
+  const signedPostContent = post.content ? (await signPrivateImageUrls(service, supabase, post.content, reviewCase.post_id)).content : post.content;
 
   return (
     <ReviewDetailClient

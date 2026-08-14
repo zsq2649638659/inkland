@@ -163,29 +163,15 @@ export async function POST(request: Request) {
       findings,
     });
     if (error) throw error;
-    stage = "promote_approved_images";
-    const { data: screenedPost } = await admin
-      .from("posts")
-      .select("id, review_status, content")
-      .eq("id", body.postId)
-      .maybeSingle();
-    if (screenedPost?.review_status === "approved") {
-      const promotedContent = await promotePrivateImages(admin, body.postId, screenedPost.content || "");
-      if (promotedContent !== (screenedPost.content || "")) {
-        const { data: latestVersion } = await admin
-          .from("post_versions")
-          .select("id")
-          .eq("post_id", body.postId)
-          .order("version_number", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (latestVersion?.id) {
-          const { error: versionError } = await admin
-            .from("post_versions")
-            .update({ content: promotedContent })
-            .eq("id", latestVersion.id);
-          if (versionError) throw new Error(`post_version_content_sync_failed:${versionError.message}`);
-        }
+    if (outcome === "approved") {
+      const { data: screenedPost } = await admin
+        .from("posts")
+        .select("review_status")
+        .eq("id", body.postId)
+        .maybeSingle();
+      if (screenedPost?.review_status === "approved") {
+        stage = "promote_approved_images";
+        await promotePrivateImages(admin, body.postId, post.content || "");
       }
     }
     console.log(JSON.stringify({ level: "info", route: "/api/moderation/screen-image", message: "server_screening_completed", post_id: body.postId, outcome, findings: findings.length, ms: Date.now() - startedAt }));
@@ -209,19 +195,59 @@ function serializeError(error: unknown) {
 async function promotePrivateImages(admin: ReturnType<typeof createAdminClient>, postId: string, content: string) {
   const paths = [...content.matchAll(/private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g)].map((match) => match[1]);
   if (!paths.length) return content;
-  let updatedContent = content;
+
+  const replacements: Array<{ sourcePath: string; publicUrl: string }> = [];
   for (const sourcePath of paths) {
     const targetPath = `approved/${postId}/${sourcePath.split("/").pop()}`;
     const { error: copyError } = await admin.storage.from("private-post-images").copy(sourcePath, targetPath, { destinationBucket: "post-images" });
-    if (copyError) throw new Error(`image_promote_copy_failed:${copyError.message}`);
+    if (copyError) {
+      const existingPublicUrl = await findPublicApprovedImageUrl(admin, postId, sourcePath);
+      if (existingPublicUrl) {
+        replacements.push({ sourcePath, publicUrl: existingPublicUrl });
+        continue;
+      }
+      throw new Error(`image_promote_copy_failed:${copyError.message}`);
+    }
     const { data } = admin.storage.from("post-images").getPublicUrl(targetPath);
     if (!data.publicUrl) throw new Error("image_promote_public_url_failed");
-    updatedContent = updatedContent.split(`private://private-post-images/${sourcePath}`).join(data.publicUrl);
-    await admin.storage.from("private-post-images").remove([sourcePath]);
+    replacements.push({ sourcePath, publicUrl: data.publicUrl });
   }
+
+  let updatedContent = content;
+  for (const { sourcePath, publicUrl } of replacements) {
+    updatedContent = updatedContent.split(`private://private-post-images/${sourcePath}`).join(publicUrl);
+  }
+
   const { error: updateError } = await admin.from("posts").update({ content: updatedContent }).eq("id", postId);
   if (updateError) throw new Error(`image_promote_content_update_failed:${updateError.message}`);
+
+  const { data: latestVersion } = await admin
+    .from("post_versions")
+    .select("id")
+    .eq("post_id", postId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestVersion?.id) {
+    const { error: versionError } = await admin
+      .from("post_versions")
+      .update({ content: updatedContent })
+      .eq("id", latestVersion.id);
+    if (versionError) throw new Error(`post_version_content_sync_failed:${versionError.message}`);
+  }
+
+  const { error: removeError } = await admin.storage.from("private-post-images").remove(replacements.map((item) => item.sourcePath));
+  if (removeError) console.error("image_promote_private_remove_failed", removeError);
   return updatedContent;
+}
+
+async function findPublicApprovedImageUrl(admin: ReturnType<typeof createAdminClient>, postId: string, sourcePath: string) {
+  const filename = sourcePath.split("/").pop();
+  if (!filename) return null;
+  const folderPath = `approved/${postId}`;
+  const { data: objects, error } = await admin.storage.from("post-images").list(folderPath);
+  if (error || !Array.isArray(objects) || !objects.some((object) => object.name === filename)) return null;
+  return admin.storage.from("post-images").getPublicUrl(`${folderPath}/${filename}`).data?.publicUrl || null;
 }
 
 async function completeAsError(admin: ReturnType<typeof createAdminClient>, postId: string, message: string) {
