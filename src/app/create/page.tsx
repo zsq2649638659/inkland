@@ -55,6 +55,19 @@ interface UploadedImage {
   localScreening?: Promise<LocalImageScreening>;
 }
 
+interface ReviewIssue {
+  id?: string;
+  category?: string | null;
+  field_name?: string | null;
+  location_type?: string | null;
+  paragraph_index?: number | null;
+  start_offset?: number | null;
+  end_offset?: number | null;
+  image_index?: number | null;
+  quoted_text?: string | null;
+  details?: string | null;
+}
+
 function privateImageMarker(path: string) {
   return `private://private-post-images/${path}`;
 }
@@ -484,13 +497,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       const loadPost = async () => {
         let { data, error: loadError } = await supabase
           .from("posts")
-          .select("id, title, content, author_note, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility")
+          .select("id, title, content, author_note, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility, pending_review_status, pending_review_reason, pending_version_id, published_version_number")
           .eq("id", editPost)
           .single();
         if (loadError?.message.includes("author_note")) {
           const fallback = await supabase
             .from("posts")
-            .select("id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility")
+            .select("id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility, pending_review_status, pending_review_reason, pending_version_id, published_version_number")
             .eq("id", editPost)
             .single();
           data = fallback.data ? { ...fallback.data, author_note: null } : null;
@@ -501,7 +514,32 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           return;
         }
         if (data) {
-          const p = data as unknown as Record<string, unknown>;
+          let p = data as unknown as Record<string, unknown>;
+          // 有冻结版本时（提交待审或被管理员打回），加载冻结版本进入编辑器：
+          // 已发布作品的 posts 行始终保留旧公开版本，作者应基于自己提交的新版本修改。
+          const pendingVersionId = (p.pending_version_id as string) || null;
+          if (pendingVersionId) {
+            const { data: versionData } = await supabase
+              .from("post_versions")
+              .select("title, content, author_note, series_name, chapter_number, chapter_title, word_count, published_at, post_type, visibility")
+              .eq("id", pendingVersionId)
+              .maybeSingle();
+            if (versionData) {
+              p = { ...p, ...(versionData as unknown as Record<string, unknown>) };
+            }
+          }
+          // 最近一次打回通知里附带的问题清单（含 OCR 图片内文字定位）。
+          const { data: rejectionNotice } = await supabase
+            .from("notifications")
+            .select("metadata")
+            .eq("template_key", "post_review_rejected")
+            .eq("related_entity_id", editPost)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const noticeMeta = rejectionNotice?.metadata as { issues?: ReviewIssue[] } | null;
+          if (noticeMeta?.issues?.length) setReviewIssues(noticeMeta.issues);
+
           const savedPublishedAt = (p.published_at as string) || null;
           setTitle(p.title as string || "");
           setVisibility(p.visibility === "followers_only" || p.visibility === "private" ? p.visibility : "public");
@@ -534,7 +572,12 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             setSeriesNameFromUrl(editingSeriesName);
             setChapterNumberFromUrl(editingChapterNumber || 1);
           }
-          if (p.review_status === "rejected") {
+          const pendingReviewStatus = (p.pending_review_status as string) || null;
+          setPendingReviewStatus(pendingReviewStatus);
+          setPublishedVersionNumber((p.published_version_number as number) ?? null);
+          if (pendingReviewStatus === "rejected") {
+            setReviewRejectionReason((p.pending_review_reason as string) || (p.review_reason as string) || "未提供原因");
+          } else if (p.review_status === "rejected") {
             setReviewRejectionReason((p.review_reason as string) || "未提供原因");
           }
           if (p.post_type === "illustration") {
@@ -652,6 +695,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   // ---- 编辑模式 ----
   const [editingPublishedAt, setEditingPublishedAt] = useState<string | null>(null);
   const [reviewRejectionReason, setReviewRejectionReason] = useState<string | null>(null);
+  const [pendingReviewStatus, setPendingReviewStatus] = useState<string | null>(null);
+  const [publishedVersionNumber, setPublishedVersionNumber] = useState<number | null>(null);
+  const [reviewIssues, setReviewIssues] = useState<ReviewIssue[]>([]);
   const [editingPostSeriesName, setEditingPostSeriesName] = useState<string | null>(null);
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
@@ -1492,13 +1538,107 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   // ============ 审核未通过提示 ============
 
+  const fieldLabel = (field?: string | null) => {
+    switch (field) {
+      case "title": return "标题";
+      case "content": return "正文";
+      case "author_note": return "作者的话";
+      case "image_ocr": return "图片中的文字";
+      case "image": return "图片";
+      default: return "作品内容";
+    }
+  };
+
+  const locateReviewIssue = (issue: ReviewIssue) => {
+    const field = issue.field_name || (issue.location_type === "image" || issue.location_type === "image_ocr" ? "image_ocr" : "content");
+    const scrollTo = (el: Element | null, focus = false) => {
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (focus && el instanceof HTMLElement) el.focus({ preventScroll: true });
+      el.animate?.(
+        [
+          { outline: "2px solid #ef4444", outlineOffset: "2px" },
+          { outline: "2px solid transparent", outlineOffset: "2px" },
+        ],
+        { duration: 1600, easing: "ease-out" },
+      );
+    };
+
+    if (field === "title") {
+      if (view === "image") scrollTo(document.getElementById("imageTitle"), true);
+      else if (view === "chapter-create") scrollTo(document.getElementById("chapterTitle"), true);
+      else scrollTo(document.getElementById("articleTitle"), true);
+      return;
+    }
+    if (field === "author_note") {
+      scrollTo(document.getElementById("chapterAuthorNote"), true);
+      return;
+    }
+    if (field === "image" || field === "image_ocr") {
+      if (view !== "image") setView("image");
+      window.setTimeout(() => {
+        const grid = document.querySelector<HTMLElement>("#page-create .image-grid");
+        const index = issue.image_index ?? 0;
+        scrollTo(grid?.querySelectorAll<HTMLElement>(".image-grid-item")?.[index] || grid);
+      }, 80);
+      return;
+    }
+    // 正文 / 图片说明
+    if (view === "image") {
+      scrollTo(document.getElementById("imageDescription"), true);
+      return;
+    }
+    scrollTo(document.querySelector<HTMLElement>("#page-create .editor-content"));
+  };
+
   const renderRejectionBanner = () =>
     reviewRejectionReason && (
-      <div className="bg-red-50 border border-red-300 rounded-lg p-4">
-        <p className="text-sm text-red-600 font-medium">
-          <i className="fa-solid fa-triangle-exclamation mr-2" />
-          该作品未通过审核，原因：{reviewRejectionReason}
-        </p>
+      <div className="review-rejection-banner" role="alert">
+        <div className="review-rejection-head">
+          <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+          <strong>作品未通过审核</strong>
+        </div>
+        <p className="review-rejection-reason">{reviewRejectionReason}</p>
+        {publishedVersionNumber != null && (
+          <p className="review-rejection-note">
+            <i className="fa-solid fa-circle-info" aria-hidden="true" />
+            旧版本仍公开可见，不会受到影响；修改并重新提交后，通过审核的新版本才会替换旧版本。
+          </p>
+        )}
+        {reviewIssues.length > 0 && (
+          <div className="review-issues">
+            <div className="review-issues-title">本次标记的问题（{reviewIssues.length}）</div>
+            <ul className="review-issues-list">
+              {reviewIssues.map((issue, index) => (
+                <li key={issue.id || index} className="review-issue-item">
+                  <span className="review-issue-index">{index + 1}</span>
+                  <span className="review-issue-field">{fieldLabel(issue.field_name)}</span>
+                  {issue.location_type === "paragraph" && issue.paragraph_index != null && (
+                    <span className="review-issue-pos">第 {issue.paragraph_index} 段</span>
+                  )}
+                  {issue.image_index != null && (
+                    <span className="review-issue-pos">第 {issue.image_index + 1} 张图</span>
+                  )}
+                  {issue.quoted_text && <span className="review-issue-quote">「{issue.quoted_text}」</span>}
+                  {issue.details && <span className="review-issue-details">{issue.details}</span>}
+                  <button type="button" className="review-issue-locate" onClick={() => locateReviewIssue(issue)}>
+                    <i className="fa-solid fa-crosshairs" aria-hidden="true" /> 定位
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+
+  const renderPendingReviewBanner = () =>
+    pendingReviewStatus === "pending" && (
+      <div className="review-pending-banner" role="status">
+        <i className="fa-solid fa-hourglass-half" aria-hidden="true" />
+        {publishedVersionNumber != null
+          ? "修改已提交人工审核，旧版本继续公开；审核通过后新版本会自动替换。"
+          : "作品已进入人工审核，审核通过后会公开。"}
       </div>
     );
 
@@ -1555,6 +1695,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
         <div className="publish-container">
           <div className="publish-form">
             {renderNotice()}
+            {renderRejectionBanner()}
+            {renderPendingReviewBanner()}
             <div className="form-section">
               <label className="form-label" htmlFor="articleTitle">作品标题 <span className="required-mark">*</span></label>
               <input
@@ -1852,11 +1994,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           <div className="publish-form">
             {renderNotice()}
             {renderRejectionBanner()}
+            {renderPendingReviewBanner()}
 
             {/* 作品标题 */}
             <div className="form-section">
               <label className="form-label">作品标题</label>
               <input
+                id="imageTitle"
                 type="text" className="form-input" placeholder="（选填）" maxLength={100}
                 value={title} onChange={(e) => setTitle(e.target.value)}
               />
@@ -1916,6 +2060,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             <div className="form-section">
               <label className="form-label">图片说明</label>
               <textarea
+                id="imageDescription"
                 className="form-textarea"
                 placeholder="分享一些关于图片的看法或说明（选填）"
                 maxLength={2000}
@@ -2248,6 +2393,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       <div className="min-h-screen bg-paper publish-article-page chapter-create-page" id="page-create">
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
         <main className="chapter-container">
+          {renderRejectionBanner()}
+          {renderPendingReviewBanner()}
           {targetSeriesName && (
             <div className="serial-info-card">
               <div className="serial-info-body">
