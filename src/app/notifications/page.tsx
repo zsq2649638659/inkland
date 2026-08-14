@@ -25,11 +25,25 @@ interface NotificationItem {
     action_label?: string;
     issue_type?: string;
     affected_image_indexes?: number[];
+    reason?: string;
+    submission_number?: number;
+    issues?: ReviewIssueMeta[];
   } | null;
   // joined fields
   actor_nickname?: string | null;
   actor_avatar_url?: string | null;
   post_title?: string | null;
+}
+
+interface ReviewIssueMeta {
+  id?: string;
+  category?: string | null;
+  field_name?: string | null;
+  location_type?: string | null;
+  paragraph_index?: number | null;
+  image_index?: number | null;
+  quoted_text?: string | null;
+  details?: string | null;
 }
 
 export default function NotificationsPage() {
@@ -227,6 +241,14 @@ export default function NotificationsPage() {
     return null;
   };
 
+  const reviewIssueLabel = (issue: ReviewIssueMeta): string => {
+    const field = issue.field_name || (issue.location_type === "image" || issue.location_type === "image_ocr" ? "image_ocr" : "content");
+    const fieldName = field === "title" ? "标题" : field === "content" ? "正文" : field === "author_note" ? "作者的话" : field === "image_ocr" ? "图片文字" : "图片";
+    const location = issue.image_index != null ? `第${issue.image_index + 1}张图` : issue.paragraph_index != null ? `第${issue.paragraph_index}段` : "";
+    const quote = issue.quoted_text ? `「${issue.quoted_text}」` : "";
+    return [fieldName, location, quote].filter(Boolean).join(" · ");
+  };
+
   if (authLoading) {
     return <div className="min-h-screen bg-paper pb-20 lg:pb-0"><div className="main-container"><HomeSidebar /><div className="content-area"><SkeletonNotification /></div></div></div>;
   }
@@ -369,7 +391,26 @@ export default function NotificationsPage() {
     // 关注类型
     if (notification.type === "follow") return <>{renderActor(notification)} 关注了你</>;
     // 系统通知类型
-    if (notification.type === "system") return renderSystemDescription(notification);
+    if (notification.type === "system") {
+      const description = renderSystemDescription(notification);
+      const issues = notification.metadata?.issues;
+      if (notification.template_key === "post_review_rejected" && issues && issues.length > 0) {
+        return (
+          <div className="notification-review-issues">
+            <div className="notification-desc">{description}</div>
+            <div className="notification-issues-row">
+              {issues.slice(0, 3).map((issue, index) => (
+                <span key={issue.id || index} className="notification-issue-chip">
+                  {reviewIssueLabel(issue)}
+                </span>
+              ))}
+              {issues.length > 3 && <span className="notification-issues-more">等 {issues.length} 项</span>}
+            </div>
+          </div>
+        );
+      }
+      return description;
+    }
 
     // 互动类型：点赞/评论/收藏/回复
     const actionLabels: Record<string, string> = {
