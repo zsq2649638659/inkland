@@ -7,8 +7,15 @@ type Finding = {
   score: number;
   details?: string;
   box?: number[] | null;
-  source?: "nudenet_modelscope" | "nsfwjs_client";
+  source?: "nudenet_modelscope" | "nsfwjs_client" | "paddleocr_modelscope";
+  severity?: "review" | "high";
+  quoted_text?: string;
+  metadata?: Record<string, unknown>;
 };
+
+type OcrBlock = { text?: string; confidence?: number; polygon?: number[][] };
+type OcrResult = { image_index?: number; status?: string; text?: string; blocks?: OcrBlock[] };
+type ModerationRule = { id: string; rule_type: "keyword" | "whitelist"; pattern: string; category: string; severity: "review" | "high"; enabled: boolean };
 
 const CLIENT_THRESHOLDS: Record<string, number> = { porn: 0.45, hentai: 0.45, sexy: 0.7 };
 
@@ -16,6 +23,45 @@ function contentImageSources(content: string) {
   return [...content.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)]
     .map((match) => match[1])
     .slice(0, 9);
+}
+
+function normalizeScreeningText(value: string) {
+  return value.normalize("NFKC").toLocaleLowerCase("zh-CN").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function keywordFindingsFromOcr(ocrResults: OcrResult[], rules: ModerationRule[], imageCount: number): Finding[] {
+  const whitelisted = new Set(rules
+    .filter((rule) => rule.enabled && rule.rule_type === "whitelist")
+    .map((rule) => `${rule.category}\u0000${normalizeScreeningText(rule.pattern)}`));
+  const keywords = rules.filter((rule) => rule.enabled && rule.rule_type === "keyword" && !whitelisted.has(`${rule.category}\u0000${normalizeScreeningText(rule.pattern)}`));
+  const findings: Finding[] = [];
+
+  for (const result of ocrResults) {
+    const imageIndex = Number(result.image_index);
+    if (!Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex >= imageCount || result.status !== "completed" || !Array.isArray(result.blocks)) continue;
+    for (const block of result.blocks.slice(0, 120)) {
+      const text = typeof block.text === "string" ? block.text.trim().slice(0, 500) : "";
+      const confidence = Number(block.confidence);
+      if (!text || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) continue;
+      const normalizedText = normalizeScreeningText(text);
+      for (const rule of keywords) {
+        const normalizedPattern = normalizeScreeningText(rule.pattern);
+        if (!normalizedPattern || !normalizedText.includes(normalizedPattern)) continue;
+        findings.push({
+          image_index: imageIndex,
+          category: rule.category,
+          score: confidence,
+          source: "paddleocr_modelscope",
+          severity: rule.severity,
+          quoted_text: text,
+          details: `图片文字识别命中关键词“${rule.pattern}”`,
+          metadata: { rule_id: rule.id, pattern: rule.pattern, ocr_polygon: block.polygon || null, ocr_confidence: confidence },
+        });
+        if (findings.length >= 100) return findings;
+      }
+    }
+  }
+  return findings;
 }
 
 export const runtime = "nodejs";
@@ -95,29 +141,58 @@ export async function POST(request: Request) {
     });
     if (!response.ok) throw new Error(`moderation_service_http_${response.status}`);
     stage = "parse_moderation_result";
-    const result = await response.json() as { outcome?: string; findings?: Finding[]; engine?: string; model?: string };
+    const result = await response.json() as { outcome?: string; findings?: Finding[]; engine?: string; model?: string; ocr_model?: string; ocr_results?: OcrResult[] };
+    const ocrResults = Array.isArray(result.ocr_results) ? result.ocr_results : [];
+    if (ocrResults.length !== images.length || ocrResults.some((item) => item.status !== "completed")) throw new Error("moderation_service_ocr_incomplete");
+    const { data: ruleRows, error: rulesError } = await admin
+      .from("moderation_rules")
+      .select("id, rule_type, pattern, category, severity, enabled")
+      .eq("enabled", true);
+    if (rulesError) throw new Error(`moderation_rules_unavailable:${rulesError.message}`);
     const serverFindings = Array.isArray(result.findings)
       ? result.findings.map((finding) => ({ ...finding, source: "nudenet_modelscope" as const }))
       : [];
-    const findings = [...serverFindings, ...clientFindings];
+    const ocrFindings = keywordFindingsFromOcr(ocrResults, (ruleRows || []) as ModerationRule[], images.length);
+    const findings = [...serverFindings, ...ocrFindings, ...clientFindings];
     const outcome = findings.length > 0 || result.outcome === "flagged" ? "flagged" : "approved";
-    if (outcome === "approved") {
-      stage = "promote_approved_images";
-      await promotePrivateImages(admin, body.postId, post.content || "");
-    }
     stage = "write_screening_result";
     const { error } = await admin.rpc("complete_image_screening", {
       post_id_input: body.postId,
       outcome,
-      result: { ...result, source: "modelscope_studio", image_count: images.length, client_auxiliary_findings: clientFindings.length },
+      result: { ...result, source: "modelscope_studio", image_count: images.length, ocr_keyword_findings: ocrFindings.length, client_auxiliary_findings: clientFindings.length },
       findings,
     });
     if (error) throw error;
+    stage = "promote_approved_images";
+    const { data: screenedPost } = await admin
+      .from("posts")
+      .select("id, review_status, content")
+      .eq("id", body.postId)
+      .maybeSingle();
+    if (screenedPost?.review_status === "approved") {
+      const promotedContent = await promotePrivateImages(admin, body.postId, screenedPost.content || "");
+      if (promotedContent !== (screenedPost.content || "")) {
+        const { data: latestVersion } = await admin
+          .from("post_versions")
+          .select("id")
+          .eq("post_id", body.postId)
+          .order("version_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (latestVersion?.id) {
+          const { error: versionError } = await admin
+            .from("post_versions")
+            .update({ content: promotedContent })
+            .eq("id", latestVersion.id);
+          if (versionError) throw new Error(`post_version_content_sync_failed:${versionError.message}`);
+        }
+      }
+    }
     console.log(JSON.stringify({ level: "info", route: "/api/moderation/screen-image", message: "server_screening_completed", post_id: body.postId, outcome, findings: findings.length, ms: Date.now() - startedAt }));
     return Response.json({ outcome, findings });
   } catch (error) {
     console.error(JSON.stringify({ level: "error", route: "/api/moderation/screen-image", message: "server_screening_failed", post_id: body.postId, stage, error: serializeError(error), ms: Date.now() - startedAt }));
-    return completeAsError(admin, body.postId, "NudeNet 服务异常。");
+    return completeAsError(admin, body.postId, "图片或 OCR 审核服务异常。");
   }
 }
 
@@ -133,7 +208,7 @@ function serializeError(error: unknown) {
 
 async function promotePrivateImages(admin: ReturnType<typeof createAdminClient>, postId: string, content: string) {
   const paths = [...content.matchAll(/private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g)].map((match) => match[1]);
-  if (!paths.length) return;
+  if (!paths.length) return content;
   let updatedContent = content;
   for (const sourcePath of paths) {
     const targetPath = `approved/${postId}/${sourcePath.split("/").pop()}`;
@@ -146,6 +221,7 @@ async function promotePrivateImages(admin: ReturnType<typeof createAdminClient>,
   }
   const { error: updateError } = await admin.from("posts").update({ content: updatedContent }).eq("id", postId);
   if (updateError) throw new Error(`image_promote_content_update_failed:${updateError.message}`);
+  return updatedContent;
 }
 
 async function completeAsError(admin: ReturnType<typeof createAdminClient>, postId: string, message: string) {
