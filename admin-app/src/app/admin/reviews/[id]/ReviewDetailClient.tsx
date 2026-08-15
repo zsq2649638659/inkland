@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { fetchWithTimeout } from "@/lib/adminFetch";
 
 /* ==================== 类型 ==================== */
 
@@ -445,6 +446,8 @@ function manualRangesIntersect(item: ManualFindingDraft, context: SelectionConte
 
 /* ==================== 主组件 ==================== */
 
+const makeClientId = () => `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
 export default function ReviewDetailClient({ post, version, reviewCase, findings, historyCases, historyVersions, comparison, imageAccessError }: {
   post: Post;
   version: Version;
@@ -457,6 +460,8 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [confirmApprove, setConfirmApprove] = useState(false);
+  const [approveError, setApproveError] = useState("");
   const [brokenImages, setBrokenImages] = useState<number[]>([]);
   const [confirmedIds, setConfirmedIds] = useState<string[]>(() => findings.filter((f) => f.status === "confirmed").map((f) => f.id));
   const [dismissedIds, setDismissedIds] = useState<string[]>(() => findings.filter((f) => f.status === "dismissed").map((f) => f.id));
@@ -530,8 +535,6 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
       : "field-content";
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-
-  const makeClientId = () => `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
   const toggleIssueType = (issueType: string) => {
     setSelectedIssueTypes((prev) => prev.includes(issueType) ? prev.filter((item) => item !== issueType) : [...prev, issueType]);
@@ -792,49 +795,58 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
         details: `${issueText}。${reason}`,
       });
     }
-    const response = await fetch("/api/admin/review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reviewCaseId: reviewCase?.id,
-        decision: "rejected",
-        reason: finalReason,
-        confirmedFindingIds: confirmedIds,
-        dismissedFindingIds: dismissedIds,
-        manualFindings: submittedFindings,
-      }),
-    });
-    const payload = await response.json().catch(() => null) as { error?: string } | null;
-    setBusy(false);
-    if (!response.ok) {
-      setMessage(payload?.error || "打回操作失败，请稍后重试。");
-      return;
+    try {
+      const response = await fetchWithTimeout("/api/admin/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reviewCaseId: reviewCase?.id,
+          decision: "rejected",
+          reason: finalReason,
+          confirmedFindingIds: confirmedIds,
+          dismissedFindingIds: dismissedIds,
+          manualFindings: submittedFindings,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      setBusy(false);
+      if (!response.ok) {
+        setMessage(payload?.error || "打回操作失败，请稍后重试。");
+        return;
+      }
+      window.location.assign("/admin?view=reviews");
+    } catch (error) {
+      setBusy(false);
+      setMessage(error instanceof Error ? error.message : "打回操作失败，请稍后重试。");
     }
-    window.location.assign("/admin?view=reviews");
   };
 
   const approve = async () => {
-    if (!window.confirm("确认该审核版本没有违规并立即公开发布吗？")) return;
     setBusy(true);
-    setMessage("");
-    const response = await fetch("/api/admin/review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reviewCaseId: reviewCase?.id,
-        decision: "approved",
-        reason: null,
-        confirmedFindingIds: confirmedIds,
-        dismissedFindingIds: dismissedIds,
-      }),
-    });
-    const payload = await response.json().catch(() => null) as { error?: string } | null;
-    setBusy(false);
-    if (!response.ok) {
-      setMessage(payload?.error || "放行操作失败，请稍后重试。");
-      return;
+    setApproveError("");
+    try {
+      const response = await fetchWithTimeout("/api/admin/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reviewCaseId: reviewCase?.id,
+          decision: "approved",
+          reason: null,
+          confirmedFindingIds: confirmedIds,
+          dismissedFindingIds: dismissedIds,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      setBusy(false);
+      if (!response.ok) {
+        setApproveError(payload?.error || "放行操作失败，请稍后重试。");
+        return;
+      }
+      window.location.assign("/admin?view=reviews");
+    } catch (error) {
+      setBusy(false);
+      setApproveError(error instanceof Error ? error.message : "放行操作失败，请稍后重试。");
     }
-    window.location.assign("/admin?view=reviews");
   };
 
   const screeningSources = (reviewCase?.screening_sources || []).map((source) => sourceLabel(source)).join("、") || "未记录";
@@ -1238,7 +1250,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
           <section className="admin-detail-panel admin-approve-panel">
             <h2>确认无违规</h2>
             <p>仅在确认审核版本没有违规时放行。放行后作品将按冻结版本公开发布。</p>
-            <button className="admin-detail-secondary" type="button" disabled={busy} onClick={() => void approve()}>
+            <button className="admin-detail-secondary" type="button" disabled={busy} onClick={() => { setApproveError(""); setConfirmApprove(true); }}>
               {busy ? "处理中…" : "确认无违规并放行"}
             </button>
           </section>
@@ -1246,6 +1258,24 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
           {message ? <div className="admin-detail-message" role="status">{message}</div> : null}
         </aside>
       </div>
+
+      {confirmApprove ? (
+        <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmApprove(false); }}>
+          <div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="approve-review-title">
+            <div className="admin-modal-header">
+              <div>
+                <h2 id="approve-review-title">确认无违规并公开发布？</h2>
+                <p className="admin-modal-desc">确认该审核版本没有违规后将立即公开发布，并结束本次人工审核。</p>
+              </div>
+            </div>
+            {approveError ? <div className="admin-alert admin-alert-error" role="alert">{approveError}</div> : null}
+            <div className="admin-modal-actions">
+              <button className="admin-btn admin-btn-light" type="button" disabled={busy} onClick={() => setConfirmApprove(false)}>取消</button>
+              <button className="admin-btn admin-btn-primary" type="button" disabled={busy} onClick={() => void approve()}>{busy ? "发布中…" : "确认放行"}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

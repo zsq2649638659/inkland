@@ -256,3 +256,52 @@
 .admin-detail-images figure.is-selected { border-color:#e7a99d; background:#fff8f6; }
 .admin-image-selector { display:flex; align-items:center; gap:7px; margin:0 0 8px; color:#777780; font-size:10px; cursor:pointer; }
 .admin-image-selector input { width:14px; height:14px; accent-color:var(--accent); }
+/* 模块8：全局搜索与通用弹窗 */
+.admin-modal { max-height:calc(100vh - 40px); overflow:auto; }
+.admin-global-search-btn { display:inline-flex; align-items:center; gap:7px; }
+.admin-global-search-modal { width:min(720px,100%); }
+.admin-global-search-form { display:flex; gap:10px; margin:16px 0 4px; }
+.admin-global-search-form input { flex:1; min-width:0; min-height:42px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; outline:0; color:var(--ink); font-size:12px; }
+.admin-global-search-form input:focus { border-color:#d5b6ac; box-shadow:0 0 0 3px #fdf0ec; }
+.admin-global-search-form .admin-btn { flex:none; }
+.admin-global-search-results { display:grid; gap:18px; margin-top:18px; }
+.admin-global-group { display:grid; gap:7px; }
+.admin-global-group h3 { display:flex; align-items:center; justify-content:space-between; margin:0 0 3px; color:#8b8b94; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.admin-global-group h3 span { padding:2px 7px; border-radius:999px; background:#f2f2f4; color:#a2a2aa; font-size:9px; }
+.admin-global-result { display:grid; gap:4px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#fbfbfc; text-decoration:none; }
+.admin-global-result:hover { border-color:#e0c1b8; background:#fff8f5; }
+.admin-global-result strong { overflow:hidden; color:#52525b; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.admin-global-result span { overflow:hidden; color:#a0a0a8; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+
+/* 模块8：连载审核打回流程 */
+.admin-detail-message { margin-top:14px; padding:11px 12px; border:1px solid #efcfc8; border-radius:8px; background:#fff5f2; color:#a7594c; font-size:11px; line-height:1.6; }
+.admin-reject-panel { display:flex; flex-direction:column; overflow:hidden; }
+.admin-reject-view, .admin-reject-preview { flex:1 1 auto; min-height:0; flex-direction:column; overflow:hidden; }
+.admin-issue-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:4px 0 12px; }
+.admin-issue-chip { position:relative; display:flex; align-items:center; gap:7px; min-height:38px; padding:8px 9px; border:1px solid #e4d6d0; border-radius:7px; background:#fff; color:#6b6b75; font-size:10px; line-height:1.35; cursor:pointer; }
+.admin-issue-chip:hover { border-color:#d8b9a6; background:#fffaf7; }
+.admin-issue-chip.is-on { border-color:#d8a08d; background:#fff0eb; color:#a05040; font-weight:700; }
+.admin-issue-chip input { position:absolute; opacity:0; pointer-events:none; }
+.admin-issue-box { display:grid; place-items:center; flex:none; width:15px; height:15px; border:1px solid #cfb7ae; border-radius:4px; background:#fff; }
+.admin-issue-box::after { content:""; width:8px; height:5px; border:2px solid #fff; border-top:0; border-right:0; transform:rotate(-45deg) translateY(-1px); opacity:0; }
+.admin-issue-chip.is-on .admin-issue-box { border-color:#d96555; background:#d96555; }
+.admin-issue-chip.is-on .admin-issue-box::after { opacity:1; }
+.admin-reject-view-bottom { flex:none; margin-top:auto; }
+.admin-reject-rule { margin:12px 0 10px; color:#a18d87; font-size:10px; line-height:1.55; }
+.admin-reject-action { width:100%; min-height:42px; border:1px solid var(--danger); border-radius:8px; background:var(--danger); color:#fff; font-size:12px; font-weight:700; }
+.admin-reject-action:not(:disabled):hover { background:#b84433; }
+.admin-reject-action:disabled { cursor:wait; opacity:.55; }
+.admin-reject-preview { padding:10px 11px; border:1px solid #e3ccc5; border-radius:7px; background:#fff9f7; }
+.admin-reject-preview h3 { margin:0 0 7px; color:#a15a4b; font-size:11px; }
+.admin-preview-lines { flex:1 1 auto; min-height:0; overflow:hidden; }
+.admin-preview-line { display:flex; align-items:flex-start; gap:7px; color:#6d5751; font-size:10px; line-height:1.6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.admin-preview-line + .admin-preview-line { margin-top:5px; }
+.admin-preview-line > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.admin-preview-dot { flex:none; width:6px; height:6px; margin-top:5px; border-radius:50%; background:#d96555; }
+.admin-preview-empty { color:#a99692; font-size:10px; }
+.admin-preview-actions { display:flex; gap:8px; }
+.admin-preview-confirm, .admin-preview-cancel { flex:1 1 0; min-width:0; min-height:38px; border-radius:8px; font-size:11px; font-weight:700; }
+.admin-preview-confirm { border:1px solid var(--danger); background:var(--danger); color:#fff; }
+.admin-preview-confirm:not(:disabled):hover { background:#b84433; }
+.admin-preview-cancel { border:1px solid #d5d5dc; background:#fff; color:#6b6b75; }
+.admin-preview-confirm:disabled, .admin-preview-cancel:disabled { cursor:wait; opacity:.55; }

@@ -4,42 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin-browser";
-import { useAdminDialog } from "@/components/AdminDialogProvider";
+import { fetchWithTimeout } from "@/lib/adminFetch";
 
-type ReviewCaseItem = {
-  id: string;
-  post_id: string;
-  post_version_id: string;
-  status: string;
-  priority: string | null;
-  route_reason: string | null;
-  screening_status: string | null;
-  screening_sources: string[] | null;
-  submission_number: number | null;
-  created_at: string;
-  updated_at: string | null;
-  version?: {
-    id?: string;
-    version_number?: number | null;
-    submission_number?: number | null;
-    title?: string | null;
-    post_type?: string | null;
-    content_rating?: string | null;
-    visibility?: string | null;
-    submitted_at?: string | null;
-    created_at?: string | null;
-  } | null;
-  post?: {
-    id?: string;
-    title?: string | null;
-    post_type?: string | null;
-    content_rating?: string | null;
-    status?: string | null;
-    review_submission_number?: number | null;
-    author?: { nickname?: string } | null;
-  } | null;
-  findings_count?: number | null;
-};
+type PostItem = { id: string; title: string; post_type: string | null; created_at: string; review_reason?: string | null; author?: { nickname?: string } | null };
 type ReportItem = {
   id: string;
   target_type: "post" | "comment" | "user";
@@ -57,6 +24,7 @@ type ReportItem = {
   author_nickname?: string | null;
 };
 type FeedbackItem = { id: string; type: string; content: string; created_at: string; user_id: string };
+type SeriesReviewItem = { id: string; series_id: string; status: string; priority: string; route_reason: string; created_at: string; series?: { id: string; name: string; description: string | null; user_id: string } | null };
 type UserSearchRow = {
   id: string;
   nickname: string | null;
@@ -79,10 +47,18 @@ export type ModerationRule = {
   hit_count: number;
   updated_at: string;
 };
+type GlobalSearchResults = {
+  posts: Array<{ id: string; title: string; post_type: string; status: string; review_status: string; author_nickname: string; href: string | null }>;
+  series: Array<{ id: string; name: string; status: string; review_status: string; href: string | null }>;
+  users: Array<{ id: string; nickname: string; moderation_status: string; href: string }>;
+  reports: Array<{ id: string; title: string; target_type: string; status: string | null; href: string }>;
+  feedbacks: Array<{ id: string; type: string; content: string; href: string }>;
+};
 export type AdminView = "reviews" | "reports" | "users" | "feedbacks" | "rules";
 
 const labels: Record<string, string> = { post: "作品", comment: "评论", user: "用户", novel: "小说", article: "文章", illustration: "插画", serial: "连载" };
 const userStatusLabels: Record<string, string> = { active: "正常", warned: "已警告", restricted: "受限", suspended: "已暂停", banned: "已封禁" };
+const statusLabelsForSearch = (status?: string | null) => status === "pending" ? "待处理" : status === "reviewing" ? "处理中" : status === "resolved" ? "已处理" : status === "cancelled" ? "已取消" : status || "未知";
 const viewCopy: Record<AdminView, { title: string; description: string }> = {
   reviews: { title: "作品审核", description: "处理发布前进入人工审核队列的作品。" },
   reports: { title: "举报中心", description: "进入独立详情页查看完整内容和举报证据。" },
@@ -91,16 +67,6 @@ const viewCopy: Record<AdminView, { title: string; description: string }> = {
   rules: { title: "审核规则", description: "维护关键词与白名单；命中规则只会进入人工审核，不会自动删除作品。" },
 };
 const fmt = (value: string) => new Date(value).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
-const reviewFilterOptions: Array<{ key: "pending" | "high_risk" | "service_error" | "first_submission" | "resubmission" | "text" | "image"; label: string }> = [
-  { key: "pending", label: "待人工审核" },
-  { key: "high_risk", label: "高风险" },
-  { key: "service_error", label: "服务异常" },
-  { key: "first_submission", label: "首次提交" },
-  { key: "resubmission", label: "重新提交" },
-  { key: "text", label: "文字作品" },
-  { key: "image", label: "图片作品" },
-];
-const ratingLabel = (value?: string | null) => (value === "all" ? "全年龄" : value === "r15" ? "15+" : value === "r18" ? "18+" : value || "未评级");
 
 function Icon({ name }: { name: "file" | "flag" | "users" | "message" | "search" | "arrow" | "check" | "x" | "lock" | "logout" }) {
   const paths: Record<string, string> = {
@@ -118,25 +84,32 @@ function Icon({ name }: { name: "file" | "flag" | "users" | "message" | "search"
   return <svg className="admin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
 
-export default function AdminDashboard({ initialReviews, initialReports, initialFeedbacks, initialRules, rulesReady, loadErrors, initialView, adminName = "管理员", adminEmail }: {
-  initialReviews: ReviewCaseItem[];
+export default function AdminDashboard({ initialPosts, initialSeriesReviews, initialReports, initialFeedbacks, initialRules, rulesReady, loadErrors, initialView, initialQuery = "", adminName = "管理员", adminEmail }: {
+  initialPosts: PostItem[];
+  initialSeriesReviews: SeriesReviewItem[];
   initialReports: ReportItem[];
   initialFeedbacks: FeedbackItem[];
   initialRules: ModerationRule[];
   rulesReady: boolean;
   loadErrors: string[];
   initialView: AdminView;
+  initialQuery?: string;
   adminName?: string;
   adminEmail: string;
 }) {
   const router = useRouter();
-  const dialog = useAdminDialog();
+  const queryKey = `admin-list-query-${initialView}`;
+  const scrollKey = `admin-list-scroll-${initialView}`;
   const [supabase] = useState(() => createAdminClient());
-  const [reviews, setReviews] = useState(initialReviews);
-  const [reports, setReports] = useState(initialReports);
-  const [feedbacks, setFeedbacks] = useState(initialFeedbacks);
-  const [rules, setRules] = useState(initialRules);
-  const [query, setQuery] = useState("");
+  const posts = initialPosts;
+  const seriesReviews = initialSeriesReviews;
+  const reports = initialReports;
+  const feedbacks = initialFeedbacks;
+  const rules = initialRules;
+  const [query, setQuery] = useState(() => {
+    if (typeof window === "undefined") return initialQuery ?? "";
+    return sessionStorage.getItem(queryKey) ?? initialQuery ?? "";
+  });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -146,7 +119,6 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
-  const [reviewFilters, setReviewFilters] = useState<Set<string>>(new Set());
   const [ruleError, setRuleError] = useState("");
   const [ruleType, setRuleType] = useState<ModerationRule["rule_type"]>("keyword");
   const [rulePattern, setRulePattern] = useState("");
@@ -158,13 +130,34 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
   const [userLoading, setUserLoading] = useState(false);
   const [userSearched, setUserSearched] = useState(false);
   const [userError, setUserError] = useState("");
+  const [deleteRule, setDeleteRule] = useState<ModerationRule | null>(null);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [globalQuery, setGlobalQuery] = useState("");
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalError, setGlobalError] = useState("");
+  const [globalResults, setGlobalResults] = useState<GlobalSearchResults | null>(null);
 
   useEffect(() => {
-    setReviews(initialReviews);
-    setReports(initialReports);
-    setFeedbacks(initialFeedbacks);
-    setRules(initialRules);
-  }, [initialReviews, initialReports, initialFeedbacks, initialRules]);
+    const savedScroll = Number(sessionStorage.getItem(scrollKey));
+    if (savedScroll > 0) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, savedScroll);
+        sessionStorage.removeItem(scrollKey);
+      });
+    }
+  }, [queryKey, scrollKey]);
+
+  useEffect(() => {
+    const saveScrollBeforeNav = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest?.("a");
+      if (anchor?.getAttribute("href")?.startsWith("/admin/")) {
+        sessionStorage.setItem(scrollKey, String(window.scrollY));
+      }
+    };
+    document.addEventListener("click", saveScrollBeforeNav, true);
+    return () => document.removeEventListener("click", saveScrollBeforeNav, true);
+  }, [scrollKey]);
 
   useEffect(() => {
     if (initialView !== "reviews" && initialView !== "reports") return;
@@ -173,7 +166,7 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
   }, [initialView, router]);
 
   const nav: Array<{ view: AdminView; label: string; icon: "file" | "flag" | "users" | "message" | "lock"; count?: number }> = [
-    { view: "reviews", label: "作品审核", icon: "file", count: reviews.length },
+    { view: "reviews", label: "作品审核", icon: "file", count: posts.length + seriesReviews.length },
     { view: "reports", label: "举报中心", icon: "flag", count: reports.length },
     { view: "users", label: "用户管理", icon: "users" },
     { view: "feedbacks", label: "用户反馈", icon: "message", count: feedbacks.length },
@@ -182,11 +175,16 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
 
   const handleFeedback = async (id: string) => {
     setBusy(id); setMessage("");
-    const response = await fetch("/api/admin/feedbacks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feedbackId: id, status: "resolved" }) });
-    setBusy(null);
-    if (!response.ok) { setMessage("反馈处理失败，请稍后重试。"); return; }
-    setFeedbacks((items) => items.filter((item) => item.id !== id));
-    setMessage("反馈已标记为处理完成。");
+    try {
+      const response = await fetchWithTimeout("/api/admin/feedbacks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feedbackId: id, status: "resolved" }) });
+      setBusy(null);
+      if (!response.ok) { setMessage("反馈处理失败，请稍后重试。"); return; }
+      router.refresh();
+      setMessage("反馈已标记为处理完成。");
+    } catch (error) {
+      setBusy(null);
+      setMessage(error instanceof Error ? error.message : "反馈处理失败，请稍后重试。");
+    }
   };
 
   const resetRuleForm = () => {
@@ -198,47 +196,106 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
     const pattern = rulePattern.trim();
     if (!pattern) { setRuleError("请填写词语或短语。"); return; }
     setBusy("create-rule"); setRuleError("");
-    const response = await fetch("/api/admin/moderation-rules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleType, pattern, category: ruleCategory, severity: ruleSeverity, description: ruleDescription.trim() || null }) });
-    const payload = await response.json().catch(() => null) as { error?: string; rule?: ModerationRule } | null;
-    setBusy(null);
-    if (!response.ok || !payload?.rule) { setRuleError(payload?.error || "规则保存失败，请稍后重试。"); return; }
-    setRules((items) => [payload.rule!, ...items]);
-    setRuleDialogOpen(false); resetRuleForm(); setMessage("规则已添加。新规则只会影响之后提交的内容。");
+    try {
+      const response = await fetchWithTimeout("/api/admin/moderation-rules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleType, pattern, category: ruleCategory, severity: ruleSeverity, description: ruleDescription.trim() || null }) });
+      const payload = await response.json().catch(() => null) as { error?: string; rule?: ModerationRule } | null;
+      setBusy(null);
+      if (!response.ok || !payload?.rule) { setRuleError(payload?.error || "规则保存失败，请稍后重试。"); return; }
+      router.refresh();
+      setRuleDialogOpen(false); resetRuleForm(); setMessage("规则已添加。新规则只会影响之后提交的内容。");
+    } catch (error) {
+      setBusy(null);
+      setRuleError(error instanceof Error ? error.message : "规则保存失败，请稍后重试。");
+    }
   };
 
   const updateRuleEnabled = async (rule: ModerationRule) => {
     setBusy(rule.id); setMessage("");
-    const response = await fetch("/api/admin/moderation-rules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: rule.id, enabled: !rule.enabled }) });
-    const payload = await response.json().catch(() => null) as { error?: string; rule?: ModerationRule } | null;
-    setBusy(null);
-    if (!response.ok || !payload?.rule) { setMessage(payload?.error || "规则更新失败，请稍后重试。"); return; }
-    setRules((items) => items.map((item) => item.id === rule.id ? payload.rule! : item));
+    try {
+      const response = await fetchWithTimeout("/api/admin/moderation-rules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: rule.id, enabled: !rule.enabled }) });
+      const payload = await response.json().catch(() => null) as { error?: string; rule?: ModerationRule } | null;
+      setBusy(null);
+      if (!response.ok || !payload?.rule) { setMessage(payload?.error || "规则更新失败，请稍后重试。"); return; }
+      router.refresh();
+    } catch (error) {
+      setBusy(null);
+      setMessage(error instanceof Error ? error.message : "规则更新失败，请稍后重试。");
+    }
   };
 
   const removeRule = async (rule: ModerationRule) => {
-    if (!await dialog.confirm({ title:"删除审核规则", message:`确定删除规则“${rule.pattern}”吗？删除后不影响已有审核记录。`, confirmLabel:"删除规则", variant:"danger" })) return;
+    setDeleteRule(rule);
+  };
+
+  const confirmRemoveRule = async () => {
+    if (!deleteRule) return;
+    const rule = deleteRule;
+    setDeleteRule(null);
     setBusy(rule.id); setMessage("");
-    const response = await fetch(`/api/admin/moderation-rules?id=${encodeURIComponent(rule.id)}`, { method: "DELETE" });
-    const payload = await response.json().catch(() => null) as { error?: string } | null;
-    setBusy(null);
-    if (!response.ok) { setMessage(payload?.error || "规则删除失败，请稍后重试。"); return; }
-    setRules((items) => items.filter((item) => item.id !== rule.id));
-    setMessage("规则已删除。");
+    try {
+      const response = await fetchWithTimeout(`/api/admin/moderation-rules?id=${encodeURIComponent(rule.id)}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      setBusy(null);
+      if (!response.ok) { setMessage(payload?.error || "规则删除失败，请稍后重试。"); return; }
+      router.refresh();
+      setMessage("规则已删除。");
+    } catch (error) {
+      setBusy(null);
+      setMessage(error instanceof Error ? error.message : "规则删除失败，请稍后重试。");
+    }
   };
 
   const searchUsers = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     setUserLoading(true); setUserError(""); setUserSearched(true);
     const params = new URLSearchParams({ query: userQuery.trim(), limit: "50" });
-    const response = await fetch(`/api/admin/users?${params.toString()}`);
-    const payload = await response.json().catch(() => null) as { error?: string; users?: UserSearchRow[] } | null;
-    setUserLoading(false);
-    if (!response.ok || !payload?.users) {
-      setUserError(payload?.error || "用户搜索失败，请稍后重试。");
+    try {
+      const response = await fetchWithTimeout(`/api/admin/users?${params.toString()}`);
+      const payload = await response.json().catch(() => null) as { error?: string; users?: UserSearchRow[] } | null;
+      setUserLoading(false);
+      if (!response.ok || !payload?.users) {
+        setUserError(payload?.error || "用户搜索失败，请稍后重试。");
+        setUserResults([]);
+        return;
+      }
+      setUserResults(payload.users);
+    } catch (error) {
+      setUserLoading(false);
+      setUserError(error instanceof Error ? error.message : "用户搜索失败，请稍后重试。");
       setUserResults([]);
-      return;
     }
-    setUserResults(payload.users);
+  };
+
+  const runGlobalSearch = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    const value = globalQuery.trim();
+    if (value.length < 2) { setGlobalError("请输入至少 2 个字符后再搜索。"); return; }
+    setGlobalLoading(true); setGlobalError(""); setGlobalResults(null);
+    const params = new URLSearchParams({ q: value });
+    try {
+      const response = await fetchWithTimeout(`/api/admin/global-search?${params.toString()}`);
+      const payload = await response.json().catch(() => null) as { error?: string } & GlobalSearchResults | null;
+      setGlobalLoading(false);
+      if (!response.ok || !payload) {
+        setGlobalError(payload?.error || "全局搜索失败，请稍后重试。");
+        setGlobalResults(null);
+        return;
+      }
+      setGlobalResults({ posts: payload.posts || [], series: payload.series || [], users: payload.users || [], reports: payload.reports || [], feedbacks: payload.feedbacks || [] });
+    } catch (error) {
+      setGlobalLoading(false);
+      setGlobalError(error instanceof Error ? error.message : "全局搜索失败，请稍后重试。");
+      setGlobalResults(null);
+    }
+  };
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    sessionStorage.setItem(queryKey, value);
+  };
+
+  const rememberListScroll = () => {
+    sessionStorage.setItem(scrollKey, String(window.scrollY));
   };
 
   const signOut = async () => {
@@ -265,33 +322,7 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
     setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); setPasswordDialogOpen(false); setMessage("密码修改成功。");
   };
 
-  const typeOfReview = (item: ReviewCaseItem) => item.version?.post_type || item.post?.post_type || "";
-  const isImageReview = (item: ReviewCaseItem) => typeOfReview(item) === "illustration";
-  const isFirstReviewSubmission = (item: ReviewCaseItem) => (item.submission_number ?? item.version?.submission_number ?? item.post?.review_submission_number ?? 1) <= 1;
-  const isReviewServiceError = (item: ReviewCaseItem) => item.status === "service_error" || item.screening_status === "failed";
-  const isPendingReview = (item: ReviewCaseItem) => item.status === "pending" || item.status === "reviewing";
-  const matchesReviewFilter = (key: string, item: ReviewCaseItem) => {
-    switch (key) {
-      case "pending": return isPendingReview(item);
-      case "high_risk": return item.priority === "high";
-      case "service_error": return isReviewServiceError(item);
-      case "first_submission": return isFirstReviewSubmission(item);
-      case "resubmission": return !isFirstReviewSubmission(item);
-      case "text": return !isImageReview(item);
-      case "image": return isImageReview(item);
-      default: return true;
-    }
-  };
-  const toggleReviewFilter = (key: string) => {
-    setReviewFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
-  const filteredReviews = reviews.filter((item) => reviewFilters.size === 0 || [...reviewFilters].every((key) => matchesReviewFilter(key, item))).filter((item) => `${item.version?.title || item.post?.title || ""} ${item.post?.author?.nickname || ""}`.toLowerCase().includes(query.toLowerCase()));
-  const highRiskReviewCount = reviews.filter((item) => item.priority === "high").length;
-  const serviceErrorReviewCount = reviews.filter((item) => isReviewServiceError(item)).length;
+  const filteredPosts = posts.filter((post) => `${post.title} ${post.author?.nickname || ""}`.toLowerCase().includes(query.toLowerCase()));
   const filteredReports = reports.filter((report) => `${report.target_title || ""} ${report.primary_reason_category || ""} ${report.author_nickname || ""} ${report.target_id}`.toLowerCase().includes(query.toLowerCase()));
   const filteredFeedbacks = feedbacks.filter((feedback) => `${feedback.type} ${feedback.content} ${feedback.user_id}`.toLowerCase().includes(query.toLowerCase()));
   const filteredRules = rules.filter((rule) => `${rule.pattern} ${rule.category} ${rule.description || ""}`.toLowerCase().includes(query.toLowerCase()));
@@ -299,7 +330,7 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
 
   const reportsView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-purple" /><h2>待处理举报</h2><span className="admin-count-pill">{filteredReports.length} 个案件</span></div><p>同一对象的多条举报会合并为一个案件；必须进入详情页查看完整证据后再处理。</p></div></div><div className="admin-queue-list">{filteredReports.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的举报案件</strong></div> : filteredReports.map((report) => <div className="admin-queue-row" key={report.id}><div className="admin-queue-badge">{labels[report.target_type] || "对象"}</div><div className="admin-queue-main"><strong>{report.target_title || "未知对象"}</strong><span>{report.primary_reason_category || "未填写原因"} · {report.report_count} 人举报 · 首次 {fmt(report.first_reported_at)} · 最近 {fmt(report.last_reported_at)}{report.author_nickname ? ` · ${report.author_nickname}` : ""}</span></div>{report.priority !== "normal" ? <span className="admin-queue-badge badge-blue">{report.priority === "urgent" ? "紧急" : "优先"}</span> : null}<Link className="admin-btn admin-btn-primary" href={reportLink(report)}>打开详情页</Link></div>)}</div></section>;
 
-  const reviewsView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-orange" /><h2>发布前人工审核</h2><span className="admin-count-pill">{filteredReviews.length} 条</span></div><p>打开详情页查看完整作品、原图和系统风险结果后，再决定放行或打回；列表不提供直接处理。</p></div></div>{(highRiskReviewCount > 0 || serviceErrorReviewCount > 0) && <div className="admin-alert" role="status"><span>队列中有 {highRiskReviewCount} 个高风险案件、{serviceErrorReviewCount} 个服务异常案件，建议优先处理。</span><Link href="/admin?view=reviews">前往审核</Link></div>}<div className="admin-filter-row">{reviewFilterOptions.map((option) => { const count = reviews.filter((item) => matchesReviewFilter(option.key, item)).length; return <button key={option.key} type="button" className={`admin-filter${reviewFilters.has(option.key) ? " is-selected" : ""}`} onClick={() => toggleReviewFilter(option.key)} aria-pressed={reviewFilters.has(option.key)}>{option.label}{count > 0 ? <span>{count}</span> : null}</button>; })}</div><div className="admin-queue-list">{filteredReviews.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的待审核作品</strong><span>新提交进入人工审核后会显示在这里。</span></div> : filteredReviews.map((item) => { const submission = item.submission_number ?? item.version?.submission_number ?? item.post?.review_submission_number ?? 1; return <div className="admin-queue-row" key={item.id}><div className="admin-queue-badge">{labels[typeOfReview(item)] || "作品"}</div><div className="admin-queue-main"><strong>{item.version?.title || item.post?.title || "无标题"}</strong><span>{item.post?.author?.nickname || "未知作者"} · 评级 {ratingLabel(item.version?.content_rating || item.post?.content_rating)} · {fmt(item.version?.submitted_at || item.version?.created_at || item.created_at)} · 第 {submission} 次提交</span><div className="admin-queue-tags">{item.status === "reviewing" ? <span className="admin-queue-tag">审核中</span> : <span className="admin-queue-tag">待人工审核</span>}{item.priority === "high" ? <span className="admin-queue-tag is-danger">高风险</span> : null}{isReviewServiceError(item) ? <span className="admin-queue-tag is-danger">服务异常</span> : null}{isFirstReviewSubmission(item) ? <span className="admin-queue-tag">首次提交</span> : <span className="admin-queue-tag">重新提交</span>}{item.findings_count ? <span className="admin-queue-tag">{item.findings_count} 条问题</span> : null}{item.route_reason ? <span className="admin-queue-tag is-muted">{item.route_reason}</span> : null}</div></div><Link className="admin-btn admin-btn-primary" href={`/admin/reviews/${item.id}`}>查看审核</Link></div>; })}</div></section>;
+  const postsView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-orange" /><h2>发布前人工审核</h2><span className="admin-count-pill">{filteredPosts.length + seriesReviews.length} 条</span></div><p>连载信息和连载章节分开列出；打开详情页查看完整内容与风险结果后，再决定放行或打回。</p></div></div><div className="admin-table">{filteredPosts.length === 0 && seriesReviews.length === 0 ? <div className="admin-empty"><strong>没有符合条件的待审核作品</strong></div> : <>{filteredPosts.map((post) => <div className="admin-table-row" key={post.id}><div className="admin-work-cell"><div className="admin-work-thumb">{post.title.slice(0, 1)}</div><div><strong>{post.title || "无标题"}</strong><span>{post.post_type === "serial" ? "连载章节（章节标题/正文）" : labels[post.post_type || ""] || "作品"}{post.review_reason ? ` · ${post.review_reason}` : ""}</span></div></div><span className="admin-author-cell">{post.author?.nickname || "未知作者"}</span><span className="admin-date-cell">{fmt(post.created_at)}</span><div className="admin-row-actions"><Link className="admin-btn admin-btn-primary" href={`/admin/reviews/${post.id}`}>查看章节审核</Link></div></div>)}{seriesReviews.map((item) => <div className="admin-table-row" key={`series-${item.id}`}><div className="admin-work-cell"><div className="admin-work-thumb">连</div><div><strong>{item.series?.name || "未命名连载"}</strong><span>连载信息（名称/简介） · {item.route_reason}</span></div></div><span className="admin-author-cell">作者 ID {item.series?.user_id?.slice(0, 8) || "未知"}</span><span className="admin-date-cell">{fmt(item.created_at)}</span><div className="admin-row-actions"><Link className="admin-btn admin-btn-primary" href={`/admin/series-reviews/${item.series_id}`}>查看连载审核</Link></div></div>)}</>}</div></section>;
 
   const feedbacksView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div className="admin-heading-line"><span className="admin-section-dot dot-blue" /><h2>反馈收件箱</h2></div></div><div className="admin-queue-list">{filteredFeedbacks.length === 0 ? <div className="admin-empty"><strong>没有符合条件的用户反馈</strong></div> : filteredFeedbacks.map((item) => <div className="admin-queue-row" key={item.id}><div className="admin-queue-badge badge-blue">{item.type}</div><div className="admin-queue-main"><strong>{item.content}</strong><span>{fmt(item.created_at)} · 用户 {item.user_id.slice(0, 8)}</span></div><button className="admin-btn admin-btn-light" disabled={busy === item.id} onClick={() => void handleFeedback(item.id)}>标记已处理</button></div>)}</div></section>;
 
@@ -307,16 +338,29 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
 
   const usersView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-teal" /><h2>用户搜索</h2><span className="admin-count-pill">{userSearched ? `${userResults.length} 位用户` : "输入关键词查询"}</span></div><p>按昵称或用户 ID 搜索；打开详情页可查看举报、违规与限制记录并执行处罚。</p></div></div><form className="admin-user-search" onSubmit={searchUsers}><input value={userQuery} onChange={(event) => setUserQuery(event.target.value)} placeholder="昵称或完整用户 ID" aria-label="搜索用户" /><button className="admin-btn admin-btn-primary" type="submit" disabled={userLoading}>{userLoading ? "搜索中…" : "搜索"}</button></form>{userError ? <div className="admin-alert admin-alert-error" role="alert">{userError}</div> : null}<div className="admin-queue-list">{!userSearched ? <div className="admin-empty"><strong>还没有搜索</strong><span>输入昵称或用户 ID 后开始查询。</span></div> : userResults.length === 0 ? <div className="admin-empty"><strong>没有找到该用户</strong><span>昵称支持模糊匹配，ID 支持完整值。</span></div> : userResults.map((user) => <div className="admin-queue-row" key={user.id}><span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span><div className="admin-queue-main"><strong>{user.nickname || "未命名用户"}</strong><span className="admin-mono">{user.id}</span><span>{userStatusLabels[user.moderation_status] || user.moderation_status} · 举报案件 {user.total_report_cases} · 待处理 {user.pending_report_cases} · 有效违规 {user.active_violations} · 有效限制 {user.active_restrictions}</span></div><Link className="admin-btn admin-btn-primary" href={`/admin/users/${user.id}`}>查看详情</Link></div>)}</div></section>;
 
-  const content = initialView === "reviews" ? reviewsView : initialView === "reports" ? reportsView : initialView === "feedbacks" ? feedbacksView : initialView === "rules" ? rulesView : initialView === "users" ? usersView : <section className="admin-card admin-full-card"><div className="admin-coming-soon"><Icon name="users" /><strong>页面尚未接入</strong><span>请从左侧选择后台功能。</span></div></section>;
+  const content = initialView === "reviews" ? postsView : initialView === "reports" ? reportsView : initialView === "feedbacks" ? feedbacksView : initialView === "rules" ? rulesView : initialView === "users" ? usersView : <section className="admin-card admin-full-card"><div className="admin-coming-soon"><Icon name="users" /><strong>页面尚未接入</strong><span>请从左侧选择后台功能。</span></div></section>;
 
   return <div className="admin-app-shell">
     <aside className="admin-sidebar">
       <div className="admin-brand"><span className="admin-brand-mark">i</span><span>inkland</span><small>OPERATIONS</small></div>
-      <div className="admin-nav-group"><p>后台功能</p>{nav.map((item) => <Link className={`admin-nav-item ${initialView === item.view ? "is-active" : ""}`} href={`/admin?view=${item.view}`} key={item.view} aria-current={initialView === item.view ? "page" : undefined}><Icon name={item.icon} /><span>{item.label}</span>{item.count ? <b>{item.count}</b> : null}</Link>)}</div>
+      <div className="admin-nav-group"><p>后台功能</p>{nav.map((item) => <Link className={`admin-nav-item ${initialView === item.view ? "is-active" : ""}`} href={`/admin?view=${item.view}`} key={item.view} onClick={rememberListScroll} aria-current={initialView === item.view ? "page" : undefined}><Icon name={item.icon} /><span>{item.label}</span>{item.count ? <b>{item.count}</b> : null}</Link>)}</div>
       <div className="admin-sidebar-user"><span className="admin-avatar">{adminName.slice(0, 1)}</span><div><strong>{adminName}</strong><small>{adminEmail}</small></div><button type="button" onClick={() => setAccountMenuOpen((open) => !open)} aria-expanded={accountMenuOpen}>账户</button>{accountMenuOpen && <div className="admin-account-menu"><button type="button" onClick={() => { setPasswordError(""); setPasswordDialogOpen(true); setAccountMenuOpen(false); }}><Icon name="lock" />修改密码</button><button type="button" className="danger" disabled={busy === "signout"} onClick={() => void signOut()}><Icon name="logout" />{busy === "signout" ? "退出中…" : "退出登录"}</button></div>}</div>
     </aside>
-    <main className="admin-main"><header className="admin-topbar"><div className="admin-breadcrumb"><span>管理后台</span><Icon name="arrow" /><strong>{viewCopy[initialView].title}</strong></div><div className="admin-top-actions"><label className="admin-search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索当前列表" aria-label="搜索当前列表" /></label><span className="admin-live"><i />后台已连接</span></div></header><div className="admin-content"><div className="admin-page-title"><div><p className="admin-eyebrow">INKLAND OPERATIONS</p><h1>{viewCopy[initialView].title}</h1><p>{viewCopy[initialView].description}</p></div><button className="admin-btn admin-btn-light" type="button" onClick={() => window.location.reload()}>刷新数据</button></div>{loadErrors.length > 0 && <div className="admin-alert admin-alert-error" role="alert">部分数据加载失败，请检查数据库配置。</div>}{message && <div className="admin-toast" role="status">{message}</div>}{content}</div></main>
+    <main className="admin-main"><header className="admin-topbar"><div className="admin-breadcrumb"><span>管理后台</span><Icon name="arrow" /><strong>{viewCopy[initialView].title}</strong></div><div className="admin-top-actions"><button className="admin-btn admin-btn-light admin-global-search-btn" type="button" onClick={() => { setGlobalQuery(""); setGlobalError(""); setGlobalResults(null); setGlobalSearchOpen(true); }}><Icon name="search" />全局搜索</button><label className="admin-search"><Icon name="search" /><input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="搜索当前列表" aria-label="搜索当前列表" /></label><span className="admin-live"><i />后台已连接</span></div></header><div className="admin-content"><div className="admin-page-title"><div><p className="admin-eyebrow">INKLAND OPERATIONS</p><h1>{viewCopy[initialView].title}</h1><p>{viewCopy[initialView].description}</p></div><button className="admin-btn admin-btn-light" type="button" onClick={() => window.location.reload()}>刷新数据</button></div>{loadErrors.length > 0 && <div className="admin-alert admin-alert-error" role="alert">部分数据加载失败，请检查数据库配置。</div>}{message && <div className="admin-toast" role="status">{message}</div>}{content}</div></main>
     {passwordDialogOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPasswordDialogOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="change-password-title" onSubmit={changePassword}><div className="admin-modal-header"><div><h2 id="change-password-title">修改管理员密码</h2><p className="admin-modal-desc">需要先验证当前密码。新密码至少8位。</p></div></div><label className="admin-field">当前密码<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label><label className="admin-field">新密码<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required /></label><label className="admin-field">再次输入新密码<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} required /></label>{passwordError && <div className="admin-alert admin-alert-error" role="alert">{passwordError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "password"} onClick={() => setPasswordDialogOpen(false)}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === "password"}>{busy === "password" ? "保存中…" : "确认修改"}</button></div></form></div>}
     {ruleDialogOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRuleDialogOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="create-rule-title" onSubmit={createRule}><div className="admin-modal-header"><div><h2 id="create-rule-title">添加审核规则</h2><p className="admin-modal-desc">先从少量明确的表达开始。除非以后另行调整，规则不会自动删除内容。</p></div></div><label className="admin-field">规则类型<select value={ruleType} onChange={(event) => setRuleType(event.target.value as ModerationRule["rule_type"])}><option value="keyword">关键词：命中后进入人工审核</option><option value="whitelist">白名单：排除已知误判表达</option></select></label><label className="admin-field">词语或短语<input value={rulePattern} onChange={(event) => setRulePattern(event.target.value)} maxLength={500} required /></label><label className="admin-field">问题分类<select value={ruleCategory} onChange={(event) => setRuleCategory(event.target.value)}><option>广告与导流</option><option>诈骗与交易风险</option><option>人身攻击与骚扰</option><option>暴力与威胁</option><option>成人与不当内容</option><option>其他</option></select></label><label className="admin-field">风险级别<select value={ruleSeverity} disabled={ruleType === "whitelist"} onChange={(event) => setRuleSeverity(event.target.value as ModerationRule["severity"])}><option value="review">进入人工审核</option><option value="high">高风险，优先审核</option></select></label><label className="admin-field">备注（可选）<input value={ruleDescription} onChange={(event) => setRuleDescription(event.target.value)} maxLength={500} /></label>{ruleError && <div className="admin-alert admin-alert-error" role="alert">{ruleError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "create-rule"} onClick={() => setRuleDialogOpen(false)}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === "create-rule"}>{busy === "create-rule" ? "保存中…" : "保存规则"}</button></div></form></div>}
+    {deleteRule ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && busy !== deleteRule.id) setDeleteRule(null); }}><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="delete-rule-title"><div className="admin-modal-header"><div><h2 id="delete-rule-title">删除这条规则？</h2><p className="admin-modal-desc">确定删除规则“{deleteRule.pattern}”吗？删除后不影响已有审核记录。</p></div></div><div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === deleteRule.id} onClick={() => setDeleteRule(null)}>取消</button><button className="admin-btn admin-btn-danger-fill" type="button" disabled={busy === deleteRule.id} onClick={() => void confirmRemoveRule()}>{busy === deleteRule.id ? "删除中…" : "确认删除"}</button></div></div></div> : null}
+    {globalSearchOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !globalLoading) setGlobalSearchOpen(false); }}><div className="admin-modal admin-global-search-modal" role="dialog" aria-modal="true" aria-labelledby="global-search-title"><div className="admin-modal-header"><div><h2 id="global-search-title">全局搜索</h2><p className="admin-modal-desc">搜索作品、连载、用户、举报案件与用户反馈。</p></div></div><form className="admin-global-search-form" onSubmit={runGlobalSearch}><input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} placeholder="输入关键词" aria-label="全局搜索关键词" autoFocus /><button className="admin-btn admin-btn-primary" type="submit" disabled={globalLoading}>{globalLoading ? "搜索中…" : "搜索"}</button></form>{globalError ? <div className="admin-alert admin-alert-error" role="alert">{globalError}</div> : null}{globalResults ? <div className="admin-global-search-results">{(() => {
+        const groups = [
+          { key: "posts", label: "作品", rows: globalResults.posts.map((item) => ({ key: item.id, title: item.title, meta: `${item.post_type || "作品"} · ${item.review_status === "pending" ? "待审核" : item.status || "已发布"}${item.author_nickname ? ` · ${item.author_nickname}` : ""}`, href: item.href })) },
+          { key: "series", label: "连载", rows: globalResults.series.map((item) => ({ key: item.id, title: item.name, meta: `${item.review_status === "pending" ? "待审核" : item.status || ""}`, href: item.href })) },
+          { key: "users", label: "用户", rows: globalResults.users.map((item) => ({ key: item.id, title: item.nickname, meta: `${userStatusLabels[item.moderation_status] || item.moderation_status}`, href: item.href })) },
+          { key: "reports", label: "举报案件", rows: globalResults.reports.map((item) => ({ key: item.id, title: item.title, meta: `${labels[item.target_type] || "对象"} · ${statusLabelsForSearch(item.status)}`, href: item.href })) },
+          { key: "feedbacks", label: "用户反馈", rows: globalResults.feedbacks.map((item) => ({ key: item.id, title: item.type, meta: item.content, href: item.href })) },
+        ].filter((group) => group.rows.length > 0);
+        const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
+        if (total === 0) return <div className="admin-empty"><strong>没有找到匹配结果</strong></div>;
+        return <>{groups.map((group) => <div className="admin-global-group" key={group.key}><h3>{group.label}<span>{group.rows.length}</span></h3>{group.rows.map((row) => row.href ? <Link className="admin-global-result" href={row.href} key={row.key} onClick={rememberListScroll}><strong>{row.title}</strong><span>{row.meta}</span></Link> : <div className="admin-global-result" key={row.key}><strong>{row.title}</strong><span>{row.meta}</span></div>)}</div>)}</>;
+      })()}</div> : null}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={globalLoading} onClick={() => setGlobalSearchOpen(false)}>关闭</button></div></div></div> : null}
   </div>;
 }
