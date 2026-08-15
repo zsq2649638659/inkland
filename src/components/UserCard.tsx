@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import { submitReportV1 } from "@/lib/reportContent";
 
 interface FollowUser {
   id: string;
@@ -65,7 +66,9 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
     setMoreOpen(false);
     const reason = await dialog.prompt({ title:"举报用户", message:`请说明举报 ${user.nickname} 的原因。`, placeholder:"请尽量描述具体情况…", confirmLabel:"提交举报", required:true });
     if (!reason || !reason.trim()) return;
-    dialog.toast("举报已提交，管理员会尽快处理");
+    const result = await submitReportV1(supabase, { targetType: "user", targetId: user.id, reason });
+    if (!result.ok) { await dialog.alert({ title: "举报失败", message: result.message, variant: "danger" }); return; }
+    dialog.toast(result.message);
   };
 
   // 按钮文字

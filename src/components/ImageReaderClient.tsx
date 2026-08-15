@@ -9,6 +9,7 @@ import BookmarkButton from "@/components/BookmarkButton";
 import EmojiPicker from "@/components/EmojiPicker";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { createNotification } from "@/lib/notifications";
+import { submitReportV1 } from "@/lib/reportContent";
 import type { Post, Comment } from "@/lib/types";
 import { useAppDialog } from "@/components/AppDialogProvider";
 
@@ -41,8 +42,9 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
     comment_count: post.comment_count || 0,
   });
   // 举报状态
-  const [reportModal, setReportModal] = useState<{ open: boolean; commentId: string; commentUserId: string } | null>(null);
+  const [reportModal, setReportModal] = useState<{ open: boolean; targetType: "comment" | "post"; targetId: string } | null>(null);
   const [reportReason, setReportReason] = useState("");
+  const [reportCustomReason, setReportCustomReason] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   // 屏蔽弹窗状态
   const [blockModal, setBlockModal] = useState<{ open: boolean; userId: string } | null>(null);
@@ -333,22 +335,27 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
 
   const handleReport = (commentId: string, commentUserId: string) => {
     if (!user) { goToLogin(); return; }
-    setReportModal({ open: true, commentId, commentUserId });
+    setReportModal({ open: true, targetType: "comment", targetId: commentId });
     setReportReason("");
+    setReportCustomReason("");
+  };
+
+  const handlePostReport = () => {
+    if (!user) { goToLogin(); return; }
+    setReportModal({ open: true, targetType: "post", targetId: post.id });
+    setReportReason("");
+    setReportCustomReason("");
   };
 
   const submitReport = async () => {
-    if (!reportModal || !reportReason.trim()) return;
+    const reason = reportReason === "其他" ? reportCustomReason.trim() : reportReason.trim();
+    if (!reportModal || !reason) return;
     setReportSubmitting(true);
-    const { error } = await supabase.from("comment_reports").insert({
-      comment_id: reportModal.commentId,
-      reporter_id: user!.id,
-      reason: reportReason.trim(),
-    });
+    const result = await submitReportV1(supabase, { targetType: reportModal.targetType, targetId: reportModal.targetId, reason });
     setReportSubmitting(false);
-    if (error) { showToast("举报失败: " + error.message); return; }
+    if (!result.ok) { showToast(result.message); return; }
     setReportModal(null);
-    showToast("举报已提交，我们会尽快处理");
+    showToast(result.message);
   };
 
   const handleBlockUser = async (blockedUserId: string) => {
@@ -420,6 +427,9 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           <svg width="22" height="22" viewBox="0 0 1024 1024" fill="currentColor">
             <path d="M866.18 128c33.15 0.19 47.49 1.15 58.88 6.98a64 64 0 0 1 27.97 27.97C960 176.64 960 194.56 960 244.1v483.58c0 40.7-0.64 56.83-6.98 69.38a64 64 0 0 1-27.97 27.97C911.36 832 893.44 832 843.9 832H168.32c-40.7 0-56.83-0.64-69.38-6.98a64 64 0 0 1-27.97-27.97c-5.76-11.39-6.78-25.73-6.91-58.88V221.82c0.13-33.15 1.09-47.49 6.91-58.88a64 64 0 0 1 27.97-27.97c11.39-5.76 25.73-6.78 58.88-6.91zM896 192H128l0.7 2.56c-0.45 6.78-0.7 23.3-0.7 49.54V768l2.56-0.7c6.78 0.45 23.3 0.7 49.54 0.7H896l-0.7-2.56c0.45-6.78 0.7-23.3 0.7-49.54V192z m-162.56 170.11l88 94.08c1.34 1.28 2.56 2.56 3.71 4.03 12.16 13 11.9 32.58-0.13 44.8l-92.16 93.44a32 32 0 1 1-45.63-44.93l40.96-41.53H301.25l41.28 41.34a32 32 0 1 1-45.25 45.25l-96-96a32 32 0 0 1 0-45.25l96-96a32 32 0 1 1 45.25 45.31L301.25 448h424.83l-39.42-42.11a32 32 0 1 1 46.72-43.78z"/>
           </svg>
+        </button>
+        <button className="floating-btn" title="举报作品" onClick={handlePostReport}>
+          <i className="fa-regular fa-flag" />
         </button>
       </div>
 
@@ -916,7 +926,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       </div>
 
       {/* 举报弹窗 */}
-      <div className={`modal-overlay${reportModal?.open ? " active" : ""}`} onClick={() => setReportModal(null)}>
+      <div className={`modal-overlay moderation-modal-overlay${reportModal?.open ? " active" : ""}`} onClick={() => setReportModal(null)}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">举报原因</div>
           <div className="modal-body">
@@ -933,13 +943,23 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                 </li>
               ))}
             </ul>
+            {reportReason === "其他" && (
+              <textarea
+                className="moderation-custom-reason"
+                value={reportCustomReason}
+                onChange={(event) => setReportCustomReason(event.target.value)}
+                placeholder="请填写举报理由"
+                rows={3}
+                autoFocus
+              />
+            )}
           </div>
           <div className="modal-actions">
             <button className="btn-modal btn-modal-cancel" onClick={() => setReportModal(null)}>取消</button>
             <button
               className="btn-modal btn-modal-primary"
               onClick={submitReport}
-              disabled={reportSubmitting || !reportReason}
+              disabled={reportSubmitting || !reportReason || (reportReason === "其他" && !reportCustomReason.trim())}
             >
               {reportSubmitting ? "提交中..." : "提交举报"}
             </button>

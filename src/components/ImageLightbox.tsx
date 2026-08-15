@@ -11,6 +11,7 @@ import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
+import { submitReportV1 } from "@/lib/reportContent";
 import SiteDialog, { useSiteDialog } from "@/components/SiteDialog";
 import type { Comment, Post } from "@/lib/types";
 import "@/app/home-lightbox.css";
@@ -48,7 +49,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
   const [moderation, setModeration] = useState<{
     mode: "report" | "block";
     targetId?: string;
-    targetType?: "post" | "comment" | "user";
+    targetType: "post" | "comment" | "user";
   } | null>(null);
 
   const authorName = post.author?.nickname || "匿名用户";
@@ -160,12 +161,18 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
 
   const submitModeration = async (reason: string) => {
     if (!user || !moderation) return;
-    const result = moderation.mode === "report"
-      ? moderation.targetType === "comment"
-        ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: moderation.targetId, reason })
-        : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: moderation.targetId || post.id, reason })
-      : await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderation.targetId || authorId });
-    if (!result.error) { setModeration(null); setToast(moderation.mode === "report" ? "举报已提交" : "已屏蔽该用户"); }
+    if (moderation.mode === "report") {
+      const result = await submitReportV1(supabase, { targetType: moderation.targetType, targetId: moderation.targetId || post.id, reason });
+      if (!result.ok) { setToast(result.message); return; }
+      setModeration(null);
+      setToast(result.message);
+      return;
+    }
+    const { error } = await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderation.targetId || authorId });
+    if (!error || (error as unknown as Record<string, unknown>).code?.toString().includes("23505")) {
+      setModeration(null);
+      setToast("已屏蔽该用户");
+    }
   };
 
   const description = useMemo(() => (post.content || "").replace(/!\[.*?\]\(.*?\)/g, "").replace(/\s+/g, " ").trim(), [post.content]);

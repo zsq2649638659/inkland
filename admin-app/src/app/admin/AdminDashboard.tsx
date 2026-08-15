@@ -40,7 +40,22 @@ type ReviewCaseItem = {
   } | null;
   findings_count?: number | null;
 };
-type ReportItem = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string; reporter?: { nickname?: string } | null; source?: "content" | "comment" };
+type ReportItem = {
+  id: string;
+  target_type: "post" | "comment" | "user";
+  target_id: string;
+  target_user_id?: string | null;
+  status: string;
+  priority: string;
+  primary_reason_category?: string | null;
+  report_count: number;
+  first_reported_at: string;
+  last_reported_at: string;
+  created_at: string;
+  target_title?: string | null;
+  target_summary?: string | null;
+  author_nickname?: string | null;
+};
 type FeedbackItem = { id: string; type: string; content: string; created_at: string; user_id: string };
 export type ModerationRule = {
   id: string;
@@ -245,12 +260,12 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
   const filteredReviews = reviews.filter((item) => reviewFilters.size === 0 || [...reviewFilters].every((key) => matchesReviewFilter(key, item))).filter((item) => `${item.version?.title || item.post?.title || ""} ${item.post?.author?.nickname || ""}`.toLowerCase().includes(query.toLowerCase()));
   const highRiskReviewCount = reviews.filter((item) => item.priority === "high").length;
   const serviceErrorReviewCount = reviews.filter((item) => isReviewServiceError(item)).length;
-  const filteredReports = reports.filter((report) => `${report.reason} ${report.reporter?.nickname || ""} ${report.target_id}`.toLowerCase().includes(query.toLowerCase()));
+  const filteredReports = reports.filter((report) => `${report.target_title || ""} ${report.primary_reason_category || ""} ${report.author_nickname || ""} ${report.target_id}`.toLowerCase().includes(query.toLowerCase()));
   const filteredFeedbacks = feedbacks.filter((feedback) => `${feedback.type} ${feedback.content} ${feedback.user_id}`.toLowerCase().includes(query.toLowerCase()));
   const filteredRules = rules.filter((rule) => `${rule.pattern} ${rule.category} ${rule.description || ""}`.toLowerCase().includes(query.toLowerCase()));
-  const reportLink = (report: ReportItem) => `/admin/reports/${report.id}?source=${report.source || "content"}`;
+  const reportLink = (report: ReportItem) => `/admin/reports/${report.id}`;
 
-  const reportsView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-purple" /><h2>待处理举报</h2><span className="admin-count-pill">{filteredReports.length} 条</span></div><p>必须进入详情页查看完整证据后再处理。</p></div></div><div className="admin-queue-list">{filteredReports.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的举报</strong></div> : filteredReports.map((report) => <div className="admin-queue-row" key={`${report.source}-${report.id}`}><div className="admin-queue-badge">{labels[report.target_type] || "对象"}</div><div className="admin-queue-main"><strong>{report.reason}</strong><span>举报人：{report.reporter?.nickname || "匿名"} · {fmt(report.created_at)} · ID {report.target_id.slice(0, 8)}</span></div><Link className="admin-btn admin-btn-primary" href={reportLink(report)}>打开详情页</Link></div>)}</div></section>;
+  const reportsView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-purple" /><h2>待处理举报</h2><span className="admin-count-pill">{filteredReports.length} 个案件</span></div><p>同一对象的多条举报会合并为一个案件；必须进入详情页查看完整证据后再处理。</p></div></div><div className="admin-queue-list">{filteredReports.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的举报案件</strong></div> : filteredReports.map((report) => <div className="admin-queue-row" key={report.id}><div className="admin-queue-badge">{labels[report.target_type] || "对象"}</div><div className="admin-queue-main"><strong>{report.target_title || "未知对象"}</strong><span>{report.primary_reason_category || "未填写原因"} · {report.report_count} 人举报 · 首次 {fmt(report.first_reported_at)} · 最近 {fmt(report.last_reported_at)}{report.author_nickname ? ` · ${report.author_nickname}` : ""}</span></div>{report.priority !== "normal" ? <span className="admin-queue-badge badge-blue">{report.priority === "urgent" ? "紧急" : "优先"}</span> : null}<Link className="admin-btn admin-btn-primary" href={reportLink(report)}>打开详情页</Link></div>)}</div></section>;
 
   const reviewsView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-orange" /><h2>发布前人工审核</h2><span className="admin-count-pill">{filteredReviews.length} 条</span></div><p>打开详情页查看完整作品、原图和系统风险结果后，再决定放行或打回；列表不提供直接处理。</p></div></div>{(highRiskReviewCount > 0 || serviceErrorReviewCount > 0) && <div className="admin-alert" role="status"><span>队列中有 {highRiskReviewCount} 个高风险案件、{serviceErrorReviewCount} 个服务异常案件，建议优先处理。</span><Link href="/admin?view=reviews">前往审核</Link></div>}<div className="admin-filter-row">{reviewFilterOptions.map((option) => { const count = reviews.filter((item) => matchesReviewFilter(option.key, item)).length; return <button key={option.key} type="button" className={`admin-filter${reviewFilters.has(option.key) ? " is-selected" : ""}`} onClick={() => toggleReviewFilter(option.key)} aria-pressed={reviewFilters.has(option.key)}>{option.label}{count > 0 ? <span>{count}</span> : null}</button>; })}</div><div className="admin-queue-list">{filteredReviews.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的待审核作品</strong><span>新提交进入人工审核后会显示在这里。</span></div> : filteredReviews.map((item) => { const submission = item.submission_number ?? item.version?.submission_number ?? item.post?.review_submission_number ?? 1; return <div className="admin-queue-row" key={item.id}><div className="admin-queue-badge">{labels[typeOfReview(item)] || "作品"}</div><div className="admin-queue-main"><strong>{item.version?.title || item.post?.title || "无标题"}</strong><span>{item.post?.author?.nickname || "未知作者"} · 评级 {ratingLabel(item.version?.content_rating || item.post?.content_rating)} · {fmt(item.version?.submitted_at || item.version?.created_at || item.created_at)} · 第 {submission} 次提交</span><div className="admin-queue-tags">{item.status === "reviewing" ? <span className="admin-queue-tag">审核中</span> : <span className="admin-queue-tag">待人工审核</span>}{item.priority === "high" ? <span className="admin-queue-tag is-danger">高风险</span> : null}{isReviewServiceError(item) ? <span className="admin-queue-tag is-danger">服务异常</span> : null}{isFirstReviewSubmission(item) ? <span className="admin-queue-tag">首次提交</span> : <span className="admin-queue-tag">重新提交</span>}{item.findings_count ? <span className="admin-queue-tag">{item.findings_count} 条问题</span> : null}{item.route_reason ? <span className="admin-queue-tag is-muted">{item.route_reason}</span> : null}</div></div><Link className="admin-btn admin-btn-primary" href={`/admin/reviews/${item.id}`}>查看审核</Link></div>; })}</div></section>;
 
