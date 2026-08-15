@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
 import { createNotification } from "@/lib/notifications";
+import { submitReportV1 } from "@/lib/reportContent";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
@@ -136,18 +137,22 @@ export default function PostCard({ post }: PostCardProps) {
   const submitModeration = async (reason: string) => {
     if (!moderationModal || !user || (moderationModal.mode === "report" && !reason.trim())) return;
     setModerationSubmitting(true);
-    const { error } = moderationModal.mode === "report"
-      ? moderationModal.targetType === "comment"
-        ? await supabase.from("comment_reports").insert({ reporter_id: user.id, comment_id: moderationModal.targetId, reason: reason.trim() })
-        : await supabase.from("content_reports").insert({ reporter_id: user.id, target_type: "post", target_id: moderationModal.targetId, reason: reason.trim() })
-      : await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderationModal.userId });
+    if (moderationModal.mode === "report") {
+      const result = await submitReportV1(supabase, { targetType: moderationModal.targetType, targetId: moderationModal.targetId, reason });
+      setModerationSubmitting(false);
+      if (!result.ok) { setToastMessage(result.message); return; }
+      setModerationModal(null);
+      setToastMessage(result.message);
+      return;
+    }
+    const { error } = await supabase.from("blocked_users").insert({ user_id: user.id, blocked_user_id: moderationModal.userId });
     setModerationSubmitting(false);
-    if (error && !(moderationModal.mode === "block" && (error as unknown as Record<string, unknown>).code?.toString().includes("23505"))) {
-      setToastMessage(moderationModal.mode === "report" ? "举报提交失败，请稍后重试。" : "屏蔽失败，请稍后重试。");
+    if (error && !(error as unknown as Record<string, unknown>).code?.toString().includes("23505")) {
+      setToastMessage("屏蔽失败，请稍后重试。");
       return;
     }
     setModerationModal(null);
-    setToastMessage(moderationModal.mode === "report" ? "举报已提交，我们会尽快处理。" : "已屏蔽该用户。");
+    setToastMessage("已屏蔽该用户。");
   };
 
   // Check follow status

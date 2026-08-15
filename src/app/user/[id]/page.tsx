@@ -4,6 +4,7 @@ import { useEffect, useState, use, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
+import { submitReportV1 } from "@/lib/reportContent";
 import { useAuth } from "@/components/AuthProvider";
 import PostCardGrid from "@/components/PostCardGrid";
 import PostTagCard from "@/components/PostTagCard";
@@ -13,6 +14,7 @@ import EmptyState from "@/components/EmptyState";
 import type { Post } from "@/lib/types";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import ModerationReasonModal from "@/components/ModerationReasonModal";
 
 interface FollowUser {
   id: string;
@@ -79,6 +81,7 @@ const loadSeriesStats = async (supabase: ReturnType<typeof createClient>, series
 };
 
 export default function UserPage({ params }: { params: Promise<{ id: string }> }) {
+  const [reportOpen, setReportOpen] = useState(false);
   const { id } = use(params);
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "works";
@@ -436,11 +439,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     setBlockDialog("success");
   };
 
-  const handleReport = async () => {
+  const handleReport = () => {
     setMoreOpen(false);
-    const reason = await dialog.prompt({ title:"举报用户", message:"请填写举报原因，管理员会结合账号内容进行核查。", placeholder:"请尽量描述具体情况…", confirmLabel:"提交举报", required:true });
-    if (!reason || !reason.trim()) return;
-    dialog.toast("举报已提交，管理员会尽快处理");
+    setReportOpen(true);
   };
 
   const handleRemoveFollower = async (targetUserId: string) => {
@@ -734,6 +735,13 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
         </div>
+        <ModerationReasonModal open={reportOpen} mode="report" onClose={() => setReportOpen(false)} onSubmit={async (reason) => {
+          if (!currentUser) return;
+          const result = await submitReportV1(supabase, { targetType: "user", targetId: id, reason });
+          setReportOpen(false);
+          setBlockDialogMessage(result.message);
+          setBlockDialog("success");
+        }} />
       </main>
     </div>
   );

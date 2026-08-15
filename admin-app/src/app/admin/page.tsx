@@ -10,10 +10,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const initialView: AdminView = allowedViews.includes(view as AdminView) ? (view as AdminView) : "reviews";
   const { supabase, user, account } = await getAdminContext();
   if (!user || !account) redirect("/admin/login");
-  const [reviewCasesResult, reportsResult, commentReportsResult, feedbacksResult, rulesResult] = await Promise.all([
+  const [reviewCasesResult, reportCasesResult, feedbacksResult, rulesResult] = await Promise.all([
     supabase.from("moderation_review_cases").select("id, post_id, post_version_id, status, priority, route_reason, screening_status, screening_sources, submission_number, created_at, updated_at").in("status", ["pending", "reviewing", "service_error"]).order("created_at", { ascending: false }).limit(100),
-    supabase.from("content_reports").select("id, target_type, target_id, reporter_id, reason, status, created_at, reporter:profiles!content_reports_reporter_id_fkey(nickname)").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(50),
-    supabase.from("comment_reports").select("id, comment_id, reporter_id, reason, status, created_at, reporter:profiles!comment_reports_reporter_id_fkey(nickname), comment:comments!comment_reports_comment_id_fkey(id, content, user_id, author:profiles!comments_user_id_fkey(nickname), post:posts!comments_post_id_fkey(id, title))").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(50),
+    supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at").in("status", ["pending", "reviewing"]).order("last_reported_at", { ascending: false }).limit(50),
     supabase.from("feedbacks").select("id, type, content, status, created_at, user_id").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(50),
     supabase.from("moderation_rules").select("id, rule_type, pattern, category, severity, description, enabled, hit_count, updated_at").order("created_at", { ascending: false }).limit(200),
   ]);
@@ -48,23 +47,41 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     post: postMap.get(reviewCase.post_id) || null,
     findings_count: findingsByCase.get(reviewCase.id) || 0,
   }));
-  const postReportIds = (reportsResult.data || []).filter((report) => report.target_type === "post").map((report) => report.target_id);
-  const userReportIds = (reportsResult.data || []).filter((report) => report.target_type === "user").map((report) => report.target_id);
-  const [{ data: reportedPosts }, { data: reportedUsers }] = await Promise.all([
-    postReportIds.length ? supabase.from("posts").select("id, title, content, post_type, user_id, author:profiles!posts_user_id_fkey(nickname)").in("id", postReportIds) : Promise.resolve({ data: [] }),
-    userReportIds.length ? supabase.from("profiles").select("id, nickname, bio").in("id", userReportIds) : Promise.resolve({ data: [] }),
-  ]);
-  const reportedPostMap = new Map((reportedPosts || []).map((post) => [post.id, post]));
-  const userMap = new Map((reportedUsers || []).map((profile) => [profile.id, profile]));
-  const enrichedContentReports = (reportsResult.data || []).map((report) => ({ ...report, target: report.target_type === "post" ? reportedPostMap.get(report.target_id) : userMap.get(report.target_id), source: "content" }));
+  const reportCaseIds = (reportCasesResult.data || []).map((item) => item.id);
+  const { data: reportSnapshots } = reportCaseIds.length
+    ? await supabase.from("moderation_report_snapshots").select("case_id, object_snapshot, context_snapshot").in("case_id", reportCaseIds)
+    : { data: [] };
+  const snapshotMap = new Map((reportSnapshots || []).map((snapshot) => [snapshot.case_id, snapshot]));
+  const reportCases = (reportCasesResult.data || []).map((item) => {
+    const snapshot = snapshotMap.get(item.id);
+    const object = (snapshot?.object_snapshot || {}) as Record<string, unknown>;
+    const context = (snapshot?.context_snapshot || {}) as Record<string, unknown>;
+    let targetTitle = "";
+    let targetSummary = "";
+    let authorNickname = "";
+    if (item.target_type === "post") {
+      targetTitle = String(object.title || "");
+      targetSummary = String(object.content || "");
+      authorNickname = String(context.author_nickname || "");
+    } else if (item.target_type === "comment") {
+      targetTitle = `评论于《${String(context.post_title || "未知作品")}》`;
+      targetSummary = String(object.content || "");
+      authorNickname = String(context.comment_author_nickname || "");
+    } else {
+      targetTitle = String(object.nickname || "未知用户");
+      targetSummary = String(object.bio || "");
+      authorNickname = String(object.nickname || "");
+    }
+    return { ...item, target_title: targetTitle, target_summary: targetSummary.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\s+/g, " ").trim().slice(0, 160), author_nickname: authorNickname };
+  });
   return <AdminDashboard adminName={account.display_name || "管理员"}
     adminEmail={account.email}
     initialView={initialView}
     initialReviews={reviewItems as never[]}
-    initialReports={[...enrichedContentReports, ...((commentReportsResult.data || []).map((report) => ({ ...report, target_type: "comment", target_id: report.comment_id, source: "comment" })) || [])] as never[]}
+    initialReports={reportCases as never[]}
     initialFeedbacks={(feedbacksResult.data || []) as never[]}
     initialRules={(rulesResult.data || []) as never[]}
     rulesReady={!rulesResult.error}
-    loadErrors={[reviewCasesResult.error?.message, reportsResult.error?.message, commentReportsResult.error?.message, feedbacksResult.error?.message].filter(Boolean) as string[]}
+    loadErrors={[reviewCasesResult.error?.message, reportCasesResult.error?.message, feedbacksResult.error?.message].filter(Boolean) as string[]}
   />;
 }
