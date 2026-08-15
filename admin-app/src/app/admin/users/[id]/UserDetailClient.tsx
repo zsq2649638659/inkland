@@ -99,13 +99,14 @@ const severityLabels: Record<string, string> = {
   critical: "紧急",
 };
 const actionCopy: Record<EnforcementAction, { label: string; title: string; desc: string; danger?: boolean }> = {
-  warn: { label: "发送警告", title: "向用户发送账号警告？", desc: "警告会写入违规记录并通知用户，账号状态变为“已警告”。不计入功能限制。" },
+  warn: { label: "发送警告", title: "向用户发送账号警告？", desc: "警告会写入违规记录并通知用户，账号状态变为“已警告”。可点选常见原因，或点“其他原因”自行输入。" },
   restrict_comment: { label: "限制评论", title: "限制该用户发表评论？", desc: "选择结束时间。限制期间评论提交会被前台和数据库双重拦截。" },
   restrict_publish: { label: "限制发布", title: "限制该用户发布内容？", desc: "选择结束时间。限制期间不能新发布、提交审核或重新提交连载审核。" },
   restrict_report: { label: "限制举报", title: "限制该用户提交举报？", desc: "选择结束时间。限制期间作品与评论举报都会被拦截。" },
   suspend: { label: "暂停账号", title: "暂停该用户账号？", desc: "选择结束时间。暂停期间评论、发布和举报均被拦截；已发布内容可勾选隐藏。" },
   ban: { label: "永久封禁", title: "永久封禁该用户账号？", desc: "永久封禁不需要结束时间。账号无法评论、发布或举报；已发布内容可勾选隐藏。" },
 };
+const warningQuickReasons = ["发布违规内容", "辱骂或人身攻击", "广告或引流", "盗用他人作品", "恶意举报", "重复提交违规内容"];
 
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "—";
@@ -119,6 +120,7 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
 
   const [action, setAction] = useState<EnforcementAction>("warn");
   const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState(false);
   const [endsAt, setEndsAt] = useState("");
   const [countViolation, setCountViolation] = useState(true);
   const [hideContent, setHideContent] = useState(false);
@@ -161,7 +163,7 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
     if (!response.ok) { setError(payload?.error || "处罚操作失败，请稍后重试。"); return; }
     setEnforceOpen(false);
     setSuccess(payload?.message || "处罚已生效。");
-    setReason(""); setEndsAt(""); setCountViolation(true); setHideContent(false); setNote("");
+    setReason(""); setCustomReason(false); setEndsAt(""); setCountViolation(true); setHideContent(false); setNote("");
     window.setTimeout(() => window.location.reload(), 900);
   };
 
@@ -287,7 +289,7 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
             <h2>账号处置</h2>
             <p>处罚会真实限制前台功能；是否计入确认违规由你勾选，不会自动累积。</p>
             <div className="admin-report-actions-column">
-              {(Object.keys(actionCopy) as EnforcementAction[]).map((key) => <button className={actionCopy[key].danger ? "admin-detail-danger" : "admin-detail-secondary"} key={key} onClick={() => { setAction(key); setError(""); setSuccess(""); setEnforceOpen(true); }}>{actionCopy[key].label}</button>)}
+              {(Object.keys(actionCopy) as EnforcementAction[]).map((key) => <button className={actionCopy[key].danger ? "admin-detail-danger" : "admin-detail-secondary"} key={key} onClick={() => { setAction(key); setReason(""); setCustomReason(false); setError(""); setSuccess(""); setEnforceOpen(true); }}>{actionCopy[key].label}</button>)}
             </div>
           </section>
 
@@ -305,7 +307,8 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
       {enforceOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setEnforceOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="enforce-user-title" onSubmit={submitEnforce}>
         <div className="admin-modal-header"><div><h2 id="enforce-user-title">{actionCopy[action].title}</h2><p className="admin-modal-desc">{actionCopy[action].desc}</p></div></div>
         <label className="admin-field">处罚类型<select value={action} onChange={(event) => setAction(event.target.value as EnforcementAction)} disabled={busy}><option value="warn">发送警告</option><option value="restrict_comment">限制评论</option><option value="restrict_publish">限制发布</option><option value="restrict_report">限制举报</option><option value="suspend">暂停账号</option><option value="ban">永久封禁</option></select></label>
-        <label className="admin-field">处罚原因<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} /></label>
+        {action === "warn" ? <div className="admin-field admin-warn-reason-field"><span className="admin-field-label">常见处罚原因</span><div className="admin-warn-reason-options">{warningQuickReasons.map((item) => <button className={reason === item && !customReason ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => { setReason(item); setCustomReason(false); }}>{item}</button>)}<button className={customReason ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={busy} onClick={() => { setCustomReason(true); if (!reason.trim()) setReason(""); }}>其他原因</button></div></div> : null}
+        <label className="admin-field">处罚原因{action === "warn" ? <input value={customReason ? reason : ""} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder={customReason ? "请输入其他处罚原因，会展示给用户并写入通知" : "请选择上方常见原因，或点“其他原因”输入"} disabled={busy || !customReason} /> : <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} />}</label>
         {needsEnds ? <label className="admin-field">结束时间<input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} disabled={busy} /></label> : null}
         <label className="admin-field admin-check-field"><input type="checkbox" checked={countViolation} onChange={(event) => setCountViolation(event.target.checked)} disabled={busy} /><span>计入确认违规（手动确认才累计，与收到举报次数无关）</span></label>
         {action === "suspend" || action === "ban" ? <label className="admin-field admin-check-field"><input type="checkbox" checked={hideContent} onChange={(event) => setHideContent(event.target.checked)} disabled={busy} /><span>隐藏该用户已发布的作品（不删除，恢复时可选还原）</span></label> : null}
