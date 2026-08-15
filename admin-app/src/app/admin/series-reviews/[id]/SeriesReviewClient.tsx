@@ -47,7 +47,10 @@ export default function SeriesReviewClient({ series, reviewCase, findings }: Ser
     const panelRect = panel.getBoundingClientRect();
     const buttonTop = actionBtn.getBoundingClientRect().top;
     const panelCss = getComputedStyle(panel);
-    const padBottom = (parseFloat(panelCss.paddingBottom) || 0) + (parseFloat(panelCss.borderBottomWidth) || 0);
+    const preview = slot.closest(".admin-reject-preview");
+    const previewCss = preview ? getComputedStyle(preview) : null;
+    const padBottom = (parseFloat(panelCss.paddingBottom) || 0) + (parseFloat(panelCss.borderBottomWidth) || 0)
+      + (previewCss ? (parseFloat(previewCss.paddingBottom) || 0) + (parseFloat(previewCss.borderBottomWidth) || 0) : 0);
     const slotHeight = Math.max(36, Math.ceil(panelRect.bottom - padBottom - buttonTop));
     slot.style.height = `${slotHeight}px`;
   }, [view, selectedIssueTypes.length, note]);
