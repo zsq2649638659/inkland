@@ -2202,9 +2202,7 @@ p {
   font-size: 13.5px;
   color: var(--color-text-muted);
   line-height: 1.5;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: pre-line;
 }
 #page-notifications .notification-desc a {
   color: var(--color-primary);
