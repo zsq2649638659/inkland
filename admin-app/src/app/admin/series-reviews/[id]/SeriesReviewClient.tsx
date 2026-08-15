@@ -216,7 +216,7 @@ export default function SeriesReviewClient({ series, reviewCase, findings }: Ser
                 </button>
               </div>
             </div>
-            <div className="admin-reject-preview" style={view === "preview" ? undefined : { display: "none" }}>
+            <div className="admin-reject-preview" style={view === "preview" ? { paddingBottom: 0 } : { display: "none" }}>
               <h3 className="admin-preview-title">打回内容预览（将发送给作者）</h3>
               <div className="admin-preview-lines">
                 {previewLines.length ? previewLines.map((line, index) => (
