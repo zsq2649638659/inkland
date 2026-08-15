@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/browser";
+import { assertCanReport } from "@/lib/userRestrictions";
 
 type ReportTargetType = "post" | "comment" | "user";
 
@@ -12,6 +13,9 @@ export async function submitReportV1(
 ) {
   const reason = input.reason.trim();
   if (!reason) return { ok: false, message: "请选择举报原因。" };
+
+  const blocked = await assertCanReport();
+  if (blocked) return { ok: false, message: blocked };
 
   const { data, error } = await supabase.rpc("submit_report_v1", {
     p_target_type: input.targetType,

@@ -12,6 +12,7 @@ import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
 import { submitReportV1 } from "@/lib/reportContent";
+import { assertCanComment } from "@/lib/userRestrictions";
 import SiteDialog, { useSiteDialog } from "@/components/SiteDialog";
 import type { Comment, Post } from "@/lib/types";
 import "@/app/home-lightbox.css";
@@ -124,6 +125,11 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
 
   const submitComment = async () => {
     if (!user || !commentText.trim()) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      setToast(blocked);
+      return;
+    }
     setSubmitting(true);
     const text = commentText.trim();
     const { data, error } = await supabase.from("comments").insert({ post_id: post.id, user_id: user.id, content: text }).select("id, created_at").single();
@@ -136,6 +142,11 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
 
   const submitReply = async (parentId: string, content: string, replyToName: string) => {
     if (!user || !content) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      setToast(blocked);
+      return;
+    }
     const storedContent = `@${replyToName} ${content}`;
     const { data, error } = await supabase.from("comments").insert({ post_id: post.id, user_id: user.id, parent_id: parentId, content: storedContent }).select("id, created_at").single();
     if (!error && data) {

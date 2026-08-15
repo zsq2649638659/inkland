@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { submitReportV1 } from "@/lib/reportContent";
+import { assertCanComment } from "@/lib/userRestrictions";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
@@ -216,6 +217,11 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
 
   const submitComment = async () => {
     if (!commentText.trim() || !user) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      setToastMessage(blocked);
+      return;
+    }
     setSubmitting(true);
     const text = commentText.trim();
     const { data: inserted, error } = await supabase

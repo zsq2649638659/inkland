@@ -187,3 +187,49 @@
 .admin-preview-confirm { border:1px solid var(--danger); background:var(--danger); color:#fff; }
 .admin-preview-confirm:not(:disabled):hover { background:#b84433; }
 .admin-preview-cancel { border:1px solid var(--border); background:#fff; color:#6b6b75; }
+
+/* 模块6：用户管理与账号处罚 */
+.dot-teal { background:#4fb8b4; box-shadow:0 0 0 3px #e2f6f4; }
+.admin-user-search { display:flex; gap:10px; padding:0 23px 18px; }
+.admin-user-search input { flex:1; min-width:0; min-height:42px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; outline:0; color:var(--ink); font-size:12px; }
+.admin-user-search input:focus { border-color:#4fb8b4; box-shadow:0 0 0 3px #e5f6f5; }
+.admin-user-search .admin-btn { flex:none; }
+.admin-user-status { display:inline-block; padding:6px 10px; border-radius:999px; font-size:11px; white-space:nowrap; }
+.admin-user-status.active { background:#e9f7ed; color:#52a574; }
+.admin-user-status.warned { background:#fff3e8; color:#d8893f; }
+.admin-user-status.restricted { background:#fff0ed; color:#d87967; }
+.admin-user-status.suspended { background:#fbe6f0; color:#c05a93; }
+.admin-user-status.banned { background:#fde8e6; color:#c3483f; }
+.admin-user-bio { margin:0 0 14px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#fbfbfc; color:#6d6d76; white-space:pre-wrap; overflow-wrap:anywhere; }
+.admin-moderation-note { display:grid; gap:5px; margin-top:14px; padding:10px 12px; border-left:3px solid #e2b8ae; border-radius:7px; background:#fff7f4; }
+.admin-moderation-note strong { color:#a25d4f; font-size:10px; }
+.admin-moderation-note span { color:#8f7a76; font-size:10px; line-height:1.6; }
+.admin-user-stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:12px; }
+.admin-user-stat-grid div { display:grid; gap:4px; padding:10px 8px; border:1px solid var(--border); border-radius:8px; background:#fbfbfc; text-align:center; }
+.admin-user-stat-grid strong { color:#45454e; font-family:Manrope,sans-serif; font-size:17px; }
+.admin-user-stat-grid span { color:#a0a0a8; font-size:9px; }
+.admin-content-panel { margin-bottom:14px; }
+.admin-check-field { display:flex; align-items:flex-start; gap:8px; font-weight:500; }
+.admin-check-field input { width:16px; min-height:16px; margin-top:2px; accent-color:#4fb8b4; }
+.admin-check-field span { color:#6d6d76; font-size:11px; line-height:1.6; }
+.admin-modal .admin-alert { margin-top:14px; margin-bottom:0; }
+.admin-field select { min-height:42px; padding:9px 11px; border:1px solid var(--border); border-radius:8px; outline:0; background:#fff; color:var(--ink); font-size:12px; }
+.admin-field select:focus { border-color:#d5b6ac; box-shadow:0 0 0 3px #fdf0ec; }
+.admin-rule-row { display:flex; align-items:center; gap:13px; min-height:74px; border-top:1px solid #f1f1f3; }
+.admin-risk-list { display:grid; gap:9px; } .admin-risk-item { display:grid; gap:6px; padding:10px; border:1px solid #f2dfda; border-radius:8px; background:#fff8f6; } .admin-risk-item strong { color:#b66454; font-size:11px; } .admin-risk-tags { display:flex; flex-wrap:wrap; gap:5px; } .admin-risk-tags span { padding:4px 6px; border-radius:5px; background:#ffebe6; color:#a95849; font-size:9px; line-height:1.3; } .admin-risk-item small { margin:0; color:#948581; font-size:9px; line-height:1.45; } .admin-detail-panel .admin-field { margin-top:13px; font-size:11px; } .admin-detail-panel textarea { min-height:74px; resize:vertical; }
+.admin-rule-kind { min-width:48px; padding:6px 8px; border-radius:6px; background:#fff0ed; color:#d87967; font-size:10px; text-align:center; }
+.admin-rule-kind.is-whitelist { background:#edf5ff; color:#6297d3; }
+.admin-rule-status { min-width:44px; color:#aaaab2; font-size:10px; text-align:center; }
+.admin-rule-status.is-enabled { color:#57a373; }
+.admin-reject-panel { border-color:#f0d8d2; background:#fffaf8; }
+.admin-approve-panel { border-color:#e4e4e8; background:#fbfbfc; }
+.admin-issue-buttons { display:grid; gap:8px; margin-top:14px; }
+.admin-issue-buttons button { min-height:42px; padding:9px 11px; border:1px solid #efcfc8; border-radius:8px; background:#fff; color:#9d564a; font-size:11px; text-align:left; cursor:pointer; }
+.admin-issue-buttons button:hover:not(:disabled) { border-color:#d96555; background:#fff1ed; }
+.admin-issue-buttons button:disabled { cursor:wait; opacity:.55; }
+.admin-approve-panel .admin-detail-secondary { margin-top:4px; border-color:#c9c9d0; color:#50505a; font-weight:700; }
+.admin-image-selection-help { margin:-8px 0 16px; color:#8e8e96; font-size:10px; line-height:1.6; }
+.admin-detail-images figure { position:relative; padding:9px; border:1px solid transparent; border-radius:10px; transition:border-color .15s ease,background .15s ease; }
+.admin-detail-images figure.is-selected { border-color:#e7a99d; background:#fff8f6; }
+.admin-image-selector { display:flex; align-items:center; gap:7px; margin:0 0 8px; color:#777780; font-size:10px; cursor:pointer; }
+.admin-image-selector input { width:14px; height:14px; accent-color:var(--accent); }

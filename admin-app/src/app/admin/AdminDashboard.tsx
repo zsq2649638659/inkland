@@ -57,6 +57,17 @@ type ReportItem = {
   author_nickname?: string | null;
 };
 type FeedbackItem = { id: string; type: string; content: string; created_at: string; user_id: string };
+type UserSearchRow = {
+  id: string;
+  nickname: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  moderation_status: string;
+  total_report_cases: number;
+  pending_report_cases: number;
+  active_violations: number;
+  active_restrictions: number;
+};
 export type ModerationRule = {
   id: string;
   rule_type: "keyword" | "whitelist";
@@ -71,6 +82,7 @@ export type ModerationRule = {
 export type AdminView = "reviews" | "reports" | "users" | "feedbacks" | "rules";
 
 const labels: Record<string, string> = { post: "作品", comment: "评论", user: "用户", novel: "小说", article: "文章", illustration: "插画", serial: "连载" };
+const userStatusLabels: Record<string, string> = { active: "正常", warned: "已警告", restricted: "受限", suspended: "已暂停", banned: "已封禁" };
 const viewCopy: Record<AdminView, { title: string; description: string }> = {
   reviews: { title: "作品审核", description: "处理发布前进入人工审核队列的作品。" },
   reports: { title: "举报中心", description: "进入独立详情页查看完整内容和举报证据。" },
@@ -141,6 +153,11 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
   const [ruleCategory, setRuleCategory] = useState("广告与导流");
   const [ruleSeverity, setRuleSeverity] = useState<ModerationRule["severity"]>("review");
   const [ruleDescription, setRuleDescription] = useState("");
+  const [userQuery, setUserQuery] = useState("");
+  const [userResults, setUserResults] = useState<UserSearchRow[]>([]);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userSearched, setUserSearched] = useState(false);
+  const [userError, setUserError] = useState("");
 
   useEffect(() => {
     setReviews(initialReviews);
@@ -209,6 +226,21 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
     setMessage("规则已删除。");
   };
 
+  const searchUsers = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    setUserLoading(true); setUserError(""); setUserSearched(true);
+    const params = new URLSearchParams({ query: userQuery.trim(), limit: "50" });
+    const response = await fetch(`/api/admin/users?${params.toString()}`);
+    const payload = await response.json().catch(() => null) as { error?: string; users?: UserSearchRow[] } | null;
+    setUserLoading(false);
+    if (!response.ok || !payload?.users) {
+      setUserError(payload?.error || "用户搜索失败，请稍后重试。");
+      setUserResults([]);
+      return;
+    }
+    setUserResults(payload.users);
+  };
+
   const signOut = async () => {
     setBusy("signout");
     const { error } = await supabase.auth.signOut();
@@ -273,7 +305,9 @@ export default function AdminDashboard({ initialReviews, initialReports, initial
 
   const rulesView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-green" /><h2>关键词与白名单</h2><span className="admin-count-pill">{filteredRules.length} 条</span></div><p>关键词命中会进入人工审核；白名单可排除明确的误判表达。</p></div>{rulesReady && <button className="admin-btn admin-btn-primary" type="button" onClick={() => { resetRuleForm(); setRuleDialogOpen(true); }}>添加规则</button>}</div>{!rulesReady ? <div className="admin-empty"><strong>审核规则数据表尚未启用</strong><span>本地功能已完成；待确认数据库迁移后即可开始维护词库。</span></div> : <div className="admin-queue-list">{filteredRules.length === 0 ? <div className="admin-empty"><strong>还没有规则</strong><span>建议先添加少量明确的广告导流或诈骗关键词，全部先设为“进入人工审核”。</span></div> : filteredRules.map((rule) => <div className="admin-rule-row" key={rule.id}><div className={`admin-rule-kind ${rule.rule_type === "whitelist" ? "is-whitelist" : ""}`}>{rule.rule_type === "whitelist" ? "白名单" : "关键词"}</div><div className="admin-queue-main"><strong>{rule.pattern}</strong><span>{rule.category} · {rule.severity === "high" ? "高风险，优先审核" : "命中后人工审核"}{rule.description ? ` · ${rule.description}` : ""}</span></div><span className={`admin-rule-status ${rule.enabled ? "is-enabled" : ""}`}>{rule.enabled ? "已启用" : "已停用"}</span><div className="admin-actions"><button className="admin-btn admin-btn-light" disabled={busy === rule.id} onClick={() => void updateRuleEnabled(rule)}>{rule.enabled ? "停用" : "启用"}</button><button className="admin-btn admin-btn-light" disabled={busy === rule.id} onClick={() => void removeRule(rule)}>删除</button></div></div>)}</div>}</section>;
 
-  const content = initialView === "reviews" ? reviewsView : initialView === "reports" ? reportsView : initialView === "feedbacks" ? feedbacksView : initialView === "rules" ? rulesView : <section className="admin-card admin-full-card"><div className="admin-coming-soon"><Icon name="users" /><strong>用户管理将在模块6接入</strong><span>当前不会使用假用户数据填充页面。</span></div></section>;
+  const usersView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-teal" /><h2>用户搜索</h2><span className="admin-count-pill">{userSearched ? `${userResults.length} 位用户` : "输入关键词查询"}</span></div><p>按昵称或用户 ID 搜索；打开详情页可查看举报、违规与限制记录并执行处罚。</p></div></div><form className="admin-user-search" onSubmit={searchUsers}><input value={userQuery} onChange={(event) => setUserQuery(event.target.value)} placeholder="昵称或完整用户 ID" aria-label="搜索用户" /><button className="admin-btn admin-btn-primary" type="submit" disabled={userLoading}>{userLoading ? "搜索中…" : "搜索"}</button></form>{userError ? <div className="admin-alert admin-alert-error" role="alert">{userError}</div> : null}<div className="admin-queue-list">{!userSearched ? <div className="admin-empty"><strong>还没有搜索</strong><span>输入昵称或用户 ID 后开始查询。</span></div> : userResults.length === 0 ? <div className="admin-empty"><strong>没有找到该用户</strong><span>昵称支持模糊匹配，ID 支持完整值。</span></div> : userResults.map((user) => <div className="admin-queue-row" key={user.id}><span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span><div className="admin-queue-main"><strong>{user.nickname || "未命名用户"}</strong><span className="admin-mono">{user.id}</span><span>{userStatusLabels[user.moderation_status] || user.moderation_status} · 举报案件 {user.total_report_cases} · 待处理 {user.pending_report_cases} · 有效违规 {user.active_violations} · 有效限制 {user.active_restrictions}</span></div><Link className="admin-btn admin-btn-primary" href={`/admin/users/${user.id}`}>查看详情</Link></div>)}</div></section>;
+
+  const content = initialView === "reviews" ? reviewsView : initialView === "reports" ? reportsView : initialView === "feedbacks" ? feedbacksView : initialView === "rules" ? rulesView : initialView === "users" ? usersView : <section className="admin-card admin-full-card"><div className="admin-coming-soon"><Icon name="users" /><strong>页面尚未接入</strong><span>请从左侧选择后台功能。</span></div></section>;
 
   return <div className="admin-app-shell">
     <aside className="admin-sidebar">

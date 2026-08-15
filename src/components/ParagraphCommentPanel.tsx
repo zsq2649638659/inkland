@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import EmojiPicker from "@/components/EmojiPicker";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { createNotification } from "@/lib/notifications";
+import { assertCanComment } from "@/lib/userRestrictions";
 import type { Comment } from "@/lib/types";
 
 interface ParagraphCommentPanelProps {
@@ -173,6 +174,11 @@ onReport,
 
   const submitComment = async () => {
     if (!user || !commentText.trim()) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      showToast(blocked);
+      return;
+    }
     setSubmitting(true);
     const { error } = await supabase.from("comments").insert({
       post_id: postId,
@@ -196,6 +202,11 @@ onReport,
 
   const submitReply = async (parentComment: Comment) => {
     if (!user || !replyText.trim()) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      showToast(blocked);
+      return;
+    }
     setSubmitting(true);
     const { error } = await supabase.from("comments").insert({
       post_id: postId,
