@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
 import { createNotification } from "@/lib/notifications";
 import { submitReportV1 } from "@/lib/reportContent";
+import { assertCanComment } from "@/lib/userRestrictions";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
@@ -272,6 +273,11 @@ export default function PostCard({ post }: PostCardProps) {
 
   const submitComment = async () => {
     if (!commentText.trim() || !user) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      setToastMessage(blocked);
+      return;
+    }
     setSubmitting(true);
     const { data, error } = await supabase
       .from("comments")

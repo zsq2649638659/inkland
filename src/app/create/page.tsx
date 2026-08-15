@@ -8,6 +8,7 @@ import { compressImage } from "@/lib/image";
 import { renderSafeMarkdown } from "@/lib/markdown";
 import { useMarkdownEditor } from "@/lib/useMarkdownEditor";
 import { screenImageLocally, type LocalImageScreening } from "@/lib/localImageScreening";
+import { assertCanPublish } from "@/lib/userRestrictions";
 
 function notifyStatsChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("inkland:stats-changed"));
@@ -1013,6 +1014,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
 
+    const blocked = await assertCanPublish();
+    if (blocked) { setErrorMsg(blocked); setSubmitting(false); return; }
+
     const { error } = await supabase.from("series").insert({
       user_id: user.id,
       name,
@@ -1048,6 +1052,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
+
+    if (visibility !== "private") {
+      const blocked = await assertCanPublish();
+      if (blocked) { setErrorMsg(blocked); setSubmitting(false); return; }
+    }
 
     let finalSeriesName: string | null = null;
     if (collectionMode === "select" && selectedCollection) finalSeriesName = selectedCollection;
@@ -1148,6 +1157,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
+
+    if (!options?.draft && visibility !== "private") {
+      const blocked = await assertCanPublish();
+      if (blocked) { setErrorMsg(blocked); setSubmitting(false); return; }
+    }
 
     const imageMd = uploadedImages.map((img) => `![${img.name}](${img.storedUrl})`).join("\n\n");
     const parts: string[] = [];
@@ -1339,6 +1353,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
 
+    const blocked = await assertCanPublish();
+    if (blocked) { setErrorMsg(blocked); setSubmitting(false); return; }
+
     const seriesData = {
       name: newSeriesName.trim(),
       description: newSeriesDesc || null,
@@ -1381,6 +1398,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErrorMsg("请先登录"); setSubmitting(false); return; }
+
+    if (!options?.draft) {
+      const blocked = await assertCanPublish();
+      if (blocked) { setErrorMsg(blocked); setSubmitting(false); return; }
+    }
 
     const nextChapter = chapterNumberOverride ?? (seriesNameFromUrl
       ? chapterNumberFromUrl

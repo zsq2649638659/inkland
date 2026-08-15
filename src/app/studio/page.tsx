@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
 import { SkeletonStudio } from "@/components/Skeleton";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import { assertCanPublish } from "@/lib/userRestrictions";
 
 type FilterType = "all" | "novel" | "illustration" | "serial";
 type StatusFilter = "all" | "published" | "draft" | "rejected";
@@ -378,6 +379,8 @@ export default function StudioPage() {
 
   const batchPublish = async () => {
     if (selectedIds.size === 0) return;
+    const blocked = await assertCanPublish();
+    if (blocked) { await dialog.alert({ title:"批量发布失败", message:blocked, variant:"danger" }); return; }
     const { error } = await supabase.from("posts").update({ status: "published", published_at: new Date().toISOString() }).in("id", Array.from(selectedIds));
     if (error) { await dialog.alert({ title:"批量发布失败", message:error.message, variant:"danger" }); return; }
     setWorks((prev) => prev.map((w) => selectedIds.has(w.id) ? { ...w, status: "published" } : w));

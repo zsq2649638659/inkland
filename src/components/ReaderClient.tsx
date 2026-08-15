@@ -11,6 +11,7 @@ import ParagraphCommentPanel from "@/components/ParagraphCommentPanel";
 import EmojiPicker from "@/components/EmojiPicker";
 import { createNotification } from "@/lib/notifications";
 import { submitReportV1 } from "@/lib/reportContent";
+import { assertCanComment } from "@/lib/userRestrictions";
 import type { Post, Comment } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { isSafeExternalImageUrl, renderSafeInlineMarkdown, renderSafeMarkdown } from "@/lib/markdown";
@@ -281,6 +282,11 @@ export default function ReaderClient({ post }: ReaderClientProps) {
   const submitComment = async () => {
     if (!user) return;
     if (!commentText.trim()) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      showToast(blocked);
+      return;
+    }
     setCommentLoading(true);
 
     const { error } = await supabase.from("comments").insert({
@@ -906,6 +912,11 @@ export default function ReaderClient({ post }: ReaderClientProps) {
                               disabled={!replyText.trim()}
                               onClick={async () => {
                                 if (!replyText.trim()) return;
+                                const blocked = await assertCanComment();
+                                if (blocked) {
+                                  showToast(blocked);
+                                  return;
+                                }
                                 setCommentLoading(true);
                                 const { error } = await supabase.from("comments").insert({
                                   post_id: post.id,
