@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- 举报证据需要按快照中的原始地址展示。 */
 
 import Link from "next/link";
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 
 type CaseRow = {
   id: string;
@@ -80,6 +80,7 @@ const statusLabels: Record<string, string> = { pending: "待处理", reviewing: 
 const priorityLabels: Record<string, string> = { normal: "普通", high: "优先", urgent: "紧急" };
 const outcomeLabels: Record<string, string> = { kept: "保留", reminded: "已提醒", deleted: "已删除", no_violation: "未发现违规" };
 const severityLabels: Record<string, string> = { minor: "轻微", standard: "普通", serious: "严重", critical: "紧急" };
+const reminderQuickReasons = ["举报理由与内容明显无关", "短时间大量重复举报", "反复举报已判定无问题内容", "补充说明含辱骂或威胁", "请勿滥用举报功能"];
 
 function text(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
@@ -98,6 +99,12 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   const [note, setNote] = useState("");
   const [modalError, setModalError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reminderTarget, setReminderTarget] = useState<{ userId: string; nickname: string } | null>(null);
+  const [reminderReason, setReminderReason] = useState("");
+  const [reminderCustomReason, setReminderCustomReason] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  const [reminderError, setReminderError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const object = (snapshot?.object_snapshot || {}) as Record<string, unknown>;
   const context = (snapshot?.context_snapshot || {}) as Record<string, unknown>;
@@ -188,6 +195,29 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     window.location.assign("/admin?view=reports");
   };
 
+  const openReminder = (userId: string, nickname: string) => {
+    setReminderTarget({ userId, nickname });
+    setReminderReason(""); setReminderCustomReason(false); setReminderError(""); setSuccess("");
+  };
+
+  const submitReminder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!reminderTarget) return;
+    if (!reminderReason.trim()) { setReminderError("请填写提醒内容。"); return; }
+    setReminderBusy(true); setReminderError(""); setSuccess("");
+    const response = await fetch("/api/admin/users/report-reminder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: reminderTarget.userId, reason: reminderReason.trim() }),
+    });
+    const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+    setReminderBusy(false);
+    if (!response.ok) { setReminderError(payload?.error || "提醒发送失败，请稍后重试。"); return; }
+    setReminderTarget(null);
+    setReminderReason(""); setReminderCustomReason(false);
+    setSuccess(payload?.message || "举报规则提醒已发送。");
+  };
+
   const reportStatusLabel = (status?: string | null) => status === "pending" ? "待处理" : status === "reviewing" ? "处理中" : status === "resolved" ? "已处理" : status || "未知";
 
   return (
@@ -227,12 +257,17 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
             <div className="admin-panel-title-row"><h2>举报明细</h2><span>{reports.length} 条</span></div>
             {reports.length ? <div className="admin-risk-list">{reports.map((report) => {
               const stat = reporterStats.find((item) => item.user_id === report.reporter_id);
+              const reporterId = report.reporter_id;
               return <div className="admin-risk-item" key={report.id}>
                 <strong>{report.kind === "comment" ? "评论举报" : report.target_type === "post" ? "作品举报" : "用户举报"} · {report.reporter?.nickname || "匿名用户"}</strong>
                 <div className="admin-risk-tags"><span>{report.reason_category || report.reason || "未填写原因"}</span><span>{reportStatusLabel(report.status)}</span></div>
                 {report.details && report.details !== report.reason ? <small>补充说明：{report.details}</small> : null}
                 <small>提交于 {new Date(report.created_at).toLocaleString("zh-CN")}</small>
                 {stat ? <small>该举报人累计 {stat.total_reports} 次 · 成立 {stat.valid_reports} · 不成立 {stat.invalid_reports} · 24 小时 {stat.reports_last_24h} 次{stat.report_restricted_until ? ` · 举报受限至 ${new Date(stat.report_restricted_until).toLocaleDateString("zh-CN")}` : ""}</small> : null}
+                {reporterId ? <div className="admin-report-stat-actions">
+                  <Link href={`/admin/users/${reporterId}`} className="admin-inline-link">查看用户并处罚</Link>
+                  <button className="admin-inline-btn" type="button" onClick={() => openReminder(reporterId, report.reporter?.nickname || "该用户")}>发送举报规则提醒</button>
+                </div> : null}
               </div>;
             })}</div> : <p className="admin-detail-empty">没有找到该案件的举报明细。</p>}
           </section>
@@ -301,6 +336,19 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
           <button className={modalCopy[pendingAction].danger ? "admin-btn admin-btn-danger-fill" : "admin-btn admin-btn-primary"} type="button" disabled={busy} onClick={() => void runAction(pendingAction)}>{busy ? "处理中…" : modalCopy[pendingAction].confirm}</button>
         </div>
       </div></div> : null}
+
+      {reminderTarget ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !reminderBusy) setReminderTarget(null); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="report-reminder-title" onSubmit={submitReminder}>
+        <div className="admin-modal-header"><div><h2 id="report-reminder-title">向举报人发送规则提醒？</h2><p className="admin-modal-desc">提醒将发送给“{reminderTarget.nickname}”的站内通知，不写入违规记录，也不会自动限制举报功能。</p></div></div>
+        <div className="admin-field admin-warn-reason-field"><span className="admin-field-label">常见提醒原因</span><div className="admin-warn-reason-options">{reminderQuickReasons.map((item) => <button className={reminderReason === item && !reminderCustomReason ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={reminderBusy} onClick={() => { setReminderReason(item); setReminderCustomReason(false); }}>{item}</button>)}<button className={reminderCustomReason ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={reminderBusy} onClick={() => { setReminderCustomReason(true); if (!reminderReason.trim()) setReminderReason(""); }}>其他原因</button></div></div>
+        <label className="admin-field">提醒内容<input value={reminderCustomReason ? reminderReason : ""} onChange={(event) => setReminderReason(event.target.value)} maxLength={500} placeholder={reminderCustomReason ? "请输入提醒内容，会展示给用户" : "请选择上方常见原因，或点“其他原因”输入"} disabled={reminderBusy || !reminderCustomReason} /></label>
+        {reminderError ? <div className="admin-alert admin-alert-error" role="alert">{reminderError}</div> : null}
+        <div className="admin-modal-actions">
+          <button className="admin-btn admin-btn-light" type="button" disabled={reminderBusy} onClick={() => setReminderTarget(null)}>取消</button>
+          <button className="admin-btn admin-btn-primary" type="submit" disabled={reminderBusy}>{reminderBusy ? "发送中…" : "发送提醒"}</button>
+        </div>
+      </form></div> : null}
+
+      {success ? <div className="admin-toast" role="status">{success}</div> : null}
     </main>
   );
 }

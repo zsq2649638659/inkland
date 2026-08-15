@@ -73,6 +73,15 @@ type UserDetailPayload = {
     reports_last_24h?: number;
     last_report_at?: string | null;
     report_restricted_until?: string | null;
+    recent_reports?: Array<{
+      id: string;
+      target_type?: string | null;
+      target_id?: string | null;
+      reason_category?: string | null;
+      details?: string | null;
+      status?: string | null;
+      created_at?: string | null;
+    }> | null;
   } | null;
 };
 
@@ -107,9 +116,21 @@ const actionCopy: Record<EnforcementAction, { label: string; title: string; desc
   ban: { label: "永久封禁", title: "永久封禁该用户账号？", desc: "永久封禁不需要结束时间。账号无法评论、发布或举报；已发布内容可勾选隐藏。" },
 };
 const warningQuickReasons = ["发布违规内容", "辱骂或人身攻击", "广告或引流", "盗用他人作品", "恶意举报", "重复提交违规内容"];
+const reminderQuickReasons = ["举报理由与内容明显无关", "短时间大量重复举报", "反复举报已判定无问题内容", "补充说明含辱骂或威胁", "请勿滥用举报功能"];
+const targetShortLabels: Record<string, string> = { post: "作品", comment: "评论", user: "用户" };
+const reportStatusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", resolved: "已处理", cancelled: "已取消" };
+const quickDurations = [
+  { label: "24 小时", hours: 24 },
+  { label: "7 天", hours: 24 * 7 },
+  { label: "30 天", hours: 24 * 30 },
+];
 
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "—";
+const toLocalInput = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 
 export default function UserDetailClient({ detail }: { detail: UserDetailPayload }) {
   const [enforceOpen, setEnforceOpen] = useState(false);
@@ -122,6 +143,7 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
   const [reason, setReason] = useState("");
   const [customReason, setCustomReason] = useState(false);
   const [endsAt, setEndsAt] = useState("");
+  const [quickHours, setQuickHours] = useState<number | null>(null);
   const [countViolation, setCountViolation] = useState(true);
   const [hideContent, setHideContent] = useState(false);
   const [note, setNote] = useState("");
@@ -131,6 +153,17 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
   const [liftReason, setLiftReason] = useState("");
   const [restoreContent, setRestoreContent] = useState(false);
   const [liftNote, setLiftNote] = useState("");
+
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderReason, setReminderReason] = useState("");
+  const [reminderCustomReason, setReminderCustomReason] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  const [reminderError, setReminderError] = useState("");
+
+  const [limitOpen, setLimitOpen] = useState(false);
+  const [limitInput, setLimitInput] = useState("20");
+  const [limitBusy, setLimitBusy] = useState(false);
+  const [limitError, setLimitError] = useState("");
 
   const user = detail.user;
   const stats = detail.stats;
@@ -163,7 +196,7 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
     if (!response.ok) { setError(payload?.error || "处罚操作失败，请稍后重试。"); return; }
     setEnforceOpen(false);
     setSuccess(payload?.message || "处罚已生效。");
-    setReason(""); setCustomReason(false); setEndsAt(""); setCountViolation(true); setHideContent(false); setNote("");
+    setReason(""); setCustomReason(false); setEndsAt(""); setQuickHours(null); setCountViolation(true); setHideContent(false); setNote("");
     window.setTimeout(() => window.location.reload(), 900);
   };
 
@@ -190,6 +223,56 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
     setSuccess(payload?.message || "操作已完成。");
     setLiftReason(""); setRestoreContent(false); setLiftNote("");
     window.setTimeout(() => window.location.reload(), 900);
+  };
+
+  const openReminder = () => {
+    setReminderReason(""); setReminderCustomReason(false); setReminderError(""); setSuccess("");
+    setReminderOpen(true);
+  };
+
+  const submitReminder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!reminderReason.trim()) { setReminderError("请填写提醒内容。"); return; }
+    setReminderBusy(true); setReminderError(""); setSuccess("");
+    const response = await fetch("/api/admin/users/report-reminder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, reason: reminderReason.trim() }),
+    });
+    const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+    setReminderBusy(false);
+    if (!response.ok) { setReminderError(payload?.error || "提醒发送失败，请稍后重试。"); return; }
+    setReminderOpen(false);
+    setReminderReason(""); setReminderCustomReason(false);
+    setSuccess(payload?.message || "举报规则提醒已发送。");
+  };
+
+  const openLimit = async () => {
+    setLimitOpen(true); setLimitBusy(true); setLimitError(""); setSuccess("");
+    const response = await fetch("/api/admin/report-config");
+    const payload = await response.json().catch(() => null) as { success?: boolean; dailyReportLimit?: number; error?: string } | null;
+    setLimitBusy(false);
+    if (!response.ok) { setLimitError(payload?.error || "举报上限读取失败，请稍后重试。"); return; }
+    const current = payload?.dailyReportLimit ?? 20;
+    setLimitInput(String(current));
+  };
+
+  const submitLimit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = Number(limitInput);
+    if (!Number.isInteger(value) || value < 1 || value > 1000) { setLimitError("每日举报上限需为 1 到 1000 之间的整数。"); return; }
+    setLimitBusy(true); setLimitError(""); setSuccess("");
+    const response = await fetch("/api/admin/report-config", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dailyReportLimit: value }),
+    });
+    const payload = await response.json().catch(() => null) as { success?: boolean; dailyReportLimit?: number; message?: string; error?: string } | null;
+    setLimitBusy(false);
+    if (!response.ok) { setLimitError(payload?.error || "举报上限更新失败，请稍后重试。"); return; }
+    setLimitOpen(false);
+    setLimitInput(String(payload?.dailyReportLimit ?? value));
+    setSuccess(payload?.message || "每日举报上限已更新。");
   };
 
   const statusPill = (status?: string | null) => <span className={`admin-user-status ${status || ""}`}>{statusLabels[status || ""] || status || "未知"}</span>;
@@ -243,6 +326,17 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
               <dt>最近举报</dt><dd>{fullDate(detail.reporter_stats.last_report_at)}</dd>
               <dt>举报受限至</dt><dd>{fullDate(detail.reporter_stats.report_restricted_until)}</dd>
             </dl> : <p>该用户没有举报行为统计。</p>}
+            <div className="admin-panel-actions">
+              <button className="admin-detail-secondary" type="button" onClick={openReminder}>发送举报规则提醒</button>
+              <button className="admin-detail-secondary" type="button" onClick={() => void openLimit()}>举报每日上限</button>
+            </div>
+            {detail.reporter_stats?.recent_reports?.length ? <div className="admin-recent-report-list">
+              {detail.reporter_stats.recent_reports.map((report) => <div className="admin-recent-report-item" key={report.id}>
+                <strong>{targetShortLabels[report.target_type || ""] || "内容"}举报 · {reportStatusLabels[report.status || ""] || report.status || "未知"}</strong>
+                <span>{report.reason_category || "未填写原因"}{report.details ? ` · ${report.details}` : ""}</span>
+                <small>{fullDate(report.created_at)} · ID {report.target_id}</small>
+              </div>)}
+            </div> : null}
           </section>
 
           <section className="admin-detail-panel">
@@ -289,7 +383,7 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
             <h2>账号处置</h2>
             <p>处罚会真实限制前台功能；是否计入确认违规由你勾选，不会自动累积。</p>
             <div className="admin-report-actions-column">
-              {(Object.keys(actionCopy) as EnforcementAction[]).map((key) => <button className={actionCopy[key].danger ? "admin-detail-danger" : "admin-detail-secondary"} key={key} onClick={() => { setAction(key); setReason(""); setCustomReason(false); setError(""); setSuccess(""); setEnforceOpen(true); }}>{actionCopy[key].label}</button>)}
+              {(Object.keys(actionCopy) as EnforcementAction[]).map((key) => <button className={actionCopy[key].danger ? "admin-detail-danger" : "admin-detail-secondary"} key={key} onClick={() => { setAction(key); setReason(""); setCustomReason(false); setEndsAt(""); setQuickHours(null); setError(""); setSuccess(""); setEnforceOpen(true); }}>{actionCopy[key].label}</button>)}
             </div>
           </section>
 
@@ -309,7 +403,8 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
         <label className="admin-field">处罚类型<select value={action} onChange={(event) => setAction(event.target.value as EnforcementAction)} disabled={busy}><option value="warn">发送警告</option><option value="restrict_comment">限制评论</option><option value="restrict_publish">限制发布</option><option value="restrict_report">限制举报</option><option value="suspend">暂停账号</option><option value="ban">永久封禁</option></select></label>
         {action === "warn" ? <div className="admin-field admin-warn-reason-field"><span className="admin-field-label">常见处罚原因</span><div className="admin-warn-reason-options">{warningQuickReasons.map((item) => <button className={reason === item && !customReason ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => { setReason(item); setCustomReason(false); }}>{item}</button>)}<button className={customReason ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={busy} onClick={() => { setCustomReason(true); if (!reason.trim()) setReason(""); }}>其他原因</button></div></div> : null}
         <label className="admin-field">处罚原因{action === "warn" ? <input value={customReason ? reason : ""} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder={customReason ? "请输入其他处罚原因，会展示给用户并写入通知" : "请选择上方常见原因，或点“其他原因”输入"} disabled={busy || !customReason} /> : <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} />}</label>
-        {needsEnds ? <label className="admin-field">结束时间<input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} disabled={busy} /></label> : null}
+        {action === "restrict_report" ? <div className="admin-field"><span className="admin-field-label">快捷时长</span><div className="admin-duration-chips">{quickDurations.map((item) => <button className={quickHours === item.hours ? "admin-duration-chip is-selected" : "admin-duration-chip"} type="button" key={item.label} disabled={busy} onClick={() => { setQuickHours(item.hours); setEndsAt(toLocalInput(new Date(Date.now() + item.hours * 3600 * 1000))); }}>{item.label}</button>)}</div></div> : null}
+        {needsEnds ? <label className="admin-field">结束时间<input type="datetime-local" value={endsAt} onChange={(event) => { setQuickHours(null); setEndsAt(event.target.value); }} disabled={busy} /></label> : null}
         <label className="admin-field admin-check-field"><input type="checkbox" checked={countViolation} onChange={(event) => setCountViolation(event.target.checked)} disabled={busy} /><span>计入确认违规（手动确认才累计，与收到举报次数无关）</span></label>
         {action === "suspend" || action === "ban" ? <label className="admin-field admin-check-field"><input type="checkbox" checked={hideContent} onChange={(event) => setHideContent(event.target.checked)} disabled={busy} /><span>隐藏该用户已发布的作品（不删除，恢复时可选还原）</span></label> : null}
         <label className="admin-field">内部备注（可选）<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="记录给审核日志的内部备注，不会展示给用户" disabled={busy} /></label>
@@ -330,6 +425,27 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
         <div className="admin-modal-actions">
           <button className="admin-btn admin-btn-light" type="button" disabled={busy} onClick={() => setLiftOpen(false)}>取消</button>
           <button className="admin-btn admin-btn-primary" type="submit" disabled={busy}>{busy ? "提交中…" : liftMode === "restore" ? "确认恢复" : "确认解除"}</button>
+        </div>
+      </form></div> : null}
+
+      {reminderOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !reminderBusy) setReminderOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="report-reminder-title" onSubmit={submitReminder}>
+        <div className="admin-modal-header"><div><h2 id="report-reminder-title">发送举报规则提醒？</h2><p className="admin-modal-desc">提醒会发送到该用户的站内通知，不写入违规记录，也不会自动限制任何功能。可点选常见原因，或点“其他原因”自行输入。</p></div></div>
+        <div className="admin-field admin-warn-reason-field"><span className="admin-field-label">常见提醒原因</span><div className="admin-warn-reason-options">{reminderQuickReasons.map((item) => <button className={reminderReason === item && !reminderCustomReason ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={reminderBusy} onClick={() => { setReminderReason(item); setReminderCustomReason(false); }}>{item}</button>)}<button className={reminderCustomReason ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={reminderBusy} onClick={() => { setReminderCustomReason(true); if (!reminderReason.trim()) setReminderReason(""); }}>其他原因</button></div></div>
+        <label className="admin-field">提醒内容<input value={reminderCustomReason ? reminderReason : ""} onChange={(event) => setReminderReason(event.target.value)} maxLength={500} placeholder={reminderCustomReason ? "请输入提醒内容，会展示给用户" : "请选择上方常见原因，或点“其他原因”输入"} disabled={reminderBusy || !reminderCustomReason} /></label>
+        {reminderError ? <div className="admin-alert admin-alert-error" role="alert">{reminderError}</div> : null}
+        <div className="admin-modal-actions">
+          <button className="admin-btn admin-btn-light" type="button" disabled={reminderBusy} onClick={() => setReminderOpen(false)}>取消</button>
+          <button className="admin-btn admin-btn-primary" type="submit" disabled={reminderBusy}>{reminderBusy ? "发送中…" : "发送提醒"}</button>
+        </div>
+      </form></div> : null}
+
+      {limitOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !limitBusy) setLimitOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="report-limit-title" onSubmit={submitLimit}>
+        <div className="admin-modal-header"><div><h2 id="report-limit-title">设置举报每日上限</h2><p className="admin-modal-desc">每个用户每天最多提交的举报数量。达到上限后，新的作品与评论举报都会被提示次日再试。</p></div></div>
+        <label className="admin-field">每日上限（1 到 1000）<input type="number" min={1} max={1000} step={1} value={limitInput} onChange={(event) => setLimitInput(event.target.value)} disabled={limitBusy} /></label>
+        {limitError ? <div className="admin-alert admin-alert-error" role="alert">{limitError}</div> : null}
+        <div className="admin-modal-actions">
+          <button className="admin-btn admin-btn-light" type="button" disabled={limitBusy} onClick={() => setLimitOpen(false)}>取消</button>
+          <button className="admin-btn admin-btn-primary" type="submit" disabled={limitBusy}>{limitBusy ? "保存中…" : "保存上限"}</button>
         </div>
       </form></div> : null}
 
