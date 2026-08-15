@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { fetchWithTimeout } from "@/lib/adminFetch";
 
 type CaseRow = {
   id: string;
@@ -181,18 +182,23 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   const runAction = async (action: ReportAction) => {
     setBusy(true);
     setModalError("");
-    const response = await fetch("/api/admin/reports", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ caseId: reportCase.id, action, note: note.trim() || undefined }),
-    });
-    if (!response.ok) {
-      const result = await response.json().catch(() => null) as { error?: string } | null;
+    try {
+      const response = await fetchWithTimeout("/api/admin/reports", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId: reportCase.id, action, note: note.trim() || undefined }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null) as { error?: string } | null;
+        setBusy(false);
+        setModalError(result?.error || "举报案件处理失败，请稍后重试。");
+        return;
+      }
+      window.location.assign("/admin?view=reports");
+    } catch (error) {
       setBusy(false);
-      setModalError(result?.error || "举报案件处理失败，请稍后重试。");
-      return;
+      setModalError(error instanceof Error ? error.message : "举报案件处理失败，请稍后重试。");
     }
-    window.location.assign("/admin?view=reports");
   };
 
   const openReminder = (userId: string, nickname: string) => {
@@ -205,17 +211,22 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     if (!reminderTarget) return;
     if (!reminderReason.trim()) { setReminderError("请填写提醒内容。"); return; }
     setReminderBusy(true); setReminderError(""); setSuccess("");
-    const response = await fetch("/api/admin/users/report-reminder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: reminderTarget.userId, reason: reminderReason.trim() }),
-    });
-    const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
-    setReminderBusy(false);
-    if (!response.ok) { setReminderError(payload?.error || "提醒发送失败，请稍后重试。"); return; }
-    setReminderTarget(null);
-    setReminderReason(""); setReminderCustomReason(false);
-    setSuccess(payload?.message || "举报规则提醒已发送。");
+    try {
+      const response = await fetchWithTimeout("/api/admin/users/report-reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: reminderTarget.userId, reason: reminderReason.trim() }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+      setReminderBusy(false);
+      if (!response.ok) { setReminderError(payload?.error || "提醒发送失败，请稍后重试。"); return; }
+      setReminderTarget(null);
+      setReminderReason(""); setReminderCustomReason(false);
+      setSuccess(payload?.message || "举报规则提醒已发送。");
+    } catch (error) {
+      setReminderBusy(false);
+      setReminderError(error instanceof Error ? error.message : "提醒发送失败，请稍后重试。");
+    }
   };
 
   const reportStatusLabel = (status?: string | null) => status === "pending" ? "待处理" : status === "reviewing" ? "处理中" : status === "resolved" ? "已处理" : status || "未知";

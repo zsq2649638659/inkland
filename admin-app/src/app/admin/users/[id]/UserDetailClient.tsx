@@ -2,7 +2,8 @@
 /* eslint-disable @next/next/no-img-element -- 头像按数据库地址展示。 */
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
+import { fetchWithTimeout } from "@/lib/adminFetch";
 
 type UserDetailPayload = {
   ok: boolean;
@@ -169,60 +170,66 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
   const stats = detail.stats;
   const needsEnds = ["restrict_comment", "restrict_publish", "restrict_report", "suspend"].includes(action);
 
-  useEffect(() => {
-    if (!enforceOpen && !liftOpen) setError("");
-  }, [enforceOpen, liftOpen]);
-
   const submitEnforce = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!reason.trim()) { setError("请填写处罚原因。"); return; }
     if (needsEnds && !endsAt) { setError("请选择结束时间。"); return; }
     setBusy(true); setError(""); setSuccess("");
-    const response = await fetch("/api/admin/users/enforce", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        action,
-        reason: reason.trim(),
-        countViolation,
-        endsAt: needsEnds ? new Date(endsAt).toISOString() : null,
-        hideContent,
-        note: note.trim() || null,
-      }),
-    });
-    const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
-    setBusy(false);
-    if (!response.ok) { setError(payload?.error || "处罚操作失败，请稍后重试。"); return; }
-    setEnforceOpen(false);
-    setSuccess(payload?.message || "处罚已生效。");
-    setReason(""); setCustomReason(false); setEndsAt(""); setQuickHours(null); setCountViolation(true); setHideContent(false); setNote("");
-    window.setTimeout(() => window.location.reload(), 900);
+    try {
+      const response = await fetchWithTimeout("/api/admin/users/enforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          action,
+          reason: reason.trim(),
+          countViolation,
+          endsAt: needsEnds ? new Date(endsAt).toISOString() : null,
+          hideContent,
+          note: note.trim() || null,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+      setBusy(false);
+      if (!response.ok) { setError(payload?.error || "处罚操作失败，请稍后重试。"); return; }
+      setEnforceOpen(false);
+      setSuccess(payload?.message || "处罚已生效。");
+      setReason(""); setCustomReason(false); setEndsAt(""); setQuickHours(null); setCountViolation(true); setHideContent(false); setNote("");
+      window.setTimeout(() => window.location.reload(), 900);
+    } catch (error) {
+      setBusy(false);
+      setError(error instanceof Error ? error.message : "处罚操作失败，请稍后重试。");
+    }
   };
 
   const submitLift = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!liftReason.trim()) { setError("请填写解除原因。"); return; }
     setBusy(true); setError(""); setSuccess("");
-    const response = await fetch("/api/admin/users/lift", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        action: liftMode,
-        restrictionType: liftMode === "restore" ? "account" : liftType,
-        reason: liftReason.trim(),
-        restoreContent,
-        note: liftNote.trim() || null,
-      }),
-    });
-    const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
-    setBusy(false);
-    if (!response.ok) { setError(payload?.error || "解除操作失败，请稍后重试。"); return; }
-    setLiftOpen(false);
-    setSuccess(payload?.message || "操作已完成。");
-    setLiftReason(""); setRestoreContent(false); setLiftNote("");
-    window.setTimeout(() => window.location.reload(), 900);
+    try {
+      const response = await fetchWithTimeout("/api/admin/users/lift", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          action: liftMode,
+          restrictionType: liftMode === "restore" ? "account" : liftType,
+          reason: liftReason.trim(),
+          restoreContent,
+          note: liftNote.trim() || null,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+      setBusy(false);
+      if (!response.ok) { setError(payload?.error || "解除操作失败，请稍后重试。"); return; }
+      setLiftOpen(false);
+      setSuccess(payload?.message || "操作已完成。");
+      setLiftReason(""); setRestoreContent(false); setLiftNote("");
+      window.setTimeout(() => window.location.reload(), 900);
+    } catch (error) {
+      setBusy(false);
+      setError(error instanceof Error ? error.message : "解除操作失败，请稍后重试。");
+    }
   };
 
   const openReminder = () => {
@@ -234,27 +241,37 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
     event.preventDefault();
     if (!reminderReason.trim()) { setReminderError("请填写提醒内容。"); return; }
     setReminderBusy(true); setReminderError(""); setSuccess("");
-    const response = await fetch("/api/admin/users/report-reminder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, reason: reminderReason.trim() }),
-    });
-    const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
-    setReminderBusy(false);
-    if (!response.ok) { setReminderError(payload?.error || "提醒发送失败，请稍后重试。"); return; }
-    setReminderOpen(false);
-    setReminderReason(""); setReminderCustomReason(false);
-    setSuccess(payload?.message || "举报规则提醒已发送。");
+    try {
+      const response = await fetchWithTimeout("/api/admin/users/report-reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, reason: reminderReason.trim() }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+      setReminderBusy(false);
+      if (!response.ok) { setReminderError(payload?.error || "提醒发送失败，请稍后重试。"); return; }
+      setReminderOpen(false);
+      setReminderReason(""); setReminderCustomReason(false);
+      setSuccess(payload?.message || "举报规则提醒已发送。");
+    } catch (error) {
+      setReminderBusy(false);
+      setReminderError(error instanceof Error ? error.message : "提醒发送失败，请稍后重试。");
+    }
   };
 
   const openLimit = async () => {
     setLimitOpen(true); setLimitBusy(true); setLimitError(""); setSuccess("");
-    const response = await fetch("/api/admin/report-config");
-    const payload = await response.json().catch(() => null) as { success?: boolean; dailyReportLimit?: number; error?: string } | null;
-    setLimitBusy(false);
-    if (!response.ok) { setLimitError(payload?.error || "举报上限读取失败，请稍后重试。"); return; }
-    const current = payload?.dailyReportLimit ?? 20;
-    setLimitInput(String(current));
+    try {
+      const response = await fetchWithTimeout("/api/admin/report-config");
+      const payload = await response.json().catch(() => null) as { success?: boolean; dailyReportLimit?: number; error?: string } | null;
+      setLimitBusy(false);
+      if (!response.ok) { setLimitError(payload?.error || "举报上限读取失败，请稍后重试。"); return; }
+      const current = payload?.dailyReportLimit ?? 20;
+      setLimitInput(String(current));
+    } catch (error) {
+      setLimitBusy(false);
+      setLimitError(error instanceof Error ? error.message : "举报上限读取失败，请稍后重试。");
+    }
   };
 
   const submitLimit = async (event: FormEvent<HTMLFormElement>) => {
@@ -262,17 +279,22 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
     const value = Number(limitInput);
     if (!Number.isInteger(value) || value < 1 || value > 1000) { setLimitError("每日举报上限需为 1 到 1000 之间的整数。"); return; }
     setLimitBusy(true); setLimitError(""); setSuccess("");
-    const response = await fetch("/api/admin/report-config", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dailyReportLimit: value }),
-    });
-    const payload = await response.json().catch(() => null) as { success?: boolean; dailyReportLimit?: number; message?: string; error?: string } | null;
-    setLimitBusy(false);
-    if (!response.ok) { setLimitError(payload?.error || "举报上限更新失败，请稍后重试。"); return; }
-    setLimitOpen(false);
-    setLimitInput(String(payload?.dailyReportLimit ?? value));
-    setSuccess(payload?.message || "每日举报上限已更新。");
+    try {
+      const response = await fetchWithTimeout("/api/admin/report-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dailyReportLimit: value }),
+      });
+      const payload = await response.json().catch(() => null) as { success?: boolean; dailyReportLimit?: number; message?: string; error?: string } | null;
+      setLimitBusy(false);
+      if (!response.ok) { setLimitError(payload?.error || "举报上限更新失败，请稍后重试。"); return; }
+      setLimitOpen(false);
+      setLimitInput(String(payload?.dailyReportLimit ?? value));
+      setSuccess(payload?.message || "每日举报上限已更新。");
+    } catch (error) {
+      setLimitBusy(false);
+      setLimitError(error instanceof Error ? error.message : "举报上限更新失败，请稍后重试。");
+    }
   };
 
   const statusPill = (status?: string | null) => <span className={`admin-user-status ${status || ""}`}>{statusLabels[status || ""] || status || "未知"}</span>;
