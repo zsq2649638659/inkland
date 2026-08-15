@@ -25,6 +25,9 @@ function submissionErrorMessage(error: { message?: string }, fallback: string) {
   if (message.includes("ERR_SAME_AS_REJECTED")) {
     return "作品内容与上次打回时相同，请修改后再提交审核";
   }
+  if (message.includes("normalize_content_for_compare") || message.includes("posts_guard_unchanged_resubmission")) {
+    return "审核拦截功能未完整部署，请先在 Supabase SQL Editor 执行 user-enforcement-v1.sql 后重试";
+  }
   return fallback;
 }
 
