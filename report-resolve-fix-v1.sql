@@ -24,6 +24,10 @@ DECLARE
   target_owner_id UUID;
   target_title TEXT;
   target_content TEXT;
+  v_object_label TEXT;
+  v_content_snippet TEXT;
+  v_notify_content TEXT;
+  v_reason_label TEXT;
   v_outcome TEXT;
   now_ts TIMESTAMPTZ := NOW();
   report_ids UUID[] := '{}';
@@ -79,6 +83,37 @@ BEGIN
       target_title := COALESCE(snapshot_record.object_snapshot->>'nickname', '');
       target_content := COALESCE(snapshot_record.object_snapshot->>'bio', '');
     END IF;
+  END IF;
+
+  -- 按飞书 3.4.2 固定模板组装“举报已处理”通知
+  v_reason_label := COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他问题');
+  IF snapshot_record.id IS NULL THEN
+    v_object_label := '未知对象';
+  ELSIF snapshot_record.target_type = 'comment' THEN
+    v_object_label := COALESCE(NULLIF(btrim(COALESCE(snapshot_record.context_snapshot->>'comment_author_nickname', '')), ''), '某用户')
+      || '在《' || COALESCE(NULLIF(btrim(COALESCE(snapshot_record.context_snapshot->>'post_title', '')), ''), '某作品') || '》下发布的评论';
+    v_content_snippet := CASE
+      WHEN btrim(COALESCE(target_content, '')) = '' THEN ''
+      ELSE left(COALESCE(target_content, ''), 80) || '……'
+    END;
+  ELSIF snapshot_record.target_type = 'post' THEN
+    v_object_label := COALESCE(NULLIF(btrim(COALESCE(snapshot_record.context_snapshot->>'author_nickname', '')), ''), '某用户')
+      || '发布的《' || COALESCE(NULLIF(btrim(COALESCE(target_title, '')), ''), '某作品') || '》';
+  ELSE
+    v_object_label := '用户“' || COALESCE(NULLIF(btrim(COALESCE(snapshot_record.object_snapshot->>'nickname', '')), ''), '某用户') || '”';
+  END IF;
+
+  IF snapshot_record.id IS NOT NULL AND snapshot_record.target_type = 'comment' THEN
+    v_notify_content := '举报已处理' || E'\n'
+      || '举报对象：' || v_object_label || E'\n'
+      || '举报内容：' || v_content_snippet || E'\n'
+      || '举报理由：' || v_reason_label || E'\n'
+      || '我们已经收到你的举报，并将重点关注相关内容和账号。感谢你对社区秩序的维护。';
+  ELSE
+    v_notify_content := '举报已处理' || E'\n'
+      || '举报对象：' || v_object_label || E'\n'
+      || '举报理由：' || v_reason_label || E'\n'
+      || '我们已经收到你的举报，并将重点关注相关内容和账号。感谢你对社区秩序的维护。';
   END IF;
 
   -- 删除内容（快照仍保留，供后台查看）
@@ -157,7 +192,7 @@ BEGIN
       delivery_status, sent_at
     ) VALUES (
       v_reporter_id, 'system', NULL, NULL,
-      '你提交的举报已处理完成，感谢你的反馈。', FALSE, now_ts,
+      v_notify_content, FALSE, now_ts,
       'report_handled', 'report_case', p_case_id,
       jsonb_build_object('case_id', p_case_id, 'target_type', case_record.target_type),
       'sent', now_ts
