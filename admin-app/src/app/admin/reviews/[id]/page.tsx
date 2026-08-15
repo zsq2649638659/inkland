@@ -62,6 +62,11 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
 
   if (!version || !post) notFound();
 
+  const { data: comparison } = await db.rpc("compare_post_submission", {
+    target_post_id: reviewCase.post_id,
+    target_version_id: reviewCase.post_version_id,
+  });
+
   const signed = await signPrivateImageUrls(service, supabase, version.content || "", reviewCase.post_id);
   const signedPostContent = post.content ? (await signPrivateImageUrls(service, supabase, post.content, reviewCase.post_id)).content : post.content;
 
@@ -73,6 +78,7 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
       findings={(findings || []) as never[]}
       historyCases={(historyCases || []) as never[]}
       historyVersions={(historyVersions || []) as never[]}
+      comparison={(comparison || null) as never}
       imageAccessError={signed.imageAccessError}
     />
   );

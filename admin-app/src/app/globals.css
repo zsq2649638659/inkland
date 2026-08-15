@@ -39,6 +39,12 @@
 .admin-review-detail-page .admin-detail-panel p { margin:0 0 12px; }
 .admin-review-detail-page .admin-detail-panel dt { margin-top:9px; }
 .admin-review-detail-page .admin-detail-panel dd { margin-top:3px; }
+.admin-review-detail-page .admin-repeat-comparison.is-identical { border-color:#efcfc8; background:#fff5f2; }
+.admin-review-detail-page .admin-repeat-comparison.is-modified { border-color:#d6e5da; background:#f3faf5; }
+.admin-review-detail-page .admin-repeat-comparison .admin-panel-title-row span { background:#ffe8e1; color:#a95b4d; }
+.admin-review-detail-page .admin-repeat-comparison.is-modified .admin-panel-title-row span { background:#e0f0e5; color:#3f7d58; }
+.admin-review-detail-page .admin-comparison-status { color:#7c4f47; font-weight:600; }
+.admin-review-detail-page .admin-repeat-comparison.is-modified .admin-comparison-status { color:#3f6b4d; }
 .admin-review-detail-page .admin-evidence-document { padding:14px 16px 18px; border-radius:8px; }
 .admin-review-detail-page .admin-evidence-document h2 { margin:8px 0 14px; font-size:17px; }
 .admin-review-detail-page .admin-detail-images { gap:14px; margin-top:16px; }

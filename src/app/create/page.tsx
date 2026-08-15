@@ -20,6 +20,14 @@ function toLocalDateTimeValue(value: string) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function submissionErrorMessage(error: { message?: string }, fallback: string) {
+  const message = error?.message || "";
+  if (message.includes("ERR_SAME_AS_REJECTED")) {
+    return "作品内容与上次打回时相同，请修改后再提交审核";
+  }
+  return fallback;
+}
+
 // ============ 类型定义 ============
 
 type ViewType = "select" | "text" | "image" | "series-create" | "series-detail" | "chapter-create";
@@ -1061,11 +1069,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     let finalReviewStatus: string | undefined;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
-      if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
+      if (error) { setErrorMsg(submissionErrorMessage(error, `更新失败: ${error.message}`)); setSubmitting(false); return; }
       finalReviewStatus = updatedPost?.review_status as string | undefined;
     } else {
       const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id, review_status").single();
-      if (error) { setErrorMsg(`发布失败: ${error.message}`); setSubmitting(false); return; }
+      if (error) { setErrorMsg(submissionErrorMessage(error, `发布失败: ${error.message}`)); setSubmitting(false); return; }
       savedPostId = createdPost?.id;
       finalReviewStatus = createdPost?.review_status as string | undefined;
     }
@@ -1169,11 +1177,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     let finalReviewStatus: string | undefined;
     if (editPostId) {
       const { data: updatedPost, error } = await supabase.from("posts").update(postData).eq("id", editPostId).select("review_status").single();
-      if (error) { setErrorMsg(`更新失败: ${error.message}`); setSubmitting(false); return; }
+      if (error) { setErrorMsg(submissionErrorMessage(error, `更新失败: ${error.message}`)); setSubmitting(false); return; }
       finalReviewStatus = updatedPost?.review_status as string | undefined;
     } else {
       const { data: createdPost, error } = await supabase.from("posts").insert({ ...postData, user_id: user.id }).select("id, review_status").single();
-      if (error) { setErrorMsg(`发布失败: ${error.message}`); setSubmitting(false); return; }
+      if (error) { setErrorMsg(submissionErrorMessage(error, `发布失败: ${error.message}`)); setSubmitting(false); return; }
       savedPostId = createdPost?.id;
       finalReviewStatus = createdPost?.review_status as string | undefined;
     }
@@ -1425,9 +1433,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
         const { error: err2 } = editPostId
           ? await supabase.from("posts").update(fallbackChapterData).eq("id", editPostId).eq("user_id", user.id)
           : await supabase.from("posts").insert(fallbackChapterData);
-        if (err2) { setErrorMsg(`发布失败: ${err2.message}`); setSubmitting(false); return; }
+        if (err2) { setErrorMsg(submissionErrorMessage(err2, `发布失败: ${err2.message}`)); setSubmitting(false); return; }
       } else {
-        setErrorMsg(`发布失败: ${error.message}`);
+        setErrorMsg(submissionErrorMessage(error, `发布失败: ${error.message}`));
         setSubmitting(false);
         return;
       }

@@ -120,6 +120,15 @@ type HistoryVersion = {
   created_at?: string | null;
 };
 
+type PostComparison = {
+  available?: boolean;
+  is_identical?: boolean;
+  changed_fields?: string[];
+  current_submission_number?: number | null;
+  previous_submission_number?: number | null;
+  previous_submitted_at?: string | null;
+} | null;
+
 type ManualFindingDraft = {
   clientId: string;
   location_type: string;
@@ -223,6 +232,15 @@ const findingStatusLabels: Record<string, string> = {
   suggested: "待确认",
   confirmed: "已确认",
   dismissed: "已忽略",
+};
+const comparisonFieldLabels: Record<string, string> = {
+  title: "标题",
+  content: "正文",
+  author_note: "作者的话",
+  series_name: "连载",
+  chapter_number: "章节序号",
+  chapter_title: "章节标题",
+  post_type: "作品类型",
 };
 
 function sourceLabel(source?: string | null) {
@@ -427,13 +445,14 @@ function manualRangesIntersect(item: ManualFindingDraft, context: SelectionConte
 
 /* ==================== 主组件 ==================== */
 
-export default function ReviewDetailClient({ post, version, reviewCase, findings, historyCases, historyVersions, imageAccessError }: {
+export default function ReviewDetailClient({ post, version, reviewCase, findings, historyCases, historyVersions, comparison, imageAccessError }: {
   post: Post;
   version: Version;
   reviewCase: ReviewCase;
   findings: Finding[];
   historyCases: HistoryCase[];
   historyVersions: HistoryVersion[];
+  comparison?: PostComparison;
   imageAccessError?: string | null;
 }) {
   const [busy, setBusy] = useState(false);
@@ -855,6 +874,25 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
 
       <div className="admin-review-layout">
         <aside className="admin-review-summary-column">
+          {comparison?.available ? (
+            <section className={`admin-detail-panel admin-repeat-comparison ${comparison.is_identical ? "is-identical" : "is-modified"}`}>
+              <div className="admin-panel-title-row">
+                <h2>与上次打回内容比对</h2>
+                <span>{comparison.is_identical ? "内容相同" : "已修改"}</span>
+              </div>
+              <p className="admin-comparison-status">
+                {comparison.is_identical
+                  ? `本次为第 ${comparison.current_submission_number ?? "?"} 次提交，与上次打回（第 ${comparison.previous_submission_number ?? "?"} 次提交）内容一致，作者未修改。`
+                  : `本次为第 ${comparison.current_submission_number ?? "?"} 次提交，相对上次打回（第 ${comparison.previous_submission_number ?? "?"} 次提交）内容已修改。`}
+              </p>
+              {comparison.is_identical ? (
+                <p>作者端再次原样提交会被拦截，需修改内容后才能重新提交审核。</p>
+              ) : comparison.changed_fields?.length ? (
+                <p>修改涉及：{comparison.changed_fields.map((field) => comparisonFieldLabels[field] || field).join("、")}</p>
+              ) : null}
+            </section>
+          ) : null}
+
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row">
               <h2>作品信息</h2>
