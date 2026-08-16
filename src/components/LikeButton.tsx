@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import { createNotification } from "@/lib/notifications";
+import { assertCanInteract } from "@/lib/userRestrictions";
 
 interface LikeButtonProps {
   postId: string;
@@ -19,6 +21,7 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
   const supabase = createClient();
   const router = useRouter();
   const { user } = useAuth();
+  const dialog = useAppDialog();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
@@ -54,6 +57,12 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
         setCount((c) => Math.max(0, c - 1));
       }
     } else {
+      const blocked = await assertCanInteract();
+      if (blocked) {
+        setLoading(false);
+        dialog.toast(blocked, "danger");
+        return;
+      }
       const { error } = await supabase
         .from("likes")
         .insert({ post_id: postId, user_id: user.id });

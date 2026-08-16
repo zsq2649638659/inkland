@@ -86,6 +86,16 @@ type UserDetailPayload = {
   } | null;
 };
 
+type ProfileRevisionRow = {
+  id: string;
+  issue_type: string;
+  issue_detail?: string | null;
+  hidden_fields?: string[] | string | null;
+  status?: string | null;
+  created_at?: string | null;
+  confirmed_at?: string | null;
+};
+
 type EnforcementAction = "warn" | "restrict_comment" | "restrict_publish" | "restrict_report" | "suspend" | "ban";
 type LiftMode = "lift" | "restore";
 
@@ -100,7 +110,21 @@ const restrictionLabels: Record<string, string> = {
   comment: "评论限制",
   publish: "发布限制",
   report: "举报限制",
+  profile_edit: "资料编辑限制",
+  interact: "互动限制",
   account: "账号处罚",
+};
+const revisionIssueLabels: Record<string, string> = {
+  avatar: "修改头像",
+  nickname: "修改昵称",
+  bio: "修改个人简介",
+  external_link: "删除外部链接",
+};
+const revisionStatusLabels: Record<string, string> = {
+  requested: "等待用户修改",
+  submitted: "用户已提交",
+  confirmed: "已确认",
+  cancelled: "已取消",
 };
 const severityLabels: Record<string, string> = {
   minor: "轻微",
@@ -133,12 +157,16 @@ const toLocalInput = (date: Date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export default function UserDetailClient({ detail }: { detail: UserDetailPayload }) {
+export default function UserDetailClient({ detail, profileRevisions }: { detail: UserDetailPayload; profileRevisions: ProfileRevisionRow[] }) {
   const [enforceOpen, setEnforceOpen] = useState(false);
   const [liftOpen, setLiftOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<ProfileRevisionRow | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
 
   const [action, setAction] = useState<EnforcementAction>("warn");
   const [reason, setReason] = useState("");
@@ -297,6 +325,28 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
     }
   };
 
+  const submitConfirmRevision = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!confirmTarget) return;
+    setConfirmBusy(true); setConfirmError("");
+    try {
+      const response = await fetchWithTimeout("/api/admin/users/profile-revision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: confirmTarget.id }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+      setConfirmBusy(false);
+      if (!response.ok) { setConfirmError(payload?.error || "确认失败，请稍后重试。"); return; }
+      setConfirmOpen(false); setConfirmTarget(null);
+      setSuccess(payload?.message || "资料整改已确认，账号资料恢复正常展示。");
+      window.setTimeout(() => window.location.reload(), 900);
+    } catch (submitError) {
+      setConfirmBusy(false);
+      setConfirmError(submitError instanceof Error ? submitError.message : "确认失败，请稍后重试。");
+    }
+  };
+
   const statusPill = (status?: string | null) => <span className={`admin-user-status ${status || ""}`}>{statusLabels[status || ""] || status || "未知"}</span>;
 
   return (
@@ -336,6 +386,16 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
               <div><strong>{stats.deleted_items}</strong><span>删除内容</span></div>
               <div><strong>{stats.active_restrictions}</strong><span>有效限制</span></div>
             </div>
+          </section>
+
+          <section className="admin-detail-panel">
+            <div className="admin-panel-title-row"><h2>资料整改</h2><span>{profileRevisions.length} 条</span></div>
+            {profileRevisions.length ? <div className="admin-risk-list">{profileRevisions.map((item) => <div className="admin-risk-item" key={item.id}>
+              <strong>{revisionIssueLabels[item.issue_type] || item.issue_type} · {revisionStatusLabels[item.status || ""] || item.status || "未知"}</strong>
+              {item.issue_detail ? <small>问题说明：{item.issue_detail}</small> : null}
+              <small>{fullDate(item.created_at)}{item.confirmed_at ? ` · 确认于 ${fullDate(item.confirmed_at)}` : ""}</small>
+              {item.status === "submitted" ? <div className="admin-panel-actions"><button className="admin-detail-secondary" type="button" onClick={() => { setConfirmTarget(item); setConfirmError(""); setConfirmOpen(true); }}>确认整改完成</button></div> : null}
+            </div>)}</div> : <p className="admin-detail-empty">该用户没有资料整改记录。</p>}
           </section>
 
           <section className="admin-detail-panel">
@@ -439,7 +499,7 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
 
       {liftOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setLiftOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="lift-user-title" onSubmit={submitLift}>
         <div className="admin-modal-header"><div><h2 id="lift-user-title">{liftMode === "restore" ? "恢复该用户账号？" : "解除功能限制？"}</h2><p className="admin-modal-desc">{liftMode === "restore" ? "恢复后账号回到正常或警告状态；勾选可同时还原此前被隐藏的已发布作品。" : "可解除单项限制，或选择“全部”一次解除所有功能限制。"}</p></div></div>
-        {liftMode === "lift" ? <label className="admin-field">解除类型<select value={liftType} onChange={(event) => setLiftType(event.target.value)} disabled={busy}><option value="all">全部限制</option><option value="comment">评论限制</option><option value="publish">发布限制</option><option value="report">举报限制</option><option value="account">账号处罚</option></select></label> : null}
+        {liftMode === "lift" ? <label className="admin-field">解除类型<select value={liftType} onChange={(event) => setLiftType(event.target.value)} disabled={busy}><option value="all">全部限制</option><option value="comment">评论限制</option><option value="publish">发布限制</option><option value="report">举报限制</option><option value="profile_edit">资料编辑限制</option><option value="interact">互动限制</option><option value="account">账号处罚</option></select></label> : null}
         <label className="admin-field">解除原因<input value={liftReason} onChange={(event) => setLiftReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} /></label>
         {liftMode === "restore" ? <label className="admin-field admin-check-field"><input type="checkbox" checked={restoreContent} onChange={(event) => setRestoreContent(event.target.checked)} disabled={busy} /><span>还原此前因暂停/封禁隐藏的已发布作品</span></label> : null}
         <label className="admin-field">内部备注（可选）<textarea value={liftNote} onChange={(event) => setLiftNote(event.target.value)} maxLength={500} placeholder="记录给审核日志的内部备注，不会展示给用户" disabled={busy} /></label>
@@ -468,6 +528,16 @@ export default function UserDetailClient({ detail }: { detail: UserDetailPayload
         <div className="admin-modal-actions">
           <button className="admin-btn admin-btn-light" type="button" disabled={limitBusy} onClick={() => setLimitOpen(false)}>取消</button>
           <button className="admin-btn admin-btn-primary" type="submit" disabled={limitBusy}>{limitBusy ? "保存中…" : "保存上限"}</button>
+        </div>
+      </form></div> : null}
+
+      {confirmOpen && confirmTarget ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !confirmBusy) setConfirmOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-revision-title" onSubmit={submitConfirmRevision}>
+        <div className="admin-modal-header"><div><h2 id="confirm-revision-title">确认资料整改完成？</h2><p className="admin-modal-desc">确认后，该用户的资料将恢复正常展示，隐藏字段立即解除。请先核对用户已按要求修改。</p></div></div>
+        <div className="admin-confirm-account"><span className="admin-field-label">整改要求</span><strong>{revisionIssueLabels[confirmTarget.issue_type] || confirmTarget.issue_type}</strong>{confirmTarget.issue_detail ? <span>{confirmTarget.issue_detail}</span> : null}</div>
+        {confirmError ? <div className="admin-alert admin-alert-error" role="alert">{confirmError}</div> : null}
+        <div className="admin-modal-actions">
+          <button className="admin-btn admin-btn-light" type="button" disabled={confirmBusy} onClick={() => setConfirmOpen(false)}>取消</button>
+          <button className="admin-btn admin-btn-primary" type="submit" disabled={confirmBusy}>{confirmBusy ? "确认中…" : "确认整改完成"}</button>
         </div>
       </form></div> : null}
 

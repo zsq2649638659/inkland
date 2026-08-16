@@ -7,7 +7,7 @@ import { fetchWithTimeout } from "@/lib/adminFetch";
 type ReportTab = "posts" | "comments" | "reporters" | "targetUsers";
 
 type FilterState = {
-  status: "all" | "pending" | "kept" | "reminded" | "deleted";
+  status: "all" | "pending" | "reviewing" | "kept" | "reminded" | "deleted" | "no_violation" | "content_case" | "profile_changes" | "warned" | "restricted" | "suspended" | "banned";
   priority: "all" | "normal" | "high" | "urgent";
   suspicious: boolean;
   serviceError: boolean;
@@ -103,7 +103,22 @@ const tabs: Array<{ key: ReportTab; label: string; hint: string }> = [
   { key: "targetUsers", label: "被举报用户风险", hint: "近期案件与确认违规集中的用户" },
 ];
 
-const statusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", kept: "已保留", reminded: "已提醒", deleted: "已删除", cancelled: "已取消", resolved: "已处理" };
+const statusLabels: Record<string, string> = {
+  pending: "待处理",
+  reviewing: "处理中",
+  kept: "已保留",
+  reminded: "已提醒",
+  deleted: "已删除",
+  no_violation: "举报不成立",
+  content_case: "已转为内容案件",
+  profile_changes: "已要求修改资料",
+  warned: "已警告",
+  restricted: "已限制功能",
+  suspended: "已暂停",
+  banned: "已永久封禁",
+  cancelled: "已取消",
+  resolved: "已处理",
+};
 const priorityLabels: Record<string, string> = { normal: "普通", high: "优先", urgent: "紧急" };
 const riskLabels: Record<string, string> = { normal: "正常", high: "高风险", urgent: "紧急风险" };
 const userStatusLabels: Record<string, string> = { active: "正常", warned: "已警告", restricted: "受限", suspended: "已暂停", banned: "已封禁" };
@@ -217,9 +232,17 @@ export default function ReportCenterClient() {
         <label className="admin-report-filter-field">处理状态<select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as FilterState["status"] })} disabled={loading}>
           <option value="all">全部状态</option>
           <option value="pending">待处理</option>
+          <option value="reviewing">处理中</option>
           <option value="kept">已保留</option>
           <option value="reminded">已提醒</option>
           <option value="deleted">已删除</option>
+          <option value="no_violation">举报不成立</option>
+          <option value="content_case">已转为内容案件</option>
+          <option value="profile_changes">已要求修改资料</option>
+          <option value="warned">已警告</option>
+          <option value="restricted">已限制功能</option>
+          <option value="suspended">已暂停</option>
+          <option value="banned">已永久封禁</option>
         </select></label>
         <label className="admin-report-filter-field">优先级<select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as FilterState["priority"] })} disabled={loading}>
           <option value="all">全部优先级</option>

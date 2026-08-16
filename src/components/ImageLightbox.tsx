@@ -12,7 +12,7 @@ import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
 import { submitReportV1 } from "@/lib/reportContent";
-import { assertCanComment } from "@/lib/userRestrictions";
+import { assertCanComment, assertCanInteract } from "@/lib/userRestrictions";
 import SiteDialog, { useSiteDialog } from "@/components/SiteDialog";
 import type { Comment, Post } from "@/lib/types";
 import "@/app/home-lightbox.css";
@@ -118,6 +118,13 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
 
   const toggleFollow = async () => {
     if (!user) { window.location.href = "/login"; return; }
+    if (!following) {
+      const blocked = await assertCanInteract();
+      if (blocked) {
+        setToast(blocked);
+        return;
+      }
+    }
     const query = supabase.from("follows");
     const result = following ? await query.delete().eq("follower_id", user.id).eq("following_id", authorId) : await query.insert({ follower_id: user.id, following_id: authorId });
     if (!result.error) setFollowing(!following);

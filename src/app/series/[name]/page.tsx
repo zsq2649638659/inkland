@@ -7,6 +7,8 @@ import { SkeletonSeriesDetail } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { useAppDialog } from "@/components/AppDialogProvider";
+import { assertCanInteract } from "@/lib/userRestrictions";
 
 interface ChapterInfo {
   id: string;
@@ -32,6 +34,7 @@ interface SeriesInfo {
 }
 
 export default function SeriesPage({ params }: { params: Promise<{ name: string }> }) {
+  const dialog = useAppDialog();
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   const supabase = createClient();
@@ -174,6 +177,11 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
       await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", seriesInfo.user_id);
       setIsFollowing(false);
     } else {
+      const blocked = await assertCanInteract();
+      if (blocked) {
+        dialog.toast(blocked, "danger");
+        return;
+      }
       await supabase.from("follows").insert({ follower_id: user.id, following_id: seriesInfo.user_id });
       setIsFollowing(true);
     }

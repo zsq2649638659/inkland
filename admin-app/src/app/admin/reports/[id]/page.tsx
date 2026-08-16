@@ -42,11 +42,31 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
     violations = (data || []) as typeof violations;
   }
 
+  let userContent: Array<{ id: string; type: "post" | "comment"; title: string; snippet: string; created_at: string }> = [];
+  if (targetUserId && reportCase.target_type === "user") {
+    const [{ data: posts }, { data: comments }] = await Promise.all([
+      supabase.from("posts").select("id, title, content, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
+      supabase.from("comments").select("id, content, created_at, post_id").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
+    ]);
+    const postIds = [...new Set((comments || []).map((comment) => comment.post_id).filter((value): value is string => Boolean(value)))];
+    const titleMap: Record<string, string> = {};
+    if (postIds.length) {
+      const { data: postTitles } = await supabase.from("posts").select("id, title").in("id", postIds);
+      for (const post of postTitles || []) titleMap[post.id] = post.title || "未知作品";
+    }
+    const strip = (value: string) => value.replace(/!\[[^\]]*\]\([^)]+\)/g, "").trim();
+    userContent = [
+      ...(posts || []).map((post) => ({ id: post.id, type: "post" as const, title: post.title || "未命名作品", snippet: strip(post.content || "").slice(0, 160), created_at: post.created_at })),
+      ...(comments || []).map((comment) => ({ id: comment.id, type: "comment" as const, title: `评论于《${titleMap[comment.post_id] || "未知作品"}》`, snippet: strip(comment.content || "").slice(0, 160), created_at: comment.created_at })),
+    ].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
   return <ReportDetailClient
     reportCase={reportCase as never}
     snapshot={snapshot as never}
     reports={reportRows as never}
     violations={violations as never}
     reporterStats={reporterStats as never}
+    userContent={userContent}
   />;
 }

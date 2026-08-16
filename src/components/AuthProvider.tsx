@@ -8,6 +8,7 @@ export interface UserProfile {
   nickname: string;
   avatar_url: string | null;
   bio?: string | null;
+  external_link?: string | null;
 }
 
 interface AuthContextType {
@@ -38,11 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from("profiles")
-        .select("nickname, avatar_url, bio")
+        .select("nickname, avatar_url, bio, external_link")
         .eq("id", userId)
         .single();
       return data
-        ? { nickname: data.nickname, avatar_url: data.avatar_url, bio: data.bio }
+        ? { nickname: data.nickname, avatar_url: data.avatar_url, bio: data.bio, external_link: data.external_link }
         : null;
     } catch {
       return null;
