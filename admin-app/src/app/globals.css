@@ -395,3 +395,23 @@
   .admin-report-query input { min-width:0; width:100%; }
   .admin-report-filters .admin-btn { flex:1 1 100%; }
 }
+
+/* 飞书 2.8 / 3.20：完整操作记录 */
+.admin-operation-record-panel .admin-panel-title-row { margin-bottom:14px; }
+.admin-operation-record-panel .admin-panel-title-row span { background:#f1efff; color:#7264bd; }
+.admin-operation-record-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.admin-operation-cell { min-width:0; padding:13px; border:1px solid #ecebf1; border-radius:9px; background:#fbfbfc; }
+.admin-operation-cell h3 { margin:0 0 10px; color:#4d4d56; font-size:12px; }
+.admin-operation-cell dl { display:grid; gap:7px; margin:0; }
+.admin-operation-cell dt { color:#a5a5ad; font-size:9px; line-height:1.4; }
+.admin-operation-cell dd { margin:2px 0 0; color:#55555e; font-size:10px; line-height:1.65; overflow-wrap:anywhere; white-space:pre-wrap; }
+.admin-operation-list { display:grid; gap:8px; }
+.admin-operation-list + .admin-operation-list { margin-top:10px; padding-top:10px; border-top:1px dashed #e7e6ec; }
+.admin-operation-item { display:grid; gap:4px; min-width:0; padding:9px 10px; border:1px solid #efedf4; border-radius:8px; background:#fff; }
+.admin-operation-item strong { color:#625f75; font-size:10px; line-height:1.5; }
+.admin-operation-item span { color:#a0a0a8; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
+.admin-operation-cell .admin-detail-empty { font-size:11px; }
+
+@media (max-width:700px) {
+  .admin-operation-record-grid { grid-template-columns:1fr; }
+}

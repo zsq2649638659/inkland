@@ -94,6 +94,19 @@ type ProfileRevisionRow = {
   created_at?: string | null;
 };
 
+export type ReportOperationRecord = {
+  case_id: string;
+  case?: Record<string, unknown> | null;
+  snapshot?: Record<string, unknown> | null;
+  reports?: Array<Record<string, unknown>>;
+  reporter_stats?: Array<Record<string, unknown>>;
+  violations?: Array<Record<string, unknown>>;
+  restrictions?: Array<Record<string, unknown>>;
+  profile_revisions?: Array<Record<string, unknown>>;
+  notifications?: Array<Record<string, unknown>>;
+  audit_logs?: Array<Record<string, unknown>>;
+};
+
 export default async function ReportCasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, user } = await getAdminContext();
@@ -148,6 +161,7 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
   let userDetail: UserDetailPayload | null = null;
   let profileRevisions: ProfileRevisionRow[] = [];
   let targetReporterDetail: ReporterDetailPayload | null = null;
+  let operationRecord: ReportOperationRecord | null = null;
   if (targetUserId && reportCase.target_type === "user") {
     const [{ data: posts }, { data: comments }, userDetailResult, revisionResult, reporterDetailResult] = await Promise.all([
       supabase.from("posts").select("id, title, content, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
@@ -174,6 +188,12 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
     targetReporterDetail = rd && rd.ok ? rd : null;
   }
 
+  const operationRecordResult = await supabase.rpc("admin_report_operation_record_v1", { p_case_id: id });
+  const operationRecordPayload = operationRecordResult.data as { ok?: boolean } | null;
+  if (operationRecordPayload?.ok) {
+    operationRecord = operationRecordResult.data as unknown as ReportOperationRecord;
+  }
+
   return <ReportDetailClient
     reportCase={reportCase as never}
     snapshot={snapshot as never}
@@ -184,5 +204,6 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
     userDetail={userDetail as never}
     profileRevisions={profileRevisions as never}
     targetReporterDetail={targetReporterDetail as never}
+    operationRecord={operationRecord as never}
   />;
 }

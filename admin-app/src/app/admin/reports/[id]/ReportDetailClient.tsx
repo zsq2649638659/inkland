@@ -136,6 +136,19 @@ type ProfileRevisionRow = {
   created_at?: string | null;
 };
 
+export type ReportOperationRecord = {
+  case_id: string;
+  case?: Record<string, unknown> | null;
+  snapshot?: Record<string, unknown> | null;
+  reports?: Array<Record<string, unknown>>;
+  reporter_stats?: Array<Record<string, unknown>>;
+  violations?: Array<Record<string, unknown>>;
+  restrictions?: Array<Record<string, unknown>>;
+  profile_revisions?: Array<Record<string, unknown>>;
+  notifications?: Array<Record<string, unknown>>;
+  audit_logs?: Array<Record<string, unknown>>;
+};
+
 type Props = {
   reportCase: CaseRow;
   snapshot: SnapshotRow | null;
@@ -146,6 +159,7 @@ type Props = {
   userDetail: UserDetailPayload | null;
   profileRevisions: ProfileRevisionRow[];
   targetReporterDetail: ReporterDetailPayload | null;
+  operationRecord?: ReportOperationRecord | null;
 };
 
 type ReportAction = "keep" | "remind" | "delete" | "dismiss" | "no_violation" | "convert_content" | "profile_revision" | "warn" | "restrict" | "suspend" | "ban" | "mark_suspicious" | "temporary_hide" | "restore";
@@ -161,6 +175,35 @@ const restrictionStatusLabels: Record<string, string> = { active: "生效中", e
 const revisionStatusLabels: Record<string, string> = { requested: "待修改", submitted: "已提交", confirmed: "已确认", cancelled: "已取消" };
 const issueLabels: Record<string, string> = { avatar: "修改头像", nickname: "修改昵称", bio: "修改个人简介", external_link: "删除外部链接" };
 const contentActionLabels: Record<string, string> = { keep: "保留内容", remind: "保留并提醒", delete: "删除内容" };
+const auditActionLabels: Record<string, string> = {
+  resolve_report_keep: "保留内容（举报不成立）",
+  resolve_report_remind: "保留并提醒内容",
+  resolve_report_delete: "删除内容",
+  dismiss_report_case: "驳回举报",
+  resolve_report_no_violation: "举报不成立",
+  resolve_user_report_no_violation: "未发现账号违规",
+  resolve_user_report_convert_content: "转为内容案件",
+  resolve_user_report_profile_revision: "要求修改资料",
+  resolve_user_report_warn: "发送账号警告",
+  resolve_user_report_restrict: "限制账号功能",
+  resolve_user_report_suspend: "暂停账号",
+  resolve_user_report_ban: "永久封禁账号",
+  mark_suspicious_report: "标记恶意举报",
+  temporary_hide_report_target: "暂时隐藏内容",
+  restore_report_target: "恢复内容展示",
+  confirm_profile_revision: "确认资料整改",
+  send_report_rule_reminder: "发送举报规则提醒",
+  enforce_user_warn: "发送账号警告",
+  enforce_user_restrict_comment: "限制评论功能",
+  enforce_user_restrict_publish: "限制发布功能",
+  enforce_user_restrict_report: "限制举报功能",
+  enforce_user_suspend: "暂停账号",
+  enforce_user_ban: "永久封禁账号",
+  lift_user_restriction: "解除功能限制",
+  restore_user_account: "恢复账号",
+};
+const restrictionTypeLabels: Record<string, string> = { comment: "评论功能", publish: "发布功能", report: "举报功能", account: "账号", profile_edit: "修改资料", interact: "互动功能" };
+const restrictionStatusLabelsFull: Record<string, string> = { active: "生效中", expired: "已到期", lifted: "已解除" };
 
 function text(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
@@ -209,7 +252,7 @@ function plainText(content: string) {
   return content.replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").trim();
 }
 
-export default function ReportDetailClient({ reportCase, snapshot, reports, violations, reporterStats, userContent, userDetail, profileRevisions, targetReporterDetail }: Props) {
+export default function ReportDetailClient({ reportCase, snapshot, reports, violations, reporterStats, userContent, userDetail, profileRevisions, targetReporterDetail, operationRecord }: Props) {
   const [pendingAction, setPendingAction] = useState<ReportAction | null>(null);
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
@@ -534,6 +577,21 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   const recentPosts = userContent.filter((item) => item.type === "post");
   const recentComments = userContent.filter((item) => item.type === "comment");
   const bypassHint = text(reportCase.metadata?.bypass_punishment_hint) || (violations.length >= 3 ? "存在多次违规记录，建议结合处罚时间线人工判断是否存在绕过处罚。" : "未发现明显绕过处罚行为。");
+  const recordCase = (operationRecord?.case || {}) as Record<string, unknown>;
+  const recordReports = operationRecord?.reports || [];
+  const recordViolations = operationRecord?.violations || [];
+  const recordRestrictions = operationRecord?.restrictions || [];
+  const recordProfileRevisions = operationRecord?.profile_revisions || [];
+  const recordNotifications = operationRecord?.notifications || [];
+  const recordAuditLogs = operationRecord?.audit_logs || [];
+  const restrictionLiftInfo = (record: Record<string, unknown>) => {
+    const liftedAt = text(record.lifted_at);
+    const liftedBy = text(record.lifted_by_nickname) || text(record.lifted_by);
+    if (liftedAt && liftedAt !== "未记录") {
+      return liftedBy ? `${fmtDateTime(liftedAt)} · 解除人 ${liftedBy}` : fmtDateTime(liftedAt);
+    }
+    return "未解除";
+  };
 
   return (
     <main className="admin-detail-shell">
@@ -627,8 +685,74 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               </figure>;
             })}</div> : null}
 
-            {isComment ? <div className="admin-context-card"><span>评论所属作品</span><strong>{text(context.post_title) || "未知作品"}</strong><p>以下是被举报评论提交时的原文快照，作品后续修改不影响本证据。</p></div> : null}
+          {isComment ? <div className="admin-context-card"><span>评论所属作品</span><strong>{text(context.post_title) || "未知作品"}</strong><p>以下是被举报评论提交时的原文快照，作品后续修改不影响本证据。</p></div> : null}
           </section>
+
+          {operationRecord ? <section className="admin-detail-panel admin-operation-record-panel">
+            <div className="admin-panel-title-row"><h2>完整操作记录</h2><span>飞书 2.8 · 3.20 全量留痕</span></div>
+            <div className="admin-operation-record-grid">
+              <div className="admin-operation-cell">
+                <h3>案件留痕</h3>
+                <dl>
+                  <dt>结案方式</dt><dd>{recordCase.outcome ? (outcomeLabels[text(recordCase.outcome)] || text(recordCase.outcome)) : "尚未结案"}</dd>
+                  <dt>处理管理员</dt><dd>{text(recordCase.resolved_by_nickname) || text(recordCase.resolved_by) || "未处理"}</dd>
+                  <dt>处理时间</dt><dd>{fmtDateTime(text(recordCase.resolved_at))}</dd>
+                  <dt>处理备注</dt><dd>{text((recordCase.metadata as Record<string, unknown> | undefined)?.note) || "未填写"}</dd>
+                  <dt>暂隐 / 可疑标记</dt><dd>{recordCase.hidden_for_review ? `已暂隐 · ${text((recordCase.metadata as Record<string, unknown> | undefined)?.hide_reason) || "原因未记录"}` : `暂隐否 · 可疑举报 ${recordCase.suspicious_report ? "是" : "否"} · 低质量队列 ${recordCase.low_quality_queue ? "是" : "否"}`}</dd>
+                </dl>
+              </div>
+              <div className="admin-operation-cell">
+                <h3>举报人记录</h3>
+                {recordReports.length ? <div className="admin-operation-list">{recordReports.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
+                  <strong>{index + 1}. {record.kind === "comment" ? "评论举报" : record.target_type === "post" ? "作品举报" : "用户举报"} · 举报人 {text(record.reporter_id).slice(0, 8)}</strong>
+                  <span>理由：{text(record.reason_category) || text(record.reason) || "未填写"}{text(record.details) && text(record.details) !== text(record.reason) ? ` · ${text(record.details)}` : ""}</span>
+                  <span>提交 {fmtDateTime(text(record.created_at))}{record.resolved_at ? ` · 处理 ${fmtDateTime(text(record.resolved_at))}` : ""}</span>
+                </div>)}</div> : <p className="admin-detail-empty">没有举报人记录。</p>}
+              </div>
+              <div className="admin-operation-cell">
+                <h3>自动审核依据</h3>
+                <dl>
+                  <dt>自动风险</dt><dd>{text(recordCase.auto_review_risk) || "未触发"}</dd>
+                  <dt>风险分</dt><dd>{recordCase.risk_score == null ? "未记录" : String(recordCase.risk_score)}</dd>
+                  <dt>规则版本</dt><dd>{text((recordCase.review_basis as Record<string, unknown> | undefined)?.rules_version) || "未记录"}</dd>
+                  <dt>扫描时间</dt><dd>{fmtDateTime(text((recordCase.review_basis as Record<string, unknown> | undefined)?.scanned_at))}</dd>
+                  <dt>扫描长度</dt><dd>{text((recordCase.review_basis as Record<string, unknown> | undefined)?.scanned_length) || "未记录"}</dd>
+                  <dt>命中关键词</dt><dd>{Array.isArray((recordCase.review_basis as Record<string, unknown> | undefined)?.matched_keywords) && ((recordCase.review_basis as Record<string, unknown>)?.matched_keywords as unknown[]).length ? ((recordCase.review_basis as Record<string, unknown>)?.matched_keywords as Array<Record<string, unknown>>).map((item) => `${text(item.pattern)}（${text(item.severity)}）`).join("、") : "无"}</dd>
+                </dl>
+              </div>
+              <div className="admin-operation-cell">
+                <h3>确认违规与处罚</h3>
+                {recordViolations.length || recordRestrictions.length ? <><div className="admin-operation-list">{recordViolations.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
+                  <strong>{record.content_type ? targetLabels[text(record.content_type)] || text(record.content_type) : "账号"} · {text(record.category)} · {record.status === "active" ? "有效" : "已撤销"}</strong>
+                  <span>{text(record.summary) || "未填写摘要"}{record.confirmed_by_nickname ? ` · 确认人 ${text(record.confirmed_by_nickname)}` : ""}</span>
+                  <span>{fmtDateTime(text(record.confirmed_at))}{text(record.revoked_at) !== "未记录" ? ` · 撤销于 ${fmtDateTime(text(record.revoked_at))}` : ""}</span>
+                </div>)}</div><div className="admin-operation-list">{recordRestrictions.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
+                  <strong>{restrictionTypeLabels[text(record.restriction_type)] || text(record.restriction_type) || "账号限制"} · {restrictionStatusLabelsFull[text(record.status)] || text(record.status)}</strong>
+                  <span>{text(record.reason) || "未填写原因"}{record.starts_at && text(record.starts_at) !== "未记录" ? ` · 开始 ${fmtDateTime(text(record.starts_at))}` : ""}{record.ends_at && text(record.ends_at) !== "未记录" ? ` · 结束 ${fmtDateTime(text(record.ends_at))}` : ""}</span>
+                  <span>解除状态：{restrictionLiftInfo(record)}</span>
+                </div>)}</div></> : <p className="admin-detail-empty">没有确认违规或处罚记录。</p>}
+              </div>
+              <div className="admin-operation-cell">
+                <h3>资料整改 / 通知 / 审计</h3>
+                {recordProfileRevisions.length ? <div className="admin-operation-list">{recordProfileRevisions.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
+                  <strong>{issueLabels[text(record.issue_type)] || text(record.issue_type)} · {revisionStatusLabels[text(record.status)] || text(record.status)}</strong>
+                  <span>{text(record.issue_detail)}{record.confirmed_at ? ` · 确认 ${fmtDateTime(text(record.confirmed_at))}` : ""}</span>
+                </div>)}</div> : null}
+                {recordNotifications.length ? <div className="admin-operation-list">{recordNotifications.slice(0, 12).map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
+                  <strong>{text(record.template_key) || "系统通知"} → {text(record.recipient_nickname) || text(record.user_id).slice(0, 8)}</strong>
+                  <span>{text(record.content).split("\n")[0] || "通知内容未记录"}{record.sent_at ? ` · ${fmtDateTime(text(record.sent_at))}` : ""}</span>
+                </div>)}</div> : null}
+                {recordAuditLogs.length ? <div className="admin-operation-list">{recordAuditLogs.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
+                  <strong>{auditActionLabels[text(record.action)] || text(record.action)}{record.admin_nickname ? ` · ${text(record.admin_nickname)}` : ""}</strong>
+                  <span>{text(record.note) || "无备注"} · {fmtDateTime(text(record.created_at))}</span>
+                </div>)}</div> : null}
+                {!recordProfileRevisions.length && !recordNotifications.length && !recordAuditLogs.length ? <p className="admin-detail-empty">没有资料整改、通知或审计记录。</p> : null}
+              </div>
+            </div>
+          </section> : <section className="admin-detail-panel">
+            <div className="admin-panel-title-row"><h2>完整操作记录</h2><span>读取失败或尚未生成</span></div>
+            <p className="admin-detail-empty">该案件暂时没有可展示的完整操作记录，不影响其他证据查看。</p>
+          </section>}
 
           {isUser ? <>
             <section className="admin-detail-panel admin-user-detail-panel">
