@@ -100,7 +100,7 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
   if (!user) redirect("/admin/login");
 
   const [{ data: reportCase }, { data: snapshot }, contentReportsResult, commentReportsResult] = await Promise.all([
-    supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at, resolved_by, resolved_at, metadata, auto_review_risk, risk_score, suspicious_report, low_quality_queue, review_basis").eq("id", id).maybeSingle(),
+    supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at, resolved_by, resolved_at, metadata, auto_review_risk, risk_score, suspicious_report, low_quality_queue, hidden_for_review, review_basis").eq("id", id).maybeSingle(),
     supabase.from("moderation_report_snapshots").select("target_type, target_id, author_id, post_id, object_snapshot, context_snapshot, captured_at").eq("case_id", id).maybeSingle(),
     supabase.from("content_reports").select("id, target_type, target_id, reporter_id, reason, reason_category, details, evidence, status, created_at, reporter:profiles!content_reports_reporter_id_fkey(nickname)").eq("case_id", id).order("created_at", { ascending: true }),
     supabase.from("comment_reports").select("id, comment_id, reporter_id, reason, reason_category, details, evidence, status, created_at, reporter:profiles!comment_reports_reporter_id_fkey(nickname)").eq("case_id", id).order("created_at", { ascending: true }),

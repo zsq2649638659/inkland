@@ -24,6 +24,7 @@ type CaseRow = {
   risk_score?: number | null;
   suspicious_report?: boolean | null;
   low_quality_queue?: boolean | null;
+  hidden_for_review?: boolean | null;
   review_basis?: Record<string, unknown> | string | null;
 };
 
@@ -147,7 +148,7 @@ type Props = {
   targetReporterDetail: ReporterDetailPayload | null;
 };
 
-type ReportAction = "keep" | "remind" | "delete" | "dismiss" | "no_violation" | "convert_content" | "profile_revision" | "warn" | "restrict" | "suspend" | "ban" | "mark_suspicious";
+type ReportAction = "keep" | "remind" | "delete" | "dismiss" | "no_violation" | "convert_content" | "profile_revision" | "warn" | "restrict" | "suspend" | "ban" | "mark_suspicious" | "temporary_hide" | "restore";
 
 const targetLabels: Record<string, string> = { post: "作品", comment: "评论", user: "用户" };
 const statusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", resolved: "已处理", cancelled: "已取消" };
@@ -264,12 +265,14 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         { key: "keep", label: "保留评论" },
         { key: "remind", label: "保留并提醒" },
         { key: "delete", label: "删除评论", danger: true },
+        ...(reportCase.hidden_for_review ? [{ key: "restore" as const, label: "恢复展示" }] : [{ key: "temporary_hide" as const, label: "暂时隐藏评论" }]),
         { key: "dismiss", label: "驳回举报" },
       ]
     : isPost
       ? [
           { key: "keep", label: "保留作品" },
           { key: "delete", label: "删除作品", danger: true },
+          ...(reportCase.hidden_for_review ? [{ key: "restore" as const, label: "恢复展示" }] : [{ key: "temporary_hide" as const, label: "暂时隐藏作品" }]),
           { key: "dismiss", label: "驳回举报" },
         ]
       : [
@@ -299,6 +302,16 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
       desc: "删除后无法恢复。作者会收到删除通知，本案件将计入确认违规记录。",
       confirm: "确认删除",
       danger: true,
+    },
+    temporary_hide: {
+      title: `暂时隐藏该${targetLabels[reportCase.target_type]}？`,
+      desc: "内容会立即从公开页面移除，仅作者本人可见；需要填写隐藏原因，作者不会收到通知。",
+      confirm: "确认隐藏",
+    },
+    restore: {
+      title: `恢复公开展示该${targetLabels[reportCase.target_type]}？`,
+      desc: "撤销暂时隐藏，内容将重新出现在公开页面。",
+      confirm: "确认恢复",
     },
     dismiss: {
       title: "驳回该举报案件？",
@@ -384,6 +397,14 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         window.setTimeout(() => window.location.reload(), 800);
         return;
       }
+      if (action === "temporary_hide" || action === "restore") {
+        const result = await response.json().catch(() => null) as { message?: string } | null;
+        setBusy(false);
+        setPendingAction(null);
+        setSuccess(result?.message || (action === "temporary_hide" ? "该内容已暂时隐藏。" : "该内容已恢复公开展示。"));
+        window.setTimeout(() => window.location.reload(), 800);
+        return;
+      }
       window.location.assign("/admin?view=reports");
     } catch (error) {
       setBusy(false);
@@ -443,6 +464,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
       options = { hide_content: hideContent, count_violation: countViolation };
     } else if (pendingAction === "mark_suspicious") {
       if (!reason.trim()) { setModalError("请填写标记原因，该原因会写入案件记录。"); return; }
+    } else if (pendingAction === "temporary_hide") {
+      if (!reason.trim()) { setModalError("请填写隐藏原因，该原因会写入案件记录。"); return; }
     }
     void runAction(pendingAction, options);
   };
@@ -778,6 +801,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         </> : null}
 
         {pendingAction === "mark_suspicious" ? <label className="admin-field">标记原因<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="例如：多次举报同一用户、证据明显不成立" /></label> : null}
+
+        {pendingAction === "temporary_hide" ? <label className="admin-field">隐藏原因<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="例如：命中高风险关键词，等待人工复核" /></label> : null}
 
         {pendingAction === "restrict" ? <>
           <div className="admin-field"><span className="admin-field-label">限制功能</span><div className="admin-warn-reason-options">{(["profile_edit", "report", "interact"] as const).map((item) => <button type="button" className={`admin-warn-reason-chip ${restrictionTypes.includes(item) ? "is-selected" : ""}`} key={item} onClick={() => toggleRestrictionType(item)}>{restrictionLabels[item]}</button>)}</div></div>
