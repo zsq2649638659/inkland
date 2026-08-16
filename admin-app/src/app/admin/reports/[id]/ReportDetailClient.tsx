@@ -374,6 +374,22 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     setPendingAction(action);
   };
 
+  const advanceToNextCase = async () => {
+    try {
+      const response = await fetchWithTimeout(`/api/admin/report-center?tab=cases&targetType=${encodeURIComponent(reportCase.target_type)}&status=pending&limit=200`);
+      if (!response.ok) throw new Error("读取下一条待审核案件失败。");
+      const result = await response.json().catch(() => null) as { cases?: CaseRow[] } | null;
+      const next = result?.cases?.[0];
+      if (next?.id && next.id !== reportCase.id) {
+        window.location.assign(`/admin/reports/${next.id}`);
+        return;
+      }
+    } catch {
+      // 读取失败时回到举报中心列表，不阻断处理流程。
+    }
+    window.location.assign("/admin?view=reports");
+  };
+
   const runAction = async (action: ReportAction, options: Record<string, unknown>) => {
     setBusy(true);
     setModalError("");
@@ -405,7 +421,11 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         window.setTimeout(() => window.location.reload(), 800);
         return;
       }
-      window.location.assign("/admin?view=reports");
+      const result = await response.json().catch(() => null) as { message?: string } | null;
+      setBusy(false);
+      setPendingAction(null);
+      setSuccess(result?.message || "举报案件已处理完成。");
+      window.setTimeout(() => void advanceToNextCase(), 600);
     } catch (error) {
       setBusy(false);
       setModalError(error instanceof Error ? error.message : "举报案件处理失败，请稍后重试。");
