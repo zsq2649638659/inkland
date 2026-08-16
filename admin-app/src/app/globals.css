@@ -305,3 +305,32 @@
 .admin-preview-confirm:not(:disabled):hover { background:#b84433; }
 .admin-preview-cancel { border:1px solid #d5d5dc; background:#fff; color:#6b6b75; }
 .admin-preview-confirm:disabled, .admin-preview-cancel:disabled { cursor:wait; opacity:.55; }
+
+/* 举报中心四分类 */
+.admin-report-tabs { display:flex; flex-wrap:wrap; gap:9px; padding:0 23px 18px; }
+.admin-report-tab { display:grid; align-content:center; gap:3px; min-width:150px; min-height:52px; padding:9px 13px; border:1px solid var(--border); border-radius:8px; background:#fff; color:#8f8f98; text-align:left; cursor:pointer; }
+.admin-report-tab span { color:#62626b; font-size:12px; font-weight:700; }
+.admin-report-tab small { color:#a3a3ab; font-size:9px; line-height:1.4; }
+.admin-report-tab.is-active { border-color:#d9b0a4; background:#fff6f2; }
+.admin-report-tab.is-active span { color:#b46a58; }
+.admin-report-tab.is-active small { color:#bd9186; }
+.admin-report-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; padding:0 23px 18px; border-bottom:1px solid var(--border); }
+.admin-report-filter-field, .admin-report-query { display:grid; gap:5px; color:#8f8f98; font-size:10px; }
+.admin-report-filter-field select, .admin-report-query input { min-height:38px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; outline:0; background:#fff; color:var(--ink); font-size:11px; }
+.admin-report-filter-field select:focus, .admin-report-query input:focus { border-color:#d5b6ac; box-shadow:0 0 0 3px #fdf0ec; }
+.admin-report-query input { min-width:210px; }
+.admin-report-toggle { display:flex; align-items:center; gap:7px; min-height:38px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:#fff; color:#7c7c85; font-size:11px; cursor:pointer; user-select:none; }
+.admin-report-toggle input { width:15px; height:15px; accent-color:var(--accent); }
+.admin-report-toggle input:checked + span { color:#a25d4f; font-weight:700; }
+.admin-report-filters .admin-btn { flex:none; }
+.admin-report-actions-column .admin-link-button { display:grid; place-items:center; text-decoration:none; }
+.admin-detail-top .admin-user-status { margin-left:8px; }
+
+@media (max-width:700px) {
+  .admin-report-tabs { padding-left:16px; padding-right:16px; }
+  .admin-report-tab { min-width:calc(50% - 5px); }
+  .admin-report-filters { padding-left:16px; padding-right:16px; }
+  .admin-report-query { flex:1 1 100%; }
+  .admin-report-query input { min-width:0; width:100%; }
+  .admin-report-filters .admin-btn { flex:1 1 100%; }
+}
