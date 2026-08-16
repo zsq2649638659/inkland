@@ -137,8 +137,8 @@ const actionCopy: Record<EnforcementAction, { label: string; title: string; desc
   restrict_comment: { label: "限制评论", title: "限制该用户发表评论？", desc: "选择结束时间。限制期间评论提交会被前台和数据库双重拦截。" },
   restrict_publish: { label: "限制发布", title: "限制该用户发布内容？", desc: "选择结束时间。限制期间不能新发布、提交审核或重新提交连载审核。" },
   restrict_report: { label: "限制举报", title: "限制该用户提交举报？", desc: "选择结束时间。限制期间作品与评论举报都会被拦截。" },
-  suspend: { label: "暂停账号", title: "暂停该用户账号？", desc: "选择结束时间。暂停期间评论、发布和举报均被拦截；已发布内容可勾选隐藏。" },
-  ban: { label: "永久封禁", title: "永久封禁该用户账号？", desc: "永久封禁不需要结束时间。账号无法评论、发布或举报；已发布内容可勾选隐藏。" },
+  suspend: { label: "暂停账号", title: "暂停该用户账号？", desc: "选择结束时间。暂停期间评论、发布和举报均被拦截；未勾选隐藏时已发布内容保持展示。" },
+  ban: { label: "永久封禁", title: "永久封禁该用户账号？", desc: "永久封禁不需要结束时间。账号无法评论、发布或举报；未勾选隐藏时已发布内容保持展示。" },
 };
 const warningQuickReasons = ["发布违规内容", "辱骂或人身攻击", "广告或引流", "盗用他人作品", "恶意举报", "重复提交违规内容"];
 const reminderQuickReasons = ["举报理由与内容明显无关", "短时间大量重复举报", "反复举报已判定无问题内容", "补充说明含辱骂或威胁", "请勿滥用举报功能"];
@@ -152,6 +152,20 @@ const quickDurations = [
 
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "—";
+const fmtDateTime = (value?: string | null) => {
+  if (!value) return "未设置";
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${pick("year")}-${pick("month")}-${pick("day")} ${pick("hour")}:${pick("minute")}`;
+};
 const toLocalInput = (date: Date) => {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -197,6 +211,25 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
   const user = detail.user;
   const stats = detail.stats;
   const needsEnds = ["restrict_comment", "restrict_publish", "restrict_report", "suspend"].includes(action);
+
+  const notificationPreview = () => {
+    const reasonText = customReason ? reason : reason || "未填写";
+    const dateLabel = endsAt ? fmtDateTime(endsAt) : "未设置";
+    if (action === "warn") {
+      return `账号警告\n原因：${reasonText}\n请认真阅读并遵守社区规范，避免再次违规。`;
+    }
+    if (action.startsWith("restrict_")) {
+      const label = action === "restrict_comment" ? "评论" : action === "restrict_publish" ? "发布" : "举报";
+      return `功能限制\n你的${label}功能已被限制（至 ${dateLabel}）。\n原因：${reasonText}\n限制结束后相关功能会恢复。`;
+    }
+    if (action === "suspend") {
+      return `账号暂停\n你的账号已被暂停（至 ${dateLabel}）。\n原因：${reasonText}`;
+    }
+    if (action === "ban") {
+      return `账号封禁\n你的账号已被永久封禁。\n原因：${reasonText}`;
+    }
+    return "";
+  };
 
   const submitEnforce = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -484,11 +517,12 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
         <div className="admin-modal-header"><div><h2 id="enforce-user-title">{actionCopy[action].title}</h2><p className="admin-modal-desc">{actionCopy[action].desc}</p></div></div>
         <label className="admin-field">处罚类型<select value={action} onChange={(event) => setAction(event.target.value as EnforcementAction)} disabled={busy}><option value="warn">发送警告</option><option value="restrict_comment">限制评论</option><option value="restrict_publish">限制发布</option><option value="restrict_report">限制举报</option><option value="suspend">暂停账号</option><option value="ban">永久封禁</option></select></label>
         {action === "warn" ? <div className="admin-field admin-warn-reason-field"><span className="admin-field-label">常见处罚原因</span><div className="admin-warn-reason-options">{warningQuickReasons.map((item) => <button className={reason === item && !customReason ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => { setReason(item); setCustomReason(false); }}>{item}</button>)}<button className={customReason ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={busy} onClick={() => { setCustomReason(true); if (!reason.trim()) setReason(""); }}>其他原因</button></div></div> : null}
-        <label className="admin-field">处罚原因{action === "warn" ? <input value={customReason ? reason : ""} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder={customReason ? "请输入其他处罚原因，会展示给用户并写入通知" : "请选择上方常见原因，或点“其他原因”输入"} disabled={busy || !customReason} /> : <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} />}</label>
+        <label className="admin-field">处罚依据{action === "warn" ? <input value={customReason ? reason : ""} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder={customReason ? "请输入其他处罚依据，会展示给用户并写入通知" : "请选择上方常见原因，或点“其他原因”输入"} disabled={busy || !customReason} /> : <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} />}</label>
         {action === "restrict_report" ? <div className="admin-field"><span className="admin-field-label">快捷时长</span><div className="admin-duration-chips">{quickDurations.map((item) => <button className={quickHours === item.hours ? "admin-duration-chip is-selected" : "admin-duration-chip"} type="button" key={item.label} disabled={busy} onClick={() => { setQuickHours(item.hours); setEndsAt(toLocalInput(new Date(Date.now() + item.hours * 3600 * 1000))); }}>{item.label}</button>)}</div></div> : null}
         {needsEnds ? <label className="admin-field">结束时间<input type="datetime-local" value={endsAt} onChange={(event) => { setQuickHours(null); setEndsAt(event.target.value); }} disabled={busy} /></label> : null}
         <label className="admin-field admin-check-field"><input type="checkbox" checked={countViolation} onChange={(event) => setCountViolation(event.target.checked)} disabled={busy} /><span>计入确认违规（手动确认才累计，与收到举报次数无关）</span></label>
-        {action === "suspend" || action === "ban" ? <label className="admin-field admin-check-field"><input type="checkbox" checked={hideContent} onChange={(event) => setHideContent(event.target.checked)} disabled={busy} /><span>隐藏该用户已发布的作品（不删除，恢复时可选还原）</span></label> : null}
+        {action === "suspend" || action === "ban" ? <label className="admin-field admin-check-field"><input type="checkbox" checked={hideContent} onChange={(event) => setHideContent(event.target.checked)} disabled={busy} /><span>隐藏该用户已发布的作品（不删除；未勾选时已发布内容保持展示，恢复时可选还原）</span></label> : null}
+        <div className="admin-notification-preview"><span className="admin-field-label">将向用户发送的通知</span><pre>{notificationPreview()}</pre></div>
         <label className="admin-field">内部备注（可选）<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="记录给审核日志的内部备注，不会展示给用户" disabled={busy} /></label>
         {error ? <div className="admin-alert admin-alert-error" role="alert">{error}</div> : null}
         <div className="admin-modal-actions">

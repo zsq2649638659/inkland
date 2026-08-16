@@ -180,6 +180,21 @@ function fmtDateTime(value: string | null | undefined) {
   return new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false });
 }
 
+function fmtNotifyDateTime(value: string | null | undefined) {
+  if (!value) return "未设置";
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${pick("year")}-${pick("month")}-${pick("day")} ${pick("hour")}:${pick("minute")}`;
+}
+
 function fmtDate(value: string | null | undefined) {
   if (!value) return "未记录";
   return new Date(value).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai" });
@@ -385,17 +400,17 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     if (!pendingAction) return "";
     const reasonText = reason.trim() || "未填写";
     if (pendingAction === "warn") {
-      return `账号警告\n你的账号收到一次正式警告。\n原因：${reasonText}\n请及时停止相关行为，避免账号功能受限。`;
+      return `账号警告\n原因：${reasonText}\n请认真阅读并遵守社区规范，避免再次违规。`;
     }
     if (pendingAction === "restrict") {
       const labels = restrictionTypes.length ? restrictionTypes.map((item) => `- ${restrictionLabels[item] || item}`).join("\n") : "- 未选择功能";
-      return `功能限制\n你的以下功能已被限制（至 ${endsAt ? fmtDateTime(endsAt) : "未设置"}）：\n${labels}\n原因：${reasonText}\n限制结束后相关功能会恢复。`;
+      return `功能限制\n你的以下功能已被限制（至 ${endsAt ? fmtNotifyDateTime(endsAt) : "未设置"}）：\n${labels}\n原因：${reasonText}\n限制结束后相关功能会恢复。`;
     }
     if (pendingAction === "suspend") {
-      return `账号暂停\n你的账号已被暂停至 ${endsAt ? fmtDateTime(endsAt) : "未设置"}。\n原因：${reasonText}\n暂停期间无法使用账号，到期后自动恢复。`;
+      return `账号暂停\n你的账号已被暂停（至 ${endsAt ? fmtNotifyDateTime(endsAt) : "未设置"}）。\n原因：${reasonText}`;
     }
     if (pendingAction === "ban") {
-      return `账号封禁\n你的账号已被永久封禁。\n原因：${reasonText}\n相关内容将根据平台规则隐藏或删除。`;
+      return `账号封禁\n你的账号已被永久封禁。\n原因：${reasonText}`;
     }
     return "";
   };
