@@ -223,10 +223,10 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
       return `功能限制\n你的${label}功能已被限制（至 ${dateLabel}）。\n原因：${reasonText}\n限制结束后相关功能会恢复。`;
     }
     if (action === "suspend") {
-      return `账号暂停\n你的账号已被暂停（至 ${dateLabel}）。\n原因：${reasonText}`;
+      return `账号暂停\n你的账号已被暂停（至 ${dateLabel}）。\n原因：${reasonText}\n影响范围：暂停期间无法发布或提交审核、无法创建连载与合集、无法评论或举报、无法编辑资料，也无法关注、点赞、收藏、写段评等互动。\n恢复说明：到期后账号将自动恢复，相关功能会重新开放。\n下一步：如需提交复核或反馈，可通过设置页反馈或联系客服邮箱联系我们。`;
     }
     if (action === "ban") {
-      return `账号封禁\n你的账号已被永久封禁。\n原因：${reasonText}`;
+      return `账号封禁\n你的账号已被永久封禁。\n原因：${reasonText}\n影响范围：账号无法发布或提交审核、无法创建连载与合集、无法评论或举报、无法编辑资料，也无法关注、点赞、收藏、写段评等互动。\n恢复说明：该处罚不可撤销，账号将保持封禁状态。\n下一步：如需提交反馈，可通过设置页反馈或联系客服邮箱联系我们。`;
     }
     return "";
   };

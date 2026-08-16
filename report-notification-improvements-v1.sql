@@ -1,89 +1,289 @@
 -- ============================================================
--- Inkland 模块 8/9 补全：用户举报 7 种处理结果（飞书 4.9-4.11）
--- 文件：user-report-actions-v1.sql
--- 依赖：report-closure-v1.sql、report-low-quality-queue-v1.sql、
---       user-enforcement-module6-v1.sql
--- 说明：幂等，可重复执行。在 Supabase SQL Editor 执行后：
---   1. 后台可用 admin_resolve_user_report_case 执行 7 种处理结果；
---   2. 资料整改使用 profile_revision_requests 记录，前台修改后恢复展示；
---   3. user_restrictions 增加 profile_edit / interact 类型，
---      资料编辑、关注、收藏、点赞均有数据库触发器硬拦截；
---   4. 举报中心状态筛选新增举报不成立、资料整改、警告、限制、
---      暂停、封禁等结果。
+-- 飞书补全 4.10：被举报用户通知模板补全（幂等增量迁移）
+-- 1. 删除内容通知：补充删除对象、规则/原因、已采取措施、下一步
+-- 2. 暂停/封禁通知：补充影响范围、恢复/不可撤销说明、下一步
+-- 幂等：CREATE OR REPLACE FUNCTION，可重复执行。
 -- ============================================================
-
-BEGIN;
-
--- ------------------------------------------------------------
--- 1. 个人资料整改字段与请求表
--- ------------------------------------------------------------
-
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS profile_revision_status TEXT;
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS profile_revision_request_id UUID;
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS hidden_profile_fields JSONB NOT NULL DEFAULT '[]'::jsonb;
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS external_link TEXT;
-
-DO $$
+CREATE OR REPLACE FUNCTION public.admin_resolve_report_case(
+  p_case_id UUID,
+  p_action TEXT,
+  p_note TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  admin_id UUID;
+  case_record public.moderation_report_cases%ROWTYPE;
+  snapshot_record public.moderation_report_snapshots%ROWTYPE;
+  report_row RECORD;
+  target_owner_id UUID;
+  target_title TEXT;
+  target_content TEXT;
+  v_object_label TEXT;
+  v_content_snippet TEXT;
+  v_notify_content TEXT;
+  v_reason_label TEXT;
+  v_outcome TEXT;
+  now_ts TIMESTAMPTZ := NOW();
+  report_ids UUID[] := '{}';
+  reporter_ids UUID[] := '{}';
+  reporter_count INTEGER := 0;
+  v_reporter_id UUID;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'profiles_profile_revision_status_check'
-      AND conrelid = 'public.profiles'::regclass
-  ) THEN
-    ALTER TABLE public.profiles ADD CONSTRAINT profiles_profile_revision_status_check
-      CHECK (profile_revision_status IS NULL OR profile_revision_status IN ('requested', 'submitted'));
+  admin_id := auth.uid();
+  IF admin_id IS NULL OR NOT public.is_admin() THEN
+    RETURN jsonb_build_object('ok', FALSE, 'code', 'not_admin', 'message', '需要管理员权限。');
   END IF;
-END $$;
+  IF p_case_id IS NULL OR p_action IS NULL
+     OR p_action NOT IN ('keep', 'remind', 'delete', 'dismiss', 'no_violation') THEN
+    RETURN jsonb_build_object('ok', FALSE, 'code', 'invalid_params', 'message', '处理参数无效。');
+  END IF;
 
-CREATE TABLE IF NOT EXISTS public.profile_revision_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  case_id UUID REFERENCES public.moderation_report_cases(id) ON DELETE SET NULL,
-  issue_type TEXT NOT NULL,
-  issue_detail TEXT,
-  original_profile JSONB NOT NULL DEFAULT '{}'::jsonb,
-  hidden_fields JSONB NOT NULL DEFAULT '[]'::jsonb,
-  status TEXT NOT NULL DEFAULT 'requested',
-  created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-  confirmed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  confirmed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT profile_revision_requests_issue_type_check
-    CHECK (issue_type IN ('avatar', 'nickname', 'bio', 'external_link')),
-  CONSTRAINT profile_revision_requests_status_check
-    CHECK (status IN ('requested', 'submitted', 'confirmed', 'cancelled'))
-);
+  SELECT * INTO case_record
+  FROM public.moderation_report_cases
+  WHERE id = p_case_id;
+  IF case_record.id IS NULL THEN
+    RETURN jsonb_build_object('ok', FALSE, 'code', 'case_missing', 'message', '没有找到该举报案件。');
+  END IF;
+  IF case_record.status NOT IN ('pending', 'reviewing') THEN
+    RETURN jsonb_build_object('ok', FALSE, 'code', 'already_resolved', 'message', '该举报案件已处理。');
+  END IF;
 
-CREATE INDEX IF NOT EXISTS profile_revision_requests_user_idx
-  ON public.profile_revision_requests (user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS profile_revision_requests_case_idx
-  ON public.profile_revision_requests (case_id);
+  SELECT * INTO snapshot_record
+  FROM public.moderation_report_snapshots
+  WHERE case_id = p_case_id
+  LIMIT 1;
 
-ALTER TABLE public.profile_revision_requests ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS profile_revision_requests_admin_all ON public.profile_revision_requests;
-CREATE POLICY profile_revision_requests_admin_all ON public.profile_revision_requests
-  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-DROP POLICY IF EXISTS profile_revision_requests_self_select ON public.profile_revision_requests;
-CREATE POLICY profile_revision_requests_self_select ON public.profile_revision_requests
-  FOR SELECT USING (auth.uid() = user_id);
+  v_outcome := CASE p_action
+    WHEN 'keep' THEN 'kept'
+    WHEN 'remind' THEN 'reminded'
+    WHEN 'delete' THEN 'deleted'
+    ELSE 'no_violation'
+  END;
 
--- ------------------------------------------------------------
--- 2. 限制类型扩展
--- ------------------------------------------------------------
+  target_owner_id := case_record.target_user_id;
+  target_title := '';
+  target_content := '';
+  IF snapshot_record.id IS NOT NULL THEN
+    target_owner_id := COALESCE(target_owner_id, snapshot_record.author_id);
+    IF snapshot_record.target_type = 'post' THEN
+      target_title := COALESCE(snapshot_record.object_snapshot->>'title', '');
+      target_content := COALESCE(snapshot_record.object_snapshot->>'content', '');
+    ELSIF snapshot_record.target_type = 'comment' THEN
+      target_content := COALESCE(snapshot_record.object_snapshot->>'content', '');
+      IF target_title = '' THEN
+        target_title := COALESCE(snapshot_record.context_snapshot->>'post_title', '');
+      END IF;
+    ELSE
+      target_title := COALESCE(snapshot_record.object_snapshot->>'nickname', '');
+      target_content := COALESCE(snapshot_record.object_snapshot->>'bio', '');
+    END IF;
+  END IF;
 
-ALTER TABLE public.user_restrictions DROP CONSTRAINT IF EXISTS user_restrictions_type_check;
-ALTER TABLE public.user_restrictions ADD CONSTRAINT user_restrictions_type_check
-  CHECK (restriction_type IN ('comment', 'publish', 'report', 'account', 'profile_edit', 'interact'));
+  -- 按飞书 3.4.2 固定模板组装“举报已处理”通知
+  v_reason_label := COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他问题');
+  IF snapshot_record.id IS NULL THEN
+    v_object_label := '未知对象';
+  ELSIF snapshot_record.target_type = 'comment' THEN
+    v_object_label := COALESCE(NULLIF(btrim(COALESCE(snapshot_record.context_snapshot->>'comment_author_nickname', '')), ''), '某用户')
+      || '在《' || COALESCE(NULLIF(btrim(COALESCE(snapshot_record.context_snapshot->>'post_title', '')), ''), '某作品') || '》下发布的评论';
+    v_content_snippet := CASE
+      WHEN btrim(COALESCE(target_content, '')) = '' THEN ''
+      ELSE left(COALESCE(target_content, ''), 80) || '……'
+    END;
+  ELSIF snapshot_record.target_type = 'post' THEN
+    v_object_label := COALESCE(NULLIF(btrim(COALESCE(snapshot_record.context_snapshot->>'author_nickname', '')), ''), '某用户')
+      || '发布的《' || COALESCE(NULLIF(btrim(COALESCE(target_title, '')), ''), '某作品') || '》';
+  ELSE
+    v_object_label := '用户“' || COALESCE(NULLIF(btrim(COALESCE(snapshot_record.object_snapshot->>'nickname', '')), ''), '某用户') || '”';
+  END IF;
 
--- ------------------------------------------------------------
--- 3. 用户举报案件 7 种处理结果
--- ------------------------------------------------------------
+  IF snapshot_record.id IS NOT NULL AND snapshot_record.target_type = 'comment' THEN
+    v_notify_content := '举报已处理' || E'\n'
+      || '举报对象：' || v_object_label || E'\n'
+      || '举报内容：' || v_content_snippet || E'\n'
+      || '举报理由：' || v_reason_label || E'\n'
+      || '我们已经收到你的举报，并将重点关注相关内容和账号。感谢你对社区秩序的维护。';
+  ELSE
+    v_notify_content := '举报已处理' || E'\n'
+      || '举报对象：' || v_object_label || E'\n'
+      || '举报理由：' || v_reason_label || E'\n'
+      || '我们已经收到你的举报，并将重点关注相关内容和账号。感谢你对社区秩序的维护。';
+  END IF;
 
+  -- 删除内容（快照仍保留，供后台查看）
+  IF p_action = 'delete' AND case_record.target_type = 'comment' THEN
+    DELETE FROM public.comments WHERE id = case_record.target_id;
+  ELSIF p_action = 'delete' AND case_record.target_type = 'post' THEN
+    DELETE FROM public.posts WHERE id = case_record.target_id;
+  END IF;
+
+  UPDATE public.moderation_report_cases
+  SET status = 'resolved',
+      outcome = v_outcome,
+      resolved_by = admin_id,
+      resolved_at = now_ts,
+      metadata = metadata || jsonb_build_object(
+        'action', p_action,
+        'note', btrim(COALESCE(p_note, '')),
+        'resolved_at', now_ts
+      ),
+      updated_at = now_ts
+  WHERE id = p_case_id;
+
+  FOR report_row IN
+    SELECT r.id, r.reporter_id, r.target_type, r.target_id, r.comment_id
+    FROM (
+      SELECT id, reporter_id, target_type, target_id, NULL::UUID AS comment_id
+      FROM public.content_reports
+      WHERE case_id = p_case_id
+      UNION ALL
+      SELECT id, reporter_id, 'comment', NULL::UUID, comment_id
+      FROM public.comment_reports
+      WHERE case_id = p_case_id
+    ) r
+  LOOP
+    IF report_row.target_type = 'comment' THEN
+      UPDATE public.comment_reports
+      SET status = 'resolved', resolved_by = admin_id, resolved_at = now_ts
+      WHERE id = report_row.id;
+    ELSE
+      UPDATE public.content_reports
+      SET status = 'resolved', resolved_by = admin_id, resolved_at = now_ts
+      WHERE id = report_row.id;
+    END IF;
+
+    report_ids := report_ids || report_row.id;
+    IF report_row.reporter_id IS NOT NULL
+       AND NOT report_row.reporter_id = ANY(reporter_ids) THEN
+      reporter_ids := reporter_ids || report_row.reporter_id;
+      reporter_count := reporter_count + 1;
+    END IF;
+  END LOOP;
+
+  -- 举报人统计与“举报已处理”通知
+  FOREACH v_reporter_id IN ARRAY reporter_ids
+  LOOP
+    INSERT INTO public.user_reporter_stats (
+      user_id, total_reports, pending_reports, valid_reports, invalid_reports,
+      updated_at
+    ) VALUES (
+      v_reporter_id, 0, 0,
+      CASE WHEN p_action IN ('delete', 'remind') THEN 1 ELSE 0 END,
+      CASE WHEN p_action IN ('dismiss', 'no_violation') THEN 1 ELSE 0 END,
+      now_ts
+    )
+    ON CONFLICT (user_id) DO UPDATE
+      SET pending_reports = GREATEST(public.user_reporter_stats.pending_reports - 1, 0),
+          valid_reports = public.user_reporter_stats.valid_reports
+            + CASE WHEN p_action IN ('delete', 'remind') THEN 1 ELSE 0 END,
+          invalid_reports = public.user_reporter_stats.invalid_reports
+            + CASE WHEN p_action IN ('dismiss', 'no_violation') THEN 1 ELSE 0 END,
+          updated_at = now_ts;
+
+    -- 第二级：处理结果进入统计后，自动重评该举报者并同步其余待处理案件
+    PERFORM public.sync_reporter_low_quality(v_reporter_id);
+
+    INSERT INTO public.notifications (
+      user_id, type, actor_id, post_id, content, read, created_at,
+      template_key, related_entity_type, related_entity_id, metadata,
+      delivery_status, sent_at
+    ) VALUES (
+      v_reporter_id, 'system', NULL, NULL,
+      v_notify_content, FALSE, now_ts,
+      'report_handled', 'report_case', p_case_id,
+      jsonb_build_object('case_id', p_case_id, 'target_type', case_record.target_type),
+      'sent', now_ts
+    );
+  END LOOP;
+
+  -- 作者侧通知与确认违规（仅实际处理时通知作者）
+  IF p_action = 'remind' AND case_record.target_type = 'comment' THEN
+    INSERT INTO public.notifications (
+      user_id, type, actor_id, post_id, content, read, created_at,
+      template_key, related_entity_type, related_entity_id, metadata,
+      delivery_status, sent_at
+    ) VALUES (
+      target_owner_id, 'system', NULL, NULL,
+      '你的评论收到文明提醒：请友善交流，避免使用攻击、骚扰或威胁性语言。', FALSE, now_ts,
+      'comment_civility_reminder', case_record.target_type, case_record.target_id,
+      jsonb_build_object('case_id', p_case_id),
+      'sent', now_ts
+    );
+  ELSIF p_action = 'delete' THEN
+    IF target_owner_id IS NOT NULL THEN
+      INSERT INTO public.notifications (
+        user_id, type, actor_id, post_id, content, read, created_at,
+        template_key, related_entity_type, related_entity_id, metadata,
+        delivery_status, sent_at
+      ) VALUES (
+        target_owner_id, 'system', NULL, NULL,
+        '内容已被删除' || E'\n'
+          || '删除对象：' || v_object_label || E'\n'
+          || '删除原因：违反社区规范（' || v_reason_label || '）' || E'\n'
+          || '已采取措施：该内容已被删除，不再公开展示。' || E'\n'
+          || '下一步：如需提交复核，可通过设置页反馈或联系客服邮箱联系我们。',
+        FALSE, now_ts,
+        CASE WHEN case_record.target_type = 'comment' THEN 'comment_deleted' ELSE 'post_deleted' END,
+        case_record.target_type, case_record.target_id,
+        jsonb_build_object('case_id', p_case_id, 'title', target_title),
+        'sent', now_ts
+      );
+    END IF;
+    IF to_regclass('public.user_violations') IS NOT NULL THEN
+      INSERT INTO public.user_violations (
+        user_id, source_type, source_id, content_type, content_id,
+        category, severity, summary, confirmed_by, confirmed_at, metadata
+      ) VALUES (
+        target_owner_id, 'report_case', p_case_id,
+        case_record.target_type, case_record.target_id,
+        COALESCE(case_record.primary_reason_category, '其他问题'), 'standard',
+        CASE WHEN case_record.target_type = 'comment'
+          THEN '举报确认后删除评论：' || left(COALESCE(target_content, ''), 120)
+          ELSE '举报确认后删除作品：' || COALESCE(target_title, '') END,
+        admin_id, now_ts,
+        jsonb_build_object('action', p_action, 'note', btrim(COALESCE(p_note, '')))
+      );
+    END IF;
+  END IF;
+
+  INSERT INTO public.admin_audit_logs (
+    admin_id, action, target_type, target_id, note, created_at, metadata
+  ) VALUES (
+    admin_id,
+    CASE p_action
+      WHEN 'keep' THEN 'resolve_report_keep'
+      WHEN 'remind' THEN 'resolve_report_remind'
+      WHEN 'delete' THEN 'resolve_report_delete'
+      WHEN 'dismiss' THEN 'dismiss_report_case'
+      ELSE 'resolve_report_no_violation'
+    END,
+    'report_case', p_case_id,
+    btrim(COALESCE(p_note, '')), now_ts,
+    jsonb_build_object(
+      'action', p_action,
+      'target_type', case_record.target_type,
+      'target_id', case_record.target_id,
+      'reporter_count', reporter_count,
+      'report_ids', report_ids
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'ok', TRUE,
+    'case_id', p_case_id,
+    'outcome', v_outcome,
+    'message', '举报案件已处理完成。'
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_resolve_report_case(UUID, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.admin_resolve_report_case(UUID, TEXT, TEXT)
+  TO authenticated, service_role;
 CREATE OR REPLACE FUNCTION public.admin_resolve_user_report_case(
   p_case_id UUID,
   p_action TEXT,
@@ -638,133 +838,14 @@ $$;
 REVOKE ALL ON FUNCTION public.admin_resolve_user_report_case(UUID, TEXT, TEXT, TEXT, JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_resolve_user_report_case(UUID, TEXT, TEXT, TEXT, JSONB)
   TO authenticated, service_role;
-
--- ------------------------------------------------------------
--- 4. 资料整改提交与确认
--- ------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION public.profile_revision_submit(p_fields TEXT[] DEFAULT NULL)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_user_id UUID := auth.uid();
-  v_profile public.profiles%ROWTYPE;
-  v_hidden TEXT[] := '{}';
-  v_submitted TEXT[] := '{}';
-  v_field TEXT;
-  v_remaining TEXT[] := '{}';
-BEGIN
-  IF v_user_id IS NULL THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'not_logged_in', 'message', '请先登录。');
-  END IF;
-  SELECT * INTO v_profile FROM public.profiles WHERE id = v_user_id;
-  IF v_profile.id IS NULL OR COALESCE(v_profile.profile_revision_status, '') <> 'requested' THEN
-    RETURN jsonb_build_object('ok', TRUE, 'submitted_fields', '[]'::jsonb);
-  END IF;
-
-  IF jsonb_typeof(COALESCE(v_profile.hidden_profile_fields, '[]'::jsonb)) = 'array' THEN
-    SELECT COALESCE(array_agg(value), '{}'::TEXT[]) INTO v_hidden
-    FROM jsonb_array_elements_text(v_profile.hidden_profile_fields) AS t(value);
-  END IF;
-  v_submitted := COALESCE(p_fields, '{}'::TEXT[]);
-  FOREACH v_field IN ARRAY v_hidden
-  LOOP
-    IF NOT v_field = ANY(v_submitted) THEN
-      v_remaining := v_remaining || v_field;
-    END IF;
-  END LOOP;
-
-  UPDATE public.profiles
-  SET hidden_profile_fields = COALESCE((
-        SELECT jsonb_agg(value) FROM unnest(v_remaining) AS t(value)
-      ), '[]'::jsonb),
-      profile_revision_status = CASE WHEN COALESCE(array_length(v_remaining, 1), 0) = 0
-        THEN 'submitted' ELSE 'requested' END,
-      updated_at = NOW()
-  WHERE id = v_user_id;
-
-  IF v_profile.profile_revision_request_id IS NOT NULL THEN
-    UPDATE public.profile_revision_requests
-    SET status = 'submitted', updated_at = NOW()
-    WHERE id = v_profile.profile_revision_request_id
-      AND status = 'requested';
-  END IF;
-
-  RETURN jsonb_build_object(
-    'ok', TRUE,
-    'remaining_fields', COALESCE((
-      SELECT jsonb_agg(value) FROM unnest(v_remaining) AS t(value)
-    ), '[]'::jsonb)
-  );
-EXCEPTION WHEN OTHERS THEN
-  RETURN jsonb_build_object('ok', FALSE, 'code', 'submit_failed', 'message', '资料整改状态更新失败：' || SQLERRM);
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.profile_revision_submit(TEXT[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.profile_revision_submit(TEXT[]) TO authenticated;
-
-CREATE OR REPLACE FUNCTION public.admin_confirm_profile_revision(p_request_id UUID)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  admin_id UUID;
-  v_request public.profile_revision_requests%ROWTYPE;
-  now_ts TIMESTAMPTZ := NOW();
-BEGIN
-  admin_id := auth.uid();
-  IF admin_id IS NULL OR NOT public.is_admin() THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'not_admin', 'message', '需要管理员权限。');
-  END IF;
-  IF p_request_id IS NULL THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'invalid_params', 'message', '资料整改记录无效。');
-  END IF;
-  SELECT * INTO v_request FROM public.profile_revision_requests WHERE id = p_request_id;
-  IF v_request.id IS NULL THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'request_missing', 'message', '没有找到该资料整改记录。');
-  END IF;
-  UPDATE public.profile_revision_requests
-  SET status = 'confirmed', confirmed_by = admin_id, confirmed_at = now_ts, updated_at = now_ts
-  WHERE id = p_request_id;
-  UPDATE public.profiles
-  SET profile_revision_status = NULL,
-      hidden_profile_fields = '[]'::jsonb,
-      updated_at = now_ts
-  WHERE id = v_request.user_id
-    AND profile_revision_request_id = p_request_id;
-  INSERT INTO public.admin_audit_logs (
-    admin_id, action, target_type, target_id, note, created_at, metadata
-  ) VALUES (
-    admin_id, 'confirm_profile_revision', 'user', v_request.user_id,
-    '确认资料整改完成', now_ts,
-    jsonb_build_object('request_id', p_request_id, 'issue_type', v_request.issue_type)
-  );
-  RETURN jsonb_build_object('ok', TRUE, 'message', '资料整改已确认。');
-EXCEPTION WHEN OTHERS THEN
-  RETURN jsonb_build_object('ok', FALSE, 'code', 'confirm_failed', 'message', '确认失败：' || SQLERRM);
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.admin_confirm_profile_revision(UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_confirm_profile_revision(UUID) TO authenticated, service_role;
-
--- ------------------------------------------------------------
--- 5. 解除限制支持新增类型（资料编辑 / 互动）
---    复用模块 6 的 admin_lift_user_restriction 定义，仅扩展类型白名单。
--- ------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION public.admin_lift_user_restriction(
+CREATE OR REPLACE FUNCTION public.admin_enforce_user_restriction(
   p_user_id UUID,
-  p_action TEXT DEFAULT 'lift',
-  p_restriction_type TEXT DEFAULT NULL,
+  p_action TEXT,
   p_reason TEXT DEFAULT NULL,
-  p_restore_content BOOLEAN DEFAULT FALSE,
+  p_count_violation BOOLEAN DEFAULT TRUE,
+  p_starts_at TIMESTAMPTZ DEFAULT NULL,
+  p_ends_at TIMESTAMPTZ DEFAULT NULL,
+  p_hide_content BOOLEAN DEFAULT FALSE,
   p_note TEXT DEFAULT NULL
 )
 RETURNS JSONB
@@ -776,126 +857,183 @@ DECLARE
   admin_id UUID;
   now_ts TIMESTAMPTZ := NOW();
   v_reason TEXT;
-  v_row RECORD;
-  v_lifted_count INTEGER := 0;
-  v_restored_count INTEGER := 0;
-  v_hidden_ids UUID[] := '{}';
+  v_starts_at TIMESTAMPTZ;
+  v_type TEXT;
+  v_category TEXT;
+  v_severity TEXT;
+  v_restriction_id UUID;
   v_cur_status TEXT;
-  v_new_status TEXT;
-  v_active_count INTEGER;
-  v_violation_count INTEGER;
+  v_hidden_ids UUID[] := '{}';
   v_notify TEXT;
   v_template_key TEXT;
-  v_type_filter TEXT;
-  v_func_label TEXT;
+  v_date_label TEXT;
 BEGIN
   admin_id := auth.uid();
   IF admin_id IS NULL OR NOT public.is_admin() THEN
     RETURN jsonb_build_object('ok', FALSE, 'code', 'not_admin', 'message', '需要管理员权限。');
   END IF;
-  IF p_user_id IS NULL OR p_action NOT IN ('lift', 'restore') THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'invalid_params', 'message', '解除参数无效。');
+  IF p_user_id IS NULL OR p_action IS NULL
+     OR p_action NOT IN ('warn', 'restrict_comment', 'restrict_publish', 'restrict_report', 'suspend', 'ban') THEN
+    RETURN jsonb_build_object('ok', FALSE, 'code', 'invalid_params', 'message', '处罚参数无效。');
   END IF;
   v_reason := btrim(COALESCE(p_reason, ''));
   IF v_reason = '' THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'missing_reason', 'message', '请填写解除原因。');
+    RETURN jsonb_build_object('ok', FALSE, 'code', 'missing_reason', 'message', '请填写处罚原因。');
   END IF;
+
   IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id) THEN
     RETURN jsonb_build_object('ok', FALSE, 'code', 'user_missing', 'message', '没有找到该用户。');
   END IF;
 
-  v_type_filter := CASE
-    WHEN p_action = 'restore' THEN 'account'
-    WHEN p_restriction_type = 'all' THEN NULL
-    WHEN p_restriction_type IN ('comment', 'publish', 'report', 'account', 'profile_edit', 'interact') THEN p_restriction_type
-    ELSE NULL
-  END;
-  IF p_action = 'lift' AND COALESCE(p_restriction_type, '') NOT IN ('all','comment','publish','report','account','profile_edit','interact') THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'invalid_type', 'message', '请选择要解除的限制类型。');
-  END IF;
-  IF p_action = 'restore' THEN
-    v_type_filter := 'account';
-    p_restore_content := TRUE;
+  v_starts_at := COALESCE(p_starts_at, now_ts);
+  v_type := CASE p_action
+    WHEN 'restrict_comment' THEN 'comment'
+    WHEN 'restrict_publish' THEN 'publish'
+    WHEN 'restrict_report' THEN 'report'
+    WHEN 'suspend' THEN 'account'
+    WHEN 'ban' THEN 'account'
+    ELSE NULL END;
+  v_category := CASE p_action
+    WHEN 'warn' THEN '账号警告'
+    WHEN 'restrict_comment' THEN '限制评论'
+    WHEN 'restrict_publish' THEN '限制发布'
+    WHEN 'restrict_report' THEN '限制举报'
+    WHEN 'suspend' THEN '账号暂停'
+    WHEN 'ban' THEN '账号封禁' END;
+  v_severity := CASE p_action
+    WHEN 'warn' THEN 'minor'
+    WHEN 'restrict_comment' THEN 'standard'
+    WHEN 'restrict_publish' THEN 'standard'
+    WHEN 'restrict_report' THEN 'standard'
+    WHEN 'suspend' THEN 'serious'
+    WHEN 'ban' THEN 'critical' END;
+
+  -- 除警告与永久封禁外，必须给出结束时间
+  IF p_action IN ('restrict_comment', 'restrict_publish', 'restrict_report', 'suspend') THEN
+    IF p_ends_at IS NULL OR p_ends_at <= v_starts_at THEN
+      RETURN jsonb_build_object('ok', FALSE, 'code', 'missing_ends_at', 'message', '请选择晚于开始时间的结束时间。');
+    END IF;
+  ELSIF p_action = 'ban' THEN
+    IF p_ends_at IS NOT NULL THEN
+      RETURN jsonb_build_object('ok', FALSE, 'code', 'ban_no_ends', 'message', '永久封禁不需要结束时间。');
+    END IF;
   END IF;
 
   SELECT moderation_status INTO v_cur_status FROM public.profiles WHERE id = p_user_id;
 
-  FOR v_row IN
-    SELECT * FROM public.user_restrictions r
-    WHERE r.user_id = p_user_id AND r.status = 'active'
-      AND (v_type_filter IS NULL OR r.restriction_type = v_type_filter)
-  LOOP
+  -- 同类型已有有效限制时直接更新，避免重复堆积
+  IF v_type IS NOT NULL THEN
     UPDATE public.user_restrictions
-    SET status = 'lifted',
-        lifted_by = admin_id,
-        lifted_at = now_ts,
-        metadata = metadata || jsonb_build_object(
-          'lift_reason', v_reason,
-          'lifted_at', now_ts,
-          'lifted_by', admin_id
-        ),
+    SET status = 'active',
+        reason = v_reason,
+        starts_at = v_starts_at,
+        ends_at = p_ends_at,
+        created_by = admin_id,
+        lifted_by = NULL,
+        lifted_at = NULL,
+        metadata = metadata || jsonb_build_object('renewed_at', now_ts, 'previous_ends_at', ends_at),
         updated_at = now_ts
-    WHERE id = v_row.id;
-    v_lifted_count := v_lifted_count + 1;
-    IF p_restore_content AND v_row.restriction_type = 'account'
-       AND jsonb_typeof(v_row.metadata->'hidden_post_ids') = 'array' THEN
-      UPDATE public.posts
-      SET status = 'published'
-      WHERE user_id = p_user_id AND status = 'hidden'
-        AND id IN (
-          SELECT hid::uuid FROM jsonb_array_elements_text(v_row.metadata->'hidden_post_ids') AS hid
-        );
-      GET DIAGNOSTICS v_restored_count = ROW_COUNT;
+    WHERE user_id = p_user_id AND restriction_type = v_type AND status = 'active'
+    RETURNING id INTO v_restriction_id;
+    IF v_restriction_id IS NULL THEN
+      INSERT INTO public.user_restrictions (
+        user_id, restriction_type, status, reason, starts_at, ends_at,
+        created_by, metadata, created_at, updated_at
+      ) VALUES (
+        p_user_id, v_type, 'active', v_reason, v_starts_at, p_ends_at,
+        admin_id, '{}'::jsonb, now_ts, now_ts
+      ) RETURNING id INTO v_restriction_id;
     END IF;
-  END LOOP;
-
-  -- 举报限制解除时清空举报人统计表中的截止时间
-  IF v_type_filter = 'report' OR v_type_filter IS NULL THEN
-    UPDATE public.user_reporter_stats
-    SET report_restricted_until = NULL, updated_at = now_ts
-    WHERE user_id = p_user_id;
   END IF;
 
-  -- 重算账号状态
-  SELECT COUNT(*) INTO v_active_count
-  FROM public.user_restrictions r
-  WHERE r.user_id = p_user_id AND r.status = 'active'
-    AND (r.ends_at IS NULL OR r.ends_at > now_ts);
-  IF v_active_count = 0 THEN
-    SELECT COUNT(*) INTO v_violation_count
-    FROM public.user_violations uv WHERE uv.user_id = p_user_id AND uv.status = 'active';
-    v_new_status := CASE WHEN v_violation_count > 0 THEN 'warned' ELSE 'active' END;
-  ELSIF EXISTS (
-    SELECT 1 FROM public.user_restrictions r
-    WHERE r.user_id = p_user_id AND r.restriction_type = 'account'
-      AND r.status = 'active' AND (r.ends_at IS NULL OR r.ends_at > now_ts)
-  ) THEN
-    v_new_status := v_cur_status;
-  ELSE
-    v_new_status := 'restricted';
+  -- 暂停/封禁时可按管理员决定隐藏已发布内容（不删除）
+  IF p_hide_content AND p_action IN ('suspend', 'ban') THEN
+    SELECT COALESCE(array_agg(id), '{}'::UUID[]) INTO v_hidden_ids
+    FROM public.posts WHERE user_id = p_user_id AND status = 'published';
+    UPDATE public.posts SET status = 'hidden' WHERE user_id = p_user_id AND status = 'published';
   END IF;
+  IF v_restriction_id IS NOT NULL AND array_length(v_hidden_ids, 1) > 0 THEN
+    UPDATE public.user_restrictions
+    SET metadata = metadata || jsonb_build_object(
+      'hidden_post_ids', (SELECT jsonb_agg(hid) FROM unnest(v_hidden_ids) AS hid)
+    )
+    WHERE id = v_restriction_id;
+  END IF;
+
+  -- 计入确认违规时写入 user_violations（与“收到举报”彻底分离）
+  IF COALESCE(p_count_violation, TRUE) THEN
+    INSERT INTO public.user_violations (
+      user_id, source_type, source_id, content_type, content_id,
+      category, severity, summary, confirmed_by, confirmed_at, metadata
+    ) VALUES (
+      p_user_id, 'manual', v_restriction_id, 'account', NULL,
+      v_category, v_severity, v_reason, admin_id, now_ts,
+      jsonb_build_object(
+        'action', p_action,
+        'restriction_type', v_type,
+        'restriction_id', v_restriction_id,
+        'starts_at', v_starts_at,
+        'ends_at', p_ends_at,
+        'hide_content', p_hide_content,
+        'note', btrim(COALESCE(p_note, ''))
+      )
+    );
+  END IF;
+
+  -- 账号状态：警告/功能限制不降级暂停或封禁
   UPDATE public.profiles
-  SET moderation_status = v_new_status,
+  SET moderation_status = CASE p_action
+        WHEN 'warn' THEN CASE WHEN v_cur_status IN ('suspended', 'banned') THEN v_cur_status ELSE 'warned' END
+        WHEN 'restrict_comment' THEN CASE WHEN v_cur_status IN ('suspended', 'banned') THEN v_cur_status ELSE 'restricted' END
+        WHEN 'restrict_publish' THEN CASE WHEN v_cur_status IN ('suspended', 'banned') THEN v_cur_status ELSE 'restricted' END
+        WHEN 'restrict_report' THEN CASE WHEN v_cur_status IN ('suspended', 'banned') THEN v_cur_status ELSE 'restricted' END
+        WHEN 'suspend' THEN 'suspended'
+        WHEN 'ban' THEN 'banned'
+      END,
       moderation_note = left(v_reason, 500),
       moderated_at = now_ts,
       moderated_by = admin_id
   WHERE id = p_user_id;
 
-  -- 解除/恢复通知
-  IF v_type_filter = 'account' OR p_action = 'restore' THEN
-    v_template_key := 'account_restored';
-    v_func_label := '账号';
-    v_notify := '账号恢复' || E'\n' || '你的账号已恢复使用。' || E'\n' || '原因：' || v_reason;
+  -- 限制举报时同步写举报人统计表
+  IF p_action = 'restrict_report' THEN
+    INSERT INTO public.user_reporter_stats (user_id, report_restricted_until, updated_at)
+    VALUES (p_user_id, p_ends_at, now_ts)
+    ON CONFLICT (user_id) DO UPDATE
+      SET report_restricted_until = EXCLUDED.report_restricted_until,
+          updated_at = now_ts;
+  END IF;
+
+  -- 固定处罚通知
+  v_date_label := CASE WHEN p_ends_at IS NULL THEN '' ELSE '（至 ' || to_char(p_ends_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD HH24:MI') || '）' END;
+  IF p_action = 'warn' THEN
+    v_template_key := 'account_warning';
+    v_notify := '账号警告' || E'\n' || '原因：' || v_reason || E'\n' || '请认真阅读并遵守社区规范，避免再次违规。';
+  ELSIF p_action = 'restrict_comment' THEN
+    v_template_key := 'restriction_comment';
+    v_notify := '功能限制' || E'\n' || '你的评论功能已被限制' || v_date_label || '。' || E'\n' || '原因：' || v_reason || E'\n' || '限制结束后相关功能会恢复。';
+  ELSIF p_action = 'restrict_publish' THEN
+    v_template_key := 'restriction_publish';
+    v_notify := '功能限制' || E'\n' || '你的发布功能已被限制' || v_date_label || '。' || E'\n' || '原因：' || v_reason || E'\n' || '限制结束后相关功能会恢复。';
+  ELSIF p_action = 'restrict_report' THEN
+    v_template_key := 'restriction_report';
+    v_notify := '功能限制' || E'\n' || '你的举报功能已被限制' || v_date_label || '。' || E'\n' || '原因：' || v_reason || E'\n' || '限制结束后相关功能会恢复。';
+  ELSIF p_action = 'suspend' THEN
+    v_template_key := 'account_suspended';
+    v_notify := '账号暂停' || E'\n'
+      || '你的账号已被暂停' || v_date_label || '。' || E'\n'
+      || '原因：' || v_reason || E'\n'
+      || '影响范围：暂停期间无法发布或提交审核、无法创建连载与合集、无法评论或举报、无法编辑资料，也无法关注、点赞、收藏、写段评等互动。' || E'\n'
+      || '恢复说明：到期后账号将自动恢复，相关功能会重新开放。' || E'\n'
+      || '下一步：如需提交复核或反馈，可通过设置页反馈或联系客服邮箱联系我们。';
   ELSE
-    v_template_key := 'restriction_lifted';
-    v_func_label := CASE v_type_filter
-      WHEN 'comment' THEN '评论'
-      WHEN 'publish' THEN '发布'
-      WHEN 'report' THEN '举报'
-      WHEN 'profile_edit' THEN '资料编辑'
-      WHEN 'interact' THEN '互动'
-      ELSE '相关功能' END;
-    v_notify := '限制解除' || E'\n' || '你的' || v_func_label || '功能已恢复。' || E'\n' || '原因：' || v_reason;
+    v_template_key := 'account_banned';
+    v_notify := '账号封禁' || E'\n'
+      || '你的账号已被永久封禁。' || E'\n'
+      || '原因：' || v_reason || E'\n'
+      || '影响范围：账号无法发布或提交审核、无法创建连载与合集、无法评论或举报、无法编辑资料，也无法关注、点赞、收藏、写段评等互动。' || E'\n'
+      || '恢复说明：该处罚不可撤销，账号将保持封禁状态。' || E'\n'
+      || '下一步：如需提交反馈，可通过设置页反馈或联系客服邮箱联系我们。';
   END IF;
   INSERT INTO public.notifications (
     user_id, type, actor_id, post_id, content, read, created_at,
@@ -906,10 +1044,12 @@ BEGIN
     v_template_key, 'user', p_user_id,
     jsonb_build_object(
       'action', p_action,
-      'restriction_type', v_type_filter,
+      'restriction_type', v_type,
+      'restriction_id', v_restriction_id,
       'reason', v_reason,
-      'restore_content', COALESCE(p_restore_content, FALSE),
-      'restored_post_count', v_restored_count
+      'starts_at', v_starts_at,
+      'ends_at', p_ends_at,
+      'hide_content', p_hide_content
     ),
     'sent', now_ts
   );
@@ -917,211 +1057,36 @@ BEGIN
   INSERT INTO public.admin_audit_logs (
     admin_id, action, target_type, target_id, note, created_at, metadata
   ) VALUES (
-    admin_id, CASE WHEN p_action = 'restore' THEN 'restore_user_account' ELSE 'lift_user_restriction' END,
-    'user', p_user_id, btrim(COALESCE(p_note, v_reason)), now_ts,
+    admin_id, 'enforce_user_' || p_action, 'user', p_user_id,
+    btrim(COALESCE(p_note, v_reason)), now_ts,
     jsonb_build_object(
       'action', p_action,
-      'restriction_type', v_type_filter,
+      'restriction_type', v_type,
+      'restriction_id', v_restriction_id,
       'reason', v_reason,
-      'lifted_count', v_lifted_count,
-      'restore_content', COALESCE(p_restore_content, FALSE),
-      'restored_post_count', v_restored_count
+      'count_violation', COALESCE(p_count_violation, TRUE),
+      'starts_at', v_starts_at,
+      'ends_at', p_ends_at,
+      'hide_content', p_hide_content,
+      'hidden_post_count', COALESCE(array_length(v_hidden_ids, 1), 0)
     )
   );
 
   RETURN jsonb_build_object(
     'ok', TRUE,
-    'message', CASE WHEN p_action = 'restore' THEN '账号已恢复使用。' ELSE '限制已解除。' END,
-    'lifted_count', v_lifted_count,
-    'restored_post_count', v_restored_count
+    'restriction_id', v_restriction_id,
+    'message', CASE p_action
+      WHEN 'warn' THEN '账号警告已发送。'
+      WHEN 'restrict_comment' THEN '评论功能限制已生效。'
+      WHEN 'restrict_publish' THEN '发布功能限制已生效。'
+      WHEN 'restrict_report' THEN '举报功能限制已生效。'
+      WHEN 'suspend' THEN '账号已暂停。'
+      ELSE '账号已永久封禁。' END
   );
   EXCEPTION WHEN OTHERS THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'lift_failed', 'message', '解除操作执行失败：' || SQLERRM);
+    RETURN jsonb_build_object('ok', FALSE, 'code', 'enforce_failed', 'message', '处罚操作执行失败：' || SQLERRM);
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.admin_lift_user_restriction(UUID, TEXT, TEXT, TEXT, BOOLEAN, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_lift_user_restriction(UUID, TEXT, TEXT, TEXT, BOOLEAN, TEXT) TO authenticated, service_role;
-
--- ------------------------------------------------------------
--- 6. 资料编辑 / 互动硬拦截触发器
--- ------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION public.enforce_user_restrictions_profile_edit()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-DECLARE
-  v_status TEXT;
-BEGIN
-  IF auth.uid() IS NULL OR NEW.id IS NULL OR NEW.id <> auth.uid()
-     OR public.is_admin() THEN
-    RETURN NEW;
-  END IF;
-  SELECT p.moderation_status INTO v_status FROM public.profiles p WHERE p.id = NEW.id;
-  IF v_status = 'banned' THEN
-    RAISE EXCEPTION '你的账号已被封禁，无法修改个人资料。';
-  ELSIF v_status = 'suspended' THEN
-    RAISE EXCEPTION '你的账号已被暂停，暂停期间无法修改个人资料。';
-  ELSIF EXISTS (
-    SELECT 1 FROM public.user_restrictions r
-    WHERE r.user_id = NEW.id AND r.restriction_type = 'profile_edit'
-      AND r.status = 'active' AND (r.ends_at IS NULL OR r.ends_at > NOW())
-  ) THEN
-    RAISE EXCEPTION '你的资料编辑功能暂时受限，无法修改个人资料。';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS profiles_enforce_restrictions ON public.profiles;
-CREATE TRIGGER profiles_enforce_restrictions
-BEFORE UPDATE OF nickname, avatar_url, bio, external_link ON public.profiles
-FOR EACH ROW EXECUTE FUNCTION public.enforce_user_restrictions_profile_edit();
-
-CREATE OR REPLACE FUNCTION public.enforce_user_restrictions_interact()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-DECLARE
-  v_user_id UUID;
-  v_status TEXT;
-  v_label TEXT;
-BEGIN
-  v_user_id := CASE TG_TABLE_NAME
-    WHEN 'follows' THEN NEW.follower_id
-    ELSE NEW.user_id END;
-  IF auth.uid() IS NULL OR v_user_id IS NULL OR v_user_id <> auth.uid() THEN
-    RETURN NEW;
-  END IF;
-  SELECT p.moderation_status INTO v_status FROM public.profiles p WHERE p.id = v_user_id;
-  v_label := CASE TG_TABLE_NAME
-    WHEN 'follows' THEN '关注其他用户'
-    WHEN 'bookmarks' THEN '收藏作品'
-    ELSE '点赞作品' END;
-  IF v_status = 'banned' THEN
-    RAISE EXCEPTION USING MESSAGE = '你的账号已被封禁，无法' || v_label || '。';
-  ELSIF v_status = 'suspended' THEN
-    RAISE EXCEPTION USING MESSAGE = '你的账号已被暂停，暂停期间无法' || v_label || '。';
-  ELSIF EXISTS (
-    SELECT 1 FROM public.user_restrictions r
-    WHERE r.user_id = v_user_id AND r.restriction_type = 'interact'
-      AND r.status = 'active' AND (r.ends_at IS NULL OR r.ends_at > NOW())
-  ) THEN
-    RAISE EXCEPTION USING MESSAGE = '你的互动功能暂时受限，无法' || v_label || '。';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS follows_enforce_restrictions ON public.follows;
-CREATE TRIGGER follows_enforce_restrictions
-BEFORE INSERT ON public.follows
-FOR EACH ROW EXECUTE FUNCTION public.enforce_user_restrictions_interact();
-
-DROP TRIGGER IF EXISTS bookmarks_enforce_restrictions ON public.bookmarks;
-CREATE TRIGGER bookmarks_enforce_restrictions
-BEFORE INSERT ON public.bookmarks
-FOR EACH ROW EXECUTE FUNCTION public.enforce_user_restrictions_interact();
-
-DROP TRIGGER IF EXISTS likes_enforce_restrictions ON public.likes;
-CREATE TRIGGER likes_enforce_restrictions
-BEFORE INSERT ON public.likes
-FOR EACH ROW EXECUTE FUNCTION public.enforce_user_restrictions_interact();
-
--- ------------------------------------------------------------
--- 6. 举报中心状态筛选（新增结果状态）
--- ------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION public.admin_report_center_v2(
-  p_tab TEXT DEFAULT 'cases',
-  p_status TEXT DEFAULT 'all',
-  p_priority TEXT DEFAULT 'all',
-  p_target_type TEXT DEFAULT 'all',
-  p_multi_report BOOLEAN DEFAULT NULL,
-  p_suspicious BOOLEAN DEFAULT NULL,
-  p_service_error BOOLEAN DEFAULT NULL,
-  p_low_quality BOOLEAN DEFAULT NULL,
-  p_query TEXT DEFAULT '',
-  p_limit INTEGER DEFAULT 100
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_base JSONB;
-  v_cases JSONB;
-BEGIN
-  IF auth.uid() IS NULL OR NOT public.is_admin() THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'not_admin', 'message', '需要管理员权限。');
-  END IF;
-  IF p_status IN ('all', 'pending', 'kept', 'reminded', 'deleted') THEN
-    RETURN public.admin_report_center_v1(
-      p_tab, p_status, p_priority, p_target_type,
-      p_multi_report, p_suspicious, p_service_error, p_low_quality,
-      p_query, p_limit
-    );
-  END IF;
-  IF p_status NOT IN ('reviewing', 'no_violation', 'content_case', 'profile_changes', 'warned', 'restricted', 'suspended', 'banned') THEN
-    RETURN jsonb_build_object('ok', FALSE, 'code', 'invalid_status', 'message', '筛选状态无效。');
-  END IF;
-
-  v_base := public.admin_report_center_v1(
-    p_tab, 'all', p_priority, p_target_type,
-    p_multi_report, p_suspicious, p_service_error, p_low_quality,
-    p_query, p_limit
-  );
-  SELECT COALESCE(jsonb_agg(x || jsonb_build_object(
-      'target_moderation_status', COALESCE((
-        SELECT p.moderation_status FROM public.profiles p
-        WHERE p.id = (x->>'target_user_id')::UUID
-      ), ''),
-      'active_restrictions', COALESCE((
-        SELECT COUNT(*)::INTEGER FROM public.user_restrictions ur
-        WHERE ur.user_id = (x->>'target_user_id')::UUID
-          AND ur.status = 'active'
-          AND (ur.ends_at IS NULL OR ur.ends_at > NOW())
-      ), 0)
-    )), '[]'::jsonb) INTO v_cases
-  FROM jsonb_array_elements(v_base->'cases') AS x
-  WHERE CASE
-    WHEN p_status = 'reviewing' THEN x->>'status' = 'reviewing'
-    ELSE x->>'outcome' = p_status END;
-
-  RETURN jsonb_build_object(
-    'ok', TRUE,
-    'tab', p_tab,
-    'cases', v_cases,
-    'reporters', v_base->'reporters',
-    'target_users', v_base->'target_users',
-    'counts', v_base->'counts',
-    'filtered', jsonb_build_object(
-      'cases', jsonb_array_length(v_cases),
-      'reporters', jsonb_array_length(v_base->'reporters'),
-      'target_users', jsonb_array_length(v_base->'target_users')
-    )
-  );
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.admin_report_center_v2(
-  TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, INTEGER
-) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_report_center_v2(
-  TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, INTEGER
-) TO authenticated, service_role;
-
-COMMIT;
-
--- ============================================================
--- 执行后只读核验（单独运行）
--- ============================================================
--- SELECT to_regprocedure('public.admin_resolve_user_report_case(uuid, text, text, text, jsonb)');
--- SELECT to_regprocedure('public.profile_revision_submit(text[])');
--- SELECT to_regprocedure('public.admin_confirm_profile_revision(uuid)');
--- SELECT to_regprocedure('public.admin_report_center_v2(text, text, text, text, boolean, boolean, boolean, boolean, text, integer)');
--- SELECT to_regclass('public.profile_revision_requests');
+REVOKE ALL ON FUNCTION public.admin_enforce_user_restriction(UUID, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.admin_enforce_user_restriction(UUID, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, TEXT) TO authenticated, service_role;

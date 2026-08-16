@@ -498,10 +498,20 @@ BEGIN
     v_notify := '功能限制' || E'\n' || '你的举报功能已被限制' || v_date_label || '。' || E'\n' || '原因：' || v_reason || E'\n' || '限制结束后相关功能会恢复。';
   ELSIF p_action = 'suspend' THEN
     v_template_key := 'account_suspended';
-    v_notify := '账号暂停' || E'\n' || '你的账号已被暂停' || v_date_label || '。' || E'\n' || '原因：' || v_reason;
+    v_notify := '账号暂停' || E'\n'
+      || '你的账号已被暂停' || v_date_label || '。' || E'\n'
+      || '原因：' || v_reason || E'\n'
+      || '影响范围：暂停期间无法发布或提交审核、无法创建连载与合集、无法评论或举报、无法编辑资料，也无法关注、点赞、收藏、写段评等互动。' || E'\n'
+      || '恢复说明：到期后账号将自动恢复，相关功能会重新开放。' || E'\n'
+      || '下一步：如需提交复核或反馈，可通过设置页反馈或联系客服邮箱联系我们。';
   ELSE
     v_template_key := 'account_banned';
-    v_notify := '账号封禁' || E'\n' || '你的账号已被永久封禁。' || E'\n' || '原因：' || v_reason;
+    v_notify := '账号封禁' || E'\n'
+      || '你的账号已被永久封禁。' || E'\n'
+      || '原因：' || v_reason || E'\n'
+      || '影响范围：账号无法发布或提交审核、无法创建连载与合集、无法评论或举报、无法编辑资料，也无法关注、点赞、收藏、写段评等互动。' || E'\n'
+      || '恢复说明：该处罚不可撤销，账号将保持封禁状态。' || E'\n'
+      || '下一步：如需提交反馈，可通过设置页反馈或联系客服邮箱联系我们。';
   END IF;
   INSERT INTO public.notifications (
     user_id, type, actor_id, post_id, content, read, created_at,
