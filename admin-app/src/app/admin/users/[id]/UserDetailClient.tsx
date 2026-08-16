@@ -150,8 +150,8 @@ const quickDurations = [
   { label: "30 天", hours: 24 * 30 },
 ];
 
-const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
-const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "—";
+const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }) : "—";
+const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false }) : "—";
 const fmtDateTime = (value?: string | null) => {
   if (!value) return "未设置";
   const parts = new Intl.DateTimeFormat("zh-CN", {
