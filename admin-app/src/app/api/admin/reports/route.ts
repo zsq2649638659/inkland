@@ -3,7 +3,7 @@ import { getAdminContext } from "@/lib/supabase/admin-server";
 
 const contentActions = ["keep", "remind", "delete", "dismiss"] as const;
 const userActions = ["no_violation", "convert_content", "profile_revision", "warn", "restrict", "suspend", "ban"] as const;
-const allowedActions = [...contentActions, ...userActions, "mark_suspicious"] as const;
+const allowedActions = [...contentActions, ...userActions, "mark_suspicious", "temporary_hide", "restore"] as const;
 
 export async function PATCH(request: Request) {
   const { supabase, user } = await getAdminContext();
@@ -32,6 +32,26 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: result?.message || "标记恶意举报失败，请稍后重试。" }, { status: 500 });
     }
     return NextResponse.json({ success: true, message: result.message || "该案件已标记为恶意举报。" });
+  }
+  if (body.action === "temporary_hide" || body.action === "restore") {
+    const hidden = body.action === "temporary_hide";
+    if (hidden && !body.reason?.trim()) {
+      return NextResponse.json({ error: "请填写隐藏原因。" }, { status: 400 });
+    }
+    const { data, error } = await supabase.rpc("admin_toggle_report_temporary_hide", {
+      p_case_id: body.caseId,
+      p_hidden: hidden,
+      p_reason: body.reason?.trim() || null,
+    });
+    const result = data as { ok?: boolean; message?: string } | null;
+    if (error || !result?.ok) {
+      const raw = error?.message || result?.message || "";
+      if (/admin_toggle_report_temporary_hide/.test(raw)) {
+        return NextResponse.json({ error: "暂时隐藏功能尚未启用，请先执行数据库迁移。" }, { status: 500 });
+      }
+      return NextResponse.json({ error: result?.message || (hidden ? "暂时隐藏失败，请稍后重试。" : "恢复展示失败，请稍后重试。") }, { status: 500 });
+    }
+    return NextResponse.json({ success: true, message: result.message || (hidden ? "该内容已暂时隐藏。" : "该内容已恢复公开展示。") });
   }
   const isUserAction = (userActions as readonly string[]).includes(body.action);
   const rpcName = isUserAction ? "admin_resolve_user_report_case" : "admin_resolve_report_case";
