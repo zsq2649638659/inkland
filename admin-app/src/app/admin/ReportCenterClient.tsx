@@ -12,6 +12,7 @@ type FilterState = {
   suspicious: boolean;
   serviceError: boolean;
   multiReport: boolean;
+  lowQuality: boolean;
   query: string;
 };
 
@@ -93,7 +94,7 @@ type ReportCenterPayload = {
   filtered: { cases: number; reporters: number; target_users: number };
 };
 
-const defaultFilters = (): FilterState => ({ status: "all", priority: "all", suspicious: false, serviceError: false, multiReport: false, query: "" });
+const defaultFilters = (): FilterState => ({ status: "all", priority: "all", suspicious: false, serviceError: false, multiReport: false, lowQuality: false, query: "" });
 
 const tabs: Array<{ key: ReportTab; label: string; hint: string }> = [
   { key: "posts", label: "作品举报", hint: "被举报对象为作品" },
@@ -144,6 +145,7 @@ export default function ReportCenterClient() {
     if (applied.suspicious) params.set("suspicious", "1");
     if (applied.serviceError) params.set("serviceError", "1");
     if (applied.multiReport) params.set("multiReport", "1");
+    if (applied.lowQuality) params.set("lowQuality", "1");
     if (applied.query.trim()) params.set("q", applied.query.trim());
     params.set("limit", "100");
 
@@ -229,13 +231,14 @@ export default function ReportCenterClient() {
       </> : null}
       <label className="admin-report-toggle"><input type="checkbox" checked={draft.suspicious} onChange={(event) => setDraft({ ...draft, suspicious: event.target.checked })} disabled={loading} /><span>疑似恶意举报</span></label>
       {(tab === "posts" || tab === "comments") ? <label className="admin-report-toggle"><input type="checkbox" checked={draft.serviceError} onChange={(event) => setDraft({ ...draft, serviceError: event.target.checked })} disabled={loading} /><span>审核服务异常</span></label> : null}
+      {(tab === "posts" || tab === "comments") ? <label className="admin-report-toggle"><input type="checkbox" checked={draft.lowQuality} onChange={(event) => setDraft({ ...draft, lowQuality: event.target.checked })} disabled={loading} /><span>低质量队列</span></label> : null}
       <label className="admin-report-query">关键词<input value={draft.query} onChange={(event) => setDraft({ ...draft, query: event.target.value })} maxLength={100} placeholder="对象标题 / 原因 / ID" disabled={loading} /></label>
       <button className="admin-btn admin-btn-primary" type="submit" disabled={loading}>{loading ? "查询中…" : "应用筛选"}</button>
     </form>
     {error ? <div className="admin-alert admin-alert-error" role="alert">{error}</div> : null}
     <div className="admin-queue-list">
       {loading ? <div className="admin-empty"><strong>正在加载{currentTab.label}…</strong><span>读取举报中心数据。</span></div>
-        : rows.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的{currentTab.label}</strong><span>可以调整筛选条件后重新查询。</span></div>
+        : rows.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的{currentTab.label}</strong><span>{applied.lowQuality && (tab === "posts" || tab === "comments") ? "当前没有低质量队列案件，可以取消该筛选后查看全部案件。" : "可以调整筛选条件后重新查询。"}</span></div>
           : tab === "posts" || tab === "comments"
             ? (rows as ReportCenterCase[]).map((row) => <div className="admin-queue-row" key={row.id}>
               <div className="admin-queue-badge">{row.target_type === "post" ? "作品" : "评论"}</div>

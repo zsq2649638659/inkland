@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const multiReportRaw = url.searchParams.get("multiReport");
   const suspiciousRaw = url.searchParams.get("suspicious");
   const serviceErrorRaw = url.searchParams.get("serviceError");
+  const lowQualityRaw = url.searchParams.get("lowQuality");
   const query = (url.searchParams.get("q") || "").trim().slice(0, 100);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 200);
 
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
     p_multi_report: parseBool(multiReportRaw),
     p_suspicious: parseBool(suspiciousRaw),
     p_service_error: parseBool(serviceErrorRaw),
+    p_low_quality: parseBool(lowQualityRaw),
     p_query: query,
     p_limit: limit,
   });
