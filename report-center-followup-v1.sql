@@ -81,7 +81,7 @@ BEGIN
   END IF;
 
   -- 内容举报案件：保留快照摘要，并综合计算风险与举报者异常
-  SELECT COALESCE(jsonb_agg(row_data ORDER BY c.last_reported_at DESC), '[]'::jsonb)
+  SELECT COALESCE(jsonb_agg(row_data ORDER BY last_reported_at DESC), '[]'::jsonb)
   INTO v_cases
   FROM (
     SELECT jsonb_build_object(
@@ -187,7 +187,7 @@ BEGIN
             WHERE flag IS NOT NULL
           ) f
         ), '[]'::jsonb)
-    ) AS row_data
+    ) AS row_data, c.last_reported_at
     FROM public.moderation_report_cases c
     LEFT JOIN public.moderation_report_snapshots s ON s.case_id = c.id
     WHERE (
@@ -345,7 +345,14 @@ BEGIN
             WHERE flag IS NOT NULL
           ) f
         ), '[]'::jsonb)
-    ) AS row_data
+    ) AS row_data, ROUND((
+      CASE WHEN COALESCE(rs.total_reports, 0) >= 8
+        THEN (COALESCE(rs.invalid_reports, 0)::numeric / GREATEST(rs.total_reports, 1)) * 40 ELSE 0 END
+      + LEAST(COALESCE(rs.reports_last_24h, 0)::numeric / 20, 1) * 25
+      + LEAST(COALESCE(rs.duplicate_attempts, 0)::numeric / 5, 1) * 20
+      + CASE WHEN COALESCE((rs.metadata->>'low_quality')::BOOLEAN, FALSE) THEN 10 ELSE 0 END
+      + CASE WHEN rs.report_restricted_until IS NOT NULL AND rs.report_restricted_until > NOW() THEN 5 ELSE 0 END
+    ), 1) AS risk_score
     FROM public.profiles p
     LEFT JOIN public.user_reporter_stats rs ON rs.user_id = p.id
     WHERE (
@@ -462,7 +469,27 @@ BEGIN
             WHERE mc.target_user_id = p.id AND mc.status IN ('pending', 'reviewing')
           ) > 0 THEN 'normal'
           ELSE 'normal' END
-    ) AS row_data
+    ) AS row_data, ROUND((
+      LEAST((
+        SELECT COUNT(*)::numeric FROM public.moderation_report_cases mc
+        WHERE mc.target_user_id = p.id AND mc.last_reported_at > NOW() - interval '30 days'
+      ) / 10, 1) * 30
+      + LEAST((
+        SELECT COUNT(*)::numeric FROM public.user_violations uv
+        WHERE uv.user_id = p.id AND uv.status = 'active'
+          AND uv.confirmed_at > NOW() - interval '90 days'
+      ) / 5, 1) * 40
+      + LEAST((
+        SELECT COUNT(*)::numeric FROM public.user_restrictions ur
+        WHERE ur.user_id = p.id AND ur.status = 'active'
+          AND (ur.ends_at IS NULL OR ur.ends_at > NOW())
+      ), 1) * 20
+      + CASE WHEN (
+        SELECT COUNT(*) FROM public.moderation_report_cases mc
+        WHERE mc.target_user_id = p.id AND mc.status IN ('pending', 'reviewing')
+          AND mc.priority IN ('high', 'urgent')
+      ) > 0 THEN 10 ELSE 0 END
+    ), 1) AS risk_score
     FROM public.profiles p
     WHERE (
         v_query = ''
@@ -629,7 +656,7 @@ BEGIN
       'target_nickname', target_nickname,
       'count', cnt,
       'last_at', last_at
-    ) AS row_data
+    ) AS row_data, cnt
     FROM (
       SELECT t.target_type, t.target_id,
         CASE WHEN t.target_type = 'post' THEN COALESCE((SELECT po.title FROM public.posts po WHERE po.id = t.target_id), '')
