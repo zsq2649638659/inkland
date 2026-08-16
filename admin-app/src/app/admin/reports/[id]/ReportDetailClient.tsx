@@ -72,16 +72,20 @@ type Props = {
   reports: ReportRow[];
   violations: ViolationRow[];
   reporterStats: ReporterStatRow[];
+  userContent: Array<{ id: string; type: "post" | "comment"; title: string; snippet: string; created_at: string }>;
 };
 
-type ReportAction = "keep" | "remind" | "delete" | "dismiss" | "no_violation";
+type ReportAction = "keep" | "remind" | "delete" | "dismiss" | "no_violation" | "convert_content" | "profile_revision" | "warn" | "restrict" | "suspend" | "ban";
 
 const targetLabels: Record<string, string> = { post: "作品", comment: "评论", user: "用户" };
 const statusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", resolved: "已处理", cancelled: "已取消" };
 const priorityLabels: Record<string, string> = { normal: "普通", high: "优先", urgent: "紧急" };
-const outcomeLabels: Record<string, string> = { kept: "保留", reminded: "已提醒", deleted: "已删除", no_violation: "未发现违规" };
+const outcomeLabels: Record<string, string> = { kept: "保留", reminded: "已提醒", deleted: "已删除", no_violation: "举报不成立", content_case: "已转为内容案件", profile_changes: "已要求修改资料", warned: "已警告", restricted: "已限制功能", suspended: "已暂停", banned: "已永久封禁" };
 const severityLabels: Record<string, string> = { minor: "轻微", standard: "普通", serious: "严重", critical: "紧急" };
 const reminderQuickReasons = ["举报理由与内容明显无关", "短时间大量重复举报", "反复举报已判定无问题内容", "补充说明含辱骂或威胁", "请勿滥用举报功能"];
+const restrictionLabels: Record<string, string> = { profile_edit: "修改个人资料", report: "提交举报", interact: "与其他用户互动" };
+const issueLabels: Record<string, string> = { avatar: "修改头像", nickname: "修改昵称", bio: "修改个人简介", external_link: "删除外部链接" };
+const contentActionLabels: Record<string, string> = { keep: "保留内容", remind: "保留并提醒", delete: "删除内容" };
 
 function text(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
@@ -95,9 +99,22 @@ function plainText(content: string) {
   return content.replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").trim();
 }
 
-export default function ReportDetailClient({ reportCase, snapshot, reports, violations, reporterStats }: Props) {
+export default function ReportDetailClient({ reportCase, snapshot, reports, violations, reporterStats, userContent }: Props) {
   const [pendingAction, setPendingAction] = useState<ReportAction | null>(null);
   const [note, setNote] = useState("");
+  const [reason, setReason] = useState("");
+  const [issueType, setIssueType] = useState<"avatar" | "nickname" | "bio" | "external_link">("avatar");
+  const [hideProfile, setHideProfile] = useState(true);
+  const [contentTargetType, setContentTargetType] = useState<"post" | "comment">("post");
+  const [contentTargetId, setContentTargetId] = useState("");
+  const [contentAction, setContentAction] = useState<"keep" | "remind" | "delete">("remind");
+  const [restrictionTypes, setRestrictionTypes] = useState<string[]>([]);
+  const [immediate, setImmediate] = useState(true);
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [hideContent, setHideContent] = useState(false);
+  const [countViolation, setCountViolation] = useState(true);
+  const [banArmed, setBanArmed] = useState(false);
   const [modalError, setModalError] = useState("");
   const [busy, setBusy] = useState(false);
   const [reminderTarget, setReminderTarget] = useState<{ userId: string; nickname: string } | null>(null);
@@ -147,7 +164,12 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         ]
       : [
           { key: "no_violation", label: "未发现账号违规" },
-          { key: "dismiss", label: "驳回举报" },
+          { key: "convert_content", label: "转为内容案件" },
+          { key: "profile_revision", label: "要求修改资料" },
+          { key: "warn", label: "发送账号警告" },
+          { key: "restrict", label: "限制账号功能" },
+          { key: "suspend", label: "暂停账号", danger: true },
+          { key: "ban", label: "永久封禁", danger: true },
         ];
 
   const modalCopy: Record<ReportAction, { title: string; desc: string; confirm: string; danger?: boolean }> = {
@@ -177,16 +199,60 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
       desc: "案件将标记为未发现违规，不会对用户账号产生提醒或处罚。",
       confirm: "确认处理",
     },
+    convert_content: {
+      title: "转为内容案件处理？",
+      desc: "仅处理具体作品或评论，不直接处罚账号；可保留、提醒或删除具体内容。",
+      confirm: "确认处理",
+    },
+    profile_revision: {
+      title: "要求修改个人资料？",
+      desc: "选择需要修改的资料位置，系统会向用户发送修改通知；管理员确认后恢复展示。",
+      confirm: "发送修改通知",
+    },
+    warn: {
+      title: "发送账号警告？",
+      desc: "向用户发送系统警告并保存警告记录，默认不限制账号功能。",
+      confirm: "发送警告",
+    },
+    restrict: {
+      title: "限制账号功能？",
+      desc: "选择要限制的功能、生效时间和结束时间，限制结束后自动恢复。",
+      confirm: "确认限制",
+    },
+    suspend: {
+      title: "暂停账号？",
+      desc: "用户在暂停期间无法使用账号，到期后系统自动恢复。",
+      confirm: "确认暂停",
+    },
+    ban: {
+      title: "永久封禁账号？",
+      desc: "账号将永久停用并阻止登录，需要二次确认后执行。",
+      confirm: "确认封禁",
+    },
   };
 
-  const runAction = async (action: ReportAction) => {
+  const openAction = (action: ReportAction) => {
+    setNote(""); setModalError(""); setReason("");
+    setIssueType("avatar"); setHideProfile(true);
+    setContentTargetType("post"); setContentTargetId(""); setContentAction("remind");
+    setRestrictionTypes([]); setImmediate(true); setStartsAt(""); setEndsAt("");
+    setHideContent(false); setCountViolation(true); setBanArmed(false);
+    if (action === "profile_revision") setReason("包含不适宜内容");
+    if (action === "convert_content") {
+      const first = userContent[0];
+      if (first) { setContentTargetType(first.type); setContentTargetId(first.id); }
+    }
+    setPendingAction(action);
+  };
+
+  const runAction = async (action: ReportAction, options: Record<string, unknown>) => {
     setBusy(true);
     setModalError("");
     try {
       const response = await fetchWithTimeout("/api/admin/reports", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId: reportCase.id, action, note: note.trim() || undefined }),
+        body: JSON.stringify({ caseId: reportCase.id, action, note: note.trim() || undefined, reason: reason.trim() || undefined, options }),
       });
       if (!response.ok) {
         const result = await response.json().catch(() => null) as { error?: string } | null;
@@ -199,6 +265,60 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
       setBusy(false);
       setModalError(error instanceof Error ? error.message : "举报案件处理失败，请稍后重试。");
     }
+  };
+
+  const toggleRestrictionType = (type: string) => {
+    setRestrictionTypes((prev) => prev.includes(type) ? prev.filter((item) => item !== type) : [...prev, type]);
+    setBanArmed(false);
+  };
+
+  const notificationPreview = () => {
+    if (!pendingAction) return "";
+    const reasonText = reason.trim() || "未填写";
+    if (pendingAction === "warn") {
+      return `账号警告\n你的账号收到一次正式警告。\n原因：${reasonText}\n请及时停止相关行为，避免账号功能受限。`;
+    }
+    if (pendingAction === "restrict") {
+      const labels = restrictionTypes.length ? restrictionTypes.map((item) => `- ${restrictionLabels[item] || item}`).join("\n") : "- 未选择功能";
+      return `功能限制\n你的以下功能已被限制（至 ${endsAt ? new Date(endsAt).toLocaleString("zh-CN") : "未设置"}）：\n${labels}\n原因：${reasonText}\n限制结束后相关功能会恢复。`;
+    }
+    if (pendingAction === "suspend") {
+      return `账号暂停\n你的账号已被暂停至 ${endsAt ? new Date(endsAt).toLocaleString("zh-CN") : "未设置"}。\n原因：${reasonText}\n暂停期间无法使用账号，到期后自动恢复。`;
+    }
+    if (pendingAction === "ban") {
+      return `账号封禁\n你的账号已被永久封禁。\n原因：${reasonText}\n相关内容将根据平台规则隐藏或删除。`;
+    }
+    return "";
+  };
+
+  const submitAction = () => {
+    if (!pendingAction) return;
+    let options: Record<string, unknown> = {};
+    if (pendingAction === "convert_content") {
+      if (!contentTargetId) { setModalError("请选择要处理的具体作品或评论。"); return; }
+      options = { target_type: contentTargetType, target_id: contentTargetId, content_action: contentAction };
+    } else if (pendingAction === "profile_revision") {
+      options = { issue_type: issueType, hide_profile: hideProfile };
+    } else if (pendingAction === "warn") {
+      if (!reason.trim()) { setModalError("请填写警告原因，该原因会写入违规记录并展示给用户。"); return; }
+      options = { count_violation: countViolation };
+    } else if (pendingAction === "restrict") {
+      if (!restrictionTypes.length) { setModalError("请至少选择一项要限制的功能。"); return; }
+      if (!endsAt) { setModalError("请选择限制结束时间。"); return; }
+      if (!reason.trim()) { setModalError("请填写限制原因，该原因会展示给用户。"); return; }
+      options = { restriction_types: restrictionTypes, immediate, count_violation: countViolation };
+      if (!immediate && startsAt) options.starts_at = new Date(startsAt).toISOString();
+      options.ends_at = new Date(endsAt).toISOString();
+    } else if (pendingAction === "suspend") {
+      if (!endsAt) { setModalError("请选择暂停结束时间。"); return; }
+      if (!reason.trim()) { setModalError("请填写暂停原因，该原因会展示给用户。"); return; }
+      options = { ends_at: new Date(endsAt).toISOString(), hide_content: hideContent, count_violation: countViolation };
+    } else if (pendingAction === "ban") {
+      if (!banArmed) { setModalError(""); setBanArmed(true); return; }
+      if (!reason.trim()) { setModalError("请填写封禁原因，该原因会展示给用户。"); return; }
+      options = { hide_content: hideContent, count_violation: countViolation };
+    }
+    void runAction(pendingAction, options);
   };
 
   const openReminder = (userId: string, nickname: string) => {
@@ -331,20 +451,58 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
             <h2>处理举报</h2>
             <p>请先阅读左侧完整证据，再选择处理动作。</p>
             <div className="admin-report-actions-column">
-              {actions.map((action) => <button className={action.danger ? "admin-detail-danger" : "admin-detail-secondary"} key={action.key} disabled={busy} onClick={() => { setNote(""); setModalError(""); setPendingAction(action.key); }}>{action.label}</button>)}
+              {actions.map((action) => <button className={action.danger ? "admin-detail-danger" : "admin-detail-secondary"} key={action.key} disabled={busy} onClick={() => openAction(action.key)}>{action.label}</button>)}
             </div>
-            <small>处理完成后，所有举报人都会收到统一的“举报已处理”通知；系统不会公开保留、删除或处罚结果。</small>
+            <small>用户举报支持 7 种处理结果；限制、暂停、封禁会先展示处罚确认信息。处理完成后，举报人收到统一受理通知。</small>
           </section>
         </aside>
       </div>
 
       {pendingAction ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setPendingAction(null); }}><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="resolve-report-title">
         <div className="admin-modal-header"><div><h2 id="resolve-report-title">{modalCopy[pendingAction].title}</h2><p className="admin-modal-desc">{modalCopy[pendingAction].desc}</p></div></div>
+        {pendingAction === "convert_content" ? <>
+          <div className="admin-field">
+            <span className="admin-field-label">具体违规内容</span>
+            {userContent.length ? <div className="admin-warn-reason-options">{userContent.map((item) => <button type="button" className={`admin-warn-reason-chip ${contentTargetId === item.id ? "is-selected" : ""}`} key={item.id} onClick={() => { setContentTargetId(item.id); setContentTargetType(item.type); setBanArmed(false); }}>{item.type === "post" ? "作品" : "评论"} · {item.title}</button>)}</div> : <span className="admin-field-hint">没有找到该用户的近期作品或评论，请先在举报明细中补充证据。</span>}
+            {contentTargetId ? <small className="admin-content-snippet">{(userContent.find((item) => item.id === contentTargetId)?.snippet || "").slice(0, 120) || "该内容没有文字摘要。"}</small> : null}
+          </div>
+          <div className="admin-field"><span className="admin-field-label">处理方式</span><div className="admin-warn-reason-options">{(["keep", "remind", "delete"] as const).map((item) => <button type="button" className={`admin-warn-reason-chip ${contentAction === item ? "is-selected" : ""}`} key={item} onClick={() => { setContentAction(item); setBanArmed(false); }}>{contentActionLabels[item]}</button>)}</div></div>
+        </> : null}
+
+        {pendingAction === "profile_revision" ? <>
+          <div className="admin-field"><span className="admin-field-label">需要修改的位置</span><div className="admin-warn-reason-options">{(Object.keys(issueLabels) as Array<"avatar" | "nickname" | "bio" | "external_link">).map((item) => <button type="button" className={`admin-warn-reason-chip ${issueType === item ? "is-selected" : ""}`} key={item} onClick={() => setIssueType(item)}>{issueLabels[item]}</button>)}</div></div>
+          <label className="admin-field">问题类型 / 修改原因<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="例如：包含不适宜内容" /></label>
+          <label className="admin-field admin-toggle-row"><input type="checkbox" checked={hideProfile} onChange={(event) => setHideProfile(event.target.checked)} /><span>完成修改前暂时隐藏该资料</span></label>
+        </> : null}
+
+        {(pendingAction === "warn" || pendingAction === "restrict" || pendingAction === "suspend" || pendingAction === "ban") ? <>
+          <div className="admin-confirm-account"><span className="admin-field-label">将处罚账号</span><strong>{targetAuthor}</strong><span className="admin-mono">{reportCase.target_user_id || reportCase.target_id}</span></div>
+          <label className="admin-field">处罚依据<input value={reason} onChange={(event) => { setReason(event.target.value); setBanArmed(false); }} maxLength={500} placeholder="该内容会写入通知并展示给用户" /></label>
+        </> : null}
+
+        {pendingAction === "restrict" ? <>
+          <div className="admin-field"><span className="admin-field-label">限制功能</span><div className="admin-warn-reason-options">{(["profile_edit", "report", "interact"] as const).map((item) => <button type="button" className={`admin-warn-reason-chip ${restrictionTypes.includes(item) ? "is-selected" : ""}`} key={item} onClick={() => toggleRestrictionType(item)}>{restrictionLabels[item]}</button>)}</div></div>
+          <label className="admin-field admin-toggle-row"><input type="checkbox" checked={immediate} onChange={(event) => setImmediate(event.target.checked)} /><span>立即生效</span></label>
+          {!immediate ? <label className="admin-field">开始时间<input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label> : null}
+          <label className="admin-field">结束时间<input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label>
+        </> : null}
+
+        {pendingAction === "suspend" ? <label className="admin-field">暂停结束时间<input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label> : null}
+
+        {(pendingAction === "suspend" || pendingAction === "ban") ? <label className="admin-field admin-toggle-row"><input type="checkbox" checked={hideContent} onChange={(event) => setHideContent(event.target.checked)} /><span>同时隐藏已发布内容（作品与评论不再公开展示）</span></label> : null}
+        {pendingAction === "restrict" ? <div className="admin-confirm-account"><span className="admin-field-label">已发布内容</span><span>保持展示，不处理。</span></div> : null}
+
+        {(pendingAction === "warn" || pendingAction === "restrict" || pendingAction === "suspend" || pendingAction === "ban") ? <>
+          <label className="admin-field admin-toggle-row"><input type="checkbox" checked={countViolation} onChange={(event) => setCountViolation(event.target.checked)} /><span>计入正式违规记录</span></label>
+          <div className="admin-notification-preview"><span className="admin-field-label">将向用户发送的通知</span><pre>{notificationPreview()}</pre></div>
+        </> : null}
+
+        {pendingAction === "ban" && banArmed ? <div className="admin-alert admin-alert-error" role="alert">再次确认：永久封禁无法撤销，封禁后该用户将无法登录。</div> : null}
         <label className="admin-field">处理备注（可选）<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="记录给审核日志的内部备注，不会展示给用户" /></label>
         {modalError ? <div className="admin-alert admin-alert-error" role="alert">{modalError}</div> : null}
         <div className="admin-modal-actions">
           <button className="admin-btn admin-btn-light" type="button" disabled={busy} onClick={() => setPendingAction(null)}>取消</button>
-          <button className={modalCopy[pendingAction].danger ? "admin-btn admin-btn-danger-fill" : "admin-btn admin-btn-primary"} type="button" disabled={busy} onClick={() => void runAction(pendingAction)}>{busy ? "处理中…" : modalCopy[pendingAction].confirm}</button>
+          <button className={modalCopy[pendingAction].danger ? "admin-btn admin-btn-danger-fill" : "admin-btn admin-btn-primary"} type="button" disabled={busy} onClick={submitAction}>{busy ? "处理中…" : pendingAction === "ban" && !banArmed ? "确认封禁" : pendingAction === "ban" && banArmed ? "再次确认永久封禁" : modalCopy[pendingAction].confirm}</button>
         </div>
       </div></div> : null}
 

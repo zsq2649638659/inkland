@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminContext } from "@/lib/supabase/admin-server";
 
 const tabs = ["cases", "reporters", "target_users"] as const;
-const statuses = ["all", "pending", "kept", "reminded", "deleted"] as const;
+const statuses = ["all", "pending", "reviewing", "kept", "reminded", "deleted", "no_violation", "content_case", "profile_changes", "warned", "restricted", "suspended", "banned"] as const;
 const priorities = ["all", "normal", "high", "urgent"] as const;
 const targetTypes = ["all", "post", "comment", "user"] as const;
 
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   }
 
   const parseBool = (raw: string | null) => raw === "1" || raw === "true" ? true : null;
-  const { data, error } = await supabase.rpc("admin_report_center_v1", {
+  const { data, error } = await supabase.rpc("admin_report_center_v2", {
     p_tab: tab,
     p_status: status,
     p_priority: priority,
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   const result = data as { ok?: boolean; message?: string; cases?: unknown; reporters?: unknown; target_users?: unknown; counts?: unknown; filtered?: unknown } | null;
   if (error || !result?.ok) {
     const raw = error?.message || result?.message || "";
-    if (/admin_report_center_v1/.test(raw)) {
+    if (/admin_report_center_v[12]/.test(raw)) {
       return NextResponse.json({ error: "举报中心功能尚未启用，请先执行举报中心数据库迁移。" }, { status: 500 });
     }
     return NextResponse.json({ error: result?.message || "举报中心数据读取失败，请稍后重试。" }, { status: 500 });

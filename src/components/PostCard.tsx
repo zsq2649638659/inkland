@@ -8,7 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
 import { createNotification } from "@/lib/notifications";
 import { submitReportV1 } from "@/lib/reportContent";
-import { assertCanComment } from "@/lib/userRestrictions";
+import { assertCanComment, assertCanInteract } from "@/lib/userRestrictions";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
@@ -180,6 +180,12 @@ export default function PostCard({ post }: PostCardProps) {
         .eq("following_id", post.user_id);
       if (!error) setFollowing(false);
     } else {
+      const blocked = await assertCanInteract();
+      if (blocked) {
+        setFollowLoading(false);
+        setToastMessage(blocked);
+        return;
+      }
       const { error } = await supabase
         .from("follows")
         .insert({ follower_id: user.id, following_id: post.user_id });

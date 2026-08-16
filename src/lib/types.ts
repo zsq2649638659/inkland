@@ -4,6 +4,10 @@ export interface Profile {
   username?: string;
   avatar_url?: string | null;
   bio?: string | null;
+  profile_revision_status?: string | null;
+  profile_revision_request_id?: string | null;
+  hidden_profile_fields?: string[] | string | null;
+  external_link?: string | null;
   created_at?: string;
 }
 

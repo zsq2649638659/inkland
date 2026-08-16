@@ -15,6 +15,7 @@ import type { Post } from "@/lib/types";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
+import { assertCanInteract } from "@/lib/userRestrictions";
 
 interface FollowUser {
   id: string;
@@ -373,6 +374,12 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         setFollowerCount((prev) => Math.max(0, prev - 1));
       }
     } else {
+      const blocked = await assertCanInteract();
+      if (blocked) {
+        setFollowLoading(false);
+        dialog.toast(blocked, "danger");
+        return;
+      }
       const { error } = await supabase.from("follows").insert({ follower_id: currentUser.id, following_id: id });
       if (!error) {
         setIsFollowing(true);

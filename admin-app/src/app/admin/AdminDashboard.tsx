@@ -59,7 +59,25 @@ export type AdminView = "reviews" | "reports" | "users" | "feedbacks" | "rules";
 
 const labels: Record<string, string> = { post: "作品", comment: "评论", user: "用户", novel: "小说", article: "文章", illustration: "插画", serial: "连载" };
 const userStatusLabels: Record<string, string> = { active: "正常", warned: "已警告", restricted: "受限", suspended: "已暂停", banned: "已封禁" };
-const statusLabelsForSearch = (status?: string | null) => status === "pending" ? "待处理" : status === "reviewing" ? "处理中" : status === "resolved" ? "已处理" : status === "cancelled" ? "已取消" : status || "未知";
+const statusLabelsForSearch = (status?: string | null) => {
+  const labels: Record<string, string> = {
+    pending: "待处理",
+    reviewing: "处理中",
+    resolved: "已处理",
+    cancelled: "已取消",
+    kept: "已保留",
+    reminded: "已提醒",
+    deleted: "已删除",
+    no_violation: "举报不成立",
+    content_case: "已转为内容案件",
+    profile_changes: "已要求修改资料",
+    warned: "已警告",
+    restricted: "已限制功能",
+    suspended: "已暂停",
+    banned: "已永久封禁",
+  };
+  return (status && labels[status]) || status || "未知";
+};
 const viewCopy: Record<AdminView, { title: string; description: string }> = {
   reviews: { title: "作品审核", description: "处理发布前进入人工审核队列的作品。" },
   reports: { title: "举报中心", description: "举报按对象与风险分为四个入口，进入详情页查看完整内容和举报证据。" },

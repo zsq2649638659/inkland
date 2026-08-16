@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { compressImage } from "@/lib/image";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { assertCanProfileEdit } from "@/lib/userRestrictions";
 
 export default function EditProfilePage() {
   const supabase = createClient();
@@ -17,10 +18,13 @@ export default function EditProfilePage() {
   const [nickname, setNickname] = useState(profile?.nickname || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
+  const [externalLink, setExternalLink] = useState(profile?.external_link || "");
+  const baselineRef = useRef({ nickname: profile?.nickname || "", bio: profile?.bio || null, avatar_url: profile?.avatar_url || null, external_link: profile?.external_link || null });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [revisionStatus, setRevisionStatus] = useState<string | null>(null);
 
   // 昵称和邮箱的编辑切换
   const [nicknameEditOpen, setNicknameEditOpen] = useState(false);
@@ -33,8 +37,29 @@ export default function EditProfilePage() {
     setNickname(profile.nickname || "");
     setBio(profile.bio || "");
     setAvatarUrl(profile.avatar_url || "");
+    setExternalLink(profile.external_link || "");
     setEmailValue(user.email || "");
+    baselineRef.current = { nickname: profile.nickname || "", bio: profile.bio || null, avatar_url: profile.avatar_url || null, external_link: profile.external_link || null };
   }, [profile, user]);
+
+  useEffect(() => {
+    if (!user) {
+      setRevisionStatus(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("profile_revision_status, hidden_profile_fields")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (data?.profile_revision_status) setRevisionStatus(data.profile_revision_status as string);
+      } catch {
+        // 查询失败时保持未知状态，不阻断资料编辑。
+      }
+    })();
+  }, [user, supabase]);
 
   // 未登录状态
   if (!user) {
@@ -107,9 +132,21 @@ export default function EditProfilePage() {
       setError("昵称不能为空");
       return;
     }
+    const linkValue = externalLink.trim();
+    if (linkValue && !/^https?:\/\//i.test(linkValue)) {
+      setError("请输入有效的 http:// 或 https:// 链接");
+      return;
+    }
     setSaving(true);
     setError("");
     setSuccess("");
+
+    const blocked = await assertCanProfileEdit();
+    if (blocked) {
+      setError(blocked);
+      setSaving(false);
+      return;
+    }
 
     const { error: updateErr } = await supabase
       .from("profiles")
@@ -117,6 +154,7 @@ export default function EditProfilePage() {
         nickname: nickname.trim(),
         bio: bio.trim() || null,
         avatar_url: avatarUrl || null,
+        external_link: externalLink.trim() || null,
       })
       .eq("id", user.id);
 
@@ -124,7 +162,24 @@ export default function EditProfilePage() {
       setError(`保存失败: ${updateErr.message}`);
     } else {
       await refreshProfile();
-      setSuccess("保存成功！");
+      const previousBaseline = baselineRef.current;
+      const submitted: string[] = [];
+      if (nickname.trim() !== previousBaseline.nickname) submitted.push("nickname");
+      if ((bio.trim() || null) !== previousBaseline.bio) submitted.push("bio");
+      if ((avatarUrl || null) !== previousBaseline.avatar_url) submitted.push("avatar");
+      if ((externalLink.trim() || null) !== previousBaseline.external_link) submitted.push("external_link");
+      baselineRef.current = { nickname: nickname.trim(), bio: bio.trim() || null, avatar_url: avatarUrl || null, external_link: externalLink.trim() || null };
+      if (revisionStatus === "requested" && submitted.length > 0) {
+        const { error: revisionError } = await supabase.rpc("profile_revision_submit", { p_fields: submitted });
+        if (!revisionError) {
+          setRevisionStatus("submitted");
+          setSuccess("保存成功！资料整改内容已提交审核。");
+        } else {
+          setSuccess("保存成功！资料整改状态更新失败，请稍后重试。");
+        }
+      } else {
+        setSuccess("保存成功！");
+      }
       setNicknameEditOpen(false);
       setEmailEditOpen(false);
       setTimeout(() => setSuccess(""), 2500);
@@ -136,7 +191,9 @@ export default function EditProfilePage() {
     setNickname(profile?.nickname || "");
     setBio(profile?.bio || "");
     setAvatarUrl(profile?.avatar_url || "");
+    setExternalLink(profile?.external_link || "");
     setEmailValue(user?.email || "");
+    baselineRef.current = { nickname: profile?.nickname || "", bio: profile?.bio || null, avatar_url: profile?.avatar_url || null, external_link: profile?.external_link || null };
     setNicknameEditOpen(false);
     setEmailEditOpen(false);
     setError("");
@@ -240,6 +297,21 @@ export default function EditProfilePage() {
                   {bio.length} / 200
                 </div>
                 <span className="field-error" role="alert">简介不能超过 200 个字符</span>
+              </div>
+
+              {/* 外部链接 */}
+              <div className="field-group">
+                <label htmlFor="external-link" className="field-label">外部链接</label>
+                <input
+                  id="external-link"
+                  type="url"
+                  className="field-input"
+                  placeholder="https://…（选填）"
+                  maxLength={200}
+                  value={externalLink}
+                  onChange={(e) => setExternalLink(e.target.value)}
+                />
+                {externalLink.trim() && !/^https?:\/\//i.test(externalLink.trim()) ? <span className="field-error visible" role="alert">请输入完整的 http:// 或 https:// 链接</span> : null}
               </div>
 
               {/* Email */}

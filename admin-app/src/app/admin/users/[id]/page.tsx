@@ -22,6 +22,13 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
     reporter_stats?: Record<string, unknown> | null;
   } | null;
 
+  const { data: profileRevisions } = await supabase
+    .from("profile_revision_requests")
+    .select("id, issue_type, issue_detail, hidden_fields, status, created_at, confirmed_at")
+    .eq("user_id", id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
   if (error || !detail?.ok) {
     const raw = error?.message || detail?.message || "";
     if (/admin_user_detail/.test(raw)) {
@@ -31,5 +38,8 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   }
   if (!detail.user) redirect("/admin?view=users");
 
-  return <UserDetailClient detail={detail as never} />;
+  return <UserDetailClient
+    detail={detail as never}
+    profileRevisions={(profileRevisions || []) as never}
+  />;
 }
