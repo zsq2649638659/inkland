@@ -708,8 +708,13 @@ BEGIN
       ) VALUES (
         target_owner_id, 'system', NULL, NULL,
         CASE WHEN case_record.target_type = 'comment'
-          THEN '你的一条评论因违反社区规则已被删除。'
-          ELSE '你的作品因违反社区规则已被删除。' END,
+          THEN '内容已被删除' || E'\n'
+            || '删除对象：你在《' || COALESCE(target_title, '某作品') || '》下发布的评论' || E'\n'
+          ELSE '内容已被删除' || E'\n'
+            || '删除对象：你的作品《' || COALESCE(target_title, '未命名作品') || '》' || E'\n' END
+          || '删除原因：违反社区规范（' || COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他问题') || '）' || E'\n'
+          || '已采取措施：该内容已被删除，不再公开展示。' || E'\n'
+          || '下一步：如需提交复核，可通过设置页反馈或联系客服邮箱联系我们。',
         FALSE, now_ts,
         CASE WHEN case_record.target_type = 'comment' THEN 'comment_deleted' ELSE 'post_deleted' END,
         case_record.target_type, case_record.target_id,
