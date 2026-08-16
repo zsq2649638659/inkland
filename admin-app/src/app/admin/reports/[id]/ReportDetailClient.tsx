@@ -24,7 +24,7 @@ type CaseRow = {
   risk_score?: number | null;
   suspicious_report?: boolean | null;
   low_quality_queue?: boolean | null;
-  review_basis?: string | null;
+  review_basis?: Record<string, unknown> | string | null;
 };
 
 type SnapshotRow = {
@@ -163,6 +163,16 @@ const contentActionLabels: Record<string, string> = { keep: "保留内容", remi
 
 function text(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
+function reviewBasisLabel(value: unknown) {
+  if (value == null || value === "") return "未记录";
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (!entries.length) return "未记录";
+    return entries.map(([key, item]) => `${key}: ${typeof item === "string" ? item : JSON.stringify(item)}`).join("；");
+  }
+  return String(value);
 }
 
 function imageUrls(content: string) {
@@ -598,7 +608,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                   <span className={reportCase.risk_score && reportCase.risk_score >= 10 ? "admin-mark-chip is-danger" : "admin-mark-chip"}>风险分：{reportCase.risk_score ?? "未记录"}</span>
                   <span className={reportCase.suspicious_report ? "admin-mark-chip is-danger" : "admin-mark-chip is-ok"}>可疑举报：{reportCase.suspicious_report ? "是" : "否"}</span>
                   <span className={reportCase.low_quality_queue ? "admin-mark-chip is-warning" : "admin-mark-chip is-ok"}>低质量队列：{reportCase.low_quality_queue ? "是" : "否"}</span>
-                  <span className="admin-mark-chip">审核依据：{reportCase.review_basis || "未记录"}</span>
+                  <span className="admin-mark-chip">审核依据：{reviewBasisLabel(reportCase.review_basis)}</span>
                 </div>
               </div>
 
