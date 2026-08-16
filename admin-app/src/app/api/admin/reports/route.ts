@@ -3,7 +3,7 @@ import { getAdminContext } from "@/lib/supabase/admin-server";
 
 const contentActions = ["keep", "remind", "delete", "dismiss"] as const;
 const userActions = ["no_violation", "convert_content", "profile_revision", "warn", "restrict", "suspend", "ban"] as const;
-const allowedActions = [...contentActions, ...userActions] as const;
+const allowedActions = [...contentActions, ...userActions, "mark_suspicious"] as const;
 
 export async function PATCH(request: Request) {
   const { supabase, user } = await getAdminContext();
@@ -17,6 +17,21 @@ export async function PATCH(request: Request) {
   } | null;
   if (!body?.caseId || !body.action || !allowedActions.includes(body.action as (typeof allowedActions)[number])) {
     return NextResponse.json({ error: "处理参数无效" }, { status: 400 });
+  }
+  if (body.action === "mark_suspicious") {
+    const { data, error } = await supabase.rpc("admin_mark_report_case_suspicious", {
+      p_case_id: body.caseId,
+      p_reason: body.reason?.trim() || null,
+    });
+    const result = data as { ok?: boolean; message?: string } | null;
+    if (error || !result?.ok) {
+      const raw = error?.message || result?.message || "";
+      if (/admin_mark_report_case_suspicious/.test(raw)) {
+        return NextResponse.json({ error: "标记恶意举报功能尚未启用，请先执行数据库迁移。" }, { status: 500 });
+      }
+      return NextResponse.json({ error: result?.message || "标记恶意举报失败，请稍后重试。" }, { status: 500 });
+    }
+    return NextResponse.json({ success: true, message: result.message || "该案件已标记为恶意举报。" });
   }
   const isUserAction = (userActions as readonly string[]).includes(body.action);
   const rpcName = isUserAction ? "admin_resolve_user_report_case" : "admin_resolve_report_case";
