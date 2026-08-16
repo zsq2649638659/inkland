@@ -175,6 +175,16 @@ function reviewBasisLabel(value: unknown) {
   return String(value);
 }
 
+function fmtDateTime(value: string | null | undefined) {
+  if (!value) return "未记录";
+  return new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false });
+}
+
+function fmtDate(value: string | null | undefined) {
+  if (!value) return "未记录";
+  return new Date(value).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai" });
+}
+
 function imageUrls(content: string) {
   return [...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]);
 }
@@ -379,10 +389,10 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     }
     if (pendingAction === "restrict") {
       const labels = restrictionTypes.length ? restrictionTypes.map((item) => `- ${restrictionLabels[item] || item}`).join("\n") : "- 未选择功能";
-      return `功能限制\n你的以下功能已被限制（至 ${endsAt ? new Date(endsAt).toLocaleString("zh-CN") : "未设置"}）：\n${labels}\n原因：${reasonText}\n限制结束后相关功能会恢复。`;
+      return `功能限制\n你的以下功能已被限制（至 ${endsAt ? fmtDateTime(endsAt) : "未设置"}）：\n${labels}\n原因：${reasonText}\n限制结束后相关功能会恢复。`;
     }
     if (pendingAction === "suspend") {
-      return `账号暂停\n你的账号已被暂停至 ${endsAt ? new Date(endsAt).toLocaleString("zh-CN") : "未设置"}。\n原因：${reasonText}\n暂停期间无法使用账号，到期后自动恢复。`;
+      return `账号暂停\n你的账号已被暂停至 ${endsAt ? fmtDateTime(endsAt) : "未设置"}。\n原因：${reasonText}\n暂停期间无法使用账号，到期后自动恢复。`;
     }
     if (pendingAction === "ban") {
       return `账号封禁\n你的账号已被永久封禁。\n原因：${reasonText}\n相关内容将根据平台规则隐藏或删除。`;
@@ -478,8 +488,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         <div className="admin-detail-kicker">REPORT CASE · {targetLabels[reportCase.target_type]?.toUpperCase() || "OBJECT"}</div>
         <h1>{targetTitle}</h1>
         <div className="admin-detail-meta">
-          目标作者：{targetAuthor} · {reportCase.report_count} 人举报 · 首次 {new Date(reportCase.first_reported_at).toLocaleString("zh-CN")} · 最近 {new Date(reportCase.last_reported_at).toLocaleString("zh-CN")}
-          {isUser && userDetail ? ` · 注册于 ${new Date(userDetail.user.created_at || "").toLocaleDateString("zh-CN")} · 当前功能限制 ${userDetail.stats.active_restrictions || 0} 项` : null}
+          目标作者：{targetAuthor} · {reportCase.report_count} 人举报 · 首次 {fmtDateTime(reportCase.first_reported_at)} · 最近 {fmtDateTime(reportCase.last_reported_at)}
+          {isUser && userDetail ? ` · 注册于 ${fmtDate(userDetail.user.created_at || "")} · 当前功能限制 ${userDetail.stats.active_restrictions || 0} 项` : null}
         </div>
       </div>
 
@@ -497,7 +507,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <dt>目标 ID</dt>
               <dd className="admin-mono">{reportCase.target_id}</dd>
               {reportCase.outcome ? <><dt>处理结果</dt><dd>{outcomeLabels[reportCase.outcome] || reportCase.outcome}</dd></> : null}
-              {reportCase.resolved_at ? <><dt>处理时间</dt><dd>{new Date(reportCase.resolved_at).toLocaleString("zh-CN")}</dd></> : null}
+              {reportCase.resolved_at ? <><dt>处理时间</dt><dd>{fmtDateTime(reportCase.resolved_at)}</dd></> : null}
             </dl>
           </section>
 
@@ -510,8 +520,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                 <strong>{report.kind === "comment" ? "评论举报" : report.target_type === "post" ? "作品举报" : "用户举报"} · {report.reporter?.nickname || "匿名用户"}</strong>
                 <div className="admin-risk-tags"><span>{report.reason_category || report.reason || "未填写原因"}</span><span>{reportStatusLabel(report.status)}</span></div>
                 {report.details && report.details !== report.reason ? <small>补充说明：{report.details}</small> : null}
-                <small>提交于 {new Date(report.created_at).toLocaleString("zh-CN")}</small>
-                {stat ? <small>该举报人累计 {stat.total_reports} 次 · 成立 {stat.valid_reports} · 不成立 {stat.invalid_reports} · 24 小时 {stat.reports_last_24h} 次{stat.report_restricted_until ? ` · 举报受限至 ${new Date(stat.report_restricted_until).toLocaleDateString("zh-CN")}` : ""}</small> : null}
+                <small>提交于 {fmtDateTime(report.created_at)}</small>
+                {stat ? <small>该举报人累计 {stat.total_reports} 次 · 成立 {stat.valid_reports} · 不成立 {stat.invalid_reports} · 24 小时 {stat.reports_last_24h} 次{stat.report_restricted_until ? ` · 举报受限至 ${fmtDate(stat.report_restricted_until)}` : ""}</small> : null}
                 {reporterId ? <div className="admin-report-stat-actions">
                   <Link href={`/admin/users/${reporterId}`} className="admin-inline-link">查看用户并处罚</Link>
                   <button className="admin-inline-btn" type="button" onClick={() => openReminder(reporterId, report.reporter?.nickname || "该用户")}>发送举报规则提醒</button>
@@ -526,26 +536,26 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <strong>{item.content_type ? targetLabels[item.content_type] || item.content_type : "账号"} · {item.category}</strong>
               <div className="admin-risk-tags"><span>{severityLabels[item.severity] || item.severity}</span><span>{item.status === "active" ? "有效" : "已撤销"}</span></div>
               {item.summary ? <small>{item.summary}</small> : null}
-              <small>确认于 {new Date(item.confirmed_at).toLocaleString("zh-CN")}</small>
+              <small>确认于 {fmtDateTime(item.confirmed_at)}</small>
             </div>)}</div> : <p className="admin-detail-empty">该用户没有确认违规记录。</p>}
           </section>
         </aside>
 
         <article className="admin-detail-content admin-review-main">
           <section className="admin-evidence-document">
-            <div className="admin-document-label">举报内容快照 · {new Date(snapshot?.captured_at || reportCase.created_at).toLocaleString("zh-CN")}</div>
+            <div className="admin-document-label">举报内容快照 · {fmtDateTime(snapshot?.captured_at || reportCase.created_at)}</div>
             <h2>{isPost ? "作品全文" : isComment ? "评论原文" : "用户资料"}</h2>
 
             {isPost ? <dl className="admin-snapshot-meta">
               <dt>内容评级</dt><dd>{text(object.content_rating) || "未记录"}</dd>
               {text(object.series_name) ? <><dt>所属连载</dt><dd>{text(object.series_name)}{text(object.chapter_number) ? ` · 第 ${text(object.chapter_number)} 章` : ""}</dd></> : null}
-              {text(object.published_at) ? <><dt>发布时间</dt><dd>{new Date(text(object.published_at)).toLocaleString("zh-CN")}</dd></> : null}
+              {text(object.published_at) ? <><dt>发布时间</dt><dd>{fmtDateTime(text(object.published_at))}</dd></> : null}
               {text(object.visibility) ? <><dt>可见范围</dt><dd>{text(object.visibility)}</dd></> : null}
             </dl> : null}
 
             {isUser ? <div className="admin-user-profile">
               {text(object.avatar_url) ? <img src={text(object.avatar_url)} alt="用户头像" className="admin-user-avatar" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="admin-user-avatar admin-user-avatar-empty">{targetAuthor.slice(0, 1)}</span>}
-              <div><strong>{targetAuthor}</strong><span>{text(object.moderation_status) ? `账号状态：${text(object.moderation_status)}` : "账号状态：未记录"}{text(object.created_at) ? ` · 注册于 ${new Date(text(object.created_at)).toLocaleDateString("zh-CN")}` : ""}</span></div>
+              <div><strong>{targetAuthor}</strong><span>{text(object.moderation_status) ? `账号状态：${text(object.moderation_status)}` : "账号状态：未记录"}{text(object.created_at) ? ` · 注册于 ${fmtDate(text(object.created_at))}` : ""}</span></div>
             </div> : null}
 
             {contentText ? <div className="admin-long-content">{contentText}</div> : <p className="admin-detail-empty">{isUser ? "该用户没有填写个人简介。" : "快照中没有可读取的文字内容。"}</p>}
@@ -573,8 +583,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                     <strong>{userDetail?.user.nickname || targetAuthor}</strong>
                   </div>
                   <dl>
-                    <dt>注册时间</dt><dd>{userDetail?.user.created_at ? new Date(userDetail.user.created_at).toLocaleString("zh-CN") : "未记录"}</dd>
-                    <dt>账号状态</dt><dd>{userDetail?.user.moderation_status || "正常"}{userDetail?.user.moderated_at ? ` · ${new Date(userDetail.user.moderated_at).toLocaleString("zh-CN")}` : ""}</dd>
+                    <dt>注册时间</dt><dd>{userDetail?.user.created_at ? fmtDateTime(userDetail.user.created_at) : "未记录"}</dd>
+                    <dt>账号状态</dt><dd>{userDetail?.user.moderation_status || "正常"}{userDetail?.user.moderated_at ? ` · ${fmtDateTime(userDetail.user.moderated_at)}` : ""}</dd>
                     <dt>个人简介</dt><dd>{userDetail?.user.bio || "未填写"}</dd>
                     <dt>当前功能限制</dt><dd>{userDetail?.stats.active_restrictions ? `${userDetail.stats.active_restrictions} 项生效中` : "无"}</dd>
                   </dl>
@@ -586,7 +596,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                     <strong>{targetAuthor}</strong>
                   </div>
                   <dl>
-                    <dt>快照时间</dt><dd>{snapshot?.captured_at ? new Date(snapshot.captured_at).toLocaleString("zh-CN") : "未记录"}</dd>
+                    <dt>快照时间</dt><dd>{snapshot?.captured_at ? fmtDateTime(snapshot.captured_at) : "未记录"}</dd>
                     <dt>资料修改状态</dt><dd>{profileRevisions.some((item) => item.status === "submitted") ? "已提交修改，待确认" : profileRevisions.length ? "有历史整改记录" : "无"}</dd>
                     <dt>简介快照</dt><dd>{text(object.bio) || "未填写"}</dd>
                   </dl>
@@ -597,7 +607,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                 <h3>资料修改记录</h3>
                 {profileRevisions.length ? <div className="admin-history-list">{profileRevisions.map((item) => <div className="admin-history-item" key={item.id}>
                   <strong>{issueLabels[item.issue_type] || item.issue_type}{item.issue_detail ? ` · ${item.issue_detail}` : ""}</strong>
-                  <span>状态：{revisionStatusLabels[item.status || ""] || item.status || "未知"} · 申请于 {item.created_at ? new Date(item.created_at).toLocaleString("zh-CN") : "未知"}{item.confirmed_at ? ` · 确认于 ${new Date(item.confirmed_at).toLocaleString("zh-CN")}` : ""}</span>
+                  <span>状态：{revisionStatusLabels[item.status || ""] || item.status || "未知"} · 申请于 {item.created_at ? fmtDateTime(item.created_at) : "未知"}{item.confirmed_at ? ` · 确认于 ${fmtDateTime(item.confirmed_at)}` : ""}</span>
                 </div>)}</div> : <p className="admin-detail-empty">没有资料修改记录。</p>}
               </div>
 
@@ -618,7 +628,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                   <strong>{item.content_type ? targetLabels[item.content_type] || item.content_type : "账号"} · {item.category}</strong>
                   <div className="admin-risk-tags"><span>{severityLabels[item.severity] || item.severity}</span><span>{item.status === "active" ? "有效" : "已撤销"}</span></div>
                   {item.summary ? <small>{item.summary}</small> : null}
-                  <small>确认于 {new Date(item.confirmed_at).toLocaleString("zh-CN")}</small>
+                  <small>确认于 {fmtDateTime(item.confirmed_at)}</small>
                 </div>)}</div> : <p className="admin-detail-empty">没有管理员确认的问题。</p>}
               </div>
             </section>
@@ -628,7 +638,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <div className="admin-evidence-list">
                 {reports.length ? reports.map((report) => <div className="admin-evidence-item" key={report.id}>
                   <strong>{report.kind === "comment" ? "评论举报" : report.target_type === "post" ? "作品举报" : "用户举报"} · {report.reporter?.nickname || "匿名用户"}</strong>
-                  <span>提交人：{report.reporter?.nickname || "匿名用户"} · 提交时间：{new Date(report.created_at).toLocaleString("zh-CN")}</span>
+                  <span>提交人：{report.reporter?.nickname || "匿名用户"} · 提交时间：{fmtDateTime(report.created_at)}</span>
                   <p>原因：{report.reason_category || report.reason || "未填写"}{report.details && report.details !== report.reason ? ` · ${report.details}` : ""}</p>
                 </div>) : <p className="admin-detail-empty">没有找到该案件的举报证据。</p>}
               </div>
@@ -636,13 +646,13 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                 <div>
                   <h3>相关作品</h3>
                   <div className="admin-content-list">{recentPosts.length ? recentPosts.slice(0, 6).map((item) => <div className="admin-content-row" key={`post-${item.id}`}>
-                    <strong>{item.title}</strong><span>{new Date(item.created_at).toLocaleString("zh-CN")}</span>
+                    <strong>{item.title}</strong><span>{fmtDateTime(item.created_at)}</span>
                   </div>) : <p className="admin-detail-empty">没有相关作品。</p>}</div>
                 </div>
                 <div>
                   <h3>相关评论</h3>
                   <div className="admin-content-list">{recentComments.length ? recentComments.slice(0, 6).map((item) => <div className="admin-content-row" key={`comment-${item.id}`}>
-                    <strong>{item.title}</strong><span>{new Date(item.created_at).toLocaleString("zh-CN")}</span>
+                    <strong>{item.title}</strong><span>{fmtDateTime(item.created_at)}</span>
                   </div>) : <p className="admin-detail-empty">没有相关评论。</p>}</div>
                 </div>
               </div>
@@ -654,13 +664,13 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                 <div className="admin-behavior-cell">
                   <h3>最近作品</h3>
                   <div className="admin-content-list">{recentPosts.length ? recentPosts.slice(0, 6).map((item) => <div className="admin-content-row" key={`post-${item.id}`}>
-                    <strong>{item.title}</strong><span>{new Date(item.created_at).toLocaleString("zh-CN")}</span>
+                    <strong>{item.title}</strong><span>{fmtDateTime(item.created_at)}</span>
                   </div>) : <p className="admin-detail-empty">没有近期作品。</p>}</div>
                 </div>
                 <div className="admin-behavior-cell">
                   <h3>最近评论</h3>
                   <div className="admin-content-list">{recentComments.length ? recentComments.slice(0, 6).map((item) => <div className="admin-content-row" key={`comment-${item.id}`}>
-                    <strong>{item.title}</strong><span>{new Date(item.created_at).toLocaleString("zh-CN")}</span>
+                    <strong>{item.title}</strong><span>{fmtDateTime(item.created_at)}</span>
                   </div>) : <p className="admin-detail-empty">没有近期评论。</p>}</div>
                 </div>
                 <div className="admin-behavior-cell">
@@ -692,7 +702,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <div className="admin-panel-title-row"><h2>历史记录</h2><span>{userDetail?.restrictions.length || 0} 条功能限制</span></div>
               {userDetail?.restrictions.length ? <div className="admin-history-list">{userDetail.restrictions.map((item) => <div className="admin-history-item" key={item.id}>
                 <strong>{restrictionLabels[item.restriction_type || ""] || item.restriction_type || "账号功能"} · {restrictionStatusLabels[item.status || ""] || item.status || "未知"}</strong>
-                <span>{item.reason ? `原因：${item.reason}` : "未填写原因"}{item.starts_at ? ` · 开始 ${new Date(item.starts_at).toLocaleString("zh-CN")}` : ""}{item.ends_at ? ` · 结束 ${new Date(item.ends_at).toLocaleString("zh-CN")}` : ""}{item.lifted_at ? ` · 解除于 ${new Date(item.lifted_at).toLocaleString("zh-CN")}` : ""}</span>
+                <span>{item.reason ? `原因：${item.reason}` : "未填写原因"}{item.starts_at ? ` · 开始 ${fmtDateTime(item.starts_at)}` : ""}{item.ends_at ? ` · 结束 ${fmtDateTime(item.ends_at)}` : ""}{item.lifted_at ? ` · 解除于 ${fmtDateTime(item.lifted_at)}` : ""}</span>
               </div>)}</div> : <p className="admin-detail-empty">该账号没有历史功能限制记录。</p>}
             </section>
 
