@@ -11,10 +11,8 @@
 .inline-comment-hint { display: none !important; }
 .inline-comment-panel .comment-actions { justify-content: flex-start; gap: 6px; }
 .inline-comment-panel .comment-more-btn { margin-left: auto; }
-.inline-reply-composer { margin: 8px 0 4px; padding: 10px; border-radius: 10px; background: var(--color-bg-page); }
-.inline-reply-composer textarea { width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; outline: 0; background: var(--color-card); resize: vertical; font-family: var(--font-family); }
-.inline-reply-composer > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-.inline-reply-composer button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; }
+.inline-reply-composer { margin: 8px 0 4px; }
+.inline-reply-composer .inline-reply-textarea { resize: vertical; }
 .nested-comment-list { display: grid; gap: 10px; margin-top: 10px; padding-left: 14px; }
 .nested-comment { display: flex; gap: 10px; padding: 10px; border-radius: 10px; background: var(--color-bg-page); }
 .nested-comment .comment-avatar { width: 30px; height: 30px; flex: 0 0 30px; }

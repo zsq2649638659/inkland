@@ -252,10 +252,10 @@ export default function PostCard({ post }: PostCardProps) {
       setLoadingComments(true);
       const { data } = await supabase
         .from("comments")
-        .select("id, content, created_at, user_id, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
+        .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
         .eq("post_id", post.id)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(100);
       if (data) {
         setComments(
           data.map((c: Record<string, unknown>) => {
@@ -266,8 +266,8 @@ export default function PostCard({ post }: PostCardProps) {
               user_id: c.user_id as string,
               content: c.content as string,
               created_at: c.created_at as string,
-              parent_id: null,
-              paragraph_index: null,
+              parent_id: (c.parent_id as string | null) ?? null,
+              paragraph_index: (c.paragraph_index as number | null) ?? null,
               author: { nickname: a?.nickname || "匿名用户", avatar_url: a?.avatar_url },
             };
           })
@@ -333,6 +333,7 @@ export default function PostCard({ post }: PostCardProps) {
   const navigateCard = (event: MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("a, button, input, textarea, select")) return;
+    if (target.closest(".card-time")) return;
     if (!target.closest(".card-title, .card-excerpt")) return;
     router.push(`/read/${post.id}`);
   };
