@@ -1,0 +1,41 @@
+import { NextResponse } from "next/server";
+import { getAdminContext } from "@/lib/supabase/admin-server";
+
+const allowedActions = ["warn", "restrict_comment", "restrict_publish", "restrict_report", "suspend", "ban"] as const;
+
+export async function POST(request: Request) {
+  const { supabase, user } = await getAdminContext();
+  if (!user) return NextResponse.json({ error: "请先登录管理员后台" }, { status: 401 });
+  const body = await request.json().catch(() => null) as {
+    userId?: string;
+    action?: string;
+    reason?: string;
+    countViolation?: boolean;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    hideContent?: boolean;
+    note?: string | null;
+  } | null;
+  if (!body?.userId || !body.action || !allowedActions.includes(body.action as (typeof allowedActions)[number])) {
+    return NextResponse.json({ error: "处罚参数无效" }, { status: 400 });
+  }
+  const { data, error } = await supabase.rpc("admin_enforce_user_restriction", {
+    p_user_id: body.userId,
+    p_action: body.action,
+    p_reason: body.reason?.trim() || null,
+    p_count_violation: body.countViolation !== false,
+    p_starts_at: body.startsAt || null,
+    p_ends_at: body.endsAt || null,
+    p_hide_content: Boolean(body.hideContent),
+    p_note: body.note?.trim() || null,
+  });
+  const result = data as { ok?: boolean; message?: string } | null;
+  if (error || !result?.ok) {
+    const raw = error?.message || result?.message || "";
+    if (/admin_enforce_user_restriction/.test(raw)) {
+      return NextResponse.json({ error: "账号处罚功能尚未启用，请先执行模块6数据库迁移。" }, { status: 500 });
+    }
+    return NextResponse.json({ error: result?.message || "处罚操作失败，请稍后重试。" }, { status: 500 });
+  }
+  return NextResponse.json({ success: true, message: result.message || "处罚已生效。" });
+}
