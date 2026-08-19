@@ -1,0 +1,12 @@
+.admin-dialog-overlay { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:24px; background:#22232a66; backdrop-filter:blur(4px); }
+.admin-dialog { width:min(430px,100%); padding:28px; border:1px solid #e5e3e2; border-radius:16px; background:#fff; box-shadow:0 24px 70px #1f202633; color:#28282e; }
+.admin-dialog-icon { display:flex; align-items:center; justify-content:center; width:42px; height:42px; margin-bottom:17px; border-radius:12px; background:#fff0ed; color:#ef705f; font-weight:800; }
+.admin-dialog h2 { margin:0; font-size:20px; }
+.admin-dialog p { margin:10px 0 0; color:#77747a; font-size:13px; line-height:1.7; white-space:pre-line; }
+.admin-dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:24px; }
+.admin-dialog-actions button { min-width:100px; min-height:42px; border-radius:9px; font-weight:700; cursor:pointer; }
+.admin-dialog-actions button:focus-visible { outline:3px solid #ef705f40; outline-offset:2px; }
+.admin-dialog-cancel { border:1px solid #dedbd9; background:#fff; color:#555259; }
+.admin-dialog-confirm { border:1px solid #ef705f; background:#ef705f; color:#fff; }
+.admin-dialog-danger .admin-dialog-confirm { border-color:#df5148; background:#df5148; }
+@media(max-width:600px) { .admin-dialog-overlay { align-items:flex-end; padding:14px; } .admin-dialog-actions { flex-direction:column-reverse; } .admin-dialog-actions button { width:100%; } }
