@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
@@ -62,6 +62,12 @@ export default function StudioPage() {
   const [sortOpen, setSortOpen] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [shownWorks, setShownWorks] = useState(12);
+  const workLoadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setShownWorks(12);
+  }, [filter, statusFilter, searchQuery, sortType]);
 
   useEffect(() => {
     if (!user) return;
@@ -250,6 +256,19 @@ export default function StudioPage() {
       return db - da;
     });
   }
+
+  useEffect(() => {
+    const el = workLoadMoreRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) setShownWorks((count) => count + 12);
+      },
+      { rootMargin: "240px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [allWorks.length, filter, statusFilter, searchQuery, sortType]);
 
   // Stats (from unfiltered data, not affected by type filter)
   const allPostsForStats = works.filter((w) => w.post_type !== "serial");
@@ -675,7 +694,7 @@ export default function StudioPage() {
             </div>
           ) : (
             <div className="works-card-grid">
-              {allWorks.map((w) => (
+              {allWorks.slice(0, shownWorks).map((w) => (
                 <div
                   key={w.id}
                   className={`work-card ${batchMode ? "batch-mode" : ""} ${selectedIds.has(w.id) ? "selected" : ""}`}
@@ -750,6 +769,17 @@ export default function StudioPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {allWorks.length > 12 && (
+            <div className="card-load-more" ref={workLoadMoreRef}>
+              {shownWorks < allWorks.length ? (
+                <button type="button" className="btn-load-more" onClick={() => setShownWorks((count) => count + 12)}>
+                  <i className="fa-solid fa-angles-down" aria-hidden="true" /> 加载更多
+                </button>
+              ) : (
+                <span className="load-more-end">已加载全部 {allWorks.length} 项作品</span>
+              )}
             </div>
           )}
 

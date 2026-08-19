@@ -12,7 +12,7 @@ function Pulse({ className }: { className?: string }) {
 /** 网格卡片骨架 */
 export function SkeletonCardGrid() {
   return (
-    <div className="rounded-[20px] bg-card overflow-hidden flex flex-col aspect-square">
+    <div className="rounded-[16px] bg-card border border-rule overflow-hidden flex flex-col aspect-square">
       <div className="flex-1 bg-rule animate-pulse" />
       <div className="p-3 flex flex-col gap-2">
         <div className="flex items-center gap-1.5">
@@ -328,7 +328,7 @@ export function SkeletonCollectionDetail() {
 
         <div className="collection-card-grid mt-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-[20px] bg-card overflow-hidden flex flex-col">
+            <div key={i} className="rounded-[16px] bg-card border border-rule overflow-hidden flex flex-col">
               <div className="aspect-square bg-rule animate-pulse" />
               <div className="p-3 flex flex-col gap-2">
                 <div className="h-4 w-3/4 bg-rule animate-pulse rounded" />

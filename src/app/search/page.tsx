@@ -466,7 +466,7 @@ function SearchContent() {
                           <i className="fa-solid fa-file-lines"></i>
                         </div>
                         <div className="post-item-content">
-                          <div className="post-snippet">{plainText.slice(0, 200)}</div>
+                          <div className="post-snippet">{plainText}</div>
                           <div className="post-source">
                             <i className="fa-solid fa-book"></i>
                             <span>{post.title}</span>

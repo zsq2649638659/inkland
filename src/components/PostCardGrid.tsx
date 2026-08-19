@@ -11,15 +11,14 @@ interface PostCardGridProps {
   showAuthor?: boolean;
 }
 
-function getTextPreview(content?: string, maxLen = 100): string {
+function getTextPreview(content?: string): string {
   if (!content) return "";
-  const plain = content
+  return content
     .replace(/!\[.*?\]\(.*?\)/g, "")
     .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
     .replace(/[#*`~>_\-|]/g, "")
     .replace(/\n+/g, " ")
     .trim();
-  return plain.length > maxLen ? plain.slice(0, maxLen) + "..." : plain;
 }
 
 function getFirstImage(content?: string): string | null {
@@ -51,7 +50,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
   ) : null;
 
   return (
-    <div className="rounded-xl bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
+    <div className="rounded-[16px] bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
       {hasImage ? (
         <Link href={`/read/${post.id}`} className="block relative flex-1 min-h-0 overflow-hidden bg-rule no-underline">
           <img
@@ -59,6 +58,8 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
             alt={post.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
+            onError={(event) => event.currentTarget.classList.add("load-error")}
+            onLoad={(event) => event.currentTarget.classList.remove("load-error")}
           />
           {/* 悬停遮罩层 */}
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-start p-3">
@@ -85,7 +86,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
             {post.title || "无标题"}
           </h3>
           {textPreview && (
-            <p className="text-xs text-muted overflow-hidden" style={{ display: "-webkit-box", WebkitLineClamp: "unset", WebkitBoxOrient: "vertical" }}>{textPreview}</p>
+            <p className="text-xs text-muted line-clamp-4 min-w-0 break-words">{textPreview}</p>
           )}
         </Link>
       )}

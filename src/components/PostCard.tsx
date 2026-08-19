@@ -23,7 +23,7 @@ interface PostCardProps {
 }
 
 // 剥离 Markdown 语法，提取纯文本
-function stripMarkdown(content?: string, maxLen = 300): string {
+function stripMarkdown(content?: string): string {
   if (!content) return "";
   let text = content
     .replace(/!\[.*?\]\(.*?\)/g, "")           // 移除图片
@@ -32,7 +32,6 @@ function stripMarkdown(content?: string, maxLen = 300): string {
     .replace(/\n+/g, " ")                      // 换行转空格
     .replace(/\s+/g, " ")                      // 合并空白
     .trim();
-  if (text.length > maxLen) text = text.slice(0, maxLen) + "...";
   return text;
 }
 
@@ -64,6 +63,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [activeImageDot, setActiveImageDot] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
   const [imageAspectRatios, setImageAspectRatios] = useState<Record<number, number>>({});
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [moderationModal, setModerationModal] = useState<
@@ -333,6 +333,7 @@ export default function PostCard({ post }: PostCardProps) {
   const navigateCard = (event: MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("a, button, input, textarea, select")) return;
+    if (!target.closest(".card-title, .card-excerpt")) return;
     router.push(`/read/${post.id}`);
   };
 
@@ -429,7 +430,8 @@ export default function PostCard({ post }: PostCardProps) {
                       setImageAspectRatios((current) => ({ ...current, [i]: image.naturalWidth / image.naturalHeight }));
                     }
                   }}
-                  className={loadedImages.has(i) ? "loaded" : ""}
+                  onError={() => setFailedImages(prev => new Set(prev).add(i))}
+                  className={`${loadedImages.has(i) ? "loaded" : ""}${failedImages.has(i) ? " load-error" : ""}`}
                 />
               </button>
             ))}
