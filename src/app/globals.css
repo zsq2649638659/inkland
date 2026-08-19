@@ -5828,6 +5828,175 @@ p {
   }
 }
 
+/* Home inline comment panel polish — aligns with the detail-page comments section */
+.inline-comment-panel .inline-comment-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 6px 0 4px;
+}
+
+.inline-comment-panel .inline-comment-list-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-text, #1A1A1A);
+}
+
+.inline-comment-panel .inline-comment-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.inline-comment-panel .inline-comment-sort button {
+  position: relative;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--color-text-light, #999999);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.inline-comment-panel .inline-comment-sort button:hover {
+  color: var(--color-primary, #F26B5B);
+}
+
+.inline-comment-panel .inline-comment-sort button.active {
+  color: var(--color-text, #1A1A1A);
+  font-weight: 600;
+}
+
+.inline-comment-panel .inline-comment-sort button.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-primary, #F26B5B);
+}
+
+.inline-comment-panel .comment-main {
+  gap: 12px;
+}
+
+.inline-comment-panel .comment-body {
+  min-width: 0;
+}
+
+.inline-comment-panel .comment-header {
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.inline-comment-panel .comment-text {
+  margin-bottom: 6px;
+  line-height: 1.65;
+}
+
+.inline-comment-panel .comment-actions {
+  gap: 8px;
+}
+
+.inline-comment-panel .comment-action-btn {
+  min-height: 32px;
+  padding: 4px 10px;
+}
+
+.inline-comment-panel .comment-more-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+/* Nested replies (楼中楼) inside the inline panel — matches detail page */
+.inline-comment-panel .nested-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding-left: 4px;
+}
+
+.inline-comment-panel .nested-comment {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.inline-comment-panel .nested-comment .comment-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+}
+
+.inline-comment-panel .nested-comment .comment-avatar-placeholder {
+  font-size: 12px;
+}
+
+.inline-comment-panel .comment-reply-label {
+  font-size: 12px;
+  color: var(--color-text-light, #999999);
+}
+
+.inline-comment-panel .comment-mention {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-primary, #F26B5B);
+}
+
+.inline-comment-panel .nested-comment-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 32px;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border, #E5E5E5);
+  border-radius: 999px;
+  background: var(--color-bg-secondary, #F5F2EF);
+  color: var(--color-text-muted, #6B6B6B);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.inline-comment-panel .nested-comment-expand:hover {
+  border-color: var(--color-primary, #F26B5B);
+  color: var(--color-primary, #F26B5B);
+  background: var(--color-primary-light, #FDDCD8);
+}
+
+.inline-comment-panel .nested-comment-expand i {
+  font-size: 10px;
+}
+
+@media (max-width: 600px) {
+  .inline-comment-panel .inline-comment-sort button,
+  .inline-comment-panel .comment-action-btn,
+  .inline-comment-panel .nested-comment-expand {
+    min-height: 36px;
+  }
+
+  .inline-comment-panel .comment-more-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
 /* ─── Paragraph Comment Panel ─── */
 .para-comment-panel-overlay {
   position: fixed;

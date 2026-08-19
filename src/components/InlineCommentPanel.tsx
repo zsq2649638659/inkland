@@ -165,7 +165,7 @@ export default function InlineCommentPanel({
                       <div><button type="button" onClick={() => setReplyingTo(null)}>取消</button><button type="button" className="btn-submit" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), comment.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}>回复</button></div>
                     </div>
                   )}
-                  <div className="nested-comment-list">
+                  <div className="nested-comment-list nested-replies">
                     {(() => {
                       const replies = comments.filter((reply) => reply.parent_id === comment.id);
                       const expanded = expandedReplyIds.has(comment.id);
@@ -188,7 +188,7 @@ export default function InlineCommentPanel({
                         </div>
                       </div>;
                     })}
-                    {!expanded && replies.length > 3 && <button type="button" className="nested-comment-expand" onClick={() => setExpandedReplyIds((current) => new Set(current).add(comment.id))}>展开更多<i className="fa-solid fa-chevron-down" /></button>}
+                    {!expanded && replies.length > 3 && <button type="button" className="nested-comment-expand" onClick={() => setExpandedReplyIds((current) => new Set(current).add(comment.id))}>展开评论<i className="fa-solid fa-chevron-down" /></button>}
                       </>;
                     })()}
                   </div>
