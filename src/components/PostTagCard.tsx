@@ -15,7 +15,7 @@ interface PostTagCardProps {
   imageTagsInOverlay?: boolean;
 }
 
-function getPlainText(content?: string, maxLen = 120): string {
+function getPlainText(content?: string): string {
   if (!content) return "";
   return content
     .replace(/!\[.*?\]\(.*?\)/g, "")
@@ -23,8 +23,7 @@ function getPlainText(content?: string, maxLen = 120): string {
     .replace(/[*_~`#>|-]/g, "")
     .replace(/\n+/g, " ")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLen);
+    .trim();
 }
 
 function getAllImages(content?: string): string[] {
@@ -79,6 +78,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
   const navigateCard = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("a, button")) return;
+    if (!target.closest(".card-title, .card-summary")) return;
     router.push(targetHref);
   };
 

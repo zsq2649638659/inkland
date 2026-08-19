@@ -35,7 +35,7 @@ export interface SerialPostCardData {
   createdAt: string;
 }
 
-function stripMarkdown(content?: string, maxLen = 120): string {
+function stripMarkdown(content?: string): string {
   if (!content) return "";
   let text = content
     .replace(/!\[.*?\]\(.*?\)/g, "")
@@ -44,7 +44,6 @@ function stripMarkdown(content?: string, maxLen = 120): string {
     .replace(/\n+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (text.length > maxLen) text = text.slice(0, maxLen) + "...";
   return text;
 }
 
@@ -259,7 +258,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       tabIndex={0}
       onClick={(event) => {
         const target = event.target as HTMLElement;
-        if (!target.closest("a, button")) router.push(`/read/${data.chapterId}`);
+        if (!target.closest("a, button") && target.closest(".card-title, .card-excerpt")) router.push(`/read/${data.chapterId}`);
       }}
       onKeyDown={(event) => { if (event.key === "Enter") router.push(`/read/${data.chapterId}`); }}
     >

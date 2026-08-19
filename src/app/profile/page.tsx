@@ -2,7 +2,7 @@
 
 // Personal center release marker: keeps the GitHub-to-Vercel deployment trigger explicit.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
@@ -117,6 +117,8 @@ export default function ProfilePage() {
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [tabLoading, setTabLoading] = useState(false);
+  const [shownProfileItems, setShownProfileItems] = useState(12);
+  const profileLoadMoreRef = useRef<HTMLDivElement>(null);
 
   // Stats
   const [likeCount, setLikeCount] = useState(0);
@@ -464,6 +466,52 @@ export default function ProfilePage() {
   const showFilters = tab === "works" || tab === "likes" || tab === "bookmarks";
 
   // “全部”需要把长篇、单篇和图片放进同一个时间序列，而不是按卡片类型分组。
+  const profilePageTotal = (() => {
+    if (tab === "works") {
+      const seriesCount = filter === "all" || filter === "series" ? seriesList.length : 0;
+      const posts = filter === "all"
+        ? displayPosts.length
+        : displayPosts.filter((p) => (filter === "image" ? hasImages(p) : !hasImages(p))).length;
+      return seriesCount + posts;
+    }
+    if (tab === "likes") {
+      if (likeFilter === "series") return likedSeriesList.length;
+      const seriesCount = likeFilter === "all" ? likedSeriesList.length : 0;
+      const posts = likeFilter === "all"
+        ? likedPosts.length
+        : likedPosts.filter((p) => (likeFilter === "image" ? hasImages(p) : !hasImages(p))).length;
+      return seriesCount + posts;
+    }
+    if (tab === "bookmarks") {
+      if (bookmarkFilter === "series") return bookmarkedSeriesList.length;
+      const seriesCount = bookmarkFilter === "all" ? bookmarkedSeriesList.length : 0;
+      const posts = bookmarkFilter === "all"
+        ? bookmarkedPosts.length
+        : bookmarkedPosts.filter((p) => (bookmarkFilter === "image" ? hasImages(p) : !hasImages(p))).length;
+      return seriesCount + posts;
+    }
+    if (tab === "following") return following.length;
+    if (tab === "followers") return followers.length;
+    return 0;
+  })();
+
+  useEffect(() => {
+    setShownProfileItems(12);
+  }, [tab, filter, likeFilter, bookmarkFilter]);
+
+  useEffect(() => {
+    const el = profileLoadMoreRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) setShownProfileItems((count) => count + 12);
+      },
+      { rootMargin: "240px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [tab, filter, likeFilter, bookmarkFilter, profilePageTotal]);
+
   const workOrder = new Map(
     [
       ...seriesList.map((series) => ({
@@ -656,7 +704,7 @@ export default function ProfilePage() {
             <div className="card-grid">
               {/* 连载卡片 */}
               {(filter === "all" || filter === "series") &&
-                seriesList.map((series) => (
+                seriesList.slice(0, shownProfileItems).map((series) => (
                     <div key={series.id} className="tag-card series" data-type="series" style={{ order: workOrder.get(`series:${series.id}`) ?? 9999 }}>
                     <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
                       <div className="series-header-info">
@@ -717,6 +765,7 @@ export default function ProfilePage() {
                   if (filter === "series") return false;
                   return true;
                 })
+                .slice(0, shownProfileItems)
                 .map((post) => (
                   <PostTagCard key={post.id} post={post} style={{ order: workOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />
                 ))}
@@ -744,7 +793,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="card-grid">
-                {likedSeriesList.map((series) => (
+                {likedSeriesList.slice(0, shownProfileItems).map((series) => (
                   <div key={series.id} className="tag-card series" data-type="series" style={{ order: likeOrder.get(`series:${series.id}`) ?? 9999 }}>
                     <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
                       <div className="series-header-info">
@@ -823,7 +872,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="card-grid">
-                {showSeries && likedSeriesList.map((series) => (
+                {showSeries && likedSeriesList.slice(0, shownProfileItems).map((series) => (
                   <div key={series.id} className="tag-card series" data-type="series" style={{ order: likeOrder.get(`series:${series.id}`) ?? 9999 }}>
                     <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
                       <div className="series-header-info">
@@ -875,7 +924,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 ))}
-                {filteredLikes.map((post) => <PostTagCard key={post.id} post={post} style={{ order: likeOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
+                {filteredLikes.slice(0, shownProfileItems).map((post) => <PostTagCard key={post.id} post={post} style={{ order: likeOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
               </div>
             );
           })()}
@@ -901,7 +950,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="card-grid">
-                {bookmarkedSeriesList.map((series) => (
+                {bookmarkedSeriesList.slice(0, shownProfileItems).map((series) => (
                   <div key={series.id} className="tag-card series" data-type="series" style={{ order: bookmarkOrder.get(`series:${series.id}`) ?? 9999 }}>
                     <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
                       <div className="series-header-info">
@@ -980,7 +1029,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="card-grid">
-                {showSeries && bookmarkedSeriesList.map((series) => (
+                {showSeries && bookmarkedSeriesList.slice(0, shownProfileItems).map((series) => (
                   <div key={series.id} className="tag-card series" data-type="series" style={{ order: bookmarkOrder.get(`series:${series.id}`) ?? 9999 }}>
                     <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
                       <div className="series-header-info">
@@ -1032,7 +1081,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 ))}
-                {filteredBookmarks.map((post) => <PostTagCard key={post.id} post={post} style={{ order: bookmarkOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
+                {filteredBookmarks.slice(0, shownProfileItems).map((post) => <PostTagCard key={post.id} post={post} style={{ order: bookmarkOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
               </div>
             );
           })()}
@@ -1065,7 +1114,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="user-cards-grid">
-                {following.map((u) => (
+                {following.slice(0, shownProfileItems).map((u) => (
                   <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={true} onUpdate={() => { loadFollowing(); loadStats(); }} />
                 ))}
               </div>
@@ -1100,13 +1149,24 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="user-cards-grid">
-                {followers.map((u) => (
+                {followers.slice(0, shownProfileItems).map((u) => (
                   <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={false} isFollowed={followingIds.has(u.id)} onUpdate={() => { loadFollowers(); loadStats(); }} />
                 ))}
               </div>
             </>
           )}
         </div>
+          {profilePageTotal > 0 && (
+            <div className="card-load-more" ref={profileLoadMoreRef}>
+              {shownProfileItems < profilePageTotal ? (
+                <button type="button" className="btn-load-more" onClick={() => setShownProfileItems((count) => count + 12)}>
+                  <i className="fa-solid fa-angles-down" aria-hidden="true" /> 加载更多
+                </button>
+              ) : (
+                <span className="load-more-end">已加载全部 {profilePageTotal} 项内容</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

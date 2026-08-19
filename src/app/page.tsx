@@ -251,7 +251,7 @@ export default function HomePage() {
         chapter_number: p.chapter_number as number | null,
         tags: ptags,
         author: { nickname: author?.nickname || "匿名用户", avatar_url: author?.avatar_url },
-        excerpt: plainText.length > 150 ? plainText.slice(0, 150) + "..." : plainText,
+        excerpt: plainText,
         images: extractedImages.length > 0 ? extractedImages : undefined,
         like_count: st.like_count,
         comment_count: st.comment_count,

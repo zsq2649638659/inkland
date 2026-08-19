@@ -2059,7 +2059,12 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               >
                 <i className="fa-solid fa-cloud-arrow-up image-upload-icon"></i>
                 <div className="image-upload-title">点击或拖拽上传图片</div>
-                {uploadingImage && <i className="fa-solid fa-spinner fa-spin" aria-label="上传中" />}
+                {uploadingImage && (
+                  <div className="image-upload-progress">
+                    <i className="fa-solid fa-spinner fa-spin" aria-label="上传中" />
+                    <span>正在上传图片，请稍候...</span>
+                  </div>
+                )}
               </div>
               <input
                 ref={fileInputRef}

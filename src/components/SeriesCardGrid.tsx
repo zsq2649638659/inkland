@@ -31,7 +31,7 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
   const avatarUrl = author?.avatar_url;
 
   return (
-    <div className="rounded-xl bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
+    <div className="rounded-[16px] bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
       {/* 封面区 */}
       <Link
         href={`/series/${encodeURIComponent(series.name)}`}
@@ -43,6 +43,8 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
             alt={series.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
+            onError={(event) => event.currentTarget.classList.add("load-error")}
+            onLoad={(event) => event.currentTarget.classList.remove("load-error")}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-rule/60 to-rule/20 p-4">
