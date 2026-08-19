@@ -1601,6 +1601,14 @@ p {
   font-size: 12px;
   color: var(--color-text-light, #999);
   margin-top: 2px;
+  cursor: default;
+  user-select: none;
+  text-decoration: none;
+}
+.card-time:hover,
+.card-time:active {
+  color: var(--color-text-light, #999);
+  text-decoration: none;
 }
 .card-follow-btn {
   margin-left: auto;
@@ -5923,15 +5931,16 @@ p {
   flex-direction: column;
   gap: 2px;
   margin-top: 10px;
-  padding-left: 4px;
+  padding-left: 14px;
+  border-left: 2px solid var(--color-border, rgba(0, 0, 0, 0.08));
 }
 
 .inline-comment-panel .nested-comment {
   display: flex;
   gap: 10px;
-  padding: 8px 0;
+  padding: 8px 10px;
   border-radius: 10px;
-  background: transparent;
+  background: var(--color-bg-secondary, #F5F2EF);
 }
 
 .inline-comment-panel .nested-comment .comment-avatar {

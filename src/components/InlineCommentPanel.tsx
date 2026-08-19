@@ -160,9 +160,12 @@ export default function InlineCommentPanel({
                     )}
                   </div>
                   {replyingTo === comment.id && (
-                    <div className="inline-reply-composer">
-                      <textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder={`回复 ${comment.author?.nickname || "评论"}`} rows={2} autoFocus />
-                      <div><button type="button" onClick={() => setReplyingTo(null)}>取消</button><button type="button" className="btn-submit" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), comment.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}>回复</button></div>
+                    <div className="inline-reply-composer inline-reply-area show">
+                      <textarea className="inline-reply-textarea" value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder={`回复 ${comment.author?.nickname || "匿名用户"}...`} rows={2} autoFocus />
+                      <div className="inline-reply-actions">
+                        <button type="button" className="btn-cancel-reply" onClick={() => { setReplyingTo(null); setReplyText(""); }}>取消</button>
+                        <button type="button" className="btn-submit-reply" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), comment.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}><i className="fa-solid fa-paper-plane" /> 回复</button>
+                      </div>
                     </div>
                   )}
                   <div className="nested-comment-list nested-replies">
@@ -184,7 +187,7 @@ export default function InlineCommentPanel({
                             <button className="comment-more-btn inline-comment-more" title="更多" aria-label="回复更多操作" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setMenuId(menuId === reply.id ? null : reply.id); }}>⋮</button>
                             {menuId === reply.id && <div className="comment-popup show">{user?.id === reply.user_id ? <button className="comment-popup-item" onClick={async () => { await onDelete?.(reply.id); setMenuId(null); }}><i className="fa-solid fa-trash-can" /> 删除</button> : <><button className="comment-popup-item" onClick={() => { onBlock?.(reply.user_id); setMenuId(null); }}><i className="fa-solid fa-ban" /> 屏蔽</button><button className="comment-popup-item" onClick={() => { onReport?.(reply.id, reply.user_id); setMenuId(null); }}><i className="fa-solid fa-flag" /> 举报</button></>}</div>}
                           </div>
-                          {replyingTo === reply.id && <div className="inline-reply-composer"><textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder={`回复 ${reply.author?.nickname || "评论"}`} rows={2} autoFocus /><div><button type="button" onClick={() => setReplyingTo(null)}>取消</button><button type="button" className="btn-submit" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), reply.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}>回复</button></div></div>}
+                          {replyingTo === reply.id && <div className="inline-reply-composer inline-reply-area show"><textarea className="inline-reply-textarea" value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder={`回复 ${reply.author?.nickname || "匿名用户"}...`} rows={2} autoFocus /><div className="inline-reply-actions"><button type="button" className="btn-cancel-reply" onClick={() => { setReplyingTo(null); setReplyText(""); }}>取消</button><button type="button" className="btn-submit-reply" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), reply.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}><i className="fa-solid fa-paper-plane" /> 回复</button></div></div>}
                         </div>
                       </div>;
                     })}
