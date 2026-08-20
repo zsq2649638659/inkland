@@ -280,9 +280,9 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
               {data.authorNickname || "匿名用户"}
             </div>
           </Link>
-          <div className="card-time">
+          <Link href={`/read/${data.chapterId}`} className="card-time no-underline">
             {getTimeAgo(data.createdAt)}
-          </div>
+          </Link>
         </div>
 
         <div className="card-header-actions">

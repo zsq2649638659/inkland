@@ -1601,14 +1601,15 @@ p {
   font-size: 12px;
   color: var(--color-text-light, #999);
   margin-top: 2px;
-  cursor: default;
+  cursor: pointer;
   user-select: none;
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 .card-time:hover,
 .card-time:active {
-  color: var(--color-text-light, #999);
-  text-decoration: none;
+  color: var(--color-primary, #F26B5B);
+  text-decoration: underline;
 }
 .card-follow-btn {
   margin-left: auto;
@@ -6147,8 +6148,9 @@ p {
 }
 
 .para-comment-panel-input {
-  position: relative;
-  z-index: 5;
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
   flex-shrink: 0;
   padding: 12px 20px 16px;
   display: flex;

@@ -406,7 +406,7 @@ onReport,
   });
 
   return (
-    <div className="h-full flex flex-col" style={{ background: "inherit" }}>
+    <>
       {/* 标题栏 - 使用设计稿的 CSS 类 */}
       <div className="para-comment-panel-header">
         <div className="para-comment-panel-head-left">
@@ -691,7 +691,7 @@ onReport,
 
       {/* Toast 提示 */}
       <div className={`toast${toastMessage ? ' show' : ''}`}>{toastMessage || ''}</div>
-    </div>
+    </>
   );
 }
 
