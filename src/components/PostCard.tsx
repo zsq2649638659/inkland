@@ -333,7 +333,6 @@ export default function PostCard({ post }: PostCardProps) {
   const navigateCard = (event: MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("a, button, input, textarea, select")) return;
-    if (target.closest(".card-time")) return;
     if (!target.closest(".card-title, .card-excerpt")) return;
     router.push(`/read/${post.id}`);
   };
@@ -366,9 +365,9 @@ export default function PostCard({ post }: PostCardProps) {
               {post.author?.username || post.author?.nickname || "匿名用户"}
             </div>
           </Link>
-          <div className="card-time">
+          <Link href={`/read/${post.id}`} className="card-time no-underline">
             {post.time_ago || post.created_at ? getTimeAgo(post.created_at || "") : "刚刚"}
-          </div>
+          </Link>
         </div>
 
         <div className="card-header-actions">
