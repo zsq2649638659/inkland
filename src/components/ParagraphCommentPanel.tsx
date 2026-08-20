@@ -36,6 +36,7 @@ onReport,
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [replyText, setReplyText] = useState("");
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+  const [commentSort, setCommentSort] = useState<"recent" | "hot">("hot");
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null);
   const [commentMenuId, setCommentMenuId] = useState<string | null>(null);
@@ -394,13 +395,29 @@ onReport,
   allItems.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   allItems.forEach((item, i) => floorMap.set(item.id, i + 1));
 
+  // 根据当前排序展示评论（最热 = 点赞 + 回复数）
+  const sortedComments = [...comments].sort((a, b) => {
+    if (commentSort === "recent") {
+      return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+    }
+    const aScore = (a.like_count || 0) + (a.reply_count || 0);
+    const bScore = (b.like_count || 0) + (b.reply_count || 0);
+    return bScore - aScore || new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+  });
+
   return (
     <div className="h-full flex flex-col" style={{ background: "inherit" }}>
       {/* 标题栏 - 使用设计稿的 CSS 类 */}
       <div className="para-comment-panel-header">
-        <span className="para-comment-panel-title">
-          评论 {comments.length}条
-        </span>
+        <div className="para-comment-panel-head-left">
+          <span className="para-comment-panel-title">
+            评论 {comments.length}条
+          </span>
+          <div className="inline-comment-sort" role="group" aria-label="评论排序">
+            <button type="button" className={commentSort === "recent" ? "active" : ""} onClick={() => setCommentSort("recent")}>最新</button>
+            <button type="button" className={commentSort === "hot" ? "active" : ""} onClick={() => setCommentSort("hot")}>最热</button>
+          </div>
+        </div>
         <button className="para-comment-panel-close" onClick={onClose}>
           <i className="fa-solid fa-xmark" />
         </button>
@@ -419,7 +436,7 @@ onReport,
           </div>
         ) : (
           <div className="flex flex-col gap-3.5" onMouseOver={handleCommentMouseOver} onMouseOut={handleCommentMouseOut}>
-            {comments.map((c, idx) => (
+            {sortedComments.map((c) => (
               <div
                 key={c.id}
                 className="comment"

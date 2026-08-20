@@ -34,6 +34,8 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   const [fontFamily, setFontFamily] = useState("sans");
   const [showSettings, setShowSettings] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentSort, setCommentSort] = useState<"recent" | "hot">("hot");
+  const [expandedReplyIds, setExpandedReplyIds] = useState<Set<string>>(new Set());
   const [commentText, setCommentText] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
   const [totalComments, setTotalComments] = useState(post.comment_count || 0);
@@ -242,6 +244,26 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           },
         };
       });
+
+      const ids = all.map((c) => c.id);
+      const { data: statsData } = await supabase
+        .from("comment_stats")
+        .select("id, like_count, reply_count")
+        .in("id", ids);
+      const statsMap = new Map<string, { like_count: number; reply_count: number }>();
+      if (statsData) {
+        for (const s of statsData as Array<Record<string, unknown>>) {
+          statsMap.set(s.id as string, {
+            like_count: (s.like_count as number) || 0,
+            reply_count: (s.reply_count as number) || 0,
+          });
+        }
+      }
+      for (const c of all) {
+        const st = statsMap.get(c.id) || { like_count: 0, reply_count: 0 };
+        c.like_count = st.like_count;
+        c.reply_count = st.reply_count;
+      }
 
       const topLevel = all.filter((c) => !c.parent_id);
       const replyMap: Record<string, Comment[]> = {};
@@ -637,13 +659,25 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           )}
 
           {/* 评论列表 */}
+          <div className="inline-comment-list-head">
+            <span className="inline-comment-list-title">全部评论</span>
+            <div className="inline-comment-sort" role="group" aria-label="评论排序">
+              <button type="button" className={commentSort === "recent" ? "active" : ""} onClick={() => setCommentSort("recent")}>最新</button>
+              <button type="button" className={commentSort === "hot" ? "active" : ""} onClick={() => setCommentSort("hot")}>最热</button>
+            </div>
+          </div>
           {comments.length === 0 ? (
             <div className="para-comment-panel-empty" style={{ padding: "60px 0" }}>
               <p>还没有人发表评论</p>
               <p>来做第一个评论的人吧</p>
             </div>
           ) : (
-            comments.map((c) => (
+            [...comments].sort((a, b) => {
+              if (commentSort === "recent") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+              const aScore = (a.like_count || 0) + (a.reply_count || 0);
+              const bScore = (b.like_count || 0) + (b.reply_count || 0);
+              return bScore - aScore || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }).map((c) => (
               <div key={c.id} className="comment" data-comment-id={c.id}>
                 <div className="comment-main">
                   <div className="comment-avatar">
@@ -667,7 +701,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                         }}
                       >
                         <i className="fa-regular fa-heart" />
-                        <span>0</span>
+                        <span>{c.like_count || 0}</span>
                       </button>
                       {user && (
                         <button
@@ -722,7 +756,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                     {/* 回复列表 */}
                     {replies[c.id] && replies[c.id].length > 0 && (
                       <div className="nested-replies">
-                        {replies[c.id].map((reply) => (
+                        {(expandedReplyIds.has(c.id) ? replies[c.id] : replies[c.id].slice(0, 3)).map((reply) => (
                           <div key={reply.id} className="nested-reply-item" data-comment-id={reply.id}>
                             <div className="nested-reply-avatar">
                               <Link href={`/user/${reply.user_id}`}>
@@ -750,7 +784,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                                   }}
                                 >
                                   <i className="fa-regular fa-heart" />
-                                  <span>0</span>
+                                  <span>{reply.like_count || 0}</span>
                                 </button>
                                 {user && (
                                   <button
@@ -804,6 +838,26 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                             </div>
                           </div>
                         ))}
+                        {replies[c.id].length > 3 && (
+                          <button
+                            type="button"
+                            className="nested-comment-expand"
+                            onClick={() =>
+                              setExpandedReplyIds((current) => {
+                                const next = new Set(current);
+                                if (next.has(c.id)) next.delete(c.id);
+                                else next.add(c.id);
+                                return next;
+                              })
+                            }
+                          >
+                            {expandedReplyIds.has(c.id) ? (
+                              <>收起回复 <i className="fa-solid fa-chevron-up" /></>
+                            ) : (
+                              <>展开全部{replies[c.id].length}条回复 <i className="fa-solid fa-chevron-down" /></>
+                            )}
+                          </button>
+                        )}
                       </div>
                     )}
 

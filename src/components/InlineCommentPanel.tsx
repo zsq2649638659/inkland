@@ -191,7 +191,26 @@ export default function InlineCommentPanel({
                         </div>
                       </div>;
                     })}
-                    {!expanded && replies.length > 3 && <button type="button" className="nested-comment-expand" onClick={() => setExpandedReplyIds((current) => new Set(current).add(comment.id))}>展开评论<i className="fa-solid fa-chevron-down" /></button>}
+                    {replies.length > 3 && (
+                      <button
+                        type="button"
+                        className="nested-comment-expand"
+                        onClick={() =>
+                          setExpandedReplyIds((current) => {
+                            const next = new Set(current);
+                            if (next.has(comment.id)) next.delete(comment.id);
+                            else next.add(comment.id);
+                            return next;
+                          })
+                        }
+                      >
+                        {expanded ? (
+                          <>收起回复 <i className="fa-solid fa-chevron-up" /></>
+                        ) : (
+                          <>展开全部{replies.length}条回复 <i className="fa-solid fa-chevron-down" /></>
+                        )}
+                      </button>
+                    )}
                       </>;
                     })()}
                   </div>
