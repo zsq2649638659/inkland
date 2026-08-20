@@ -5745,7 +5745,6 @@ p {
 .inline-comment-panel {
   margin-top: 14px;
   padding: 18px 0 4px;
-  border-top: 1px solid var(--color-border, #E5E5E5);
 }
 
 .inline-comment-panel .comment-input-area {
@@ -5771,6 +5770,10 @@ p {
 .inline-comment-panel .comment-textarea {
   min-height: 64px;
   font-size: 14px;
+}
+
+.inline-comment-panel .comment-submit-row {
+  justify-content: flex-end;
 }
 
 .inline-comment-hint {
@@ -5806,7 +5809,6 @@ p {
 
 .inline-comment-list .comment {
   padding: 14px 0;
-  border-bottom: 1px solid var(--color-bg-secondary, #F5F2EF);
 }
 
 .inline-comment-list .comment:first-child {
@@ -5836,8 +5838,8 @@ p {
   }
 }
 
-/* Home inline comment panel polish — aligns with the detail-page comments section */
-.inline-comment-panel .inline-comment-list-head {
+/* Shared comment sort header — used by homepage cards, detail-page comments and para-comment panel */
+.inline-comment-list-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5845,7 +5847,7 @@ p {
   margin: 6px 0 4px;
 }
 
-.inline-comment-panel .inline-comment-list-title {
+.inline-comment-list-title {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
@@ -5853,13 +5855,13 @@ p {
   color: var(--color-text, #1A1A1A);
 }
 
-.inline-comment-panel .inline-comment-sort {
+.inline-comment-sort {
   display: inline-flex;
   align-items: center;
   gap: 16px;
 }
 
-.inline-comment-panel .inline-comment-sort button {
+.inline-comment-sort button {
   position: relative;
   min-height: 32px;
   padding: 0;
@@ -5871,16 +5873,16 @@ p {
   font-family: inherit;
 }
 
-.inline-comment-panel .inline-comment-sort button:hover {
+.inline-comment-sort button:hover {
   color: var(--color-primary, #F26B5B);
 }
 
-.inline-comment-panel .inline-comment-sort button.active {
+.inline-comment-sort button.active {
   color: var(--color-text, #1A1A1A);
   font-weight: 600;
 }
 
-.inline-comment-panel .inline-comment-sort button.active::after {
+.inline-comment-sort button.active::after {
   content: "";
   position: absolute;
   left: 0;
@@ -5931,16 +5933,15 @@ p {
   flex-direction: column;
   gap: 2px;
   margin-top: 10px;
-  padding-left: 14px;
-  border-left: 2px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  padding-left: 0;
+  border: none;
 }
 
 .inline-comment-panel .nested-comment {
   display: flex;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--color-bg-secondary, #F5F2EF);
+  padding: 8px 0;
+  background: transparent;
 }
 
 .inline-comment-panel .nested-comment .comment-avatar {
@@ -5964,7 +5965,7 @@ p {
   color: var(--color-primary, #F26B5B);
 }
 
-.inline-comment-panel .nested-comment-expand {
+.nested-comment-expand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5972,31 +5973,30 @@ p {
   min-height: 32px;
   gap: 6px;
   margin-top: 4px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-border, #E5E5E5);
-  border-radius: 999px;
-  background: var(--color-bg-secondary, #F5F2EF);
-  color: var(--color-text-muted, #6B6B6B);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-primary, #F26B5B);
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease;
 }
 
-.inline-comment-panel .nested-comment-expand:hover {
-  border-color: var(--color-primary, #F26B5B);
-  color: var(--color-primary, #F26B5B);
-  background: var(--color-primary-light, #FDDCD8);
+.nested-comment-expand:hover {
+  color: var(--color-primary-hover, #E85A4A);
 }
 
-.inline-comment-panel .nested-comment-expand i {
+.nested-comment-expand i {
   font-size: 10px;
 }
 
 @media (max-width: 600px) {
-  .inline-comment-panel .inline-comment-sort button,
+  .inline-comment-sort button,
   .inline-comment-panel .comment-action-btn,
-  .inline-comment-panel .nested-comment-expand {
+  .nested-comment-expand {
     min-height: 36px;
   }
 
@@ -6065,6 +6065,22 @@ p {
   color: var(--color-text, #1A1A1A);
 }
 
+.para-comment-panel-head-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.para-comment-panel-head-left .inline-comment-sort {
+  gap: 12px;
+}
+
+.para-comment-panel-head-left .inline-comment-sort button {
+  min-height: 28px;
+  font-size: 13px;
+}
+
 .para-comment-panel-close {
   width: 24px;
   height: 24px;
@@ -6086,7 +6102,9 @@ p {
 
 .para-comment-panel-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
@@ -6129,11 +6147,15 @@ p {
 }
 
 .para-comment-panel-input {
+  position: relative;
+  z-index: 5;
   flex-shrink: 0;
   padding: 12px 20px 16px;
   display: flex;
   gap: 10px;
   align-items: flex-end;
+  background: var(--color-card, #FFFFFF);
+  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.06));
 }
 
 .para-comment-panel-input textarea {
