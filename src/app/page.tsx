@@ -19,6 +19,16 @@ interface TagItem {
   post_count: number;
 }
 
+// 信息流客户端缓存：命中时秒开（不闪骨架屏），后台再静默刷新。
+// 键 = 用户id:tab，避免切换/回切首页时反复跨区直连 Supabase 重拉。
+interface FeedCacheEntry {
+  posts: Post[];
+  serialCards: SerialPostCardData[];
+  at: number;
+}
+const feedCache = new Map<string, FeedCacheEntry>();
+const FEED_CACHE_TTL = 30_000; // 30s
+
 export default function HomePage() {
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
@@ -106,12 +116,24 @@ export default function HomePage() {
 
   const handleRefresh = () => {
     setHasNewPosts(false);
-    loadPosts();
+    loadPosts({ force: true });
   };
 
-  const loadPosts = async () => {
-    setLoading(true);
-    setError("");
+  const loadPosts = async (opts?: { force?: boolean }) => {
+    // 命中缓存：秒开（不闪骨架屏），再走后台静默刷新更新缓存
+    const cacheKey = user ? `${user.id}:${tab}` : `anon:${tab}`;
+    const hit = !opts?.force ? feedCache.get(cacheKey) : undefined;
+    const fromCache = !!hit && Date.now() - hit.at < FEED_CACHE_TTL;
+
+    if (fromCache) {
+      setPosts(hit!.posts);
+      setSerialCards(hit!.serialCards);
+      setError("");
+      setLoading(false);
+    } else {
+      setLoading(true);
+      setError("");
+    }
 
     const postSelect = `id, user_id, title, content, cover_url, word_count, post_type, created_at, series_name, chapter_number,
          author:profiles!posts_user_id_fkey(nickname, avatar_url),
@@ -342,6 +364,7 @@ export default function HomePage() {
     setSerialCards(serialCardList);
     setHasNewPosts(false);
     setLoading(false);
+    feedCache.set(cacheKey, { posts: formatted, serialCards: serialCardList, at: Date.now() });
 
     if (formatted.length > 0 || serialCardList.length > 0) {
       const times: string[] = [];
