@@ -464,12 +464,12 @@ export default function PostCard({ post }: PostCardProps) {
 
       {/* V2: card-actions — 互动按钮 */}
       <div className="card-actions">
-        <LikeButton postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} />
+        <LikeButton postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} initialActive={post.liked_by_me} />
         <button className="card-action" onClick={handleCommentClick}>
           <i className="fa-regular fa-comment"></i>
           <span>{commentCount}</span>
         </button>
-        <BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} />
+        <BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} initialActive={post.bookmarked_by_me} />
         <div className="relative">
           <button className="card-action" onClick={handleShare}>
             <i className="fa-solid fa-arrow-up-from-bracket"></i>

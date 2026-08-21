@@ -68,6 +68,8 @@ begin
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,
                coalesce(s.bookmark_count, 0) as bookmark_count,
+               exists(select 1 from public.likes l where l.post_id = p.id and l.user_id = v_me) as liked_by_me,
+               exists(select 1 from public.bookmarks r where r.post_id = p.id and r.user_id = v_me) as bookmarked_by_me,
                coalesce((select json_agg(tg.name)
                          from public.post_tags pt
                          join public.tags tg on tg.id = pt.tag_id
@@ -131,6 +133,8 @@ begin
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,
                coalesce(s.bookmark_count, 0) as bookmark_count,
+               exists(select 1 from public.likes l where l.post_id = p.id and l.user_id = v_me) as liked_by_me,
+               exists(select 1 from public.bookmarks r where r.post_id = p.id and r.user_id = v_me) as bookmarked_by_me,
                coalesce((select json_agg(tg.name)
                          from public.post_tags pt
                          join public.tags tg on tg.id = pt.tag_id

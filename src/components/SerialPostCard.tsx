@@ -33,6 +33,8 @@ export interface SerialPostCardData {
   commentCount: number;
   bookmarkCount: number;
   createdAt: string;
+  likedByMe?: boolean;
+  bookmarkedByMe?: boolean;
 }
 
 function stripMarkdown(content?: string): string {
@@ -350,12 +352,12 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
 
       {/* V2: card-actions — 互动按钮 */}
       <div className="card-actions">
-        <LikeButton postId={data.chapterId} initialCount={data.likeCount} onLogin={goToLogin} />
+        <LikeButton postId={data.chapterId} initialCount={data.likeCount} onLogin={goToLogin} initialActive={data.likedByMe} />
         <button className="card-action" onClick={handleCommentClick}>
           <i className="fa-regular fa-comment" />
           <span>{commentCount}</span>
         </button>
-        <BookmarkButton postId={data.chapterId} initialCount={data.bookmarkCount} onLogin={goToLogin} />
+        <BookmarkButton postId={data.chapterId} initialCount={data.bookmarkCount} onLogin={goToLogin} initialActive={data.bookmarkedByMe} />
         <button className="card-action" onClick={handleShare}>
           <i className="fa-solid fa-arrow-up-from-bracket" />
           <span>分享</span>
