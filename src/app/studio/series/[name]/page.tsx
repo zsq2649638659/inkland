@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
-import { SkeletonLine } from "@/components/Skeleton";
+import { SkeletonSeriesDetail } from "@/components/Skeleton";
 import { useAuth } from "@/components/AuthProvider";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
@@ -190,7 +190,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     return { className: "ch-status-draft", label: "草稿" };
   };
 
-  if (loading) return <div id="page-series" className="min-h-screen bg-[#f5f6f7]"><main className="max-w-5xl mx-auto px-4 py-8"><div className="space-y-3">{Array.from({ length: 8 }).map((_, i) => <SkeletonLine key={i} height="3rem" />)}</div></main></div>;
+  if (loading) return <div id="page-series" className="min-h-screen bg-[#f5f6f7]"><SkeletonSeriesDetail /></div>;
 
   if (!user) {
     return <div id="page-series" className="min-h-screen bg-[#f5f6f7] flex items-center justify-center"><p className="text-muted">请先登录</p></div>;

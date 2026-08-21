@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, useCallback } from "react";
 import { createClient } from "@/lib/supabase/browser";
-import { SkeletonCardList } from "@/components/Skeleton";
+import { SkeletonTagPage } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
 import PostTagCard from "@/components/PostTagCard";
@@ -342,7 +342,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
     return (
       <div id="page-tag" className="min-h-screen bg-paper">
         <main className="main-container">
-          <div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <SkeletonCardList key={i} />)}</div>
+          <SkeletonTagPage />
         </main>
       </div>
     );

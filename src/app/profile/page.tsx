@@ -10,7 +10,7 @@ import { useAuth } from "@/components/AuthProvider";
 import PostTagCard from "@/components/PostTagCard";
 import SeriesCardGrid from "@/components/SeriesCardGrid";
 import UserCard from "@/components/UserCard";
-import { SkeletonProfile, SkeletonProfileSection } from "@/components/Skeleton";
+import { SkeletonProfile, SkeletonProfileSection, SkeletonWorksGrid, SkeletonUserCardList } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Post } from "@/lib/types";
@@ -683,7 +683,7 @@ export default function ProfilePage() {
         {/* Tab: Works */}
         <div className={`tab-content${tab === "works" ? " active" : ""}`}>
           {loading ? (
-            <SkeletonProfile />
+            <SkeletonWorksGrid count={6} />
           ) : error ? (
             <div className="text-center py-8"><p className="text-sm text-red-500 mb-2">{error}</p></div>
           ) : displayPosts.length === 0 && seriesList.length === 0 ? (
@@ -776,7 +776,7 @@ export default function ProfilePage() {
         {/* Tab: Likes */}
         <div className={`tab-content${tab === "likes" ? " active" : ""}`}>
           {loading ? (
-            <SkeletonProfile />
+            <SkeletonWorksGrid count={6} />
           ) : likeFilter === "series" ? (
             likedSeriesList.length === 0 ? (
               <div className="empty-state">
@@ -933,7 +933,7 @@ export default function ProfilePage() {
         {/* Tab: Bookmarks */}
         <div className={`tab-content${tab === "bookmarks" ? " active" : ""}`}>
           {loading ? (
-            <SkeletonProfile />
+            <SkeletonWorksGrid count={6} />
           ) : bookmarkFilter === "series" ? (
             bookmarkedSeriesList.length === 0 ? (
               <div className="empty-state">
@@ -1090,7 +1090,7 @@ export default function ProfilePage() {
         {/* Tab: Following */}
         <div className={`tab-content${tab === "following" ? " active" : ""}`}>
           {tabLoading ? (
-            <p className="text-sm text-muted text-center py-8">加载中...</p>
+            <SkeletonUserCardList />
           ) : following.length === 0 ? (
             <div className="empty-state">
               <div className="empty-illustration">
@@ -1125,7 +1125,7 @@ export default function ProfilePage() {
         {/* Tab: Followers */}
         <div className={`tab-content${tab === "followers" ? " active" : ""}`}>
           {tabLoading ? (
-            <p className="text-sm text-muted text-center py-8">加载中...</p>
+            <SkeletonUserCardList />
           ) : followers.length === 0 ? (
             <div className="empty-state">
               <div className="empty-illustration">

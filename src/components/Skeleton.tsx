@@ -1,346 +1,570 @@
 "use client";
 
-/** 骨架屏脉冲动画 */
-function Pulse({ className }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse bg-rule rounded ${className || ""}`}
-    />
-  );
+import type { CSSProperties } from "react";
+
+/**
+ * 通用辉光占位块（.sk-block 由 globals.css 提供 shimmer 动画）。
+ * 所有骨架屏都复用真实组件/页面的设计系统容器类（.card、.tag-card、
+ * .profile-section、.user-card、.notification-item 等），仅把内容替换为
+ * SB 占位块，从而保证骨架屏与加载完成后的真实组件在位置、尺寸、内容结构上完全一致。
+ */
+function SB({ className = "", style }: { className?: string; style: CSSProperties }) {
+  return <span className={`sk-block ${className}`} style={{ display: "block", ...style }} aria-hidden="true" />;
 }
 
-/** 网格卡片骨架 */
-export function SkeletonCardGrid() {
+/* ================= 首页 / 信息流卡片 ================= */
+
+/** 信息流卡片骨架 —— 精确匹配 PostCard / SerialPostCard 的 .card 结构 */
+function SkeletonFeedCard({ withImage = false }: { withImage?: boolean }) {
   return (
-    <div className="rounded-[16px] bg-card border border-rule overflow-hidden flex flex-col aspect-square">
-      <div className="flex-1 bg-rule animate-pulse" />
-      <div className="p-3 flex flex-col gap-2">
-        <div className="flex items-center gap-1.5">
-          <div className="w-5 h-5 rounded-full bg-rule animate-pulse" />
-          <div className="h-3 w-16 bg-rule animate-pulse rounded" />
+    <article className="card" aria-hidden="true">
+      {/* card-header：头像 + 作者信息 + 关注按钮/更多 */}
+      <div className="card-header">
+        <div className="card-avatar">
+          <span className="sk-circle" style={{ width: "100%", height: "100%" }} />
         </div>
-        <div className="flex gap-1">
-          <div className="h-4 w-10 bg-rule animate-pulse rounded-full" />
-          <div className="h-4 w-12 bg-rule animate-pulse rounded-full" />
+        <div className="card-author-info">
+          <SB style={{ width: 96, height: 14 }} />
+          <SB style={{ width: 52, height: 12, marginTop: 6 }} />
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
-            <div className="h-3 w-8 bg-rule animate-pulse rounded" />
-            <div className="h-3 w-8 bg-rule animate-pulse rounded" />
-          </div>
-          <div className="h-3 w-12 bg-rule animate-pulse rounded" />
+        <div className="card-header-actions">
+          <span className="sk-pill" style={{ width: 72, height: 26, flexShrink: 0 }} />
+          <span className="sk-circle" style={{ width: 32, height: 32, flexShrink: 0 }} />
         </div>
       </div>
-    </div>
-  );
-}
-
-/** 通知列表骨架 */
-export function SkeletonNotification() {
-  return (
-    <div className="bg-card rounded-xl overflow-hidden">
-      <div className="flex flex-col">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex items-start gap-4 px-5 py-4">
-            <div className="w-11 h-11 rounded-xl bg-rule animate-pulse flex-shrink-0" />
-            <div className="flex-1 flex flex-col gap-2">
-              <div className="h-4 w-48 bg-rule animate-pulse rounded" />
-              <div className="h-3.5 w-64 bg-rule animate-pulse rounded" />
-            </div>
-            <div className="flex-shrink-0 flex flex-col items-end gap-1">
-              <div className="h-3 w-12 bg-rule animate-pulse rounded" />
-            </div>
-          </div>
+      {/* card-title */}
+      <SB style={{ width: "62%", height: 22, marginBottom: 14 }} />
+      {/* card-excerpt（3 行） */}
+      <SB style={{ width: "100%", height: 15 }} />
+      <SB style={{ width: "88%", height: 15, marginTop: 8 }} />
+      <SB style={{ width: "70%", height: 15, marginTop: 8 }} />
+      {/* 图片带（部分卡片有图） */}
+      {withImage && (
+        <div className="card-image-strip">
+          <div className="sk-img" style={{ width: "100%", height: 220 }} />
+        </div>
+      )}
+      {/* card-tags */}
+      <div className="card-tags" style={{ marginBottom: 14, marginTop: 14 }}>
+        <span className="sk-pill" style={{ width: 56, height: 24, flexShrink: 0 }} />
+        <span className="sk-pill" style={{ width: 64, height: 24, flexShrink: 0 }} />
+        <span className="sk-pill" style={{ width: 48, height: 24, flexShrink: 0 }} />
+      </div>
+      {/* card-actions：喜欢 / 评论 / 收藏 / 分享 */}
+      <div className="card-actions">
+        {[0, 1, 2, 3].map((n) => (
+          <SB key={n} style={{ width: 44, height: 16 }} />
         ))}
       </div>
-    </div>
+    </article>
   );
 }
 
-/** 列表视图骨架 - 使用 shimmer 闪烁效果 */
-export function SkeletonCardList() {
-  return (
-    <div className="feed-skeleton-card">
-      {/* 头部：头像 + 用户名 + 时间 */}
-      <div className="feed-skeleton-header">
-        <div className="feed-skeleton-line circle feed-skeleton-avatar" />
-        <div>
-          <div className="feed-skeleton-line round feed-skeleton-name" />
-          <div className="feed-skeleton-line round feed-skeleton-time" />
-        </div>
-      </div>
-
-      {/* 标题 */}
-      <div className="feed-skeleton-line round feed-skeleton-title" />
-
-      {/* 正文 */}
-      <div className="feed-skeleton-line round feed-skeleton-body" />
-      <div className="feed-skeleton-line round feed-skeleton-body short" />
-
-      {/* 标签 */}
-      <div className="feed-skeleton-tags">
-        <div className="feed-skeleton-line pill feed-skeleton-tag" />
-        <div className="feed-skeleton-line pill feed-skeleton-tag" />
-      </div>
-
-      {/* 底部：喜欢 / 评论 / 收藏 */}
-      <div className="feed-skeleton-footer">
-        <div className="feed-skeleton-line round feed-skeleton-stat" />
-        <div className="feed-skeleton-line round feed-skeleton-stat" />
-        <div className="feed-skeleton-line round feed-skeleton-stat" />
-      </div>
-    </div>
-  );
-}
-
-/** 首页首屏骨架：鉴权和首页数据都还在准备时使用 */
-export function SkeletonHome() {
-  return (
-    <div className="feed-skeleton" aria-label="正在加载首页内容" aria-busy="true">
-      {[1, 2, 3].map((i) => <SkeletonCardList key={i} />)}
-    </div>
-  );
-}
-
-/** 首页右侧 feed 的统一骨架 */
+/** 下方标签栏骨架（首页 tab bar 下方的占位） */
 export function SkeletonFeed() {
   return (
-    <div className="feed-skeleton" aria-label="正在加载作品" aria-busy="true">
-      {[1, 2, 3, 4, 5].map((i) => <SkeletonCardList key={i} />)}
+    <div className="feed-skeleton" role="status" aria-label="内容加载中，请稍候" aria-busy="true">
+      <SkeletonFeedCard withImage />
+      <SkeletonFeedCard />
+      <SkeletonFeedCard withImage />
+      <SkeletonFeedCard />
     </div>
   );
 }
 
-/** 个人页头部骨架 */
-export function SkeletonProfile() {
+/** 首页首屏（鉴权尚未完成）骨架 */
+export function SkeletonHome() {
   return (
-    <div className="bg-card rounded-[20px] p-6 mb-6">
-      <div className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-rule animate-pulse" />
-        <div className="flex-1 flex flex-col gap-2">
-          <div className="h-6 w-32 bg-rule animate-pulse rounded" />
-          <div className="h-4 w-48 bg-rule animate-pulse rounded" />
+    <div className="feed-skeleton" role="status" aria-label="首页加载中，请稍候" aria-busy="true">
+      <SkeletonFeedCard withImage />
+      <SkeletonFeedCard />
+      <SkeletonFeedCard withImage />
+      <SkeletonFeedCard />
+      <SkeletonFeedCard />
+    </div>
+  );
+}
+
+/* ================= 网格卡片（profile / tag / collection 共用） ================= */
+
+/** 文字单篇 tag-card 骨架 */
+function SkeletonTextCard() {
+  return (
+    <div className="tag-card" aria-hidden="true">
+      <SB style={{ width: "84%", height: 24 }} />
+      <SB style={{ width: "100%", height: 15, marginTop: 12 }} />
+      <SB style={{ width: "92%", height: 15, marginTop: 8 }} />
+      <div className="card-tags" style={{ marginTop: 12 }}>
+        <span className="sk-pill" style={{ width: 48, height: 22, flexShrink: 0 }} />
+        <span className="sk-pill" style={{ width: 56, height: 22, flexShrink: 0 }} />
+      </div>
+      <div className="card-footer">
+        <div className="card-stats">
+          {[0, 1, 2].map((n) => (
+            <SB key={n} style={{ width: 40, height: 14 }} />
+          ))}
         </div>
-        <div className="h-9 w-24 bg-rule animate-pulse rounded-lg" />
       </div>
     </div>
   );
 }
 
-/** 个人中心顶部资料区骨架 - 与创作中心 shimmer 风格一致 */
+/** 图片 tag-card 骨架（含 1:1 图片舞台） */
+function SkeletonTagCard() {
+  return (
+    <div className="tag-card" aria-hidden="true">
+      <div className="card-image-stage">
+        <span className="sk-img" style={{ width: "100%", height: "100%" }} />
+      </div>
+      <SB style={{ width: "80%", height: 22, marginTop: 12 }} />
+      <SB style={{ width: "100%", height: 14, marginTop: 10 }} />
+      <div className="card-footer">
+        <div className="card-stats">
+          {[0, 1, 2].map((n) => (
+            <SB key={n} style={{ width: 40, height: 14 }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 长篇连载 tag-card 骨架（约等于系列卡片：标题 + 简介 + 章节预览 + 统计） */
+function SkeletonSeriesCard() {
+  return (
+    <div className="tag-card series" aria-hidden="true">
+      <span className="sk-pill" style={{ width: 56, height: 22, flexShrink: 0 }} />
+      <SB style={{ width: "78%", height: 18, marginTop: 12 }} />
+      <SB style={{ width: "100%", height: 14, marginTop: 8 }} />
+      <SB style={{ width: "60%", height: 14, marginTop: 6 }} />
+      <div className="chapter-preview">
+        <SB style={{ width: 60, height: 11 }} />
+        <SB style={{ width: "70%", height: 15, marginTop: 8 }} />
+        <SB style={{ width: "90%", height: 13, marginTop: 6 }} />
+      </div>
+      <div className="card-footer">
+        <div className="card-stats">
+          {[0, 1, 2].map((n) => (
+            <SB key={n} style={{ width: 40, height: 14 }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 作品网格骨架 —— 匹配 profile 作品/喜欢/收藏、tag、collection 的卡片网格 */
+export function SkeletonWorksGrid({
+  count = 6,
+  containerClass = "card-grid",
+}: {
+  count?: number;
+  containerClass?: string;
+}) {
+  return (
+    <div className={containerClass} role="status" aria-label="作品加载中，请稍候" aria-busy="true">
+      {Array.from({ length: count }).map((_, i) =>
+        i % 3 === 0 ? <SkeletonSeriesCard key={i} /> : i % 3 === 1 ? <SkeletonTagCard key={i} /> : <SkeletonTextCard key={i} />,
+      )}
+    </div>
+  );
+}
+
+/* ================= 个人页 ================= */
+
+/** 顶部资料区骨架 —— 复用 .profile-section 真实布局 */
 export function SkeletonProfileSection() {
   return (
-    <section className="profile-section profile-section-skeleton" aria-label="正在加载个人资料" aria-busy="true">
-      <div className="studio-skeleton-line profile-skeleton-avatar" />
-      <div className="profile-skeleton-info">
-        <div className="studio-skeleton-line profile-skeleton-name" />
-        <div className="studio-skeleton-line profile-skeleton-bio" />
-        <div className="profile-skeleton-stats">
-          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="studio-skeleton-line profile-skeleton-stat" />)}
+    <section className="profile-section profile-section-skeleton" aria-label="个人资料加载中" aria-busy="true">
+      <div className="profile-avatar">
+        <span className="sk-circle" style={{ width: "100%", height: "100%" }} />
+      </div>
+      <div className="profile-info">
+        <SB style={{ width: 150, height: 26 }} />
+        <SB style={{ width: "58%", height: 15, marginTop: 10 }} />
+        <div className="profile-stats" style={{ marginTop: 16 }}>
+          {[0, 1, 2, 3, 4].map((n) => (
+            <div className="profile-stat" key={n} style={{ gap: 6 }}>
+              <SB style={{ width: 44, height: 15 }} />
+            </div>
+          ))}
         </div>
       </div>
-      <div className="studio-skeleton-line profile-skeleton-action" />
+      <div className="profile-actions">
+        <span className="sk-pill" style={{ width: 96, height: 38, display: "inline-block" }} />
+      </div>
     </section>
   );
 }
 
-/** 系列详情页骨架 */
+/** 个人主页整体骨架 —— authLoading 时使用（资料区 + 标签 + 网格） */
+export function SkeletonProfile() {
+  return (
+    <div role="status" aria-label="个人主页加载中，请稍候" aria-busy="true">
+      <SkeletonProfileSection />
+      <div className="segmented-tabs" style={{ margin: "16px 0" }}>
+        <div className="segmented-tabs-left">
+          <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />
+        </div>
+        <div className="segmented-tabs-right">
+          <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />
+        </div>
+      </div>
+      <SkeletonWorksGrid count={6} />
+    </div>
+  );
+}
+
+/** 关注/粉丝列表骨架 —— 复用 .user-card 布局 */
+export function SkeletonUserCardList() {
+  return (
+    <div className="user-cards-grid" role="status" aria-label="加载中" aria-busy="true">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div className="user-card" key={i} aria-hidden="true">
+          <span className="sk-circle" style={{ width: 56, height: 56, flexShrink: 0 }} />
+          <div className="user-info">
+            <SB style={{ width: 110, height: 16 }} />
+            <SB style={{ width: "70%", height: 13, marginTop: 6 }} />
+          </div>
+          <div className="user-actions">
+            <span className="sk-pill" style={{ width: 84, height: 30, flexShrink: 0 }} />
+            <span className="sk-circle" style={{ width: 24, height: 24, flexShrink: 0 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ================= 通知页 ================= */
+
+/** 通知列表骨架 —— 复用 .notification-item 结构 */
+export function SkeletonNotification() {
+  return (
+    <div className="notification-list" role="status" aria-label="消息加载中，请稍候" aria-busy="true">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div className="notification-item" key={i} aria-hidden="true">
+          <div className="icon-wrapper">
+            <span className="sk-circle" style={{ width: "100%", height: "100%" }} />
+          </div>
+          <div className="notification-content">
+            <div className="notification-title-row">
+              <SB style={{ width: "42%", height: 16 }} />
+              <SB style={{ width: 40, height: 12, flexShrink: 0 }} />
+            </div>
+            <SB style={{ width: "72%", height: 13, marginTop: 4 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ================= 标签详情页 ================= */
+
+/** 标签详情页资料区骨架 —— 匹配 tag 页 profile-section（hashtag 头像 + 3 项统计） */
+export function SkeletonTagProfile() {
+  return (
+    <section className="profile-section profile-section-skeleton" aria-label="标签资料加载中" aria-busy="true">
+      <div className="profile-avatar">
+        <span className="sk-circle" style={{ width: "100%", height: "100%" }} />
+      </div>
+      <div className="profile-info">
+        <SB style={{ width: 140, height: 26 }} />
+        <SB style={{ width: "62%", height: 15, marginTop: 10 }} />
+        <div className="profile-stats" style={{ marginTop: 16 }}>
+          {[0, 1, 2].map((n) => (
+            <div className="profile-stat" key={n} style={{ gap: 6 }}>
+              <SB style={{ width: 44, height: 15 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="profile-actions">
+        <span className="sk-pill" style={{ width: 96, height: 38, display: "inline-block" }} />
+        <span className="sk-pill" style={{ width: 76, height: 38, display: "inline-block", marginLeft: 10 }} />
+      </div>
+    </section>
+  );
+}
+
+/** 标签详情页骨架 —— 资料区 + 标签切换 + 类型筛选 + 网格 */
+export function SkeletonTagPage() {
+  return (
+    <div role="status" aria-label="标签页加载中，请稍候" aria-busy="true">
+      <SkeletonTagProfile />
+      <div className="segmented-tabs" style={{ margin: "16px 0" }}>
+        <div className="segmented-tabs-left">
+          <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />
+        </div>
+        <div className="segmented-tabs-right">
+          <span className="sk-pill" style={{ width: 52, height: 34, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 52, height: 34, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 52, height: 34, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 52, height: 34, flexShrink: 0 }} />
+        </div>
+      </div>
+      <div className="type-filters-row">
+        <div className="type-filters">
+          <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
+          <span className="sk-pill" style={{ width: 72, height: 30, flexShrink: 0 }} />
+        </div>
+      </div>
+      <SkeletonWorksGrid count={6} />
+    </div>
+  );
+}
+
+/* ================= 系列详情页 ================= */
+
+/** 系列详情页骨架 —— hero 卡片 + 章节网格 */
 export function SkeletonSeriesDetail() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex flex-col gap-4">
-        <div className="h-8 w-64 bg-rule animate-pulse rounded" />
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-rule animate-pulse" />
-          <div className="h-4 w-24 bg-rule animate-pulse rounded" />
-        </div>
-        <div className="h-4 w-full bg-rule animate-pulse rounded" />
-        <div className="h-4 w-3/4 bg-rule animate-pulse rounded" />
-        <div className="h-4 w-1/2 bg-rule animate-pulse rounded" />
-        <div className="flex gap-2 mt-4">
-          <div className="h-10 w-24 bg-rule animate-pulse rounded-lg" />
-          <div className="h-10 w-28 bg-rule animate-pulse rounded-lg" />
-        </div>
-      </div>
-      <div className="mt-8 space-y-3">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-16 bg-rule animate-pulse rounded-lg" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** 单行文本骨架 */
-export function SkeletonLine({ width = "100%", height = "1rem" }: { width?: string; height?: string }) {
-  return <div className="bg-rule animate-pulse rounded" style={{ width, height }} />;
-}
-
-/** 创作中心骨架 - 匹配实际 studio 页面布局 */
-export function SkeletonStudio() {
-  return (
-    <div className="studio-skeleton" aria-label="正在加载创作中心" aria-busy="true">
-      {/* 页面头部 */}
-      <div className="studio-skeleton-header">
-        <div className="studio-skeleton-line studio-skeleton-title" />
-        <div className="studio-skeleton-line studio-skeleton-subtitle" />
-      </div>
-
-      {/* 统计卡片 */}
-      <div className="studio-skeleton-stats">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="studio-skeleton-stat-card">
-            <div className="studio-skeleton-line studio-skeleton-stat-icon" />
-            <div className="studio-skeleton-line studio-skeleton-stat-number" />
-            <div className="studio-skeleton-line studio-skeleton-stat-label" />
+    <div className="min-h-screen bg-paper" aria-label="连载详情加载中" aria-busy="true">
+      <div className="page-wrapper">
+        <div className="content-container">
+          <div className="hero-card">
+            <div className="hero-title-row">
+              <div className="hero-title-left">
+                <SB style={{ width: 180, height: 28 }} />
+                <span className="sk-pill" style={{ width: 52, height: 22, flexShrink: 0 }} />
+              </div>
+              <div className="hero-actions">
+                <span className="sk-pill" style={{ width: 96, height: 34, flexShrink: 0 }} />
+                <span className="sk-pill" style={{ width: 96, height: 34, flexShrink: 0 }} />
+              </div>
+            </div>
+            <div className="hero-meta-row">
+              <span className="sk-circle" style={{ width: 20, height: 20, flexShrink: 0 }} />
+              <SB style={{ width: 64, height: 14 }} />
+              <span className="meta-sep">|</span>
+              <SB style={{ width: 48, height: 14 }} />
+            </div>
+            <div className="hero-stats-row">
+              <SB style={{ width: 76, height: 16 }} />
+              <span className="stat-sep">|</span>
+              <SB style={{ width: 76, height: 16 }} />
+            </div>
+            <SB style={{ width: "100%", height: 14, marginTop: 8 }} />
+            <SB style={{ width: "88%", height: 14, marginTop: 8 }} />
+            <div className="tags-row" style={{ marginTop: 16 }}>
+              <span className="sk-pill" style={{ width: 56, height: 26, flexShrink: 0 }} />
+              <span className="sk-pill" style={{ width: 60, height: 26, flexShrink: 0 }} />
+              <span className="sk-pill" style={{ width: 48, height: 26, flexShrink: 0 }} />
+            </div>
           </div>
-        ))}
-      </div>
-
-      {/* 工具栏 */}
-      <div className="studio-skeleton-toolbar">
-        <div className="studio-skeleton-tabs">
-          <div className="studio-skeleton-line studio-skeleton-tab active" />
-          <div className="studio-skeleton-line studio-skeleton-tab" />
-          <div className="studio-skeleton-line studio-skeleton-tab" />
-          <div className="studio-skeleton-line studio-skeleton-tab" />
-        </div>
-        <div className="studio-skeleton-line studio-skeleton-search" />
-      </div>
-
-      {/* 作品卡片网格 */}
-      <div className="studio-skeleton-grid">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="studio-skeleton-work-card">
-            <div className="studio-skeleton-work-meta">
-              <div className="studio-skeleton-line studio-skeleton-work-type" />
-              <div className="studio-skeleton-line studio-skeleton-work-status" />
+          <div className="chapter-section">
+            <div className="chapter-section-header">
+              <div>
+                <SB style={{ width: 64, height: 18 }} />
+              </div>
             </div>
-            <div className="studio-skeleton-line studio-skeleton-work-title" />
-            <div className="studio-skeleton-work-stats">
-              <div className="studio-skeleton-line studio-skeleton-work-stat" />
-              <div className="studio-skeleton-line studio-skeleton-work-stat" />
-              <div className="studio-skeleton-line studio-skeleton-work-stat" />
+            <div className="chapter-grid-wrapper">
+              <div className="chapter-grid">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div className="chapter-grid-item" key={i} aria-hidden="true">
+                    <span className="sk-block" style={{ width: "72%", height: 14, borderRadius: 4 }} />
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="studio-skeleton-line studio-skeleton-work-date" />
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** 搜索页面骨架 - 搜索结果区域 */
-export function SkeletonSearchResults() {
-  return (
-    <div className="results-area">
-      {/* 标签骨架 */}
-      <div className="result-section">
-        <div className="tags-grid">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="tag-card skeleton">
-              <div className="h-4 w-4 bg-rule animate-pulse rounded" />
-              <div className="h-4 w-16 bg-rule animate-pulse rounded" />
-              <div className="h-3 w-12 bg-rule animate-pulse rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* 用户骨架 */}
-      <div className="result-section">
-        <div className="user-cards-grid">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="user-card skeleton">
-              <div className="w-10 h-10 rounded-full bg-rule animate-pulse" />
-              <div className="user-info">
-                <div className="h-4 w-20 bg-rule animate-pulse rounded" />
-              </div>
-              <div className="user-actions">
-                <div className="h-8 w-20 bg-rule animate-pulse rounded-lg" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* 作品/正文骨架 */}
-      <div className="result-section">
-        <div className="work-list">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="work-item skeleton">
-              <div className="w-10 h-10 rounded-lg bg-rule animate-pulse" />
-              <div className="work-info" style={{ width: "100%" }}>
-                <div className="h-5 w-48 bg-rule animate-pulse rounded mb-2" />
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-12 bg-rule animate-pulse rounded" />
-                  <div className="h-3 w-3 rounded-full bg-rule animate-pulse" />
-                  <div className="h-4 w-16 bg-rule animate-pulse rounded" />
-                  <div className="h-3 w-3 rounded-full bg-rule animate-pulse" />
-                  <div className="h-4 w-14 bg-rule animate-pulse rounded" />
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>
   );
 }
 
-/** 合集详情页骨架 */
+/* ================= 合集详情页 ================= */
+
+/** 合集详情页骨架 —— hero + 筛选 + 网格 */
 export function SkeletonCollectionDetail() {
   return (
-    <div className="collection-page-wrapper">
+    <div className="collection-page-wrapper" aria-label="合集加载中" aria-busy="true">
       <div className="collection-content-container">
         <section className="collection-hero">
           <div className="collection-hero-title-row">
             <div className="collection-title-block">
-              <div className="h-8 w-48 bg-rule animate-pulse rounded" />
+              <SB style={{ width: 200, height: 30 }} />
             </div>
-            <div className="collection-hero-actions flex gap-2">
-              <div className="h-9 w-24 bg-rule animate-pulse rounded-lg" />
-              <div className="h-9 w-20 bg-rule animate-pulse rounded-lg" />
+            <div className="collection-hero-actions">
+              <span className="sk-pill" style={{ width: 104, height: 32, flexShrink: 0 }} />
+              <span className="sk-pill" style={{ width: 80, height: 32, flexShrink: 0 }} />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="h-4 w-full bg-rule animate-pulse rounded" />
-            <div className="h-4 w-3/4 bg-rule animate-pulse rounded mt-1" />
+          <div className="collection-description" style={{ marginTop: 12 }}>
+            <SB style={{ width: "60%", height: 15 }} />
           </div>
-          <div className="collection-meta-row mt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-rule animate-pulse" />
-              <div className="h-4 w-24 bg-rule animate-pulse rounded" />
-            </div>
-            <div className="h-4 w-px bg-rule animate-pulse mx-2" />
-            <div className="h-4 w-20 bg-rule animate-pulse rounded" />
-            <div className="h-4 w-px bg-rule animate-pulse mx-2" />
-            <div className="h-4 w-20 bg-rule animate-pulse rounded" />
+          <div className="collection-meta-row" style={{ marginTop: 16 }}>
+            <span className="sk-circle" style={{ width: 22, height: 22, flexShrink: 0 }} />
+            <SB style={{ width: 84, height: 14 }} />
+            <span className="collection-meta-sep">|</span>
+            <SB style={{ width: 60, height: 14 }} />
+            <span className="collection-meta-sep">|</span>
+            <SB style={{ width: 60, height: 14 }} />
           </div>
         </section>
-
-        <div className="collection-works-head mt-8">
-          <div className="h-5 w-32 bg-rule animate-pulse rounded" />
-          <div className="flex gap-2 mt-4">
-            <div className="h-8 w-16 bg-rule animate-pulse rounded-full" />
-            <div className="h-8 w-16 bg-rule animate-pulse rounded-full" />
-            <div className="h-8 w-16 bg-rule animate-pulse rounded-full" />
+        <div className="collection-works-head">
+          <SB style={{ width: 80, height: 18 }} />
+          <div className="collection-filters" style={{ display: "flex", gap: 8 }}>
+            <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
+            <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
+            <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
           </div>
         </div>
-
-        <div className="collection-card-grid mt-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-[16px] bg-card border border-rule overflow-hidden flex flex-col">
-              <div className="aspect-square bg-rule animate-pulse" />
-              <div className="p-3 flex flex-col gap-2">
-                <div className="h-4 w-3/4 bg-rule animate-pulse rounded" />
-                <div className="flex gap-1">
-                  <div className="h-4 w-12 bg-rule animate-pulse rounded-full" />
-                  <div className="h-4 w-10 bg-rule animate-pulse rounded-full" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <SkeletonWorksGrid count={6} containerClass="collection-card-grid" />
       </div>
     </div>
   );
+}
+
+/* ================= 创作中心 ================= */
+
+/** 创作中心骨架 —— 标题 + 统计卡 + 工具栏 + 作品网格 */
+export function SkeletonStudio() {
+  return (
+    <div role="status" aria-label="创作中心加载中，请稍候" aria-busy="true">
+      <div className="page-header">
+        <div className="page-title">
+          <SB style={{ width: 144, height: 28 }} />
+        </div>
+        <div className="page-subtitle">
+          <SB style={{ width: 300, height: 14 }} />
+        </div>
+      </div>
+      <div className="stats-grid">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div className="stat-card" key={i} aria-hidden="true">
+            <span className="sk-block" style={{ width: 36, height: 36, borderRadius: 10, display: "inline-block" }} />
+            <SB style={{ width: 48, height: 28, marginTop: 10 }} />
+            <SB style={{ width: 56, height: 13, marginTop: 6 }} />
+          </div>
+        ))}
+      </div>
+      <div className="toolbar toolbar-pc">
+        <div className="toolbar-pc-normal">
+          <div className="segmented-tabs">
+            <div className="segmented-tabs-left">
+              <span className="sk-pill" style={{ width: 72, height: 34, flexShrink: 0 }} />
+              <span className="sk-pill" style={{ width: 72, height: 34, flexShrink: 0 }} />
+            </div>
+            <div className="segmented-tabs-right">
+              <span className="sk-pill" style={{ width: 72, height: 34, flexShrink: 0 }} />
+              <span className="sk-pill" style={{ width: 72, height: 34, flexShrink: 0 }} />
+            </div>
+          </div>
+          <div className="studio-toolbar-row2" style={{ marginTop: 10 }}>
+            <div className="search-wrap">
+              <span className="sk-pill" style={{ width: 260, height: 36, display: "inline-block" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="works-card-grid">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div className="work-card" key={i} aria-hidden="true">
+            <div className="card-body">
+              <div className="card-meta">
+                <SB style={{ width: 64, height: 14 }} />
+                <SB style={{ width: 48, height: 14 }} />
+              </div>
+              <SB style={{ width: "78%", height: 20, marginTop: 6 }} />
+              <SB style={{ width: "100%", height: 13, marginTop: 12 }} />
+              <SB style={{ width: "88%", height: 13, marginTop: 8 }} />
+              <div className="studio-card-tags" style={{ marginTop: 12 }}>
+                <span className="sk-pill" style={{ width: 44, height: 24, flexShrink: 0 }} />
+                <span className="sk-pill" style={{ width: 44, height: 24, flexShrink: 0 }} />
+              </div>
+              <div className="card-actions" style={{ marginTop: "auto", paddingTop: 12 }}>
+                <span className="sk-pill" style={{ width: 64, height: 30 }} />
+                <span className="sk-pill" style={{ width: 64, height: 30 }} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ================= 搜索页 ================= */
+
+/** 搜索结果骨架 —— 仅渲染当前生效的筛选分区 */
+export function SkeletonSearchResults({ variant = "tags" }: { variant?: "tags" | "users" | "works" | "posts" }) {
+  return (
+    <div className="results-area" role="status" aria-label="搜索加载中，请稍候" aria-busy="true">
+      <div className="result-section">
+        {variant === "tags" && (
+          <div className="tags-grid">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div className="tag-card" key={i} aria-hidden="true">
+                <span className="sk-circle" style={{ width: 22, height: 22 }} />
+                <SB style={{ width: 56, height: 16, marginTop: 14 }} />
+                <SB style={{ width: 40, height: 13, marginTop: 8 }} />
+              </div>
+            ))}
+          </div>
+        )}
+        {variant === "users" && (
+          <div className="user-cards-grid">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div className="user-card" key={i} aria-hidden="true">
+                <span className="sk-circle" style={{ width: 48, height: 48, flexShrink: 0 }} />
+                <div className="user-info">
+                  <SB style={{ width: 96, height: 15 }} />
+                </div>
+                <div className="user-actions">
+                  <span className="sk-pill" style={{ width: 88, height: 32, flexShrink: 0 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {variant === "works" && (
+          <div className="work-list">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div className="work-item" key={i} aria-hidden="true">
+                <span className="sk-block" style={{ width: 36, height: 40, borderRadius: 8, flexShrink: 0 }} />
+                <div className="work-info">
+                  <SB style={{ width: "58%", height: 18 }} />
+                  <div className="work-meta" style={{ marginTop: 8 }}>
+                    <SB style={{ width: 44, height: 14 }} />
+                    <span className="meta-dot" />
+                    <SB style={{ width: 52, height: 14 }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {variant === "posts" && (
+          <div className="post-list">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div className="post-item" key={i} aria-hidden="true">
+                <span className="sk-circle" style={{ width: 36, height: 36, flexShrink: 0 }} />
+                <div className="post-item-content">
+                  <SB style={{ width: "92%", height: 14 }} />
+                  <SB style={{ width: "68%", height: 14, marginTop: 8 }} />
+                  <SB style={{ width: "40%", height: 12, marginTop: 10 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ================= 通用 ================= */
+
+/** 单行文本骨架（通用导出） */
+export function SkeletonLine({ width = "100%", height = "1rem" }: { width?: string | number; height?: string | number }) {
+  return <span className="sk-block" style={{ width, height, display: "block" }} aria-hidden="true" />;
 }
