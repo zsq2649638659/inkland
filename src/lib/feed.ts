@@ -170,6 +170,19 @@ export async function loadFeed(
     }
   }
 
+  // ---- 当前用户的点赞/收藏状态（一次性批量，避免每卡 N+1 查询）----
+  let likedSet = new Set<string>();
+  let bookmarkedSet = new Set<string>();
+  if (userId && limitedArr.length > 0) {
+    const meIds = limitedArr.map((p) => p.id as string);
+    const [{ data: myLikes }, { data: myBookmarks }] = await Promise.all([
+      supabase.from("likes").select("post_id").eq("user_id", userId).in("post_id", meIds),
+      supabase.from("bookmarks").select("post_id").eq("user_id", userId).in("post_id", meIds),
+    ]);
+    likedSet = new Set((myLikes || []).map((l) => (l as Record<string, unknown>).post_id as string));
+    bookmarkedSet = new Set((myBookmarks || []).map((b) => (b as Record<string, unknown>).post_id as string));
+  }
+
   const normalPosts: Record<string, unknown>[] = [];
   const serialChapters: Record<string, unknown>[] = [];
   for (const p of limitedArr) {
@@ -212,6 +225,8 @@ export async function loadFeed(
       like_count: st.like_count,
       comment_count: st.comment_count,
       bookmark_count: st.bookmark_count,
+      liked_by_me: likedSet.has(p.id as string),
+      bookmarked_by_me: bookmarkedSet.has(p.id as string),
       time_ago: getTimeAgo(p.created_at as string),
     };
   });
@@ -256,6 +271,8 @@ export async function loadFeed(
       likeCount: st.like_count,
       commentCount: st.comment_count,
       bookmarkCount: st.bookmark_count,
+      likedByMe: likedSet.has(latest.id as string),
+      bookmarkedByMe: bookmarkedSet.has(latest.id as string),
       createdAt: latest.created_at as string,
     });
   }
@@ -367,6 +384,8 @@ async function normalizeRpcResult(
       like_count: p.like_count ?? 0,
       comment_count: p.comment_count ?? 0,
       bookmark_count: p.bookmark_count ?? 0,
+      liked_by_me: !!p.liked_by_me,
+      bookmarked_by_me: !!p.bookmarked_by_me,
       time_ago: getTimeAgo(p.created_at),
     };
   };
@@ -428,6 +447,8 @@ async function normalizeRpcResult(
       likeCount: latest.like_count ?? 0,
       commentCount: latest.comment_count ?? 0,
       bookmarkCount: latest.bookmark_count ?? 0,
+      likedByMe: !!latest.liked_by_me,
+      bookmarkedByMe: !!latest.bookmarked_by_me,
       createdAt: latest.created_at as string,
     });
   }

@@ -71,30 +71,71 @@ const hasImages = (post: Post): boolean => {
   return /!\[.*?\]\(.*?\)/g.test(content);
 };
 
-// 查询系列下所有章节的点赞/评论/收藏总数
-const loadSeriesStats = async (supabase: ReturnType<typeof createClient>, seriesName: string) => {
+// 一次性批量组装系列信息：所有章节一次取回 + 所有章节统计一次取回，
+// 消除“每个系列各自串行发章节查询 + 点赞/评论/收藏统计”的 N+1。
+const assembleSeriesInfo = async (supabase: ReturnType<typeof createClient>, seriesMeta: SeriesInfo[]): Promise<SeriesInfo[]> => {
+  if (seriesMeta.length === 0) return [];
+  const seen = new Set<string>();
+  const meta = seriesMeta.filter((s) => { if (seen.has(s.name)) return false; seen.add(s.name); return true; });
+  const names = meta.map((s) => s.name);
+  if (names.length === 0) return [];
+
+  // 一次取回所有系列的章节
   const { data: chapters } = await supabase
     .from("posts")
-    .select("id")
-    .eq("series_name", seriesName)
+    .select("id, series_name, title, content, chapter_number, created_at")
+    .in("series_name", names)
     .eq("post_type", "serial")
     .eq("status", "published");
 
-  if (!chapters || chapters.length === 0) return { like_count: 0, comment_count: 0, bookmark_count: 0 };
+  const bySeries = new Map<string, Array<Record<string, unknown>>>();
+  const allChapterIds: string[] = [];
+  for (const ch of (chapters as unknown as Record<string, unknown>[]) || []) {
+    const sn = ch.series_name as string;
+    if (!sn) continue;
+    if (!bySeries.has(sn)) bySeries.set(sn, []);
+    bySeries.get(sn)!.push(ch);
+    allChapterIds.push(ch.id as string);
+  }
 
-  const chapterIds = chapters.map((c: Record<string, unknown>) => c.id as string);
+  // 一次取回所有章节的统计（post_stats 已按章节聚合 like/comment/bookmark）
+  const statsMap = new Map<string, { like: number; comment: number; bookmark: number }>();
+  if (allChapterIds.length > 0) {
+    const { data: stats } = await supabase
+      .from("post_stats")
+      .select("id, like_count, comment_count, bookmark_count")
+      .in("id", allChapterIds);
+    for (const s of (stats as unknown as Array<Record<string, unknown>>) || []) {
+      statsMap.set(s.id as string, {
+        like: (s.like_count as number) || 0,
+        comment: (s.comment_count as number) || 0,
+        bookmark: (s.bookmark_count as number) || 0,
+      });
+    }
+  }
 
-  const [likeRes, commentRes, bookmarkRes] = await Promise.all([
-    supabase.from("likes").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-    supabase.from("comments").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-    supabase.from("bookmarks").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-  ]);
-
-  return {
-    like_count: likeRes.count || 0,
-    comment_count: commentRes.count || 0,
-    bookmark_count: bookmarkRes.count || 0,
-  };
+  return meta.map((s) => {
+    const chapters = bySeries.get(s.name) || [];
+    chapters.sort((a, b) => (b.chapter_number as number || 0) - (a.chapter_number as number || 0));
+    const latest = chapters[0];
+    let like = 0, comment = 0, bookmark = 0;
+    for (const ch of chapters) {
+      const st = statsMap.get(ch.id as string);
+      if (st) { like += st.like; comment += st.comment; bookmark += st.bookmark; }
+    }
+    return {
+      ...s,
+      like_count: like,
+      comment_count: comment,
+      bookmark_count: bookmark,
+      latestChapterId: latest ? latest.id as string : null,
+      latestChapterNumber: latest ? latest.chapter_number as number : null,
+      latestChapterTitle: latest ? latest.title as string : null,
+      latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
+      latestChapterCreatedAt: latest ? latest.created_at as string : null,
+      totalChapters: chapters.length,
+    };
+  });
 };
 
 export default function ProfilePage() {
@@ -230,31 +271,8 @@ export default function ProfilePage() {
       return true;
     });
 
-    const seriesWithChapters = await Promise.all(deduped.map(async (s) => {
-      const { data: chapters, count } = await supabase
-        .from("posts")
-        .select("id, title, content, chapter_number, created_at", { count: "exact" })
-        .eq("series_name", s.name)
-        .eq("post_type", "serial")
-        .eq("status", "published")
-        .order("chapter_number", { ascending: false })
-        .limit(1);
-
-      const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
-      const stats = await loadSeriesStats(supabase, s.name);
-      return {
-        ...s,
-        ...stats,
-        latestChapterId: latest ? latest.id as string : null,
-        latestChapterNumber: latest ? latest.chapter_number as number : null,
-        latestChapterTitle: latest ? latest.title as string : null,
-        latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
-        latestChapterCreatedAt: latest ? latest.created_at as string : null,
-        totalChapters: count || 0,
-      };
-    }));
-
-    return seriesWithChapters;
+    // 批量组装：所有章节 + 所有章节统计各一次取回，消除逐系列的 N+1
+    return assembleSeriesInfo(supabase, deduped);
   };
 
   const loadLikes = async () => {
@@ -344,31 +362,8 @@ export default function ProfilePage() {
         return true;
       });
 
-      const seriesWithChapters = await Promise.all(deduped.map(async (s) => {
-        const { data: chapters, count } = await supabase
-          .from("posts")
-          .select("id, title, content, chapter_number, created_at", { count: "exact" })
-          .eq("series_name", s.name)
-          .eq("post_type", "serial")
-          .eq("status", "published")
-          .order("chapter_number", { ascending: false })
-          .limit(1);
-
-        const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
-        const stats = await loadSeriesStats(supabase, s.name);
-        return {
-          ...s,
-          ...stats,
-          latestChapterId: latest ? latest.id as string : null,
-          latestChapterNumber: latest ? latest.chapter_number as number : null,
-          latestChapterTitle: latest ? latest.title as string : null,
-          latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
-          latestChapterCreatedAt: latest ? latest.created_at as string : null,
-          totalChapters: count || 0,
-        };
-      }));
-
-      setSeriesList(seriesWithChapters);
+      // 批量组装：所有章节 + 所有章节统计各一次取回，消除逐系列的 N+1
+      setSeriesList(await assembleSeriesInfo(supabase, deduped));
     }
   };
 

@@ -15,19 +15,21 @@ interface LikeButtonProps {
   iconOnly?: boolean;
   plain?: boolean;
   className?: string;
+  // 父组件已算好的点赞状态；传入时跳过挂载时的独立查询（消除信息流 N+1）
+  initialActive?: boolean;
 }
 
-export default function LikeButton({ postId, initialCount, onLogin, iconOnly, plain, className }: LikeButtonProps) {
+export default function LikeButton({ postId, initialCount, onLogin, iconOnly, plain, className, initialActive }: LikeButtonProps) {
   const supabase = createClient();
   const router = useRouter();
   const { user } = useAuth();
   const dialog = useAppDialog();
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(initialActive ?? false);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || initialActive !== undefined) return;
     supabase
       .from("likes")
       .select("id")
@@ -35,7 +37,7 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => setLiked(!!data));
-  }, [user, postId]);
+  }, [user, postId, initialActive]);
 
   const toggle = async () => {
     if (!user) {

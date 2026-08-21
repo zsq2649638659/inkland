@@ -42,6 +42,9 @@ export interface Post {
   time_ago?: string;
   excerpt?: string;
   images?: string[];
+  // 当前用户对该作品的状态（由聚合层一次性算好，避免每卡 N+1 查询）
+  liked_by_me?: boolean;
+  bookmarked_by_me?: boolean;
 }
 
 export interface Tag {

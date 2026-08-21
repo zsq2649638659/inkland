@@ -15,19 +15,21 @@ interface BookmarkButtonProps {
   iconOnly?: boolean;
   plain?: boolean;
   className?: string;
+  // 父组件已算好的收藏状态；传入时跳过挂载时的独立查询（消除信息流 N+1）
+  initialActive?: boolean;
 }
 
-export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly, plain, className }: BookmarkButtonProps) {
+export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly, plain, className, initialActive }: BookmarkButtonProps) {
   const supabase = createClient();
   const router = useRouter();
   const { user } = useAuth();
   const dialog = useAppDialog();
-  const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarked, setBookmarked] = useState(initialActive ?? false);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || initialActive !== undefined) return;
     supabase
       .from("bookmarks")
       .select("id")
@@ -35,7 +37,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => setBookmarked(!!data));
-  }, [user, postId]);
+  }, [user, postId, initialActive]);
 
   const toggle = async () => {
     if (!user) {
