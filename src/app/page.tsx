@@ -116,65 +116,79 @@ export default function HomePage() {
     const postSelect = `id, user_id, title, content, cover_url, word_count, post_type, created_at, series_name, chapter_number,
          author:profiles!posts_user_id_fkey(nickname, avatar_url),
          post_tags(tags(name))`;
-    const { data: blockedRows } = user
-      ? await supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id)
-      : { data: [] };
-    const blockedIds = new Set((blockedRows || []).map((row) => row.blocked_user_id as string));
-    let query = supabase
-      .from("posts")
-      .select(postSelect)
-      .eq("status", "published");
-    let bookmarkedSeriesNames: string[] = [];
 
-    if (tab === "following") {
-      if (user) {
-        const [{ data: follows }, { data: bookmarks }] = await Promise.all([
-          supabase.from("follows").select("following_id").eq("follower_id", user.id),
-          supabase.from("bookmarks").select("post_id").eq("user_id", user.id),
-        ]);
-        const followingIds = [user.id];
-        if (follows) {
-          for (const f of follows) {
-            followingIds.push((f as Record<string, unknown>).following_id as string);
-          }
-        }
-        query = query.in("user_id", followingIds);
+    // Batch 1：互不依赖的旁路查询并行发出。Supabase 为跨区访问，单次请求约 1s，
+    // 串行 await 会成倍拖长骨架屏，先把这几条查出来再据此组合主查询。
+    const needsFollow = tab === "following";
+    const blockedPromise = user
+      ? supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id)
+      : Promise.resolve({ data: [] as unknown[] });
+    const followsPromise = needsFollow && user
+      ? supabase.from("follows").select("following_id").eq("follower_id", user.id)
+      : Promise.resolve({ data: [] as unknown[] });
+    const bookmarksPromise = needsFollow && user
+      ? supabase.from("bookmarks").select("post_id").eq("user_id", user.id)
+      : Promise.resolve({ data: [] as unknown[] });
 
-        const bookmarkedPostIds = [...new Set((bookmarks || []).map((bookmark) => bookmark.post_id as string).filter(Boolean))];
-        if (bookmarkedPostIds.length > 0) {
-          const { data: bookmarkedPosts } = await supabase
-            .from("posts")
-            .select("id, series_name, post_type, chapter_number")
-            .in("id", bookmarkedPostIds)
-            .eq("status", "published");
-          bookmarkedSeriesNames = [...new Set((bookmarkedPosts || [])
-            .filter((post) => post.post_type === "serial" && post.chapter_number && post.series_name)
-            .map((post) => post.series_name as string))];
-        }
-      } else {
-        setPosts([]);
-        setSerialCards([]);
-        setLoading(false);
-        return;
-      }
-      query = query.order("created_at", { ascending: false });
-    } else if (tab === "hot24") {
-      query = query.order("created_at", { ascending: false });
-    }
+    const [{ data: blockedRows }, { data: follows }, { data: bookmarks }] = await Promise.all([
+      blockedPromise,
+      followsPromise,
+      bookmarksPromise,
+    ]);
 
-    query = query.limit(50);
-
-    const { data: rawPosts, error: err } = await query;
-
-    if (err) {
-      setError(err.message);
+    if (needsFollow && !user) {
+      setPosts([]);
+      setSerialCards([]);
       setLoading(false);
       return;
     }
 
-    const rawArr = (rawPosts || []) as unknown as Record<string, unknown>[];
+    const blockedIds = new Set((blockedRows || []).map((row) => (row as Record<string, unknown>).blocked_user_id as string));
 
-    if (tab === "following" && bookmarkedSeriesNames.length > 0) {
+    let query = supabase
+      .from("posts")
+      .select(postSelect)
+      .eq("status", "published");
+
+    let rawArr: Record<string, unknown>[] = [];
+    let bookmarkedSeriesNames: string[] = [];
+
+    if (needsFollow) {
+      const followingIds = (follows || []).map((f) => (f as Record<string, unknown>).following_id as string);
+      followingIds.push(user!.id);
+      query = query.in("user_id", followingIds);
+
+      const bookmarkedPostIds = [...new Set((bookmarks || []).map((bm) => (bm as Record<string, unknown>).post_id as string).filter(Boolean))];
+      // Batch 2：主 feed 查询与收藏作品解析并行（二者只依赖 Batch 1 结果）
+      const bookmarkedPostsPromise = bookmarkedPostIds.length > 0
+        ? supabase.from("posts").select("id, series_name, post_type, chapter_number").in("id", bookmarkedPostIds).eq("status", "published")
+        : Promise.resolve({ data: [] as unknown[] });
+
+      const [{ data: rawPosts, error: err }, { data: bookmarkedPosts }] = await Promise.all([
+        query.order("created_at", { ascending: false }).limit(50),
+        bookmarkedPostsPromise,
+      ]);
+      if (err) {
+        setError(err.message);
+        setLoading(false);
+        return;
+      }
+      rawArr = (rawPosts || []) as unknown as Record<string, unknown>[];
+      bookmarkedSeriesNames = [...new Set((bookmarkedPosts || [])
+        .filter((p) => (p as Record<string, unknown>).post_type === "serial" && (p as Record<string, unknown>).chapter_number && (p as Record<string, unknown>).series_name)
+        .map((p) => (p as Record<string, unknown>).series_name as string))];
+    } else {
+      const { data: rawPosts, error: err } = await query.order("created_at", { ascending: false }).limit(50);
+      if (err) {
+        setError(err.message);
+        setLoading(false);
+        return;
+      }
+      rawArr = (rawPosts || []) as unknown as Record<string, unknown>[];
+    }
+
+    // Batch 3：关注里收藏的连载系列补全（依赖 Batch 2 解析出的 series 名）
+    if (bookmarkedSeriesNames.length > 0) {
       const { data: bookmarkedSeriesPosts } = await supabase
         .from("posts")
         .select(postSelect)
@@ -183,11 +197,11 @@ export default function HomePage() {
       const merged = new Map<string, Record<string, unknown>>();
       for (const post of rawArr) merged.set(post.id as string, post);
       for (const post of (bookmarkedSeriesPosts || []) as unknown as Record<string, unknown>[]) merged.set(post.id as string, post);
-      rawArr.splice(0, rawArr.length, ...merged.values());
+      rawArr = [...merged.values()];
     }
 
     // 屏蔽关系对发现页统一生效，避免被屏蔽用户的作品从推荐或关注内容中重新出现。
-    rawArr.splice(0, rawArr.length, ...rawArr.filter((post) => !blockedIds.has(post.user_id as string)));
+    rawArr = rawArr.filter((post) => !blockedIds.has(post.user_id as string));
 
     rawArr.sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
     const limitedRawArr = rawArr.slice(0, 50);
@@ -210,11 +224,18 @@ export default function HomePage() {
       }
     }
 
+    // Batch 4：作品统计与系列元数据并行（互不依赖）
     const allIds = limitedRawArr.map((p) => p.id as string);
-    const { data: stats } = await supabase
+    const seriesNames = [...new Set(serialChapters.map((ch) => ch.series_name as string).filter(Boolean))];
+    const statsPromise = supabase
       .from("post_stats")
       .select("id, like_count, comment_count, bookmark_count")
       .in("id", allIds);
+    const seriesPromise = seriesNames.length > 0
+      ? supabase.from("series").select("name, description, cover_url, tags, status, series_type").in("name", seriesNames)
+      : Promise.resolve({ data: [] as unknown[] });
+
+    const [{ data: stats }, { data: seriesData }] = await Promise.all([statsPromise, seriesPromise]);
     const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();
     if (stats) for (const s of stats as Array<Record<string, unknown>>) {
       statsMap.set(s.id as string, {
@@ -267,12 +288,6 @@ export default function HomePage() {
       if (!seriesMap.has(sn)) seriesMap.set(sn, []);
       seriesMap.get(sn)!.push(ch);
     }
-
-    const seriesNames = [...seriesMap.keys()];
-    const { data: seriesData } = await supabase
-      .from("series")
-      .select("name, description, cover_url, tags, status, series_type")
-      .in("name", seriesNames);
 
     const seriesMeta = new Map<string, Record<string, unknown>>();
     if (seriesData) {
@@ -349,12 +364,12 @@ export default function HomePage() {
     if (!follows || follows.length === 0) { setFollowedTags([]); setLoading(false); return; }
 
     const tagIds = [...new Set((follows as Array<Record<string, unknown>>).map((f) => f.tag_id as string))];
-    const { data: tagsData } = await supabase.from("tags").select("id, name").in("id", tagIds);
+    // tags 与 post_tags 都只依赖 tagIds，可并行，避免跨区串行多耗一轮 ~1s
+    const [{ data: tagsData }, { data: rawCounts }] = await Promise.all([
+      supabase.from("tags").select("id, name").in("id", tagIds),
+      supabase.from("post_tags").select("tag_id, post_id").in("tag_id", tagIds),
+    ]);
     const tagNames = (tagsData || []).map((t: Record<string, unknown>) => t.name as string);
-    const { data: rawCounts } = await supabase
-      .from("post_tags")
-      .select("tag_id, post_id")
-      .in("tag_id", tagIds);
 
     const postIds = [...new Set((rawCounts || []).map((r: Record<string, unknown>) => r.post_id as string))];
     let validPostIds = new Set<string>();
