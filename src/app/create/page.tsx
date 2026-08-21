@@ -894,10 +894,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const loadCollections = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    // series_name 为双语义字段：合集内的单篇与长篇连载的章节共用，
+    // 必须排除 serial 行，否则连载名会混入合集选择列表
     const { data } = await supabase
       .from("posts")
       .select("series_name")
       .eq("user_id", user.id)
+      .neq("post_type", "serial")
       .not("series_name", "is", null)
       .neq("series_name", "");
     if (data) {
@@ -908,6 +911,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       }
       const list: { name: string; count: number }[] = [];
       map.forEach((count, name) => list.push({ name, count }));
+      list.sort((a, b) => b.count - a.count);
       setExistingCollections(list);
     }
   }, [supabase]);
