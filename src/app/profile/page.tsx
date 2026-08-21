@@ -71,56 +71,81 @@ const hasImages = (post: Post): boolean => {
   return /!\[.*?\]\(.*?\)/g.test(content);
 };
 
-// 一次性批量组装系列信息：所有章节一次取回 + 所有章节统计一次取回，
-// 消除“每个系列各自串行发章节查询 + 点赞/评论/收藏统计”的 N+1。
-const assembleSeriesInfo = async (supabase: ReturnType<typeof createClient>, seriesMeta: SeriesInfo[]): Promise<SeriesInfo[]> => {
+// 章节目录行：只取定位/排序需要的轻量字段，绝不携带正文
+type ChapterDirRow = { id: string; series_name: string; chapter_number: number | null; created_at: string };
+
+// 批量组装系列信息，两波轻量查询：
+//   第 1 波：章节目录（id/series_name/chapter_number/created_at，不含正文）。
+//            调用方若已并行预取（如“我的作品”页与系列查询同波发出），直接复用。
+//   第 2 波：全部章节统计 + 各系列最新一章标题/正文，Promise.all 并行。
+// 旧实现一次拉回所有系列全部章节的完整 content——连载动辄上百章、累计
+// 数百 KB~数 MB 正文跨区传输，导致点击个人中心卡顿无响应。
+const assembleSeriesInfo = async (
+  supabase: ReturnType<typeof createClient>,
+  seriesMeta: SeriesInfo[],
+  opts?: { prefetchedChapters?: ChapterDirRow[] }
+): Promise<SeriesInfo[]> => {
   if (seriesMeta.length === 0) return [];
   const seen = new Set<string>();
   const meta = seriesMeta.filter((s) => { if (seen.has(s.name)) return false; seen.add(s.name); return true; });
   const names = meta.map((s) => s.name);
   if (names.length === 0) return [];
 
-  // 一次取回所有系列的章节
-  const { data: chapters } = await supabase
-    .from("posts")
-    .select("id, series_name, title, content, chapter_number, created_at")
-    .in("series_name", names)
-    .eq("post_type", "serial")
-    .eq("status", "published");
+  let chapterDir = opts?.prefetchedChapters;
+  if (!chapterDir) {
+    const { data } = await supabase
+      .from("posts")
+      .select("id, series_name, chapter_number, created_at")
+      .in("series_name", names)
+      .eq("post_type", "serial")
+      .eq("status", "published");
+    chapterDir = (data as unknown as ChapterDirRow[]) || [];
+  }
 
-  const bySeries = new Map<string, Array<Record<string, unknown>>>();
+  const nameSet = new Set(names);
+  const bySeries = new Map<string, ChapterDirRow[]>();
   const allChapterIds: string[] = [];
-  for (const ch of (chapters as unknown as Record<string, unknown>[]) || []) {
-    const sn = ch.series_name as string;
-    if (!sn) continue;
+  for (const ch of chapterDir) {
+    const sn = ch.series_name;
+    if (!sn || !nameSet.has(sn)) continue;
     if (!bySeries.has(sn)) bySeries.set(sn, []);
     bySeries.get(sn)!.push(ch);
-    allChapterIds.push(ch.id as string);
+    allChapterIds.push(ch.id);
+  }
+  const latestIds: string[] = [];
+  for (const rows of bySeries.values()) {
+    rows.sort((a, b) => (b.chapter_number || 0) - (a.chapter_number || 0));
+    if (rows[0]) latestIds.push(rows[0].id);
   }
 
-  // 一次取回所有章节的统计（post_stats 已按章节聚合 like/comment/bookmark）
+  // 第 2 波（并行）：所有章节统计（post_stats 已按章节聚合）+ 各系列最新一章标题/正文
+  const [{ data: stats }, { data: latestRows }] = await Promise.all([
+    allChapterIds.length > 0
+      ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", allChapterIds)
+      : Promise.resolve({ data: null }),
+    latestIds.length > 0
+      ? supabase.from("posts").select("id, title, content, chapter_number, created_at").in("id", latestIds)
+      : Promise.resolve({ data: null }),
+  ]);
+
   const statsMap = new Map<string, { like: number; comment: number; bookmark: number }>();
-  if (allChapterIds.length > 0) {
-    const { data: stats } = await supabase
-      .from("post_stats")
-      .select("id, like_count, comment_count, bookmark_count")
-      .in("id", allChapterIds);
-    for (const s of (stats as unknown as Array<Record<string, unknown>>) || []) {
-      statsMap.set(s.id as string, {
-        like: (s.like_count as number) || 0,
-        comment: (s.comment_count as number) || 0,
-        bookmark: (s.bookmark_count as number) || 0,
-      });
-    }
+  for (const s of (stats as unknown as Array<Record<string, unknown>>) || []) {
+    statsMap.set(s.id as string, {
+      like: (s.like_count as number) || 0,
+      comment: (s.comment_count as number) || 0,
+      bookmark: (s.bookmark_count as number) || 0,
+    });
   }
+  const latestMap = new Map<string, Record<string, unknown>>();
+  for (const l of (latestRows as unknown as Array<Record<string, unknown>>) || []) latestMap.set(l.id as string, l);
 
   return meta.map((s) => {
-    const chapters = bySeries.get(s.name) || [];
-    chapters.sort((a, b) => (b.chapter_number as number || 0) - (a.chapter_number as number || 0));
-    const latest = chapters[0];
+    const dirs = bySeries.get(s.name) || [];
+    const latestDir = dirs[0] || null;
+    const latest = latestDir ? latestMap.get(latestDir.id) : undefined;
     let like = 0, comment = 0, bookmark = 0;
-    for (const ch of chapters) {
-      const st = statsMap.get(ch.id as string);
+    for (const d of dirs) {
+      const st = statsMap.get(d.id);
       if (st) { like += st.like; comment += st.comment; bookmark += st.bookmark; }
     }
     return {
@@ -128,12 +153,12 @@ const assembleSeriesInfo = async (supabase: ReturnType<typeof createClient>, ser
       like_count: like,
       comment_count: comment,
       bookmark_count: bookmark,
-      latestChapterId: latest ? latest.id as string : null,
-      latestChapterNumber: latest ? latest.chapter_number as number : null,
-      latestChapterTitle: latest ? latest.title as string : null,
+      latestChapterId: latestDir ? latestDir.id : null,
+      latestChapterNumber: latestDir ? latestDir.chapter_number : null,
+      latestChapterTitle: latest ? (latest.title as string) || null : null,
       latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
-      latestChapterCreatedAt: latest ? latest.created_at as string : null,
-      totalChapters: chapters.length,
+      latestChapterCreatedAt: latest ? (latest.created_at as string) || null : latestDir ? latestDir.created_at : null,
+      totalChapters: dirs.length,
     };
   });
 };
@@ -256,11 +281,20 @@ export default function ProfilePage() {
   // 按系列名称加载系列信息（不限定 user_id，可用于加载喜欢的系列）
   const loadSeriesByName = async (seriesNames: string[]): Promise<SeriesInfo[]> => {
     if (seriesNames.length === 0) return [];
-    const { data } = await supabase
-      .from("series")
-      .select("id, name, cover_url, description, series_type, tags, status, created_at")
-      .in("name", seriesNames)
-      .order("created_at", { ascending: false });
+    // 系列元数据与章节目录（不含正文）互不依赖，并行取回
+    const [{ data }, { data: chapterDir }] = await Promise.all([
+      supabase
+        .from("series")
+        .select("id, name, cover_url, description, series_type, tags, status, created_at")
+        .in("name", seriesNames)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("posts")
+        .select("id, series_name, chapter_number, created_at")
+        .in("series_name", seriesNames)
+        .eq("post_type", "serial")
+        .eq("status", "published"),
+    ]);
 
     if (!data) return [];
 
@@ -271,8 +305,10 @@ export default function ProfilePage() {
       return true;
     });
 
-    // 批量组装：所有章节 + 所有章节统计各一次取回，消除逐系列的 N+1
-    return assembleSeriesInfo(supabase, deduped);
+    // 批量组装：目录已预取，内部只剩「统计 + 最新一章」一波并行查询
+    return assembleSeriesInfo(supabase, deduped, {
+      prefetchedChapters: (chapterDir as unknown as ChapterDirRow[]) || [],
+    });
   };
 
   const loadLikes = async () => {
@@ -347,11 +383,21 @@ export default function ProfilePage() {
 
   const loadSeries = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("series")
-      .select("id, name, cover_url, description, series_type, tags, status, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    // 系列元数据与「我的已发布连载章节目录」互不依赖，并行取回；
+    // 目录不含正文，直接交给 assembleSeriesInfo 复用，省一轮串行往返。
+    const [{ data }, { data: chapterDir }] = await Promise.all([
+      supabase
+        .from("series")
+        .select("id, name, cover_url, description, series_type, tags, status, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("posts")
+        .select("id, series_name, chapter_number, created_at")
+        .eq("user_id", user.id)
+        .eq("post_type", "serial")
+        .eq("status", "published"),
+    ]);
 
     if (data) {
       const raw = data as unknown as SeriesInfo[];
@@ -362,8 +408,10 @@ export default function ProfilePage() {
         return true;
       });
 
-      // 批量组装：所有章节 + 所有章节统计各一次取回，消除逐系列的 N+1
-      setSeriesList(await assembleSeriesInfo(supabase, deduped));
+      // 批量组装：目录已预取，内部只剩「统计 + 最新一章」一波并行查询
+      setSeriesList(await assembleSeriesInfo(supabase, deduped, {
+        prefetchedChapters: (chapterDir as unknown as ChapterDirRow[]) || [],
+      }));
     }
   };
 
@@ -397,20 +445,21 @@ export default function ProfilePage() {
   const loadFollowers = async () => {
     if (!user) return;
     setTabLoading(true);
-    // Also load current user's following IDs for the followers tab
-    const { data: myFollowing } = await supabase
-      .from("follows")
-      .select("following_id")
-      .eq("follower_id", user.id);
+    // 我的关注列表与粉丝列表互不依赖，并行取回（原实现串行两轮）
+    const [{ data: myFollowing }, { data: fData }] = await Promise.all([
+      supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", user.id),
+      supabase
+        .from("follows")
+        .select("follower_id, created_at, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio)")
+        .eq("following_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
     const myFollowingSet = new Set((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
     setFollowingIds(myFollowingSet);
-
-    const { data: fData } = await supabase
-      .from("follows")
-      .select("follower_id, created_at, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio)")
-      .eq("following_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
     if (fData) {
       const users = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
         .filter((f) => f.profiles)

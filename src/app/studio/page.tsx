@@ -93,10 +93,38 @@ export default function StudioPage() {
     });
 
     const ids = filtered.map((p) => p.id as string);
-    const { data: stats } = await supabase
-      .from("post_stats")
-      .select("id, like_count, comment_count, bookmark_count")
-      .in("id", ids);
+    // 统计查询与私有图片签名 URL 解析互不依赖，同时发出（原实现先等统计、再串行解析签名）。
+    const statsPromise = ids.length > 0
+      ? supabase
+          .from("post_stats")
+          .select("id, like_count, comment_count, bookmark_count")
+          .in("id", ids)
+      : Promise.resolve({ data: null });
+
+    // 解析私有图片的 signed URL
+    const imageTypes = new Set(["illustration", "comic", "cosplay"]);
+    const privateMarker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
+    const urlMap: Record<string, string[]> = {};
+    const resolveTasks = filtered
+      .filter((w) => imageTypes.has(w.post_type as string) && (w.content as string | null)?.includes("private://"))
+      .map(async (w) => {
+        const content = (w.content as string) || "";
+        const paths = [...content.matchAll(privateMarker)].map((m) => m[1]);
+        const results = await Promise.all(
+          paths.map(async (path) => {
+            const { data } = await supabase.storage.from("private-post-images").createSignedUrl(path, 3600);
+            return { marker: `private://private-post-images/${path}`, signedUrl: data?.signedUrl || null };
+          })
+        );
+        let resolved = content;
+        for (const { marker, signedUrl } of results) {
+          if (signedUrl) resolved = resolved.split(marker).join(signedUrl);
+        }
+        urlMap[w.id as string] = [...resolved.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1]);
+      });
+    const resolveAll = resolveTasks.length > 0 ? Promise.all(resolveTasks) : Promise.resolve([]);
+
+    const { data: stats } = await statsPromise;
     const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();
     if (stats) for (const s of stats as Array<Record<string, unknown>>) {
       statsMap.set(s.id as string, {
@@ -114,40 +142,29 @@ export default function StudioPage() {
     setWorks(workList);
     setLoading(false);
 
-    // 解析私有图片的 signed URL
-    const imageTypes = new Set(["illustration", "comic", "cosplay"]);
-    const privateMarker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
-    const urlMap: Record<string, string[]> = {};
-    const resolveTasks = workList
-      .filter((w) => imageTypes.has(w.post_type) && w.content?.includes("private://"))
-      .map(async (w) => {
-        const content = w.content || "";
-        const paths = [...content.matchAll(privateMarker)].map((m) => m[1]);
-        const results = await Promise.all(
-          paths.map(async (path) => {
-            const { data } = await supabase.storage.from("private-post-images").createSignedUrl(path, 3600);
-            return { marker: `private://private-post-images/${path}`, signedUrl: data?.signedUrl || null };
-          })
-        );
-        let resolved = content;
-        for (const { marker, signedUrl } of results) {
-          if (signedUrl) resolved = resolved.split(marker).join(signedUrl);
-        }
-        urlMap[w.id] = [...resolved.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1]);
-      });
     if (resolveTasks.length > 0) {
-      await Promise.all(resolveTasks);
+      await resolveAll;
       setResolvedImageUrls((prev) => ({ ...prev, ...urlMap }));
     }
   };
 
   const loadSeries = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("series")
-      .select("id, name, description, tags, series_type, created_at, updated_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    // 系列元数据与「我的全部连载章节行」互不依赖，并行取回（原实现串行两轮）。
+    // 章节行只取 series_name 用于计数，不拉正文；按 user_id 圈定比按 series_name
+    // 更精确，避免同名系列的其他作者章节被误计入。
+    const [{ data }, { data: chapterRows }] = await Promise.all([
+      supabase
+        .from("series")
+        .select("id, name, description, tags, series_type, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("posts")
+        .select("series_name")
+        .eq("user_id", user.id)
+        .eq("post_type", "serial"),
+    ]);
 
     if (data) {
       const seen = new Set<string>();
@@ -156,17 +173,9 @@ export default function StudioPage() {
         seen.add(s.name);
         return true;
       });
-      const names = deduped.map((s) => s.name);
       const chapterCountMap = new Map<string, number>();
-      if (names.length > 0) {
-        const { data: chapterRows } = await supabase
-          .from("posts")
-          .select("series_name")
-          .in("series_name", names)
-          .eq("post_type", "serial");
-        for (const row of (chapterRows || []) as Array<{ series_name: string | null }>) {
-          if (row.series_name) chapterCountMap.set(row.series_name, (chapterCountMap.get(row.series_name) || 0) + 1);
-        }
+      for (const row of (chapterRows || []) as Array<{ series_name: string | null }>) {
+        if (row.series_name) chapterCountMap.set(row.series_name, (chapterCountMap.get(row.series_name) || 0) + 1);
       }
       setSeriesList(deduped.map((s) => ({ ...s, chapter_count: chapterCountMap.get(s.name) || 0 })));
     }
