@@ -94,6 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           // SIGNED_OUT
           if (active) {
+            // 必须同步清空 userIdRef：否则再次登录同一账号时，
+            // hydrateSession 会因「用户 id 相同」命中提前 return，跳过 setUser，
+            // 页面就一直停在未登录态，直到手动刷新才恢复。
+            userIdRef.current = null;
             setUser(null);
             setProfile(null);
             setLoading(false);
