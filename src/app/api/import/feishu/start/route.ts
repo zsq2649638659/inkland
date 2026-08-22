@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   authorizeUrl.searchParams.set("client_id", process.env.FEISHU_APP_ID!);
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("redirect_uri", process.env.FEISHU_REDIRECT_URI!);
-  authorizeUrl.searchParams.set("scope", "wiki:node:read");
+  authorizeUrl.searchParams.set("scope", "wiki:node:read docx:document:readonly");
   authorizeUrl.searchParams.set("prompt", "consent");
   authorizeUrl.searchParams.set("state", state);
   return NextResponse.redirect(authorizeUrl);
