@@ -362,7 +362,14 @@ async function normalizeRpcResult(
 ): Promise<FeedResult | null> {
   const raw = data.posts;
   if (!Array.isArray(raw)) return null;
-  if (raw.length > 0 && raw.some((p) => !p || typeof p.id !== "string" || typeof p.content !== "string")) return null;
+  // post_type 决定首页使用普通卡片还是长篇连载卡片。旧版 RPC 曾漏掉该字段，
+  // 如果继续消费会把 serial 章节误当普通作品；此时应直接回落到完整查询。
+  if (raw.length > 0 && raw.some((p) => (
+    !p
+    || typeof p.id !== "string"
+    || typeof p.content !== "string"
+    || typeof p.post_type !== "string"
+  ))) return null;
 
   const toPost = (p: RpcRow): Post => {
     const content = (p.content as string) || "";
