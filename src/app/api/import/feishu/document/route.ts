@@ -35,7 +35,7 @@ async function resolveDocumentId(reference: FeishuDocumentReference, accessToken
     const missingScope = payload.code === 99991672 || /scope|permission/i.test(payload.msg || "");
     return {
       error: missingScope
-        ? "站点尚未开通飞书知识库节点只读权限（wiki:node:read），请管理员开通并重新发布飞书应用"
+        ? "当前飞书授权未包含知识库节点只读权限（wiki:node:read），请断开授权后重新连接"
         : payload.msg || "无法读取这个飞书知识库节点",
       status: response.ok ? 403 : response.status,
     };
