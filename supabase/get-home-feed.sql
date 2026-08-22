@@ -63,7 +63,7 @@ begin
     )
     select json_build_object(
       'posts', coalesce((select json_agg(x) from (
-        select p.id, p.title, p.content, p.cover_url, p.word_count, p.created_at,
+        select p.id, p.title, p.content, p.cover_url, p.word_count, p.post_type, p.created_at,
                p.user_id, p.series_name, p.chapter_number,
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,
@@ -128,7 +128,7 @@ begin
     )
     select json_build_object(
       'posts', coalesce((select json_agg(x) from (
-        select p.id, p.title, p.content, p.cover_url, p.word_count, p.created_at,
+        select p.id, p.title, p.content, p.cover_url, p.word_count, p.post_type, p.created_at,
                p.user_id, p.series_name, p.chapter_number,
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,
