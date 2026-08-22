@@ -15,11 +15,22 @@ const notionHeaders = (token: string) => ({
 });
 
 function notionPageId(value: string) {
+  const trimmed = value.trim();
+  const copiedUrl = trimmed.match(/https?:\/\/[^\s<>"']+/i)?.[0] || trimmed;
   let url: URL;
-  try { url = new URL(value); } catch { return null; }
-  if (!/(^|\.)notion\.(so|site)$/.test(url.hostname)) return null;
-  const compact = url.pathname.match(/([0-9a-fA-F]{32})(?:$|[/?#-])/i)?.[1];
-  const dashed = url.pathname.match(/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/i)?.[1];
+  try { url = new URL(copiedUrl.replace(/[),\]，。]+$/, "")); } catch { return null; }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+
+  // Notion 官方链接通常使用 notion.so / notion.site，但公开页面也可能绑定自定义域名。
+  // 这里只提取页面 UUID，真正的读取始终请求 api.notion.com，不会抓取用户填写的网址。
+  let path = url.pathname;
+  try { path = decodeURIComponent(path); } catch { /* 保留原始路径继续识别 */ }
+  const dashed = path.match(/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/i)?.[1];
+  const compact = path.match(/([0-9a-fA-F]{32})/i)?.[1]
+    || ["p", "page_id", "pageId", "id"]
+      .map((key) => url.searchParams.get(key) || "")
+      .map((candidate) => candidate.replace(/-/g, ""))
+      .find((candidate) => /^[0-9a-fA-F]{32}$/.test(candidate));
   const id = compact || dashed?.replace(/-/g, "");
   return id ? `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}` : null;
 }
