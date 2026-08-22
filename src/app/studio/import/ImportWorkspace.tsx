@@ -505,7 +505,8 @@ export default function ImportWorkspace() {
     sessionStorage.setItem(`inkland-import-${provider}-url`, onlineUrl.trim());
     const popup = window.open(`/api/import/${provider}/start`, `inkland-${provider}-oauth`, "popup,width=620,height=760");
     if (!popup) {
-      setError("浏览器阻止了授权窗口，请允许本站打开弹窗后重试。");
+      // 部分内置浏览器会无条件拦截弹窗；改用当前页面授权，回调后仍能恢复文档链接。
+      window.location.assign(`/api/import/${provider}/start`);
       return;
     }
     setNotice(`请在新窗口完成${provider === "notion" ? " Notion" : "飞书"}授权；当前导入批次会保留。`);
