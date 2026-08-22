@@ -61,10 +61,20 @@ export async function POST(request: Request) {
     fetch(`https://open.feishu.cn/open-apis/docx/v1/documents/${id}`, { headers: authHeaders(session.accessToken), cache: "no-store" }),
     fetch(`https://open.feishu.cn/open-apis/docx/v1/documents/${id}/raw_content`, { headers: authHeaders(session.accessToken), cache: "no-store" }),
   ]);
-  const meta = await metaResponse.json() as { data?: { document?: { title?: string } }; msg?: string };
-  const contentPayload = await contentResponse.json() as { data?: { content?: string }; msg?: string };
-  if (!metaResponse.ok || !contentResponse.ok) {
-    return Response.json({ error: contentPayload.msg || meta.msg || "当前授权无法读取这个飞书文档" }, { status: Math.max(metaResponse.status, contentResponse.status) });
+  const meta = await metaResponse.json() as { code?: number; data?: { document?: { title?: string } }; msg?: string };
+  const contentPayload = await contentResponse.json() as { code?: number; data?: { content?: string }; msg?: string };
+  const apiFailed = !metaResponse.ok || !contentResponse.ok
+    || (meta.code !== undefined && meta.code !== 0)
+    || (contentPayload.code !== undefined && contentPayload.code !== 0);
+  if (apiFailed) {
+    const message = contentPayload.msg || meta.msg || "";
+    const missingDocxScope = meta.code === 99991679 || contentPayload.code === 99991679
+      || /docx:document(?::readonly)?/.test(message);
+    return Response.json({
+      error: missingDocxScope
+        ? "当前飞书授权未包含新版文档只读权限（docx:document:readonly），请断开授权后重新连接"
+        : message || "当前授权无法读取这个飞书文档",
+    }, { status: Math.max(metaResponse.status, contentResponse.status, 400) });
   }
   const title = meta.data?.document?.title?.trim() || "未命名飞书文档";
   const content = contentPayload.data?.content?.trim() || "";
