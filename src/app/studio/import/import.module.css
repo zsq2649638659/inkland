@@ -66,7 +66,7 @@
 .stepActions > button:not(.primaryButton), .finalActions > button:not(.primaryButton) { border: 1px solid #8d766b; background: #fff; color: #604b41; padding: 9px 16px; cursor: pointer; }
 .textPlanList { display: grid; gap: 12px; margin-top: 22px; }
 .stepPage { min-width: 0; }
-.stepPage > .textPlanList { margin: 0 0 14px; }
+.stepPage > .textPlanList { max-height: 320px; overflow-y: auto; scrollbar-gutter: stable; margin: 0 0 14px; padding-right: 6px; }
 .stepScrollArea { height: clamp(430px, 62vh, 680px); overflow-y: auto; overscroll-behavior: contain; padding: 2px 10px 14px 2px; scrollbar-gutter: stable; }
 .stepScrollArea .textPlanList { margin-top: 0; margin-bottom: 14px; }
 .textPlanCard { border: 1px solid #cfc5bf; background: #f9f7f6; padding: 15px; }

@@ -8,6 +8,7 @@ import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
+import { cleanImportHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
 import styles from "./import.module.css";
 
 const ACCEPTED_EXTENSIONS = new Set(["txt", "text", "md", "markdown", "html", "htm", "docx", "epub"]);
@@ -45,20 +46,17 @@ interface PublishResult {
   message: string;
 }
 
-interface TextChapter {
-  title: string;
-  content: string;
-}
-
 interface TextImportPlan {
   id: string;
   fileName: string;
   sourceType: string;
-  bytes: ArrayBuffer;
+  sourceUrl?: string;
+  bytes?: ArrayBuffer;
+  canChangeEncoding: boolean;
   encoding: string;
   detectedEncoding: string;
   content: string;
-  chapters: TextChapter[];
+  chapters: ImportChapter[];
   mode: "single" | "collection" | "serial";
   groupName: string;
   groupDescription: string;
@@ -101,30 +99,7 @@ function normalizeContent(content: string) {
   return content.replace(/\r\n?/g, "\n").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-const CHAPTER_HEADING = /^(?:第[零〇一二三四五六七八九十百千万两\d]+[章节卷回部篇集]|chapter\s+[零〇一二三四五六七八九十百千万两\d]+|序章|楔子|引子|前言|后记|终章|尾声|番外(?:[零〇一二三四五六七八九十百千万两\d]+)?)(?:[：:\s　\-—·].*)?$/i;
 const TEXT_ENCODINGS = ["utf-8", "gb18030", "big5", "utf-16le", "utf-16be"] as const;
-
-function cleanHeading(line: string) {
-  return line.trim().replace(/^#{1,6}\s*/, "").trim();
-}
-
-function splitTextChapters(content: string): TextChapter[] {
-  const lines = normalizeContent(content).split("\n");
-  const headings = lines
-    .map((line, index) => ({ index, title: cleanHeading(line) }))
-    .filter(({ title }) => title.length > 0 && title.length <= 80 && CHAPTER_HEADING.test(title));
-  if (headings.length < 2) return [];
-
-  return headings.map((heading, index) => {
-    const nextIndex = headings[index + 1]?.index ?? lines.length;
-    const beforeFirst = index === 0 ? lines.slice(0, heading.index).join("\n").trim() : "";
-    const body = lines.slice(heading.index + 1, nextIndex).join("\n").trim();
-    return {
-      title: heading.title,
-      content: normalizeContent([beforeFirst, body].filter(Boolean).join("\n\n")),
-    };
-  }).filter((chapter) => chapter.content);
-}
 
 function decodeText(bytes: ArrayBuffer, encoding: string) {
   return new TextDecoder(encoding).decode(bytes).replace(/^\uFEFF/, "");
@@ -263,11 +238,13 @@ async function parseEpub(file: File): Promise<ParsedWork[]> {
 }
 
 async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
+  const sourceLabel = plan.canChangeEncoding ? "TXT" : "在线文档";
   const common = {
     sourceType: plan.sourceType,
+    sourceUrl: plan.sourceUrl,
     sourceBatchId: plan.id,
     sourcePlanId: plan.id,
-    detectedEncoding: plan.encoding,
+    detectedEncoding: plan.canChangeEncoding ? plan.encoding : undefined,
     groupDescription: plan.groupDescription,
     groupTags: plan.groupTags,
   };
@@ -280,7 +257,7 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
       groupMode: "single",
       warning: plan.chapters.length >= 2
         ? `检测到 ${plan.chapters.length} 个章节标题，目前选择保持整篇。`
-        : "没有识别到至少两个常见章节标题；你仍可在下方检查并编辑正文。",
+        : `没有识别到至少两个常见章节标题；这份${sourceLabel}将保持整篇，你仍可在下方检查并编辑正文。`,
     })];
   }
 
@@ -291,9 +268,9 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
     sourceName: `${plan.fileName} · ${chapter.title}`,
     groupMode: plan.mode,
     groupName: plan.groupName.trim() || titleFromFileName(plan.fileName),
-    chapterNumber: plan.mode === "serial" ? index + 1 : undefined,
+    chapterNumber: plan.mode === "serial" ? (chapter.number || index + 1) : undefined,
     chapterTitle: plan.mode === "serial" ? chapter.title : undefined,
-    warning: `已从同一个 TXT 中拆出第 ${index + 1}/${plan.chapters.length} 部分，并保留“${plan.groupName.trim() || titleFromFileName(plan.fileName)}”分组关系。`,
+    warning: `已从同一份${sourceLabel}中拆出第 ${index + 1}/${plan.chapters.length} 部分，并保留“${plan.groupName.trim() || titleFromFileName(plan.fileName)}”分组关系。`,
   })));
 }
 
@@ -301,12 +278,13 @@ async function parseTextFile(file: File): Promise<ParsedFileResult> {
   const bytes = await file.arrayBuffer();
   const detectedEncoding = detectTextEncoding(bytes);
   const content = normalizeContent(decodeText(bytes, detectedEncoding));
-  const chapters = splitTextChapters(content);
+  const chapters = splitImportChapters(content);
   const plan: TextImportPlan = {
     id: crypto.randomUUID(),
     fileName: file.name,
     sourceType: getExtension(file.name),
     bytes,
+    canChangeEncoding: true,
     encoding: detectedEncoding,
     detectedEncoding,
     content,
@@ -475,8 +453,8 @@ export default function ImportWorkspace() {
     setError("");
     try {
       const encoding = changes.encoding || current.encoding;
-      const content = changes.encoding ? normalizeContent(decodeText(current.bytes, encoding)) : current.content;
-      const chapters = changes.encoding ? splitTextChapters(content) : current.chapters;
+      const content = changes.encoding && current.bytes ? normalizeContent(decodeText(current.bytes, encoding)) : current.content;
+      const chapters = changes.encoding ? splitImportChapters(content) : current.chapters;
       const mode = changes.mode || (chapters.length >= 2 ? current.mode : "single");
       const nextPlan: TextImportPlan = { ...current, ...changes, encoding, content, chapters, mode };
       const works = await buildTextWorks(nextPlan);
@@ -487,9 +465,9 @@ export default function ImportWorkspace() {
       ]);
       setNotice(changes.encoding
         ? `已按 ${encoding.toUpperCase()} 重新读取“${current.fileName}”，识别到 ${chapters.length} 个章节。`
-        : `已更新“${current.fileName}”的拆分方式。`);
+        : `已更新“${current.fileName}”的拆分方式，共生成 ${works.length} 篇内容。`);
     } catch (planError) {
-      setError(planError instanceof Error ? planError.message : "重新解析 TXT 失败");
+      setError(planError instanceof Error ? planError.message : "重新检测和拆分内容失败");
     } finally {
       setBusy(false);
     }
@@ -548,20 +526,40 @@ export default function ImportWorkspace() {
       });
       const payload = await response.json() as { title?: string; content?: string; sourceName?: string; sourceType?: string; sourceUrl?: string; error?: string };
       if (!response.ok || !payload.title || !payload.content) throw new Error(payload.error || "在线文档读取失败");
-      const work = await makeParsedWork({
-        title: payload.title,
-        content: payload.content,
-        sourceName: payload.sourceName || payload.title,
+      const sourceUrl = payload.sourceUrl || onlineUrl.trim();
+      const normalizedTitle = payload.title.trim();
+      const contentLines = normalizeContent(payload.content).split("\n");
+      if (cleanImportHeading(contentLines[0] || "") === normalizedTitle) contentLines.shift();
+      const content = normalizeContent(contentLines.join("\n"));
+      if (textPlans.some((plan) => plan.sourceUrl === sourceUrl || (plan.sourceType === provider && plan.content === content))) {
+        setNotice("这篇在线文档已经在当前导入批次中，未重复添加。");
+        return;
+      }
+      const chapters = splitImportChapters(content);
+      const plan: TextImportPlan = {
+        id: crypto.randomUUID(),
+        fileName: normalizedTitle,
         sourceType: payload.sourceType || provider,
-        sourceUrl: payload.sourceUrl || onlineUrl.trim(),
-        sourceBatchId: crypto.randomUUID(),
-        warning: "在线文档只导入标题和正文，不导入评论、修改历史、协作者信息和复杂嵌入内容。",
-      });
-      setParsedWorks((works) => works.some((item) => item.sourceHash === work.sourceHash) ? works : [...works, work]);
+        sourceUrl,
+        canChangeEncoding: false,
+        encoding: "utf-8",
+        detectedEncoding: "utf-8",
+        content,
+        chapters,
+        mode: chapters.length >= 2 ? "serial" : "single",
+        groupName: normalizedTitle,
+        groupDescription: "",
+        groupTags: [],
+      };
+      const works = await buildTextWorks(plan);
+      setTextPlans((plans) => [...plans, plan]);
+      setParsedWorks((items) => [...items, ...works]);
       setPublishResults([]);
       setPublishProgress(0);
       setPublishComplete(false);
-      setNotice("文档已加入当前导入批次；你可以继续选择其他导入方式，完成后再进入下一步。");
+      setNotice(chapters.length >= 2
+        ? "文档已加入当前导入批次；章节检测和拆分方式将在第二步确认。"
+        : "文档已加入当前导入批次；你可以继续选择其他导入方式，完成后再进入下一步。");
     } catch (readError) {
       setError(readError instanceof Error ? readError.message : "在线文档读取失败");
     } finally {
@@ -938,8 +936,8 @@ export default function ImportWorkspace() {
               {currentStep === 2 && <div className={styles.stepPage}>
                 <div className={styles.sectionHeader}><div><h2>确认导入内容</h2><p>章节检测和拆分方式在本步骤处理；工作区内部可以独立滚动。</p></div><label><input type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setParsedWorks((current) => current.map((work) => ({ ...work, selected: event.target.checked })))} /> 全选</label></div>
                 {textPlans.length > 0 && <div className={styles.textPlanList}>{textPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
-                    <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>当前编码：{plan.encoding.toUpperCase()}；{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div><label>文字编码<select value={plan.encoding} disabled={busy} onChange={(event) => void updateTextPlan(plan.id, { encoding: event.target.value })}>{TEXT_ENCODINGS.map((encoding) => <option value={encoding} key={encoding}>{encoding.toUpperCase()}{encoding === plan.detectedEncoding ? "（自动识别）" : ""}</option>)}</select></label></div>
-                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>这份 TXT 应该怎样导入？</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>可尝试切换文字编码。章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
+                    <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>{plan.canChangeEncoding ? `当前编码：${plan.encoding.toUpperCase()}；` : `来源：${plan.sourceType.toUpperCase()}；`}{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div>{plan.canChangeEncoding && <label>文字编码<select value={plan.encoding} disabled={busy} onChange={(event) => void updateTextPlan(plan.id, { encoding: event.target.value })}>{TEXT_ENCODINGS.map((encoding) => <option value={encoding} key={encoding}>{encoding.toUpperCase()}{encoding === plan.detectedEncoding ? "（自动识别）" : ""}</option>)}</select></label>}</div>
+                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>这份{plan.canChangeEncoding ? " TXT" : "在线文档"}应该怎样导入？</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>{plan.canChangeEncoding ? "可尝试切换文字编码。" : ""}章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
                   </section>)}</div>}
                 <div className={styles.stepScrollArea}>
                   <div className={styles.previewList}>{parsedWorks.map((work) => <article className={styles.previewCard} key={work.id}><input type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: event.target.checked } : item))} /><div className={styles.previewBody}><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value } : item))} /><div className={styles.fileMeta}>{work.sourceName} · {work.wordCount.toLocaleString()} 字 · 来源：{work.sourceType.toUpperCase()}{work.detectedEncoding ? ` · ${work.detectedEncoding.toUpperCase()}` : ""}{work.groupMode === "serial" ? ` · 长篇第 ${work.chapterNumber} 章` : work.groupMode === "collection" ? " · 合集单篇" : ""}</div><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value) } : item))} />{work.warning && <p className={styles.warning}>{work.warning}</p>}</div></article>)}</div>
