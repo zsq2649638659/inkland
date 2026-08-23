@@ -231,14 +231,6 @@ export async function loadFeed(
     };
   });
 
-  const seriesMap = new Map<string, Record<string, unknown>[]>();
-  for (const p of serialChapters) {
-    const sn = p.series_name as string;
-    if (!sn) continue;
-    if (!seriesMap.has(sn)) seriesMap.set(sn, []);
-    seriesMap.get(sn)!.push(p);
-  }
-
   const seriesMeta = new Map<string, Record<string, unknown>>();
   if (seriesData) {
     for (const s of seriesData as Record<string, unknown>[]) {
@@ -247,33 +239,35 @@ export async function loadFeed(
   }
 
   const serialCardList: SerialPostCardData[] = [];
-  for (const [sn, chapters] of seriesMap) {
-    chapters.sort((a, b) => (b.chapter_number as number) - (a.chapter_number as number));
-    const latest = chapters[0];
+  // 首页信息流按“发布的章节”展示动态。同一连载一次发布多章时，每章都应有一张
+  // SerialPostCard；系列标题、简介和标签共用，章节内容和互动数据各自独立。
+  for (const chapter of serialChapters) {
+    const sn = chapter.series_name as string;
+    if (!sn) continue;
     const meta = seriesMeta.get(sn) || {};
-    const author = latest.author as { nickname: string; avatar_url: string | null } | null;
-    const st = statsMap.get(latest.id as string) || { like_count: 0, comment_count: 0, bookmark_count: 0 };
+    const author = chapter.author as { nickname: string; avatar_url: string | null } | null;
+    const st = statsMap.get(chapter.id as string) || { like_count: 0, comment_count: 0, bookmark_count: 0 };
 
     serialCardList.push({
-      chapterId: latest.id as string,
-      chapterTitle: (latest.title as string) || "无标题",
-      chapterNumber: latest.chapter_number as number,
-      content: (latest.content as string) || "",
+      chapterId: chapter.id as string,
+      chapterTitle: (chapter.title as string) || "无标题",
+      chapterNumber: chapter.chapter_number as number,
+      content: (chapter.content as string) || "",
       seriesName: sn,
       seriesDescription: (meta.description as string) || "",
       seriesCover: (meta.cover_url as string) || null,
       seriesTags: (meta.tags as string[]) || [],
       seriesStatus: (meta.status as string) || "ongoing",
       seriesType: (meta.series_type as string) || "fanfic",
-      authorId: latest.user_id as string,
+      authorId: chapter.user_id as string,
       authorNickname: author?.nickname || "匿名用户",
       authorAvatar: author?.avatar_url || null,
       likeCount: st.like_count,
       commentCount: st.comment_count,
       bookmarkCount: st.bookmark_count,
-      likedByMe: likedSet.has(latest.id as string),
-      bookmarkedByMe: bookmarkedSet.has(latest.id as string),
-      createdAt: latest.created_at as string,
+      likedByMe: likedSet.has(chapter.id as string),
+      bookmarkedByMe: bookmarkedSet.has(chapter.id as string),
+      createdAt: chapter.created_at as string,
     });
   }
 
@@ -424,39 +418,31 @@ async function normalizeRpcResult(
     if (fetched) for (const s of fetched as RpcRow[]) seriesMeta.set(s.name as string, s);
   }
 
-  const bySeries = new Map<string, Array<Post & RpcRow>>();
-  for (const s of serials) {
-    const sn = s.series_name as string;
-    if (!sn) continue;
-    if (!bySeries.has(sn)) bySeries.set(sn, []);
-    bySeries.get(sn)!.push(s);
-  }
-
   const serialCards: SerialPostCardData[] = [];
-  for (const [sn, chapters] of bySeries) {
-    chapters.sort((a, b) => (b.chapter_number as number) - (a.chapter_number as number));
-    const latest = chapters[0];
+  for (const chapter of serials) {
+    const sn = chapter.series_name as string;
+    if (!sn) continue;
     const meta = seriesMeta.get(sn) || {};
     serialCards.push({
-      chapterId: latest.id as string,
-      chapterTitle: latest.title || "无标题",
-      chapterNumber: latest.chapter_number as number,
-      content: (latest.content as string) || "",
+      chapterId: chapter.id as string,
+      chapterTitle: chapter.title || "无标题",
+      chapterNumber: chapter.chapter_number as number,
+      content: (chapter.content as string) || "",
       seriesName: sn,
       seriesDescription: meta.description || "",
       seriesCover: meta.cover_url || null,
       seriesTags: meta.tags || [],
       seriesStatus: meta.status || "ongoing",
       seriesType: meta.series_type || "fanfic",
-      authorId: latest.user_id as string,
-      authorNickname: latest.author?.nickname || "匿名用户",
-      authorAvatar: latest.author?.avatar_url || null,
-      likeCount: latest.like_count ?? 0,
-      commentCount: latest.comment_count ?? 0,
-      bookmarkCount: latest.bookmark_count ?? 0,
-      likedByMe: !!latest.liked_by_me,
-      bookmarkedByMe: !!latest.bookmarked_by_me,
-      createdAt: latest.created_at as string,
+      authorId: chapter.user_id as string,
+      authorNickname: chapter.author?.nickname || "匿名用户",
+      authorAvatar: chapter.author?.avatar_url || null,
+      likeCount: chapter.like_count ?? 0,
+      commentCount: chapter.comment_count ?? 0,
+      bookmarkCount: chapter.bookmark_count ?? 0,
+      likedByMe: !!chapter.liked_by_me,
+      bookmarkedByMe: !!chapter.bookmarked_by_me,
+      createdAt: chapter.created_at as string,
     });
   }
 
