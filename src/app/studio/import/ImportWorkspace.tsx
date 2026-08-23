@@ -1085,6 +1085,7 @@ export default function ImportWorkspace() {
 
           <section className={styles.panel}>
               {currentStep === 1 && <>
+              <p className={styles.sourceGroupLabel}>导入方法</p>
               <div className={styles.sourceTabs} role="tablist" aria-label="选择导入来源" onKeyDown={handleSourceTabKeyDown}>
                 {SOURCE_TABS.map(([key, title, description]) => (
                   <button key={key} id={`source-tab-${key}`} ref={(element) => { sourceTabRefs.current[key] = element; }} type="button" role="tab" aria-selected={sourceTab === key} aria-controls="import-source-panel" className={sourceTab === key ? styles.activeSource : ""} onClick={() => { setSourceTab(key); setOnlineUrl(""); setError(""); setNotice(""); }}>
@@ -1154,19 +1155,19 @@ export default function ImportWorkspace() {
                 <div className={styles.sectionHeader}><div><h2>当前队列</h2>{notice && <p className={styles.queueNotice} role="status">{notice}</p>}</div><button type="button" className={styles.textButton} onClick={resetImport}>清空全部</button></div>
                 <ul>{importQueueEntries.map((entry) => <li key={entry.key}><div><strong>{entry.title}</strong><span>{entry.detail}</span></div><button type="button" className={styles.textButton} onClick={() => removeImportedSource(entry.sourceBatchId, entry.workId)}>移除作品</button></li>)}</ul>
               </div>}
-              <div className={styles.stepActions}><span>已导入 {importQueueEntries.length} 份来源</span><button type="button" className={styles.primaryButton} disabled={busy || parsedWorks.length === 0} onClick={continueFromImport}>导入完成，下一步</button></div>
+              <div className={styles.stepActions}><span>已导入 {importQueueEntries.length} 份来源</span><button type="button" className={styles.primaryButton} disabled={busy || parsedWorks.length === 0} onClick={continueFromImport}>下一步</button></div>
               </>}
 
               {currentStep === 2 && <div className={styles.stepPage}>
                 {textPlans.length > 0 && <div className={styles.textPlanList}>{textPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
                     <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>{plan.canChangeEncoding ? `当前编码：${plan.encoding.toUpperCase()}；` : `来源：${plan.sourceType.toUpperCase()}；`}{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div>{plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}</div>
-                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>这份{plan.canChangeEncoding ? " TXT" : "在线文档"}应该怎样导入？</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
+                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>导入类型</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
                   </section>)}</div>}
                 <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setParsedWorks((current) => current.map((work) => ({ ...work, selected: event.target.checked })))} /> 全选</label></div>
                 <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
                   <div className={styles.previewList}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy) { setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: !item.selected } : item)); } }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: event.target.checked } : item))} /></div><label className={styles.contentField}><span>正文</span><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value) } : item))} /></label></div></article>)}</div>
                 </div>
-                <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>确认内容，下一步</button></div>
+                <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>下一步</button></div>
               </div>}
 
               {currentStep === 3 && <div className={styles.stepPage}>
@@ -1175,7 +1176,7 @@ export default function ImportWorkspace() {
                   {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}><label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label><label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>{plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}</section>)}
                   {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <><div className={styles.bulkTagBar}><span>批量添加单篇标签</span><input value={bulkTag} placeholder="逗号或空格隔开；不会添加到长篇章节" onChange={(event) => setBulkTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); applyBulkTags(); } }} /><button type="button" onClick={applyBulkTags}>添加到所选单篇</button></div><div className={styles.tagWorkList}>{parsedWorks.filter((work) => work.selected && work.groupMode !== "serial").map((work) => <article key={work.id}><div><strong>{work.title}</strong><p>{work.wordCount.toLocaleString()} 字{work.groupMode === "collection" ? " · 合集单篇" : ""}</p></div><div className={styles.tagsSection}><strong>单篇标签 <span>{work.tags.length > 0 ? `已添加 ${work.tags.length} 个` : "至少添加1个"}</span></strong><TagEditor tags={work.tags} onChange={(tags) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, tags } : item))} /></div></article>)}</div></>}
                 </div>
-                <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(2); }}>上一步</button><span>{selectedWithTagsCount}/{selectedParsedCount} 篇已满足标签要求</span><button type="button" className={styles.primaryButton} onClick={continueFromTags}>信息完成，下一步</button></div>
+                <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(2); }}>上一步</button><span>{selectedWithTagsCount}/{selectedParsedCount} 篇已满足标签要求</span><button type="button" className={styles.primaryButton} onClick={continueFromTags}>下一步</button></div>
               </div>}
 
               {currentStep === 4 && <div className={styles.previewSection}>
@@ -1185,21 +1186,18 @@ export default function ImportWorkspace() {
                   <fieldset className={`${styles.publishModes} collection-options`}>
                     <legend>发布方式</legend>
                     <button type="button" className={`collection-option ${publishMode === "publish" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "publish"} disabled={busy || publishComplete} onClick={() => setPublishMode("publish")}>
-                      <span className="radio-circle"><span className="radio-dot" /></span>
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>立即发布</strong></span><span className="collection-option-desc">提交审核，审核通过后公开</span></span>
                     </button>
                     <button type="button" className={`collection-option ${publishMode === "draft" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "draft"} disabled={busy || publishComplete} onClick={() => setPublishMode("draft")}>
-                      <span className="radio-circle"><span className="radio-dot" /></span>
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>保存到草稿箱</strong></span><span className="collection-option-desc">稍后在创作中心继续编辑</span></span>
                     </button>
                     <button type="button" className={`collection-option ${publishMode === "schedule" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "schedule"} disabled={busy || publishComplete} onClick={() => setPublishMode("schedule")}>
-                      <span className="radio-circle"><span className="radio-dot" /></span>
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>定时发布</strong></span><span className="collection-option-desc">提交审核，通过后按设定时间公开</span></span>
                     </button>
                   </fieldset>
                   {publishMode === "schedule" && <SchedulePicker disabled={busy || publishComplete} onChange={(value) => { scheduleValueRef.current = value; }} />}
                   <label className={styles.copyrightBox}><input type="checkbox" checked={copyrightConfirmed} disabled={busy || publishComplete} onChange={(event) => setCopyrightConfirmed(event.target.checked)} /><span>我确认自己是所选内容的作者，或已取得在 Inkland 发布这些内容的许可。</span></label>
-                  <div className={styles.finalActions}>{!publishComplete && <button type="button" disabled={busy} onClick={() => { setError(""); setCurrentStep(3); }}>上一步</button>}<button type="button" className={styles.primaryButton} disabled={busy || publishComplete || selectedParsedCount === 0} onClick={() => void publishSelectedWorks()}>{busy ? "正在处理..." : publishMode === "draft" ? "一键保存到草稿箱" : publishMode === "schedule" ? "一键定时发布" : "一键发布"}</button></div>
+                  <div className={styles.finalActions}>{!publishComplete && <button type="button" disabled={busy} onClick={() => { setError(""); setCurrentStep(3); }}>上一步</button>}<button type="button" className={styles.primaryButton} disabled={busy || publishComplete || selectedParsedCount === 0} onClick={() => void publishSelectedWorks()}>{busy ? "正在处理..." : "下一步"}</button></div>
                 </section>
               </div>}
 
@@ -1228,7 +1226,7 @@ export default function ImportWorkspace() {
                       <p className={styles.workMsg}>{result.message}</p>
                     </li>)}
                   </ul>
-                  {publishComplete && <div className={styles.resultActions}><Link href="/studio" className={styles.primaryButton}>查看创作中心</Link><button type="button" onClick={resetImport}>继续导入</button></div>}
+                  {publishComplete && <div className={styles.resultActions}><button type="button" onClick={resetImport}>继续导入</button><Link href="/studio" className={styles.primaryButton}>查看创作中心</Link></div>}
                 </section>
               </div>}
           </section>
