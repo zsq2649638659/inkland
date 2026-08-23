@@ -408,6 +408,7 @@
   .schedulePickerField, .schedulePickerField:first-child, .schedulePickerField:last-child { width: 100%; max-width: none; min-width: 0; flex: auto; }
   .scheduleTimePopover { right: auto; left: 0; }
   .textPlanHeading { display: grid; }
+  .textPlanHeading strong { display: block; margin-right: -0.5em; }
   .splitOptions { display: grid; }
   .groupNameField { grid-template-columns: 1fr; }
   .stickyActions { bottom: 72px; }
