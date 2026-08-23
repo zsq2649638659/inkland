@@ -382,8 +382,8 @@
   .draftHeading { grid-template-columns: 1fr; }
   .sectionHeader { align-items: center; }
   .sectionHeader .textButton { flex: none; white-space: nowrap; }
-  .previewList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .resultList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .previewList { grid-template-columns: repeat(auto-fit, minmax(30%, 1fr)); }
+  .resultList { grid-template-columns: repeat(auto-fit, minmax(30%, 1fr)); }
   .resultList li { flex-wrap: wrap; }
   .resultList .success .workMsg { display: none; }
   .stepPage > .textPlanList { max-height: none; overflow-y: visible; scrollbar-gutter: auto; padding-right: 0; }
@@ -393,9 +393,9 @@
   .stepActions > button:not(.primaryButton) { margin-right: auto; }
   .groupInfoCard > label { grid-template-columns: 1fr; }
   .groupInfoCard > label > span { padding-top: 0; }
-  .publishSummary { grid-template-columns: 1fr; }
+  .publishSummary { grid-template-columns: repeat(auto-fit, minmax(30%, 1fr)); }
   .publishSummary span { text-align: left; }
-  .publishModes { grid-template-columns: 1fr; }
+  :global(#page-create) .publishModes { grid-template-columns: repeat(auto-fit, minmax(30%, 1fr)); }
   .publishModes .collection-option {
     min-height: 0;
     flex-direction: row;
@@ -1090,7 +1090,7 @@
 }
 
 @media (max-width: 760px) {
-  .previewList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .previewList { grid-template-columns: repeat(auto-fit, minmax(30%, 1fr)); }
 }
 
 .previewCard {
@@ -1320,7 +1320,7 @@
   .steps::-webkit-scrollbar { display: none; }
   .steps li { flex: 0 0 auto; min-width: 132px; }
   .stepPage { padding: 0; }
-  .splitOptions { grid-template-columns: 1fr; }
+  .splitOptions { grid-template-columns: repeat(auto-fit, minmax(30%, 1fr)); }
   .previewCard {
     padding: 10px;
   }
