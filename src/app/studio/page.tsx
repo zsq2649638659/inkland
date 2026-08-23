@@ -83,6 +83,9 @@ export default function StudioPage() {
       .from("posts")
       .select("id, title, content, cover_url, post_type, status, review_status, review_reason, word_count, created_at, updated_at, published_at, series_name, chapter_number, post_tags(tags(name))")
       .eq("user_id", user.id)
+      // 连载章节不在作品列表展示（由系列区承载），服务端直接排除，
+      // 避免批量导入的章节把 limit(50) 挤占并白拉回大量正文。
+      .neq("post_type", "serial")
       .order("updated_at", { ascending: false });
 
     const { data } = await q.limit(50);

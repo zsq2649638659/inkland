@@ -7,7 +7,10 @@
 --   1. posts 每行已折叠统计（like/comment/bookmark）、作者昵称/头像、标签；
 --   2. 收藏系列（未关注的作者）的章节行直接并入 posts，去重后按时间倒序截断 limit；
 --   3. 连载卡片需要的系列元数据（描述/封面/标签/状态/类型）折叠进 seriesMeta，
---      客户端不再需要第二次系列查询。
+--      客户端不再需要第二次系列查询；
+--   4. content 截断为前 6000 字符预览：信息流卡片只展示摘要/头几张图（沿用
+--      “列表视图用 400px 缩略图而非原图”的既有口径），避免批量导入的超长单篇
+--      （10 万+ 字）把单次往返撑到数 MB。
 -- RLS/安全：SECURITY INVOKER + auth.uid() 识别调用者，身份一律取自会话，不信任客户端 p_user_id。
 -- ============================================================
 
@@ -63,7 +66,7 @@ begin
     )
     select json_build_object(
       'posts', coalesce((select json_agg(x) from (
-        select p.id, p.title, p.content, p.cover_url, p.word_count, p.post_type, p.created_at,
+        select p.id, p.title, left(p.content, 6000) as content, p.cover_url, p.word_count, p.post_type, p.created_at,
                p.user_id, p.series_name, p.chapter_number,
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,
@@ -128,7 +131,7 @@ begin
     )
     select json_build_object(
       'posts', coalesce((select json_agg(x) from (
-        select p.id, p.title, p.content, p.cover_url, p.word_count, p.post_type, p.created_at,
+        select p.id, p.title, left(p.content, 6000) as content, p.cover_url, p.word_count, p.post_type, p.created_at,
                p.user_id, p.series_name, p.chapter_number,
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,

@@ -203,6 +203,9 @@ export default function ProfilePage() {
       .from("posts")
       .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, status, review_status, review_reason, user_id, post_tags(tags(name))")
       .eq("user_id", user.id)
+      // 连载章节不在“我的作品”列表展示（由系列卡片承载），服务端直接排除：
+      // 否则 limit(50) 会被章节行挤占，且白拉回大量章节正文（跨区传输数 MB）。
+      .or("post_type.neq.serial,chapter_number.is.null")
       .order("created_at", { ascending: false })
       .limit(50);
 
