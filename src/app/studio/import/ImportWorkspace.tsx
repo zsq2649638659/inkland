@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
 import { cleanImportHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
+import { addTags, MAX_TAGS_PER_WORK, splitTags } from "@/lib/tagRules";
 import styles from "./import.module.css";
 
 const ACCEPTED_EXTENSIONS = new Set(["txt", "text", "md", "markdown", "html", "htm", "docx", "epub"]);
@@ -25,7 +26,6 @@ interface ParsedWork {
   sourceHash: string;
   wordCount: number;
   selected: boolean;
-  tags: string[];
   warning?: string;
   sourceUrl?: string;
   sourceBatchId?: string;
@@ -279,7 +279,7 @@ async function hashContent(value: string) {
   return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function makeParsedWork(input: Omit<ParsedWork, "id" | "sourceHash" | "wordCount" | "selected" | "tags">): Promise<ParsedWork> {
+async function makeParsedWork(input: Omit<ParsedWork, "id" | "sourceHash" | "wordCount" | "selected">): Promise<ParsedWork> {
   const content = normalizeContent(input.content);
   if (!content) throw new Error(`${input.sourceName} 没有可导入的正文`);
   return {
@@ -289,7 +289,6 @@ async function makeParsedWork(input: Omit<ParsedWork, "id" | "sourceHash" | "wor
     sourceHash: await hashContent(`${input.title}\n${content}`),
     wordCount: countWords(content),
     selected: true,
-    tags: [],
   };
 }
 
@@ -436,25 +435,23 @@ async function parseFile(file: File): Promise<ParsedFileResult> {
   })] };
 }
 
-function TagEditor({ tags = [], onChange, disabled = false }: { tags?: string[]; onChange: (tags: string[]) => void; disabled?: boolean }) {
+function TagEditor({ tags = [], onChange, disabled = false, showHint = true, placeholder = "多个标签可用逗号或空格隔开" }: { tags?: string[]; onChange: (tags: string[]) => void; disabled?: boolean; showHint?: boolean; placeholder?: string }) {
   const [value, setValue] = useState("");
   const addTag = () => {
-    const nextTags = value.split(/[\s,，]+/).map((tag) => tag.trim()).filter(Boolean);
+    const nextTags = splitTags(value);
     if (nextTags.length === 0) return;
-    onChange(Array.from(new Set([...tags, ...nextTags])).slice(0, 10));
+    onChange(addTags(tags, nextTags));
     setValue("");
   };
   return (
     <div className={styles.tagEditor}>
-      <div className={styles.tagList}>
+      <div className={styles.tagInputWrapper}>
         {tags.map((tag) => (
           <span className={styles.tag} key={tag}>{tag}<button type="button" disabled={disabled} aria-label={`删除标签 ${tag}`} onClick={() => onChange(tags.filter((item) => item !== tag))}>×</button></span>
         ))}
+        <input value={value} disabled={disabled} placeholder={placeholder} onChange={(event) => setValue(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); addTag(); } }} />
       </div>
-      <div className={styles.tagInputRow}>
-        <input value={value} disabled={disabled} placeholder="多个标签可用逗号或空格隔开" onChange={(event) => setValue(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); addTag(); } }} />
-        <button type="button" disabled={disabled} onClick={addTag}>添加</button>
-      </div>
+      {showHint && <span className={styles.tagEditorHint}>每个作品最多 {MAX_TAGS_PER_WORK} 个标签</span>}
     </div>
   );
 }
@@ -581,7 +578,7 @@ export default function ImportWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [bulkTag, setBulkTag] = useState("");
+  const [bulkTags, setBulkTags] = useState<string[]>([]);
   const [copyrightConfirmed, setCopyrightConfirmed] = useState(false);
   const [publishMode, setPublishMode] = useState<"publish" | "draft" | "schedule">("publish");
   const [publishResults, setPublishResults] = useState<PublishResult[]>([]);
@@ -879,27 +876,29 @@ export default function ImportWorkspace() {
       if (work.groupDescription.trim().length > 500) return `${label}简介不能超过500个字`;
       if (work.groupMode === "serial" && (!work.groupTags || work.groupTags.length === 0)) return "请给长篇连载本身添加至少1个标签";
     }
-    const missingWorkTags = items.filter((work) => work.groupMode !== "serial" && work.tags.length === 0);
+    const missingWorkTags = items.filter((work) => work.groupMode !== "serial" && bulkTags.length === 0);
     if (missingWorkTags.length > 0) return `还有 ${missingWorkTags.length} 篇单篇没有标签，请先补齐标签`;
     return null;
   };
 
-  const applyBulkTags = () => {
-    const tags = bulkTag.split(/[\s,，]+/).map((tag) => tag.trim()).filter(Boolean);
-    if (tags.length === 0) { setError("请输入要批量添加的标签"); return; }
-    const selected = parsedWorks.filter((work) => work.selected && work.groupMode !== "serial");
-    if (selected.length === 0) { setError("请先选择要添加标签的作品"); return; }
-    setParsedWorks((current) => current.map((work) => work.selected && work.groupMode !== "serial"
-      ? { ...work, tags: Array.from(new Set([...work.tags, ...tags])).slice(0, 10) }
-      : work));
-    setBulkTag("");
+  const handleBulkTagsChange = (nextTags: string[]) => {
+    const removed = bulkTags.filter((tag) => !nextTags.includes(tag));
+    const added = nextTags.filter((tag) => !bulkTags.includes(tag));
+    if (added.length > 0 && !parsedWorks.some((work) => work.selected && work.groupMode !== "serial")) {
+      setError("请先选择要添加标签的作品");
+      return;
+    }
+    setBulkTags(nextTags);
+    setError("");
+    if (removed.length > 0) setNotice(`已从单篇内容中移除标签：${removed.join("、")}。`);
+    else if (added.length > 0) setNotice("已批量添加标签，将应用到本次选中的每篇单篇。");
   };
 
   const resetImport = () => {
     setCurrentStep(1);
     setParsedWorks([]);
     setTextPlans([]);
-    setBulkTag("");
+    setBulkTags([]);
     setCopyrightConfirmed(false);
     setPublishMode("publish");
     scheduleValueRef.current = "";
@@ -1005,7 +1004,7 @@ export default function ImportWorkspace() {
         const { data: post, error: postError } = await supabase.from("posts").insert(postData).select("id, review_status, status").single();
         if (postError || !post?.id) throw postError || new Error("作品创建失败");
         try {
-          if (!isSerial) await saveTagsForPost(post.id as string, work.tags);
+          if (!isSerial) await saveTagsForPost(post.id as string, bulkTags);
         }
         catch (tagError) {
           await supabase.from("posts").delete().eq("id", post.id).eq("user_id", user.id);
@@ -1041,7 +1040,7 @@ export default function ImportWorkspace() {
   );
 
   const selectedParsedCount = parsedWorks.filter((work) => work.selected).length;
-  const selectedWithTagsCount = parsedWorks.filter((work) => work.selected && (work.groupMode === "serial" ? (work.groupTags?.length || 0) > 0 : work.tags.length > 0)).length;
+  const selectedWithTagsCount = parsedWorks.filter((work) => work.selected && (work.groupMode === "serial" ? (work.groupTags?.length || 0) > 0 : bulkTags.length > 0)).length;
   const publishDoneCount = publishResults.filter((result) => result.status === "success" || result.status === "failed").length;
   const publishSuccessCount = publishResults.filter((result) => result.status === "success").length;
   const publishFailedCount = publishResults.filter((result) => result.status === "failed").length;
@@ -1171,17 +1170,22 @@ export default function ImportWorkspace() {
               </div>}
 
               {currentStep === 3 && <div className={styles.stepPage}>
-                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；合集中的每篇单篇分别添加标签。</p></div><span>已选 {selectedParsedCount} 篇</span></div>
+                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；单篇标签会应用到本次选中的每篇单篇。</p></div><span>已选 {selectedParsedCount} 篇</span></div>
                 <div className={styles.stepScrollArea}>
                   {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}><label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label><label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>{plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}</section>)}
-                  {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <><div className={styles.bulkTagBar}><span>批量添加单篇标签</span><input value={bulkTag} placeholder="逗号或空格隔开；不会添加到长篇章节" onChange={(event) => setBulkTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); applyBulkTags(); } }} /><button type="button" onClick={applyBulkTags}>添加到所选单篇</button></div><div className={styles.tagWorkList}>{parsedWorks.filter((work) => work.selected && work.groupMode !== "serial").map((work) => <article key={work.id}><div><strong>{work.title}</strong><p>{work.wordCount.toLocaleString()} 字{work.groupMode === "collection" ? " · 合集单篇" : ""}</p></div><div className={styles.tagsSection}><strong>单篇标签 <span>{work.tags.length > 0 ? `已添加 ${work.tags.length} 个` : "至少添加1个"}</span></strong><TagEditor tags={work.tags} onChange={(tags) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, tags } : item))} /></div></article>)}</div></>}
+                  {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <>
+                    <div className={styles.bulkTagBar}>
+                      <span>批量添加单篇标签</span>
+                      <TagEditor tags={bulkTags} showHint={false} placeholder={`逗号或空格隔开；每篇最多 ${MAX_TAGS_PER_WORK} 个`} onChange={handleBulkTagsChange} />
+                    </div>
+                  </>}
                 </div>
                 <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(2); }}>上一步</button><span>{selectedWithTagsCount}/{selectedParsedCount} 篇已满足标签要求</span><button type="button" className={styles.primaryButton} onClick={continueFromTags}>下一步</button></div>
               </div>}
 
               {currentStep === 4 && <div className={styles.previewSection}>
                 <div className={styles.sectionHeader}><div><h2>确认发布</h2><p>本批次共 {selectedParsedCount} 篇内容，请选择最终处理方式。</p></div></div>
-                <ul className={styles.publishSummary}>{parsedWorks.filter((work) => work.selected).map((work) => <li key={work.id}><strong>{work.title}</strong><span>{work.groupMode === "serial" ? `${work.groupName} · ${(work.groupTags || []).map((tag) => `#${tag}`).join(" ")}` : work.tags.map((tag) => `#${tag}`).join(" ")}</span></li>)}</ul>
+                <ul className={styles.publishSummary}>{parsedWorks.filter((work) => work.selected).map((work) => <li key={work.id}><strong>{work.title}</strong><span>{work.groupMode === "serial" ? `${work.groupName} · ${(work.groupTags || []).map((tag) => `#${tag}`).join(" ")}` : bulkTags.map((tag) => `#${tag}`).join(" ")}</span></li>)}</ul>
                 <section className={styles.publishPanel} aria-label="确认发布">
                   <fieldset className={`${styles.publishModes} collection-options`}>
                     <legend>发布方式</legend>
