@@ -356,13 +356,14 @@ async function normalizeRpcResult(
 ): Promise<FeedResult | null> {
   const raw = data.posts;
   if (!Array.isArray(raw)) return null;
-  // post_type 决定首页使用普通卡片还是长篇连载卡片。旧版 RPC 曾漏掉该字段，
-  // 如果继续消费会把 serial 章节误当普通作品；此时应直接回落到完整查询。
+  // 仅校验真正不可推断的关键形状。post_type 不再强制：线上可能仍部署着
+  // 不返回该列的旧版 get_home_feed（缺列时 typeof 为 undefined，曾导致
+  // 校验永远失败 → 每次都回落 3-4 波慢查询 → 首页/切 tab 骨架屏 ~10s）。
+  // 缺失时按 chapter_number>0 且有 series_name 推断为连载章节。
   if (raw.length > 0 && raw.some((p) => (
     !p
     || typeof p.id !== "string"
     || typeof p.content !== "string"
-    || typeof p.post_type !== "string"
   ))) return null;
 
   const toPost = (p: RpcRow): Post => {
@@ -395,7 +396,11 @@ async function normalizeRpcResult(
   const serials: Array<Post & RpcRow> = [];
   for (const p of raw as RpcRow[]) {
     const post = toPost(p);
-    if (p.post_type === "serial" && p.chapter_number && p.chapter_number > 0) {
+    // post_type 缺失（旧版 SQL）时按数据模型推断：连载章节必有 chapter_number>0
+    // 且挂在某系列名下；合集单篇 chapter_number 为 null。
+    const isSerialChapter = p.post_type === "serial"
+      || (p.post_type == null && p.chapter_number != null && p.chapter_number > 0 && !!p.series_name);
+    if (isSerialChapter) {
       serials.push({ ...p, ...post });
     } else {
       normals.push(post);
