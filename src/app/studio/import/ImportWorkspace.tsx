@@ -1170,7 +1170,7 @@ export default function ImportWorkspace() {
               </div>}
 
               {currentStep === 3 && <div className={styles.stepPage}>
-                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；单篇标签会应用到本次选中的每篇单篇。</p></div><span>已选 {selectedParsedCount} 篇</span></div>
+                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；单篇标签会应用到本次选中的每篇单篇。</p></div></div>
                 <div className={styles.stepScrollArea}>
                   {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}><label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label><label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>{plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}</section>)}
                   {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <>
