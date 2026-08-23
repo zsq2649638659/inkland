@@ -1718,6 +1718,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   <div className="type-card-desc">{t.desc}</div>
                 </button>
               ))}
+              <Link href="/studio/import" className="type-card">
+                <div className="type-card-icon">
+                  <i className="fa-solid fa-file-import" aria-hidden="true" />
+                </div>
+                <div className="type-card-title">批量导入作品</div>
+                <div className="type-card-desc">从本地文档、Notion 或飞书一次导入多篇内容，确认后统一编辑和发布</div>
+              </Link>
             </div>
           </div>
         </div>
