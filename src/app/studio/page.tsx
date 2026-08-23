@@ -520,6 +520,11 @@ export default function StudioPage() {
           <div className="page-header">
             <h1 className="page-title">创作中心</h1>
             <p className="page-subtitle">管理你的所有作品，追踪创作进度与互动数据</p>
+            <div style={{ marginTop: 12 }}>
+              <Link href="/studio/import" className="feed-empty-action">
+                <i className="fa-solid fa-file-import" aria-hidden="true" /> 批量导入作品
+              </Link>
+            </div>
           </div>
 
           {/* 统计卡片（使用未筛选数据，不受 type/status 筛选影响） */}
