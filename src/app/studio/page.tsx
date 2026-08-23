@@ -6,6 +6,7 @@ import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
+import { slimContent } from "@/lib/feed";
 import { SkeletonStudio } from "@/components/Skeleton";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { assertCanPublish } from "@/lib/userRestrictions";
@@ -79,30 +80,55 @@ export default function StudioPage() {
     if (!user) return;
     setLoading(true);
 
-    let q = supabase
-      .from("posts")
-      .select("id, title, content, cover_url, post_type, status, review_status, review_reason, word_count, created_at, updated_at, published_at, series_name, chapter_number, post_tags(tags(name))")
-      .eq("user_id", user.id)
-      // 连载章节不在作品列表展示（由系列区承载），服务端直接排除，
-      // 避免批量导入的章节把 limit(50) 挤占并白拉回大量正文。
-      .neq("post_type", "serial")
-      .order("updated_at", { ascending: false });
+    // 优先走服务端聚合路由（机房内拉取 posts+stats 并瘦身，客户端只下载轻量数据）；
+    // 本地 dev 或路由异常时回落客户端直连。
+    let data: Record<string, unknown>[] | null = null;
+    let statsRows: Array<Record<string, unknown>> | null = null;
+    try {
+      const apiResp = await fetch("/api/studio-works", { credentials: "same-origin" });
+      if (apiResp.ok) {
+        const json = await apiResp.json();
+        if (json && Array.isArray(json.data)) {
+          data = json.data as Record<string, unknown>[];
+          statsRows = json.stats as Array<Record<string, unknown>>;
+        }
+      }
+    } catch {
+      // 回落直连
+    }
 
-    const { data } = await q.limit(50);
-    if (!data) { setLoading(false); return; }
+    let statsPromise: Promise<{ data: unknown }> | null = null;
+    if (data === null) {
+      const q = supabase
+        .from("posts")
+        .select("id, title, content, cover_url, post_type, status, review_status, review_reason, word_count, created_at, updated_at, published_at, series_name, chapter_number, post_tags(tags(name))")
+        .eq("user_id", user.id)
+        // 连载章节不在作品列表展示（由系列区承载），服务端直接排除，
+        // 避免批量导入的章节把 limit(50) 挤占并白拉回大量正文。
+        .neq("post_type", "serial")
+        .order("updated_at", { ascending: false });
+      const res = await q.limit(50);
+      if (!res.data) { setLoading(false); return; }
+      // 直连回落路径同样瘦身：卡片只消费摘要+图片，超长全文交给编辑器
+      data = (res.data as unknown as Record<string, unknown>[]).map((p) => ({
+        ...p,
+        content: slimContent((p.content as string) || ""),
+      }));
+      const ids = (data as Record<string, unknown>[]).map((p) => p.id as string);
+      statsPromise = ids.length > 0
+        ? Promise.resolve(
+            supabase
+              .from("post_stats")
+              .select("id, like_count, comment_count, bookmark_count")
+              .in("id", ids)
+              .then((r) => ({ data: r.data as unknown }))
+          )
+        : null;
+    }
 
-    const filtered = (data as unknown as Record<string, unknown>[]).filter((p) => {
+    const filtered = (data as Record<string, unknown>[]).filter((p) => {
       return p.post_type !== "serial";
     });
-
-    const ids = filtered.map((p) => p.id as string);
-    // 统计查询与私有图片签名 URL 解析互不依赖，同时发出（原实现先等统计、再串行解析签名）。
-    const statsPromise = ids.length > 0
-      ? supabase
-          .from("post_stats")
-          .select("id, like_count, comment_count, bookmark_count")
-          .in("id", ids)
-      : Promise.resolve({ data: null });
 
     // 解析私有图片的 signed URL
     const imageTypes = new Set(["illustration", "comic", "cosplay"]);
@@ -127,9 +153,13 @@ export default function StudioPage() {
       });
     const resolveAll = resolveTasks.length > 0 ? Promise.all(resolveTasks) : Promise.resolve([]);
 
-    const { data: stats } = await statsPromise;
+    let stats: Array<Record<string, unknown>> | null = statsRows;
+    if (statsPromise) {
+      const r = await statsPromise;
+      stats = r.data as Array<Record<string, unknown>> | null;
+    }
     const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();
-    if (stats) for (const s of stats as Array<Record<string, unknown>>) {
+    if (stats) for (const s of stats) {
       statsMap.set(s.id as string, {
         like_count: s.like_count as number,
         comment_count: s.comment_count as number,
