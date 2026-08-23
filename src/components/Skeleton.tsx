@@ -172,36 +172,10 @@ export function SkeletonWorksGrid({
 
 /* ================= 个人页 ================= */
 
-/** 顶部资料区骨架 —— 复用 .profile-section 真实布局 */
-export function SkeletonProfileSection() {
-  return (
-    <section className="profile-section profile-section-skeleton" aria-label="个人资料加载中" aria-busy="true">
-      <div className="profile-avatar">
-        <span className="sk-circle" style={{ width: "100%", height: "100%" }} />
-      </div>
-      <div className="profile-info">
-        <SB style={{ width: 150, height: 26 }} />
-        <SB style={{ width: "58%", height: 15, marginTop: 10 }} />
-        <div className="profile-stats" style={{ marginTop: 16 }}>
-          {[0, 1, 2, 3, 4].map((n) => (
-            <div className="profile-stat" key={n} style={{ gap: 6 }}>
-              <SB style={{ width: 44, height: 15 }} />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="profile-actions">
-        <span className="sk-pill" style={{ width: 96, height: 38, display: "inline-block" }} />
-      </div>
-    </section>
-  );
-}
-
-/** 个人主页整体骨架 —— authLoading 时使用（资料区 + 标签 + 网格） */
+/** 个人主页整体骨架 —— authLoading 时使用（标签 + 网格） */
 export function SkeletonProfile() {
   return (
     <div role="status" aria-label="个人主页加载中，请稍候" aria-busy="true">
-      <SkeletonProfileSection />
       <div className="segmented-tabs" style={{ margin: "16px 0" }}>
         <div className="segmented-tabs-left">
           <span className="sk-pill" style={{ width: 64, height: 34, flexShrink: 0 }} />

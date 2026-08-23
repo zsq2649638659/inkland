@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import JSZip from "jszip";
 import mammoth from "mammoth";
-import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
 import { cleanImportHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
+import { addTags, MAX_TAGS_PER_WORK, splitTags } from "@/lib/tagRules";
 import styles from "./import.module.css";
 
 const ACCEPTED_EXTENSIONS = new Set(["txt", "text", "md", "markdown", "html", "htm", "docx", "epub"]);
@@ -25,7 +26,6 @@ interface ParsedWork {
   sourceHash: string;
   wordCount: number;
   selected: boolean;
-  tags: string[];
   warning?: string;
   sourceUrl?: string;
   sourceBatchId?: string;
@@ -45,6 +45,13 @@ interface PublishResult {
   status: "waiting" | "publishing" | "success" | "failed";
   message: string;
 }
+
+const renderStatusMark = (status: PublishResult["status"]) => {
+  if (status === "success") return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (status === "failed") return <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><line x1="4" y1="4" x2="11" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><line x1="11" y1="4" x2="4" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+  if (status === "publishing") return <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeOpacity=".25" strokeWidth="1.8" /><path d="M7.5 1.5a6 6 0 0 1 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  return null;
+};
 
 interface TextImportPlan {
   id: string;
@@ -91,15 +98,120 @@ function countWords(content: string) {
   return content.replace(/\s/g, "").length;
 }
 
-function toLocalDateTimeValue(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
-
 function normalizeContent(content: string) {
   return content.replace(/\r\n?/g, "\n").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 const TEXT_ENCODINGS = ["utf-8", "gb18030", "big5", "utf-16le", "utf-16be"] as const;
+const SOURCE_TABS = [
+  ["local", "本地文档", "DOCX / TXT / MD / HTML / EPUB"],
+  ["notion", "Notion", "官方授权导入"],
+  ["feishu", "飞书", "官方授权导入"],
+  ["export", "其他在线文档", "先导出，再导入"],
+] as const;
+type SourceTabKey = (typeof SOURCE_TABS)[number][0];
+
+function EncodingSelect({ value, disabled, onChange }: { value: string; disabled?: boolean; onChange: (encoding: string) => void }) {
+  const menuId = useId();
+  const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 220, maxHeight: 240 });
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [open]);
+
+  const updateMenuPosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.max(rect.width, 220);
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const openAbove = spaceBelow < 220 && rect.top > spaceBelow;
+    const availableHeight = Math.max(120, openAbove ? rect.top - 14 : spaceBelow);
+    const maxHeight = Math.min(240, availableHeight);
+    setMenuPosition({
+      top: openAbove ? Math.max(8, rect.top - maxHeight - 6) : rect.bottom + 6,
+      left: Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8)),
+      width,
+      maxHeight,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  const focusOption = (index: number) => {
+    const nextIndex = (index + TEXT_ENCODINGS.length) % TEXT_ENCODINGS.length;
+    optionRefs.current[nextIndex]?.focus();
+  };
+
+  const openAndFocusSelected = () => {
+    if (disabled) return;
+    setOpen(true);
+    window.requestAnimationFrame(() => focusOption(Math.max(0, TEXT_ENCODINGS.indexOf(value as (typeof TEXT_ENCODINGS)[number]))));
+  };
+
+  return <div className={styles.encodingSelect} ref={rootRef}>
+    <button
+      ref={triggerRef}
+      type="button"
+      className={styles.encodingTrigger}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-controls={menuId}
+      disabled={disabled}
+      onClick={() => setOpen((current) => !current)}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          openAndFocusSelected();
+        }
+        if (event.key === "Escape") setOpen(false);
+      }}
+    >
+      <span>{value.toUpperCase()}</span>
+      <i className={`fa-solid fa-chevron-${open ? "up" : "down"}`} aria-hidden="true" />
+    </button>
+    {open && typeof document !== "undefined" && createPortal(<div ref={menuRef} id={menuId} className={styles.encodingMenu} role="listbox" aria-label="文字编码" style={menuPosition}>
+      {TEXT_ENCODINGS.map((encoding, index) => <button
+        key={encoding}
+        ref={(element) => { optionRefs.current[index] = element; }}
+        type="button"
+        role="option"
+        aria-selected={encoding === value}
+        className={encoding === value ? styles.encodingOptionSelected : ""}
+        onClick={() => { onChange(encoding); setOpen(false); triggerRef.current?.focus(); }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") { event.preventDefault(); focusOption(index + 1); }
+          if (event.key === "ArrowUp") { event.preventDefault(); focusOption(index - 1); }
+          if (event.key === "Home") { event.preventDefault(); focusOption(0); }
+          if (event.key === "End") { event.preventDefault(); focusOption(TEXT_ENCODINGS.length - 1); }
+          if (event.key === "Escape") { event.preventDefault(); setOpen(false); triggerRef.current?.focus(); }
+        }}
+      >
+        <span>{encoding.toUpperCase()}</span>
+        {encoding === value && <i className="fa-solid fa-check" aria-hidden="true" />}
+      </button>)}
+    </div>, document.body)}
+  </div>;
+}
 
 function decodeText(bytes: ArrayBuffer, encoding: string) {
   return new TextDecoder(encoding).decode(bytes).replace(/^\uFEFF/, "");
@@ -167,7 +279,7 @@ async function hashContent(value: string) {
   return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function makeParsedWork(input: Omit<ParsedWork, "id" | "sourceHash" | "wordCount" | "selected" | "tags">): Promise<ParsedWork> {
+async function makeParsedWork(input: Omit<ParsedWork, "id" | "sourceHash" | "wordCount" | "selected">): Promise<ParsedWork> {
   const content = normalizeContent(input.content);
   if (!content) throw new Error(`${input.sourceName} 没有可导入的正文`);
   return {
@@ -177,7 +289,6 @@ async function makeParsedWork(input: Omit<ParsedWork, "id" | "sourceHash" | "wor
     sourceHash: await hashContent(`${input.title}\n${content}`),
     wordCount: countWords(content),
     selected: true,
-    tags: [],
   };
 }
 
@@ -324,24 +435,126 @@ async function parseFile(file: File): Promise<ParsedFileResult> {
   })] };
 }
 
-function TagEditor({ tags = [], onChange, disabled = false }: { tags?: string[]; onChange: (tags: string[]) => void; disabled?: boolean }) {
+function TagEditor({ tags = [], onChange, disabled = false, showHint = true, placeholder = "多个标签可用逗号或空格隔开" }: { tags?: string[]; onChange: (tags: string[]) => void; disabled?: boolean; showHint?: boolean; placeholder?: string }) {
   const [value, setValue] = useState("");
   const addTag = () => {
-    const nextTags = value.split(/[\s,，]+/).map((tag) => tag.trim()).filter(Boolean);
+    const nextTags = splitTags(value);
     if (nextTags.length === 0) return;
-    onChange(Array.from(new Set([...tags, ...nextTags])).slice(0, 10));
+    onChange(addTags(tags, nextTags));
     setValue("");
   };
   return (
     <div className={styles.tagEditor}>
-      <div className={styles.tagList}>
+      <div className={styles.tagInputWrapper}>
         {tags.map((tag) => (
           <span className={styles.tag} key={tag}>{tag}<button type="button" disabled={disabled} aria-label={`删除标签 ${tag}`} onClick={() => onChange(tags.filter((item) => item !== tag))}>×</button></span>
         ))}
+        <input value={value} disabled={disabled} placeholder={placeholder} onChange={(event) => setValue(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); addTag(); } }} />
       </div>
-      <div className={styles.tagInputRow}>
-        <input value={value} disabled={disabled} placeholder="多个标签可用逗号或空格隔开" onChange={(event) => setValue(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); addTag(); } }} />
-        <button type="button" disabled={disabled} onClick={addTag}>添加</button>
+      {showHint && <span className={styles.tagEditorHint}>每个作品最多 {MAX_TAGS_PER_WORK} 个标签</span>}
+    </div>
+  );
+}
+
+function SchedulePicker({ disabled, onChange }: { disabled?: boolean; onChange: (value: string) => void }) {
+  const [value, setValue] = useState("");
+  const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [scheduleMonth, setScheduleMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [scheduleTime, setScheduleTime] = useState("20:00");
+
+  const calendarMonthDate = new Date(`${scheduleMonth}-01T00:00:00`);
+  const calendarYear = calendarMonthDate.getFullYear();
+  const calendarMonthIndex = calendarMonthDate.getMonth();
+  const now = new Date();
+  const todayLocalValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const currentCalendarMonth = todayLocalValue.slice(0, 7);
+  const calendarDays = Array.from(
+    { length: new Date(calendarYear, calendarMonthIndex + 1, 0).getDate() + new Date(calendarYear, calendarMonthIndex, 1).getDay() },
+    (_, index) => index < new Date(calendarYear, calendarMonthIndex, 1).getDay() ? null : index - new Date(calendarYear, calendarMonthIndex, 1).getDay() + 1,
+  );
+  const scheduleSelectedDate = value ? value.slice(0, 10) : "";
+  const scheduleHour = scheduleTime.split(":")[0] || "20";
+  const scheduleMinute = scheduleTime.split(":")[1] || "00";
+  const scheduleDisplayValue = value
+    ? new Date(value).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
+    : "选择公开日期";
+
+  const openDatePicker = () => { setSchedulePickerOpen(!schedulePickerOpen); setTimePickerOpen(false); };
+  const openTimePicker = () => { setTimePickerOpen(!timePickerOpen); setSchedulePickerOpen(false); };
+  const changeValue = (nextValue: string) => { setValue(nextValue); onChange(nextValue); };
+
+  return (
+    <div className={styles.schedulePickerFields}>
+      <div className={styles.schedulePickerField}>
+        <span className={styles.schedulePickerLabel}>公开日期</span>
+        <button type="button" className={`${styles.schedulePickerTrigger} ${value ? styles.schedulePickerSelected : ""}`} disabled={disabled} onClick={openDatePicker} aria-expanded={schedulePickerOpen}>
+          <span><i className="fa-regular fa-calendar-days" aria-hidden="true" /> {scheduleDisplayValue}</span>
+          <i className={`fa-solid fa-chevron-down ${schedulePickerOpen ? styles.schedulePickerChevronUp : ""}`} aria-hidden="true" />
+        </button>
+        {schedulePickerOpen && (
+          <div className={styles.scheduleCalendarPopover} role="dialog" aria-label="选择公开日期">
+            <div className={styles.scheduleCalendarHeader}>
+              <button type="button" aria-label="上个月" disabled={scheduleMonth <= currentCalendarMonth} onClick={() => {
+                const previous = new Date(calendarYear, calendarMonthIndex - 1, 1);
+                setScheduleMonth(`${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`);
+              }}><i className="fa-solid fa-chevron-left" aria-hidden="true" /></button>
+              <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
+              <button type="button" aria-label="下个月" onClick={() => {
+                const next = new Date(calendarYear, calendarMonthIndex + 1, 1);
+                setScheduleMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+              }}><i className="fa-solid fa-chevron-right" aria-hidden="true" /></button>
+            </div>
+            <div className={styles.scheduleCalendarWeekdays}>{["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day}>{day}</span>)}</div>
+            <div className={styles.scheduleCalendarGrid}>
+              {calendarDays.map((day, index) => {
+                if (!day) return <span key={`empty-${index}`} />;
+                const dayValue = `${scheduleMonth}-${String(day).padStart(2, "0")}`;
+                const isSelected = scheduleSelectedDate === dayValue;
+                const isToday = todayLocalValue === dayValue;
+                const isPast = dayValue < todayLocalValue;
+                return (
+                  <button type="button" key={dayValue} disabled={isPast} className={`${isSelected ? styles.scheduleDaySelected : ""} ${isToday ? styles.scheduleDayToday : ""} ${isPast ? styles.scheduleDayPast : ""}`} onClick={() => { if (isPast) return; changeValue(`${dayValue}T${scheduleTime}`); setSchedulePickerOpen(false); }}>
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className={styles.schedulePickerField}>
+        <span className={styles.schedulePickerLabel}>公开时间</span>
+        <button type="button" className={`${styles.schedulePickerTrigger} ${timePickerOpen ? styles.schedulePickerOpen : ""}`} disabled={disabled} onClick={openTimePicker} aria-expanded={timePickerOpen}>
+          <span><i className="fa-regular fa-clock" aria-hidden="true" /> {scheduleTime}</span>
+          <i className={`fa-solid fa-chevron-down ${timePickerOpen ? styles.schedulePickerChevronUp : ""}`} aria-hidden="true" />
+        </button>
+        {timePickerOpen && (
+          <div className={styles.scheduleTimePopover} role="dialog" aria-label="选择公开时间">
+            <span className={styles.scheduleTimePopoverTitle}>选择小时和分钟</span>
+            <div className={styles.scheduleTimeColumns}>
+              <div className={styles.scheduleTimeColumn}>
+                <span>小时</span>
+                <div className={styles.scheduleTimeOptions}>
+                  {Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0")).map((hour) => (
+                    <button type="button" key={hour} className={scheduleHour === hour ? styles.scheduleTimeOptionSelected : ""} onClick={() => { const nextTime = `${hour}:${scheduleMinute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) changeValue(`${scheduleSelectedDate}T${nextTime}`); }}>{hour}</button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.scheduleTimeColumn}>
+                <span>分钟</span>
+                <div className={styles.scheduleTimeOptions}>
+                  {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((minute) => (
+                    <button type="button" key={minute} className={scheduleMinute === minute ? styles.scheduleTimeOptionSelected : ""} onClick={() => { const nextTime = `${scheduleHour}:${minute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) changeValue(`${scheduleSelectedDate}T${nextTime}`); setTimePickerOpen(false); }}>{minute}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -351,6 +564,13 @@ export default function ImportWorkspace() {
   const { user, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scheduleValueRef = useRef("");
+  const sourceTabRefs = useRef<Record<SourceTabKey, HTMLButtonElement | null>>({
+    local: null,
+    notion: null,
+    feishu: null,
+    export: null,
+  });
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [parsedWorks, setParsedWorks] = useState<ParsedWork[]>([]);
   const [textPlans, setTextPlans] = useState<TextImportPlan[]>([]);
@@ -358,17 +578,14 @@ export default function ImportWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [bulkTag, setBulkTag] = useState("");
+  const [bulkTags, setBulkTags] = useState<string[]>([]);
   const [copyrightConfirmed, setCopyrightConfirmed] = useState(false);
-  const [publishMode, setPublishMode] = useState<"publish" | "draft" | "schedule">("draft");
-  const [scheduleValue, setScheduleValue] = useState("");
+  const [publishMode, setPublishMode] = useState<"publish" | "draft" | "schedule">("publish");
   const [publishResults, setPublishResults] = useState<PublishResult[]>([]);
   const [publishProgress, setPublishProgress] = useState(0);
   const [publishComplete, setPublishComplete] = useState(false);
-  const [sourceTab, setSourceTab] = useState<"local" | "notion" | "feishu" | "export">("local");
+  const [sourceTab, setSourceTab] = useState<SourceTabKey>("local");
   const [onlineUrl, setOnlineUrl] = useState("");
-  const [configOpen, setConfigOpen] = useState(false);
-  const [siteOrigin, setSiteOrigin] = useState("http://127.0.0.1:3002");
   const [providerStatus, setProviderStatus] = useState<ImportStatus>({
     notion: { configured: false, connected: false },
     feishu: { configured: false, connected: false },
@@ -383,22 +600,33 @@ export default function ImportWorkspace() {
     }
   }, []);
 
+  const handleSourceTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const focusedIndex = SOURCE_TABS.findIndex(([key]) => sourceTabRefs.current[key] === document.activeElement);
+    const activeIndex = focusedIndex >= 0 ? focusedIndex : SOURCE_TABS.findIndex(([key]) => key === sourceTab);
+    let nextIndex = activeIndex;
+    if (event.key === "ArrowRight") nextIndex = (activeIndex + 1) % SOURCE_TABS.length;
+    else if (event.key === "ArrowLeft") nextIndex = (activeIndex - 1 + SOURCE_TABS.length) % SOURCE_TABS.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = SOURCE_TABS.length - 1;
+    else return;
+    event.preventDefault();
+    sourceTabRefs.current[SOURCE_TABS[nextIndex][0]]?.focus();
+  };
+
   useEffect(() => {
     // OAuth 状态只能在浏览器挂载后从同源接口读取。
     void refreshProviderStatus();
-    setSiteOrigin(window.location.origin);
     const params = new URLSearchParams(window.location.search);
     const connected = params.get("connected");
     const oauthError = params.get("oauthError");
     if (connected === "notion" || connected === "feishu") {
       setSourceTab(connected);
-      setOnlineUrl(sessionStorage.getItem(`inkland-import-${connected}-url`) || "");
-      setNotice(`${connected === "notion" ? "Notion" : "飞书"} 已连接，现在可以读取刚才的文档。`);
+      setNotice(`${connected === "notion" ? "Notion" : "飞书"} 已连接，现在可以粘贴文档链接并读取。`);
       window.history.replaceState({}, "", "/studio/import");
       void refreshProviderStatus();
     } else if (oauthError) {
       const providerName = oauthError.startsWith("notion") ? "Notion" : "飞书";
-      setError(oauthError.endsWith("not_configured") ? `${providerName} 官方授权尚未配置，请先完成开发者应用配置。` : `${providerName} 授权失败或已取消，请重试。`);
+      setError(oauthError.endsWith("not_configured") ? `${providerName} 导入暂时不可用，请稍后再试。` : `${providerName} 授权失败或已取消，请重试。`);
       window.history.replaceState({}, "", "/studio/import");
     }
   }, [refreshProviderStatus]);
@@ -475,12 +703,10 @@ export default function ImportWorkspace() {
 
   const connectProvider = (provider: "notion" | "feishu") => {
     setError("");
-    if (!onlineUrl.trim()) { setError(`请先粘贴${provider === "notion" ? " Notion" : "飞书"}文档链接`); return; }
     if (!providerStatus[provider].configured) {
-      setError(`${provider === "notion" ? "Notion" : "飞书"} 官方授权尚未配置。页面功能已就绪，配置开发者应用后即可连接。`);
+      setError(`${provider === "notion" ? "Notion" : "飞书"} 导入暂时不可用，请稍后再试。`);
       return;
     }
-    sessionStorage.setItem(`inkland-import-${provider}-url`, onlineUrl.trim());
     const popup = window.open(`/api/import/${provider}/start`, `inkland-${provider}-oauth`, "popup,width=620,height=760");
     if (!popup) {
       // 部分内置浏览器会无条件拦截弹窗；改用当前页面授权，回调后仍能恢复文档链接。
@@ -514,7 +740,7 @@ export default function ImportWorkspace() {
 
   const readOnlineDocument = async (provider: "notion" | "feishu") => {
     if (!onlineUrl.trim()) { setError("请先粘贴文档链接"); return; }
-    if (!providerStatus[provider].connected) { connectProvider(provider); return; }
+    if (!providerStatus[provider].connected) { setError(`请先连接并授权${provider === "notion" ? " Notion" : "飞书"}`); return; }
     setBusy(true);
     setError("");
     setNotice("");
@@ -573,7 +799,6 @@ export default function ImportWorkspace() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provider }),
     });
-    sessionStorage.removeItem(`inkland-import-${provider}-url`);
     await refreshProviderStatus();
     setNotice(`${provider === "notion" ? "Notion" : "飞书"} 已断开。`);
   };
@@ -651,32 +876,32 @@ export default function ImportWorkspace() {
       if (work.groupDescription.trim().length > 500) return `${label}简介不能超过500个字`;
       if (work.groupMode === "serial" && (!work.groupTags || work.groupTags.length === 0)) return "请给长篇连载本身添加至少1个标签";
     }
-    const missingWorkTags = items.filter((work) => work.groupMode !== "serial" && work.tags.length === 0);
+    const missingWorkTags = items.filter((work) => work.groupMode !== "serial" && bulkTags.length === 0);
     if (missingWorkTags.length > 0) return `还有 ${missingWorkTags.length} 篇单篇没有标签，请先补齐标签`;
     return null;
   };
 
-  const applyBulkTags = () => {
-    const tags = bulkTag.split(/[\s,，]+/).map((tag) => tag.trim()).filter(Boolean);
-    const selected = parsedWorks.filter((work) => work.selected && work.groupMode !== "serial");
-    if (selected.length === 0) { setError("请先选择要添加标签的作品"); return; }
-    if (tags.length === 0) { setError("请输入要批量添加的标签"); return; }
-    setParsedWorks((works) => works.map((work) => work.selected && work.groupMode !== "serial"
-      ? { ...work, tags: Array.from(new Set([...work.tags, ...tags])).slice(0, 10) }
-      : work));
-    setBulkTag("");
+  const handleBulkTagsChange = (nextTags: string[]) => {
+    const removed = bulkTags.filter((tag) => !nextTags.includes(tag));
+    const added = nextTags.filter((tag) => !bulkTags.includes(tag));
+    if (added.length > 0 && !parsedWorks.some((work) => work.selected && work.groupMode !== "serial")) {
+      setError("请先选择要添加标签的作品");
+      return;
+    }
+    setBulkTags(nextTags);
     setError("");
-    setNotice(`已为 ${selected.length} 篇单篇内容添加标签；长篇连载标签请在连载信息中填写。`);
+    if (removed.length > 0) setNotice(`已从单篇内容中移除标签：${removed.join("、")}。`);
+    else if (added.length > 0) setNotice("已批量添加标签，将应用到本次选中的每篇单篇。");
   };
 
   const resetImport = () => {
     setCurrentStep(1);
     setParsedWorks([]);
     setTextPlans([]);
-    setBulkTag("");
+    setBulkTags([]);
     setCopyrightConfirmed(false);
-    setScheduleValue("");
-    setPublishMode("draft");
+    setPublishMode("publish");
+    scheduleValueRef.current = "";
     setPublishResults([]);
     setPublishProgress(0);
     setPublishComplete(false);
@@ -730,6 +955,7 @@ export default function ImportWorkspace() {
 
     let scheduledAt: string | null = null;
     if (publishMode === "schedule") {
+      const scheduleValue = scheduleValueRef.current;
       if (!scheduleValue) { setError("请先选择定时发布时间"); return; }
       const scheduledDate = new Date(scheduleValue);
       if (Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) { setError("定时发布时间必须晚于当前时间"); return; }
@@ -778,7 +1004,7 @@ export default function ImportWorkspace() {
         const { data: post, error: postError } = await supabase.from("posts").insert(postData).select("id, review_status, status").single();
         if (postError || !post?.id) throw postError || new Error("作品创建失败");
         try {
-          if (!isSerial) await saveTagsForPost(post.id as string, work.tags);
+          if (!isSerial) await saveTagsForPost(post.id as string, bulkTags);
         }
         catch (tagError) {
           await supabase.from("posts").delete().eq("id", post.id).eq("user_id", user.id);
@@ -810,11 +1036,15 @@ export default function ImportWorkspace() {
 
   if (authLoading) return <div className={styles.centerState}>正在加载...</div>;
   if (!user) return (
-    <div className="min-h-screen bg-paper pb-20 lg:pb-0"><div className="main-container"><HomeSidebar /><main className="content-area"><div className={styles.centerState}><h1>批量导入作品</h1><p>登录后才能批量发布作品。</p><Link href="/login" className={styles.primaryButton}>登录</Link></div></main></div></div>
+    <div id="page-create" className="min-h-screen bg-paper"><main className={styles.page}><div className={styles.centerState}><h1>批量导入作品</h1><p>登录后才能批量发布作品。</p><Link href="/login" className={styles.primaryButton}>登录</Link></div></main></div>
   );
 
   const selectedParsedCount = parsedWorks.filter((work) => work.selected).length;
-  const selectedWithTagsCount = parsedWorks.filter((work) => work.selected && (work.groupMode === "serial" ? (work.groupTags?.length || 0) > 0 : work.tags.length > 0)).length;
+  const selectedWithTagsCount = parsedWorks.filter((work) => work.selected && (work.groupMode === "serial" ? (work.groupTags?.length || 0) > 0 : bulkTags.length > 0)).length;
+  const publishDoneCount = publishResults.filter((result) => result.status === "success" || result.status === "failed").length;
+  const publishSuccessCount = publishResults.filter((result) => result.status === "success").length;
+  const publishFailedCount = publishResults.filter((result) => result.status === "failed").length;
+  const publishingItem = publishResults.find((result) => result.status === "publishing");
   const activeGroupedPlans = textPlans.filter((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
   const importQueueEntries = Array.from(parsedWorks.reduce((groups, work) => {
     const key = work.sourceBatchId || work.id;
@@ -835,147 +1065,178 @@ export default function ImportWorkspace() {
   });
 
   return (
-    <div className="min-h-screen bg-paper pb-20 lg:pb-0">
-      <div className="main-container">
-        <HomeSidebar />
-        <main className={`content-area ${styles.page}`}>
+    <div id="page-create" className="min-h-screen bg-paper">
+        <main className={styles.page}>
           <header className={styles.header}>
-            <div><Link href="/studio" className={styles.backLink}>← 返回创作中心</Link><h1>批量导入作品</h1><p>导入并确认内容，添加标签后可批量发布、保存草稿或定时发布。</p></div>
+            <div><h1>批量导入作品</h1><p>汇集不同来源的作品，逐步确认内容和信息，再统一发布。</p></div>
           </header>
 
           <ol className={styles.steps} aria-label="导入步骤">
-            <li className={currentStep === 1 ? styles.activeStep : currentStep > 1 ? styles.completedStep : ""}><span>1</span>导入作品</li>
-            <li className={currentStep === 2 ? styles.activeStep : currentStep > 2 ? styles.completedStep : ""}><span>2</span>确认内容</li>
-            <li className={currentStep === 3 ? styles.activeStep : currentStep > 3 ? styles.completedStep : ""}><span>3</span>编辑信息</li>
-            <li className={currentStep === 4 ? styles.activeStep : currentStep > 4 ? styles.completedStep : ""}><span>4</span>确认发布</li>
-            <li className={currentStep === 5 ? styles.activeStep : ""}><span>5</span>发布结果</li>
+            <li aria-current={currentStep === 1 ? "step" : undefined} className={currentStep === 1 ? styles.activeStep : currentStep > 1 ? styles.completedStep : ""}><span>1</span>导入作品</li>
+            <li aria-current={currentStep === 2 ? "step" : undefined} className={currentStep === 2 ? styles.activeStep : currentStep > 2 ? styles.completedStep : ""}><span>2</span>确认内容</li>
+            <li aria-current={currentStep === 3 ? "step" : undefined} className={currentStep === 3 ? styles.activeStep : currentStep > 3 ? styles.completedStep : ""}><span>3</span>编辑信息</li>
+            <li aria-current={currentStep === 4 ? "step" : undefined} className={currentStep === 4 ? styles.activeStep : currentStep > 4 ? styles.completedStep : ""}><span>4</span>确认发布</li>
+            <li aria-current={currentStep === 5 ? "step" : undefined} className={currentStep === 5 ? styles.activeStep : ""}><span>5</span>发布结果</li>
           </ol>
 
-          {error && <div className={styles.errorNotice} role="alert">{error}</div>}
-          {notice && <div className={styles.successNotice} role="status">{notice}</div>}
+          {error && sourceTab !== "notion" && sourceTab !== "feishu" && <div className={styles.errorNotice} role="alert">{error}</div>}
+          {notice && parsedWorks.length === 0 && <div className={styles.successNotice} role="status">{notice}</div>}
 
           <section className={styles.panel}>
               {currentStep === 1 && <>
-              <div className={styles.sourceTabs} role="tablist" aria-label="选择导入来源">
-                {([
-                  ["local", "本地文档", "DOCX / TXT / MD / HTML / EPUB"],
-                  ["notion", "Notion", "官方 OAuth 授权"],
-                  ["feishu", "飞书", "官方 OAuth 授权"],
-                  ["export", "其他在线文档", "导出文件"],
-                ] as const).map(([key, title, description]) => (
-                  <button key={key} type="button" role="tab" aria-selected={sourceTab === key} className={sourceTab === key ? styles.activeSource : ""} onClick={() => { setSourceTab(key); setOnlineUrl(""); setError(""); setNotice(""); }}>
-                    <strong>{title}</strong><span>{description}</span>
+              <div className={styles.sourceTabs} role="tablist" aria-label="选择导入来源" onKeyDown={handleSourceTabKeyDown}>
+                {SOURCE_TABS.map(([key, title, description]) => (
+                  <button key={key} id={`source-tab-${key}`} ref={(element) => { sourceTabRefs.current[key] = element; }} type="button" role="tab" aria-selected={sourceTab === key} aria-controls="import-source-panel" className={sourceTab === key ? styles.activeSource : ""} onClick={() => { setSourceTab(key); setOnlineUrl(""); setError(""); setNotice(""); }}>
+                    <span><strong>{title}</strong><small>{description}</small></span>
                   </button>
                 ))}
               </div>
 
-              {sourceTab === "local" && <div
+              <div id="import-source-panel" role="tabpanel" aria-labelledby={`source-tab-${sourceTab}`} className={styles.sourceContentRow}>
+              {sourceTab === "local" && <><div
                 className={`${styles.dropZone} ${dragging ? styles.dragging : ""}`}
+                role="button"
+                tabIndex={busy ? -1 : 0}
+                aria-label="点击上传本地文档"
+                aria-disabled={busy}
+                onClick={() => { if (!busy) fileInputRef.current?.click(); }}
+                onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+                  if (!busy && (event.key === "Enter" || event.key === " ")) {
+                    event.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
                 onDragEnter={(event: DragEvent) => { event.preventDefault(); setDragging(true); }}
                 onDragOver={(event: DragEvent) => event.preventDefault()}
                 onDragLeave={() => setDragging(false)}
                 onDrop={(event: DragEvent) => { event.preventDefault(); setDragging(false); void handleFiles(event.dataTransfer.files); }}
               >
                 <i className="fa-solid fa-file-arrow-up" aria-hidden="true" />
-                <h2>选择本地文档</h2>
+                <strong className={styles.uploadHint}>点击上传文件</strong>
                 <p>支持 DOCX、TXT、Markdown、HTML、EPUB；一次最多50个文件，单个不超过20MB。</p>
-                <p className={styles.minorText}>文件在当前浏览器中解析，原始文件不会上传。EPUB 会按阅读顺序拆分章节。</p>
-                <button type="button" className={styles.primaryButton} onClick={() => fileInputRef.current?.click()} disabled={busy}>{busy ? "正在解析..." : "选择文件"}</button>
-                <input ref={fileInputRef} type="file" hidden multiple accept=".txt,.text,.md,.markdown,.html,.htm,.docx,.epub,text/plain,text/markdown,text/html,application/epub+zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event: ChangeEvent<HTMLInputElement>) => { if (event.target.files) void handleFiles(event.target.files); event.target.value = ""; }} />
-              </div>}
+                {busy && <span className={styles.uploadBusy}>正在解析...</span>}
+              </div><input ref={fileInputRef} type="file" hidden multiple accept=".txt,.text,.md,.markdown,.html,.htm,.docx,.epub,text/plain,text/markdown,text/html,application/epub+zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event: ChangeEvent<HTMLInputElement>) => { if (event.target.files) void handleFiles(event.target.files); event.target.value = ""; }} /></>}
 
               {(sourceTab === "notion" || sourceTab === "feishu") && <div className={styles.onlinePanel}>
                 <div className={styles.onlineHeading}>
-                  <div><h2>从{sourceTab === "notion" ? " Notion" : "飞书"}导入</h2><p>只读取你粘贴并授权的这一篇文档，不读取评论、历史版本或协作者资料。</p></div>
-                  <span className={providerStatus[sourceTab].connected ? styles.connectedBadge : styles.disconnectedBadge}>{providerStatus[sourceTab].connected ? "已连接" : providerStatus[sourceTab].configured ? "未连接" : "尚未配置"}</span>
+                  <div><span className={styles.panelEyebrow}>在线文档</span><h2>从{sourceTab === "notion" ? " Notion" : "飞书"}导入</h2><p>先连接账号，再粘贴你要导入的文档链接。</p></div>
+                  <span className={providerStatus[sourceTab].connected ? styles.connectedBadge : styles.disconnectedBadge}><i className={`fa-solid ${providerStatus[sourceTab].connected ? "fa-circle-check" : "fa-circle"}`} aria-hidden="true" />{providerStatus[sourceTab].connected ? "已连接" : "未连接"}</span>
                 </div>
-                <label className={styles.urlField}><span>文档链接</span><input type="url" value={onlineUrl} placeholder={sourceTab === "notion" ? "https://www.notion.so/..." : "https://xxx.feishu.cn/docx/..."} onChange={(event) => setOnlineUrl(event.target.value)} /></label>
-                {!providerStatus[sourceTab].configured && <div className={styles.configHint}>本地页面已经具备完整授权流程，但还需要站点管理员配置{sourceTab === "notion" ? " Notion Client ID、Client Secret 和回调地址" : "飞书 App ID、App Secret 和回调地址"}后才能连接。用户不需要、也不能手填 Token。</div>}
-                <div className={styles.onlineActions}>
-                  {providerStatus[sourceTab].connected ? <>
-                    <button type="button" className={styles.primaryButton} disabled={busy} onClick={() => void readOnlineDocument(sourceTab)}>{busy ? "正在读取..." : "读取这篇文档"}</button>
-                    <button type="button" className={styles.textButton} onClick={() => void disconnectProvider(sourceTab)}>断开授权</button>
-                  </> : <button type="button" className={styles.primaryButton} disabled={busy || !providerStatus[sourceTab].configured} onClick={() => connectProvider(sourceTab)}>连接并授权这篇文档</button>}
-                  <button type="button" className={styles.textButton} onClick={() => setConfigOpen((open) => !open)}>{configOpen ? "收起管理员配置" : "站点管理员配置"}</button>
-                </div>
-                {configOpen && <div className={styles.configPanel}>
-                  <strong>{sourceTab === "notion" ? "Notion" : "飞书"}接入配置</strong>
-                  <p>此处只展示配置方法和当前状态。Client Secret 必须保存在服务端环境变量中，不能由普通用户在网页里填写。</p>
-                  <ol>
-                    <li>在{sourceTab === "notion" ? " Notion 开发者后台创建 Public integration" : "飞书开放平台创建应用并开通文档只读权限"}。</li>
-                    <li>将回调地址配置为 <code>{siteOrigin}/api/import/{sourceTab}/callback</code>。</li>
-                    <li>在站点服务端填写：<code>{sourceTab === "notion" ? "NOTION_CLIENT_ID / NOTION_CLIENT_SECRET / NOTION_REDIRECT_URI" : "FEISHU_APP_ID / FEISHU_APP_SECRET / FEISHU_REDIRECT_URI"}</code>，然后重启站点。</li>
-                    <li>回到这里点击“刷新配置状态”，确认状态变成“未连接”。</li>
-                  </ol>
-                  <div className={styles.configActions}>
-                    <a href={sourceTab === "notion" ? "https://developers.notion.com/guides/get-started/authorization" : "https://open.feishu.cn/"} target="_blank" rel="noreferrer">打开官方配置页面</a>
-                    <button type="button" onClick={() => void refreshProviderStatus()}>刷新配置状态</button>
+                {!providerStatus[sourceTab].connected ? <div className={styles.connectStage}>
+                  <div className={styles.stageIcon}><i className="fa-solid fa-link" aria-hidden="true" /></div>
+                  <div><strong>连接你的{sourceTab === "notion" ? " Notion" : "飞书"}账号</strong><p>授权完成后，回到这里粘贴并读取具体文档。</p></div>
+                  <button type="button" className={styles.primaryButton} disabled={busy} onClick={() => connectProvider(sourceTab)}>连接并授权</button>
+                </div> : <div className={styles.readStage}>
+                  <label className={styles.urlField}><span>文档链接</span><input type="url" value={onlineUrl} placeholder={sourceTab === "notion" ? "粘贴 Notion 页面链接" : "粘贴飞书文档或知识库链接"} onChange={(event) => setOnlineUrl(event.target.value)} /></label>
+                  <div className={styles.onlineActions}>
+                    <button type="button" className={styles.primaryButton} disabled={busy || !onlineUrl.trim()} onClick={() => void readOnlineDocument(sourceTab)}>{busy ? "正在读取..." : "粘贴链接并读取"}</button>
+                    <button type="button" className={styles.textButton} onClick={() => void disconnectProvider(sourceTab)}>断开连接</button>
                   </div>
                 </div>}
               </div>}
 
+              {error && (sourceTab === "notion" || sourceTab === "feishu") && <div className={`${styles.errorNotice} ${styles.onlineResultNotice}`} role="alert">{error}</div>}
+
               {sourceTab === "export" && <div className={styles.onlinePanel}>
                 <div className={styles.onlineHeading}><div><h2>导出文件后导入</h2><p>适用于石墨、Google 文档、Word Online、WPS、腾讯文档和语雀。</p></div><span className={styles.guideBadge}>DOCX / MD</span></div>
-                <div className={styles.platformNames} aria-label="支持导出后导入的平台"><span>石墨</span><span>Google 文档</span><span>Word Online</span><span>WPS</span><span>腾讯文档</span><span>语雀</span></div>
-                <ol className={styles.shimoSteps}><li>打开原文档，在“文件”或右上角菜单中选择“下载 / 导出”。</li><li>优先选择 Word（DOCX）；有 Markdown 选项时也可以选择 MD。</li><li>下载完成后，点击下方按钮选择文件；可以一次选择多份。</li></ol>
+                <p className={styles.shimoSteps}>打开原文档，在“文件”或右上角菜单中选择“下载 / 导出”。优先选择 Word（DOCX）；有 Markdown 选项时也可以选择 MD。下载完成后，点击下方按钮选择文件；可以一次选择多份。</p>
                 <button type="button" className={styles.primaryButton} onClick={() => { setSourceTab("local"); setOnlineUrl(""); setNotice("请选择刚刚导出的 DOCX 或 Markdown 文件；可以一次选择多份。"); window.setTimeout(() => fileInputRef.current?.click(), 0); }}>选择导出的文件</button>
               </div>}
 
               <aside className={styles.privacyBox}>
                 <strong>导入隐私说明</strong>
-                <ul><li>本地原文件只在浏览器内解析，不上传服务器。</li><li>只有点击发布、保存草稿或定时发布后，确认过的正文和标签才会写入 Inkland。</li><li>不导入批注、修订历史、文档作者元数据、评论和协作者信息。</li><li>在线平台仅通过官方授权读取你明确选择的文档；尚未接入官方授权的平台只提供导出引导。</li></ul>
+                <ul><li>本地文件仅在浏览器解析，原文件不上传；确认发布、保存草稿或定时发布后，正文和标签才会写入 Inkland。</li><li>不导入批注、修订历史、作者元数据、评论或协作者信息；在线平台只读取你通过官方授权选择的文档，其他平台仅提供导出引导。</li></ul>
               </aside>
+              </div>
 
               {parsedWorks.length > 0 && <div className={styles.importQueue}>
-                <div className={styles.sectionHeader}><div><h2>当前导入批次</h2><p>已加入 {importQueueEntries.length} 份来源，可以继续切换其他方式导入。</p></div><button type="button" className={styles.textButton} onClick={resetImport}>清空全部</button></div>
-                <ul>{importQueueEntries.map((entry) => <li key={entry.key}><div><strong>{entry.title}</strong><span>{entry.detail}</span></div><button type="button" onClick={() => removeImportedSource(entry.sourceBatchId, entry.workId)}>移除</button></li>)}</ul>
+                <div className={styles.sectionHeader}><div><h2>当前队列</h2>{notice && <p className={styles.queueNotice} role="status">{notice}</p>}</div><button type="button" className={styles.textButton} onClick={resetImport}>清空全部</button></div>
+                <ul>{importQueueEntries.map((entry) => <li key={entry.key}><div><strong>{entry.title}</strong><span>{entry.detail}</span></div><button type="button" className={styles.textButton} onClick={() => removeImportedSource(entry.sourceBatchId, entry.workId)}>移除作品</button></li>)}</ul>
               </div>}
               <div className={styles.stepActions}><span>已导入 {importQueueEntries.length} 份来源</span><button type="button" className={styles.primaryButton} disabled={busy || parsedWorks.length === 0} onClick={continueFromImport}>导入完成，下一步</button></div>
               </>}
 
               {currentStep === 2 && <div className={styles.stepPage}>
-                <div className={styles.sectionHeader}><div><h2>确认导入内容</h2><p>章节检测和拆分方式在本步骤处理；工作区内部可以独立滚动。</p></div><label><input type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setParsedWorks((current) => current.map((work) => ({ ...work, selected: event.target.checked })))} /> 全选</label></div>
                 {textPlans.length > 0 && <div className={styles.textPlanList}>{textPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
-                    <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>{plan.canChangeEncoding ? `当前编码：${plan.encoding.toUpperCase()}；` : `来源：${plan.sourceType.toUpperCase()}；`}{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div>{plan.canChangeEncoding && <label>文字编码<select value={plan.encoding} disabled={busy} onChange={(event) => void updateTextPlan(plan.id, { encoding: event.target.value })}>{TEXT_ENCODINGS.map((encoding) => <option value={encoding} key={encoding}>{encoding.toUpperCase()}{encoding === plan.detectedEncoding ? "（自动识别）" : ""}</option>)}</select></label>}</div>
-                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>这份{plan.canChangeEncoding ? " TXT" : "在线文档"}应该怎样导入？</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>{plan.canChangeEncoding ? "可尝试切换文字编码。" : ""}章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
+                    <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>{plan.canChangeEncoding ? `当前编码：${plan.encoding.toUpperCase()}；` : `来源：${plan.sourceType.toUpperCase()}；`}{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div>{plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}</div>
+                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>这份{plan.canChangeEncoding ? " TXT" : "在线文档"}应该怎样导入？</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
                   </section>)}</div>}
-                <div className={styles.stepScrollArea}>
-                  <div className={styles.previewList}>{parsedWorks.map((work) => <article className={styles.previewCard} key={work.id}><input type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: event.target.checked } : item))} /><div className={styles.previewBody}><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value } : item))} /><div className={styles.fileMeta}>{work.sourceName} · {work.wordCount.toLocaleString()} 字 · 来源：{work.sourceType.toUpperCase()}{work.detectedEncoding ? ` · ${work.detectedEncoding.toUpperCase()}` : ""}{work.groupMode === "serial" ? ` · 长篇第 ${work.chapterNumber} 章` : work.groupMode === "collection" ? " · 合集单篇" : ""}</div><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value) } : item))} />{work.warning && <p className={styles.warning}>{work.warning}</p>}</div></article>)}</div>
+                <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setParsedWorks((current) => current.map((work) => ({ ...work, selected: event.target.checked })))} /> 全选</label></div>
+                <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
+                  <div className={styles.previewList}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy) { setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: !item.selected } : item)); } }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: event.target.checked } : item))} /></div><label className={styles.contentField}><span>正文</span><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value) } : item))} /></label></div></article>)}</div>
                 </div>
                 <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>确认内容，下一步</button></div>
               </div>}
 
               {currentStep === 3 && <div className={styles.stepPage}>
-                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；合集中的每篇单篇分别添加标签。</p></div><span>已选 {selectedParsedCount} 篇</span></div>
+                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；单篇标签会应用到本次选中的每篇单篇。</p></div><span>已选 {selectedParsedCount} 篇</span></div>
                 <div className={styles.stepScrollArea}>
-                  {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}><div className={styles.groupInfoHeading}><div><strong>{plan.mode === "serial" ? "长篇连载信息" : "合集信息"}</strong><p>{plan.mode === "serial" ? `${parsedWorks.filter((work) => work.selected && work.sourcePlanId === plan.id).length} 个章节共用以下信息和标签` : "合集标题和简介属于合集；标签仍在下方逐篇填写"}</p></div><span>{plan.fileName}</span></div><label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label><label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>{plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}</section>)}
-                  {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <><div className={styles.bulkTagBar}><span>批量添加单篇标签</span><input value={bulkTag} placeholder="逗号或空格隔开；不会添加到长篇章节" onChange={(event) => setBulkTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); applyBulkTags(); } }} /><button type="button" onClick={applyBulkTags}>添加到所选单篇</button></div><div className={styles.tagWorkList}>{parsedWorks.filter((work) => work.selected && work.groupMode !== "serial").map((work) => <article key={work.id}><div><strong>{work.title}</strong><p>{work.wordCount.toLocaleString()} 字{work.groupMode === "collection" ? " · 合集单篇" : ""}</p></div><div className={styles.tagsSection}><strong>单篇标签 <span>{work.tags.length > 0 ? `已添加 ${work.tags.length} 个` : "至少添加1个"}</span></strong><TagEditor tags={work.tags} onChange={(tags) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, tags } : item))} /></div></article>)}</div></>}
+                  {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}><label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label><label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>{plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}</section>)}
+                  {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <>
+                    <div className={styles.bulkTagBar}>
+                      <span>批量添加单篇标签</span>
+                      <TagEditor tags={bulkTags} showHint={false} placeholder={`逗号或空格隔开；每篇最多 ${MAX_TAGS_PER_WORK} 个`} onChange={handleBulkTagsChange} />
+                    </div>
+                  </>}
                 </div>
                 <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(2); }}>上一步</button><span>{selectedWithTagsCount}/{selectedParsedCount} 篇已满足标签要求</span><button type="button" className={styles.primaryButton} onClick={continueFromTags}>信息完成，下一步</button></div>
               </div>}
 
               {currentStep === 4 && <div className={styles.previewSection}>
                 <div className={styles.sectionHeader}><div><h2>确认发布</h2><p>本批次共 {selectedParsedCount} 篇内容，请选择最终处理方式。</p></div></div>
-                <ul className={styles.publishSummary}>{parsedWorks.filter((work) => work.selected).map((work) => <li key={work.id}><strong>{work.title}</strong><span>{work.groupMode === "serial" ? `${work.groupName} · ${(work.groupTags || []).map((tag) => `#${tag}`).join(" ")}` : work.tags.map((tag) => `#${tag}`).join(" ")}</span></li>)}</ul>
+                <ul className={styles.publishSummary}>{parsedWorks.filter((work) => work.selected).map((work) => <li key={work.id}><strong>{work.title}</strong><span>{work.groupMode === "serial" ? `${work.groupName} · ${(work.groupTags || []).map((tag) => `#${tag}`).join(" ")}` : bulkTags.map((tag) => `#${tag}`).join(" ")}</span></li>)}</ul>
                 <section className={styles.publishPanel} aria-label="确认发布">
-                  <fieldset className={styles.publishModes} disabled={busy || publishComplete}>
-                    <label><input type="radio" name="publish-mode" checked={publishMode === "draft"} onChange={() => setPublishMode("draft")} /><span><strong>保存到草稿箱</strong>稍后在创作中心继续编辑</span></label>
-                    <label><input type="radio" name="publish-mode" checked={publishMode === "publish"} onChange={() => setPublishMode("publish")} /><span><strong>立即发布</strong>提交审核，审核通过后公开</span></label>
-                    <label><input type="radio" name="publish-mode" checked={publishMode === "schedule"} onChange={() => setPublishMode("schedule")} /><span><strong>定时发布</strong>提交审核，通过后按设定时间公开</span></label>
+                  <fieldset className={`${styles.publishModes} collection-options`}>
+                    <legend>发布方式</legend>
+                    <button type="button" className={`collection-option ${publishMode === "publish" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "publish"} disabled={busy || publishComplete} onClick={() => setPublishMode("publish")}>
+                      <span className="radio-circle"><span className="radio-dot" /></span>
+                      <span className="collection-option-copy"><span className="collection-option-text"><strong>立即发布</strong></span><span className="collection-option-desc">提交审核，审核通过后公开</span></span>
+                    </button>
+                    <button type="button" className={`collection-option ${publishMode === "draft" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "draft"} disabled={busy || publishComplete} onClick={() => setPublishMode("draft")}>
+                      <span className="radio-circle"><span className="radio-dot" /></span>
+                      <span className="collection-option-copy"><span className="collection-option-text"><strong>保存到草稿箱</strong></span><span className="collection-option-desc">稍后在创作中心继续编辑</span></span>
+                    </button>
+                    <button type="button" className={`collection-option ${publishMode === "schedule" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "schedule"} disabled={busy || publishComplete} onClick={() => setPublishMode("schedule")}>
+                      <span className="radio-circle"><span className="radio-dot" /></span>
+                      <span className="collection-option-copy"><span className="collection-option-text"><strong>定时发布</strong></span><span className="collection-option-desc">提交审核，通过后按设定时间公开</span></span>
+                    </button>
                   </fieldset>
-                  {publishMode === "schedule" && <label className={styles.scheduleField}><span>发布时间</span><input type="datetime-local" value={scheduleValue} min={toLocalDateTimeValue(new Date(Date.now() + 60_000))} disabled={busy || publishComplete} onChange={(event) => setScheduleValue(event.target.value)} /></label>}
-                  <label className={styles.copyrightBox}><input type="checkbox" checked={copyrightConfirmed} disabled={busy || publishComplete} onChange={(event) => setCopyrightConfirmed(event.target.checked)} /><span><strong>版权确认</strong>我确认自己是所选内容的作者，或已取得在 Inkland 发布这些内容的许可。</span></label>
+                  {publishMode === "schedule" && <SchedulePicker disabled={busy || publishComplete} onChange={(value) => { scheduleValueRef.current = value; }} />}
+                  <label className={styles.copyrightBox}><input type="checkbox" checked={copyrightConfirmed} disabled={busy || publishComplete} onChange={(event) => setCopyrightConfirmed(event.target.checked)} /><span>我确认自己是所选内容的作者，或已取得在 Inkland 发布这些内容的许可。</span></label>
                   <div className={styles.finalActions}>{!publishComplete && <button type="button" disabled={busy} onClick={() => { setError(""); setCurrentStep(3); }}>上一步</button>}<button type="button" className={styles.primaryButton} disabled={busy || publishComplete || selectedParsedCount === 0} onClick={() => void publishSelectedWorks()}>{busy ? "正在处理..." : publishMode === "draft" ? "一键保存到草稿箱" : publishMode === "schedule" ? "一键定时发布" : "一键发布"}</button></div>
                 </section>
               </div>}
 
               {currentStep === 5 && <div className={styles.previewSection}>
                 <div className={styles.sectionHeader}><div><h2>发布结果</h2><p>正在处理本批次的 {selectedParsedCount} 篇内容，请不要关闭当前页面。</p></div></div>
-                <section className={styles.progressPanel} aria-live="polite"><div className={styles.progressHeading}><strong>{publishComplete ? "处理完成" : "正在批量处理"}</strong><span>{publishProgress}%</span></div><div className={styles.progressTrack}><span style={{ width: `${publishProgress}%` }} /></div><ul className={styles.resultList}>{publishResults.map((result) => <li key={result.workId} className={styles[result.status]}><span>{result.status === "success" ? "✓" : result.status === "failed" ? "!" : result.status === "publishing" ? "…" : "·"}</span><div><strong>{result.title}</strong><p>{result.message}</p></div></li>)}</ul>{publishComplete && <div className={styles.resultActions}><Link href="/studio" className={styles.primaryButton}>查看创作中心</Link><button type="button" onClick={resetImport}>继续导入</button></div>}</section>
+                <section className={styles.progressPanel} aria-live="polite">
+                  <div className={styles.statusHead}>
+                    <span className={`${styles.headIcon} ${publishComplete ? styles.headDone : styles.headSpin}`} aria-hidden="true">
+                      {publishComplete
+                        ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        : <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.8" stroke="currentColor" strokeOpacity=".25" strokeWidth="2" /><path d="M8.5 1.7a6.8 6.8 0 0 1 6.8 6.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>}
+                    </span>
+                    <div className={styles.headText}>
+                      <h3>{publishComplete ? "处理完成" : "正在写入作品"}<span className={styles.counter}>{publishDoneCount} / {publishResults.length} 篇</span></h3>
+                      <p>{publishComplete
+                        ? <>成功 {publishSuccessCount} 篇{publishFailedCount > 0 ? <>，失败 {publishFailedCount} 篇；失败的内容保留在页面中，可返回上一步修改后重试</> : "；全部内容已按所选方式处理完毕"}</>
+                        : (publishingItem ? <>正在写入<b>《{publishingItem.title}》</b>的作品和标签</> : "即将开始写入，请稍候")}</p>
+                    </div>
+                    <span className={styles.pct}>{publishProgress}%</span>
+                  </div>
+                  <div className={`${styles.progressTrack}${publishComplete ? ` ${styles.progressComplete}` : ""}`}><span style={{ width: `${publishProgress}%` }} /></div>
+                  <ul className={styles.resultList}>
+                    {publishResults.map((result) => <li key={result.workId} className={styles[result.status]}>
+                      <span className={styles.mark} aria-hidden="true">{renderStatusMark(result.status)}</span>
+                      <strong className={styles.workTitle}>{result.title}</strong>
+                      <p className={styles.workMsg}>{result.message}</p>
+                    </li>)}
+                  </ul>
+                  {publishComplete && <div className={styles.resultActions}><Link href="/studio" className={styles.primaryButton}>查看创作中心</Link><button type="button" onClick={resetImport}>继续导入</button></div>}
+                </section>
               </div>}
           </section>
         </main>
-      </div>
     </div>
   );
 }
