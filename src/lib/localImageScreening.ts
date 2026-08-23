@@ -17,19 +17,15 @@ type NSFWModel = {
 };
 
 let modelPromise: Promise<NSFWModel> | null = null;
-const LOCAL_MODEL_URL = "/models/nsfwjs/mobilenet_v2/model.json";
 
 async function getModel() {
   if (!modelPromise) {
     modelPromise = (async () => {
-      const tf = await import("@tensorflow/tfjs");
-      tf.enableProdMode();
+      await import("@tensorflow/tfjs");
       const nsfwjs = await import("nsfwjs/core");
-      return nsfwjs.load(LOCAL_MODEL_URL) as Promise<NSFWModel>;
-    })().catch((error) => {
-      modelPromise = null;
-      throw error;
-    });
+      const { MobileNetV2Model } = await import("nsfwjs/models/mobilenet_v2");
+      return nsfwjs.load("MobileNetV2", { modelDefinitions: [MobileNetV2Model] }) as Promise<NSFWModel>;
+    })();
   }
   return modelPromise;
 }
