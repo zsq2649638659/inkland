@@ -117,7 +117,9 @@ export default function HomePage() {
   // 轻量数据）；本地 dev 或路由异常时安全回落客户端直连。
   const fetchFeed = async (): Promise<FeedResult | null> => {
     try {
-      const apiResp = await fetch(`/api/feed?tab=${tab}`, { credentials: "same-origin" });
+      // 未登录时声明匿名，服务端可跳过会话验证往返（匿名数据本就公开，无越权）
+      const uParam = user ? "" : "&u=anon";
+      const apiResp = await fetch(`/api/feed?tab=${tab}${uParam}`, { credentials: "same-origin" });
       if (apiResp.ok) {
         const json = await apiResp.json();
         if (json && Array.isArray(json.posts)) return json as FeedResult;
