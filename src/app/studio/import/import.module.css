@@ -383,7 +383,8 @@
   .sectionHeader { align-items: center; }
   .bulkTagBar { grid-template-columns: 1fr; }
   .stepActions { flex-wrap: wrap; }
-  .stepActions > span { width: 100%; }
+  .stepActions > span { width: 100%; order: -1; }
+  .stepActions > button:not(.primaryButton) { margin-right: auto; }
   .groupInfoCard > label { grid-template-columns: 1fr; }
   .groupInfoCard > label > span { padding-top: 0; }
   .publishSummary { grid-template-columns: 1fr; }
