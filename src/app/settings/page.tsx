@@ -7,8 +7,9 @@ import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import ProfileEditForm from "@/components/ProfileEditForm";
 
-type SettingsTab = "password" | "blocked" | "notifications" | "about" | "contact";
+type SettingsTab = "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
 
 const siteContactEmail = "inkland@163.com";
 
@@ -16,7 +17,7 @@ export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("password");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
@@ -45,6 +46,7 @@ export default function SettingsPage() {
   }, []);
 
   const tabs: { key: SettingsTab; label: string }[] = [
+    { key: "profile", label: "编辑资料" },
     { key: "password", label: "修改密码" },
     { key: "blocked", label: "屏蔽管理" },
     { key: "notifications", label: "通知设置" },
@@ -190,6 +192,15 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
+
+          {/* ---- Panel: 编辑资料 ---- */}
+          <section className="settings-panel" style={{ display: activeTab === "profile" ? "block" : "none" }}>
+            <h2 className="settings-panel-title">编辑资料</h2>
+            <p className="settings-panel-desc">修改你在 Inkland 展示的头像、昵称和个人简介。</p>
+            <div id="page-profile-edit" className="profile-edit-content">
+              <ProfileEditForm />
+            </div>
+          </section>
 
           {/* ---- Panel: 修改密码 ---- */}
           <form
