@@ -28,6 +28,23 @@ const postSelect = `id, user_id, title, content, cover_url, word_count, post_typ
      author:profiles!posts_user_id_fkey(nickname, avatar_url),
      post_tags(tags(name))`;
 
+// 列表卡片只消费「摘要 + 图片 + 私有图路径」；批量导入的超长正文（实测单篇
+// 19 万字、50 篇 feed 达 3.4MB）会把跨区传输、客户端渲染与 feedCache 全部拖垮。
+// 超过阈值的正文截断为前缀，并把正文中的全部图片 markdown 追加到尾部——
+// 图片链接本身很小，保留全部可让卡片轮播/私有图签名解析照常工作。
+const CONTENT_SLIM_LIMIT = 1500;
+
+export function slimContent(content: string): string {
+  if (content.length <= CONTENT_SLIM_LIMIT) return content;
+  const head = content.slice(0, CONTENT_SLIM_LIMIT);
+  const images = content.match(/!\[[^\]]*\]\([^)]+\)/g);
+  if (!images || images.length === 0) return head;
+  // 已出现在前缀里的图片不再追加，避免重复
+  const tail = images.filter((img) => !head.includes(img));
+  if (tail.length === 0) return head;
+  return head + "\n" + tail.join("\n");
+}
+
 export async function loadFeed(
   supabase: SupabaseClient,
   opts: { tab: FeedTab; userId?: string | null; limit?: number; tryRpc?: boolean }
@@ -196,7 +213,7 @@ export async function loadFeed(
   const formatted: Post[] = normalPosts.map((p) => {
     const ptags = (p.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
     const author = p.author as { nickname: string; avatar_url: string | null } | null;
-    const content = (p.content as string) || "";
+    const content = slimContent((p.content as string) || "");
     const st = statsMap.get(p.id as string) || { like_count: 0, comment_count: 0, bookmark_count: 0 };
     const plainText = content
       .replace(/!\[.*?\]\(.*?\)/g, "")
@@ -252,7 +269,7 @@ export async function loadFeed(
       chapterId: chapter.id as string,
       chapterTitle: (chapter.title as string) || "无标题",
       chapterNumber: chapter.chapter_number as number,
-      content: (chapter.content as string) || "",
+      content: slimContent((chapter.content as string) || ""),
       seriesName: sn,
       seriesDescription: (meta.description as string) || "",
       seriesCover: (meta.cover_url as string) || null,
@@ -367,7 +384,7 @@ async function normalizeRpcResult(
   ))) return null;
 
   const toPost = (p: RpcRow): Post => {
-    const content = (p.content as string) || "";
+    const content = slimContent((p.content as string) || "");
     const images = extractImagesForRpc(content);
     return {
       id: p.id,
@@ -432,7 +449,7 @@ async function normalizeRpcResult(
       chapterId: chapter.id as string,
       chapterTitle: chapter.title || "无标题",
       chapterNumber: chapter.chapter_number as number,
-      content: (chapter.content as string) || "",
+      content: slimContent((chapter.content as string) || ""),
       seriesName: sn,
       seriesDescription: meta.description || "",
       seriesCover: meta.cover_url || null,

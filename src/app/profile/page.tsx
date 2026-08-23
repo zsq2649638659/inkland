@@ -12,6 +12,7 @@ import SeriesCardGrid from "@/components/SeriesCardGrid";
 import UserCard from "@/components/UserCard";
 import { SkeletonProfile, SkeletonWorksGrid, SkeletonUserCardList } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
+import { slimContent } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 
 type FilterType = "all" | "single" | "image" | "series";
@@ -194,23 +195,42 @@ export default function ProfilePage() {
     else setTab("works");
   }, []);
 
+  // 列表数据优先走服务端聚合路由（机房内拉取并瘦身，客户端只下载轻量数据）；
+  // 本地 dev 或路由异常时返回 null，调用方回落客户端直连。
+  const fetchProfilePosts = async (apiTab: "works" | "likes" | "bookmarks"): Promise<Post[] | null> => {
+    try {
+      const apiResp = await fetch(`/api/profile-posts?tab=${apiTab}`, { credentials: "same-origin" });
+      if (apiResp.ok) {
+        const json = await apiResp.json();
+        if (json && Array.isArray(json.data)) return json.data as Post[];
+      }
+    } catch {
+      // 回落直连
+    }
+    return null;
+  };
+
   const loadPosts = async () => {
     if (!user) return;
     setLoading(true);
     setError("");
 
-    const q = supabase
-      .from("posts")
-      .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, status, review_status, review_reason, user_id, post_tags(tags(name))")
-      .eq("user_id", user.id)
-      // 连载章节不在“我的作品”列表展示（由系列卡片承载），服务端直接排除：
-      // 否则 limit(50) 会被章节行挤占，且白拉回大量章节正文（跨区传输数 MB）。
-      .or("post_type.neq.serial,chapter_number.is.null")
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    const { data, error: err } = await q;
-    if (err) { setError(`加载失败: ${err.message}`); setLoading(false); return; }
+    let data: Post[] | null = await fetchProfilePosts("works");
+    if (data === null) {
+      const q = supabase
+        .from("posts")
+        .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, status, review_status, review_reason, user_id, post_tags(tags(name))")
+        .eq("user_id", user.id)
+        // 连载章节不在“我的作品”列表展示（由系列卡片承载），服务端直接排除：
+        // 否则 limit(50) 会被章节行挤占，且白拉回大量章节正文（跨区传输数 MB）。
+        .or("post_type.neq.serial,chapter_number.is.null")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      const { data: d, error: err } = await q;
+      if (err) { setError(`加载失败: ${err.message}`); setLoading(false); return; }
+      // 直连回落路径同样瘦身：卡片只消费摘要+图片，超长全文交给详情页
+      data = ((d as unknown as Post[]) || []).map((p) => ({ ...p, content: slimContent(p.content || "") }));
+    }
 
     const privatePrefix = "private://private-post-images/";
     const resolvePrivateUrl = async (url?: string | null) => {
@@ -294,31 +314,41 @@ export default function ProfilePage() {
   const loadLikes = async () => {
     if (!user) return;
     setLoading(true);
-    const { data: likes } = await supabase.from("likes").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
-    if (likes && likes.length > 0) {
-      const postIds = likes.map((l: Record<string, unknown>) => l.post_id as string);
-      const interactionTimes = new Map(likes.map((l: Record<string, unknown>) => [l.post_id as string, l.created_at as string]));
-      const { data: posts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
-      if (posts) {
-        const formatted = (posts as unknown as Post[]).map((p) => {
-          const cp = p as unknown as Record<string, unknown>;
-          const ptags = (cp.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
-          return { ...p, tags: ptags, interaction_at: interactionTimes.get(p.id) || p.created_at };
-        });
-        formatted.sort((a, b) => new Date((b as Post & { interaction_at?: string }).interaction_at || "").getTime() - new Date((a as Post & { interaction_at?: string }).interaction_at || "").getTime());
-        setLikedPosts(formatted);
-
-        // 收集喜欢帖子所属的系列，加载系列信息
-        const seriesNames = [...new Set(formatted.filter((p) => p.series_name).map((p) => p.series_name as string))];
-        const seriesData = await loadSeriesByName(seriesNames);
-        setLikedSeriesList(seriesData.map((series) => ({
-          ...series,
-          interaction_at: formatted
-            .filter((post) => post.series_name === series.name)
-            .map((post) => (post as Post & { interaction_at?: string }).interaction_at || "")
-            .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || series.created_at,
-        })));
+    let posts: Array<Post & { interaction_at?: string }> | null = await fetchProfilePosts("likes") as Array<Post & { interaction_at?: string }> | null;
+    if (posts === null) {
+      const { data: likes } = await supabase.from("likes").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      if (likes && likes.length > 0) {
+        const postIds = likes.map((l: Record<string, unknown>) => l.post_id as string);
+        const interactionTimes = new Map(likes.map((l: Record<string, unknown>) => [l.post_id as string, l.created_at as string]));
+        const { data: rawPosts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
+        posts = ((rawPosts as unknown as Post[]) || []).map((p) => ({
+          ...p,
+          content: slimContent(p.content || ""),
+          interaction_at: interactionTimes.get(p.id) || p.created_at,
+        }));
+      } else {
+        posts = [];
       }
+    }
+    if (posts.length > 0) {
+      const formatted = posts.map((p) => {
+        const cp = p as unknown as Record<string, unknown>;
+        const ptags = (cp.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
+        return { ...p, tags: ptags };
+      });
+      formatted.sort((a, b) => new Date((b as Post & { interaction_at?: string }).interaction_at || "").getTime() - new Date((a as Post & { interaction_at?: string }).interaction_at || "").getTime());
+      setLikedPosts(formatted);
+
+      // 收集喜欢帖子所属的系列，加载系列信息
+      const seriesNames = [...new Set(formatted.filter((p) => p.series_name).map((p) => p.series_name as string))];
+      const seriesData = await loadSeriesByName(seriesNames);
+      setLikedSeriesList(seriesData.map((series) => ({
+        ...series,
+        interaction_at: formatted
+          .filter((post) => post.series_name === series.name)
+          .map((post) => (post as Post & { interaction_at?: string }).interaction_at || "")
+          .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || series.created_at,
+      })));
     } else {
       setLikedPosts([]);
       setLikedSeriesList([]);
@@ -329,31 +359,41 @@ export default function ProfilePage() {
   const loadBookmarks = async () => {
     if (!user) return;
     setLoading(true);
-    const { data: bms } = await supabase.from("bookmarks").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
-    if (bms && bms.length > 0) {
-      const postIds = bms.map((b: Record<string, unknown>) => b.post_id as string);
-      const interactionTimes = new Map(bms.map((b: Record<string, unknown>) => [b.post_id as string, b.created_at as string]));
-      const { data: posts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
-      if (posts) {
-        const formatted = (posts as unknown as Post[]).map((p) => {
-          const cp = p as unknown as Record<string, unknown>;
-          const ptags = (cp.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
-          return { ...p, tags: ptags, interaction_at: interactionTimes.get(p.id) || p.created_at };
-        });
-        formatted.sort((a, b) => new Date((b as Post & { interaction_at?: string }).interaction_at || "").getTime() - new Date((a as Post & { interaction_at?: string }).interaction_at || "").getTime());
-        setBookmarkedPosts(formatted);
-
-        // 收集收藏帖子所属的系列，加载系列信息
-        const seriesNames = [...new Set(formatted.filter((p) => p.series_name).map((p) => p.series_name as string))];
-        const seriesData = await loadSeriesByName(seriesNames);
-        setBookmarkedSeriesList(seriesData.map((series) => ({
-          ...series,
-          interaction_at: formatted
-            .filter((post) => post.series_name === series.name)
-            .map((post) => (post as Post & { interaction_at?: string }).interaction_at || "")
-            .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || series.created_at,
-        })));
+    let posts: Array<Post & { interaction_at?: string }> | null = await fetchProfilePosts("bookmarks") as Array<Post & { interaction_at?: string }> | null;
+    if (posts === null) {
+      const { data: bms } = await supabase.from("bookmarks").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      if (bms && bms.length > 0) {
+        const postIds = bms.map((b: Record<string, unknown>) => b.post_id as string);
+        const interactionTimes = new Map(bms.map((b: Record<string, unknown>) => [b.post_id as string, b.created_at as string]));
+        const { data: rawPosts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
+        posts = ((rawPosts as unknown as Post[]) || []).map((p) => ({
+          ...p,
+          content: slimContent(p.content || ""),
+          interaction_at: interactionTimes.get(p.id) || p.created_at,
+        }));
+      } else {
+        posts = [];
       }
+    }
+    if (posts.length > 0) {
+      const formatted = posts.map((p) => {
+        const cp = p as unknown as Record<string, unknown>;
+        const ptags = (cp.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
+        return { ...p, tags: ptags };
+      });
+      formatted.sort((a, b) => new Date((b as Post & { interaction_at?: string }).interaction_at || "").getTime() - new Date((a as Post & { interaction_at?: string }).interaction_at || "").getTime());
+      setBookmarkedPosts(formatted);
+
+      // 收集收藏帖子所属的系列，加载系列信息
+      const seriesNames = [...new Set(formatted.filter((p) => p.series_name).map((p) => p.series_name as string))];
+      const seriesData = await loadSeriesByName(seriesNames);
+      setBookmarkedSeriesList(seriesData.map((series) => ({
+        ...series,
+        interaction_at: formatted
+          .filter((post) => post.series_name === series.name)
+          .map((post) => (post as Post & { interaction_at?: string }).interaction_at || "")
+          .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || series.created_at,
+      })));
     } else {
       setBookmarkedPosts([]);
       setBookmarkedSeriesList([]);

@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonFeed, SkeletonHome } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
-import { loadFeed } from "@/lib/feed";
+import { loadFeed, type FeedResult } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 
 type TabType = "following" | "myTags" | "hot24";
@@ -20,15 +20,14 @@ interface TagItem {
   post_count: number;
 }
 
-// 信息流客户端缓存：命中时秒开（不闪骨架屏），后台再静默刷新。
-// 键 = 用户id:tab，避免切换/回切首页时反复向 /api/feed 重拉。
+// 信息流客户端缓存：命中即秒开（不闪骨架屏），后台静默刷新。
+// 键 = 用户id:tab，避免切换/回切首页时反复重拉。
 interface FeedCacheEntry {
   posts: Post[];
   serialCards: SerialPostCardData[];
   at: number;
 }
 const feedCache = new Map<string, FeedCacheEntry>();
-const FEED_CACHE_TTL = 30_000; // 30s
 
 export default function HomePage() {
   const supabase = useMemo(() => createClient(), []);
@@ -114,15 +113,29 @@ export default function HomePage() {
 
   // 共享聚合逻辑（浏览器端）：优先走 get_home_feed RPC 单查询（部署后 1 次往返），
   // 否则回落 3 波并行查询。客户端缓存命中时秒开，后台再静默刷新。
+  // 优先走 /api/feed 服务端聚合（Vercel 机房内拉取并瘦身，客户端只下载
+  // 轻量数据）；本地 dev 或路由异常时安全回落客户端直连。
+  const fetchFeed = async (): Promise<FeedResult | null> => {
+    try {
+      const apiResp = await fetch(`/api/feed?tab=${tab}`, { credentials: "same-origin" });
+      if (apiResp.ok) {
+        const json = await apiResp.json();
+        if (json && Array.isArray(json.posts)) return json as FeedResult;
+      }
+    } catch {
+      // 本地 dev 的服务端 Supabase TLS 问题等场景：回落直连
+    }
+    return null;
+  };
+
   const loadPosts = async (opts?: { force?: boolean }) => {
-    // 命中缓存：秒开（不闪骨架屏），再走后台静默刷新更新缓存
+    // 命中缓存：立即秒开（不闪骨架屏），后台照常静默刷新
     const cacheKey = user ? `${user.id}:${tab}` : `anon:${tab}`;
     const hit = !opts?.force ? feedCache.get(cacheKey) : undefined;
-    const fromCache = !!hit && Date.now() - hit.at < FEED_CACHE_TTL;
 
-    if (fromCache) {
-      setPosts(hit!.posts);
-      setSerialCards(hit!.serialCards);
+    if (hit) {
+      setPosts(hit.posts);
+      setSerialCards(hit.serialCards);
       setError("");
       setLoading(false);
     } else {
@@ -137,7 +150,7 @@ export default function HomePage() {
       return;
     }
 
-    const res = await loadFeed(supabase, { tab, userId: user?.id ?? null });
+    const res = (await fetchFeed()) ?? (await loadFeed(supabase, { tab, userId: user?.id ?? null }));
     if (res.error) {
       setError(res.error);
       setPosts([]);
@@ -146,8 +159,16 @@ export default function HomePage() {
       return;
     }
 
-    setPosts(res.posts);
-    setSerialCards(res.serialCards);
+    // 后台刷新结果与缓存一致时跳过 setState，避免无谓的全列表重渲染
+    const unchanged = hit
+      && hit.posts.length === res.posts.length
+      && hit.serialCards.length === res.serialCards.length
+      && (res.posts.length === 0 || res.posts[0]?.id === hit.posts[0]?.id)
+      && (res.serialCards.length === 0 || res.serialCards[0]?.chapterId === hit.serialCards[0]?.chapterId);
+    if (!unchanged) {
+      setPosts(res.posts);
+      setSerialCards(res.serialCards);
+    }
     setHasNewPosts(false);
     setLoading(false);
     feedCache.set(cacheKey, { posts: res.posts, serialCards: res.serialCards, at: Date.now() });
@@ -168,7 +189,7 @@ export default function HomePage() {
       setLoading(false);
       return;
     }
-    const res = await loadFeed(supabase, { tab: "myTags", userId: user.id });
+    const res = (await fetchFeed()) ?? (await loadFeed(supabase, { tab: "myTags", userId: user.id }));
     if (res.error) {
       setError(res.error);
       setFollowedTags([]);
