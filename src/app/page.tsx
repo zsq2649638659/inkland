@@ -266,7 +266,7 @@ export default function HomePage() {
                 {hasNewPosts && (
                   <button
                     onClick={handleRefresh}
-                    className="w-full py-2.5 px-4 rounded-xl bg-accent/10 border border-accent/30 text-accent text-sm font-medium hover:bg-accent/20 transition-colors flex items-center justify-center gap-2"
+                    className="home-refresh-notice"
                   >
                     <i className="fa-solid fa-arrow-rotate-right" />
                     有新作品发布，点击查看

@@ -7,6 +7,7 @@ import { SkeletonSeriesDetail } from "@/components/Skeleton";
 import { useAuth } from "@/components/AuthProvider";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { addTags, MAX_TAGS_PER_WORK } from "@/lib/tagRules";
 
 interface ChapterInfo {
   id: string;
@@ -150,8 +151,8 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
 
   const addTag = (tag: string) => {
     const t = tag.trim();
-    if (t && !editTags.includes(t)) {
-      setEditTags([...editTags, t]);
+    if (t && !editTags.includes(t) && editTags.length < MAX_TAGS_PER_WORK) {
+      setEditTags(addTags(editTags, [t]));
       setEditTagInput("");
     }
   };
@@ -315,7 +316,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                       autoComplete="off"
                     />
                   </div>
-                  <p className="edit-field-hint">按 Enter 确认添加，按 Backspace 删除最后一个标签</p>
+                  <p className="edit-field-hint">按 Enter 确认添加，按 Backspace 删除最后一个标签；最多 {MAX_TAGS_PER_WORK} 个标签</p>
                 </div>
 
                 {/* 简介编辑 */}

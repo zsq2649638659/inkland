@@ -10,9 +10,8 @@ import { useAuth } from "@/components/AuthProvider";
 import PostTagCard from "@/components/PostTagCard";
 import SeriesCardGrid from "@/components/SeriesCardGrid";
 import UserCard from "@/components/UserCard";
-import { SkeletonProfile, SkeletonProfileSection, SkeletonWorksGrid, SkeletonUserCardList } from "@/components/Skeleton";
+import { SkeletonProfile, SkeletonWorksGrid, SkeletonUserCardList } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
-import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Post } from "@/lib/types";
 
 type FilterType = "all" | "single" | "image" | "series";
@@ -166,7 +165,6 @@ const assembleSeriesInfo = async (
 export default function ProfilePage() {
   const supabase = createClient();
   const { user, profile, loading: authLoading } = useAuth();
-  const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [displayPosts, setDisplayPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -186,12 +184,6 @@ export default function ProfilePage() {
   const [shownProfileItems, setShownProfileItems] = useState(12);
   const profileLoadMoreRef = useRef<HTMLDivElement>(null);
 
-  // Stats
-  const [likeCount, setLikeCount] = useState(0);
-  const [bookmarkCount, setBookmarkCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [followerCount, setFollowerCount] = useState(0);
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("tab");
@@ -201,20 +193,6 @@ export default function ProfilePage() {
     else if (t === "followers") setTab("followers");
     else setTab("works");
   }, []);
-
-  const loadStats = async () => {
-    if (!user) return;
-    const [likeRes, bmRes, fwingRes, fwerRes] = await Promise.all([
-      supabase.from("likes").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-      supabase.from("bookmarks").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
-    ]);
-    setLikeCount(likeRes.count || 0);
-    setBookmarkCount(bmRes.count || 0);
-    setFollowingCount(fwingRes.count || 0);
-    setFollowerCount(fwerRes.count || 0);
-  };
 
   const loadPosts = async () => {
     if (!user) return;
@@ -273,7 +251,6 @@ export default function ProfilePage() {
       };
     });
 
-    setAllPosts(raw);
     setDisplayPosts(postsWithAuthor);
     setLoading(false);
   };
@@ -478,27 +455,12 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user) return;
-    loadStats();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
     if (tab === "works") { loadPosts(); loadSeries(); }
     else if (tab === "likes") loadLikes();
     else if (tab === "bookmarks") loadBookmarks();
     else if (tab === "following") loadFollowing();
     else if (tab === "followers") loadFollowers();
   }, [user, tab, filter]);
-
-  const displayName = profile?.nickname || user?.email?.split("@")[0] || "用户";
-  const avatarChar = profile?.nickname?.[0] || user?.email?.[0] || "?";
-
-  // 与创作中心“总作品数”保持一致：普通作品 + 去重后的长篇连载。
-  // 章节本身不单独计数，草稿和未过审作品也沿用创作中心的总数口径。
-  const workCount = allPosts.filter((p) => {
-    const cp = p as unknown as Record<string, unknown>;
-    return cp.post_type !== "serial";
-  }).length + seriesList.length;
 
   const filterPills: { key: FilterType; label: string }[] = [
     { key: "all", label: "全部" },
@@ -625,53 +587,6 @@ export default function ProfilePage() {
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
-        {/* Profile Section */}
-        {loading ? <SkeletonProfileSection /> : <section className="profile-section">
-          <div className="profile-avatar">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt={displayName} />
-            ) : (
-              <DefaultAvatar name={displayName} style={{ width: "100%", height: "100%" }} />
-            )}
-          </div>
-          <div className="profile-info">
-            <h1 className="profile-name">{displayName}</h1>
-            <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
-            <div className="profile-stats">
-              <div className="profile-stat">
-                <i className="fa-solid fa-book"></i>
-                <span>作品数</span>
-                <span className="stat-value">{workCount}</span>
-              </div>
-              <div className="profile-stat">
-                <i className="fa-regular fa-heart"></i>
-                <span>喜欢数</span>
-                <span className="stat-value">{likeCount}</span>
-              </div>
-              <div className="profile-stat">
-                <i className="fa-solid fa-bookmark"></i>
-                <span>收藏数</span>
-                <span className="stat-value">{bookmarkCount}</span>
-              </div>
-              <div className="profile-stat">
-                <i className="fa-solid fa-user-group"></i>
-                <span>关注数</span>
-                <span className="stat-value">{followingCount}</span>
-              </div>
-              <div className="profile-stat">
-                <i className="fa-solid fa-users"></i>
-                <span>粉丝数</span>
-                <span className="stat-value">{followerCount}</span>
-              </div>
-            </div>
-          </div>
-          <div className="profile-actions">
-            <Link href="/profile/edit" className="btn-edit-profile">
-              <i className="fa-solid fa-pen-to-square"></i> 编辑资料
-            </Link>
-          </div>
-        </section>}
-
         {/* Segmented Tabs */}
         <div className="segmented-tabs">
           <div className="segmented-tabs-left">
@@ -1159,7 +1074,7 @@ export default function ProfilePage() {
               </div>
               <div className="user-cards-grid">
                 {following.slice(0, shownProfileItems).map((u) => (
-                  <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={true} onUpdate={() => { loadFollowing(); loadStats(); }} />
+                  <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={true} onUpdate={() => { loadFollowing(); }} />
                 ))}
               </div>
             </>
@@ -1194,7 +1109,7 @@ export default function ProfilePage() {
               </div>
               <div className="user-cards-grid">
                 {followers.slice(0, shownProfileItems).map((u) => (
-                  <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={false} isFollowed={followingIds.has(u.id)} onUpdate={() => { loadFollowers(); loadStats(); }} />
+                  <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={false} isFollowed={followingIds.has(u.id)} onUpdate={() => { loadFollowers(); }} />
                 ))}
               </div>
             </>
