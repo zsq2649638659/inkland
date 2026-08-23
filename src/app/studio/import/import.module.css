@@ -407,7 +407,7 @@
   .schedulePickerFields { flex-direction: column; }
   .schedulePickerField, .schedulePickerField:first-child, .schedulePickerField:last-child { width: 100%; max-width: none; min-width: 0; flex: auto; }
   .scheduleTimePopover { right: auto; left: 0; }
-  .textPlanHeading { display: grid; }
+  .textPlanHeading { display: grid; justify-content: stretch; }
   .textPlanHeading strong { display: block; margin-right: -0.5em; }
   .splitOptions { display: grid; }
   .groupNameField { grid-template-columns: 1fr; }
