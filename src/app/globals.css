@@ -873,13 +873,13 @@ p {
   gap: 4px;
   background: var(--color-bg-secondary, #E8E4E0);
   padding: 4px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-card);
   width: auto;
 }
 .tab-btn {
   padding: 8px 20px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-muted, #6B6B6B);
   font-family: var(--font-family);
@@ -7173,7 +7173,7 @@ p {
   gap: 4px;
   background: var(--color-bg-secondary);
   padding: 4px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-card);
   width: auto;
   overflow-x: auto;
   scrollbar-width: none;
@@ -7182,7 +7182,7 @@ p {
 #page-search .filter-tab {
   padding: 8px 20px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-muted);
   font-family: var(--font-family);
@@ -7702,7 +7702,7 @@ p {
   justify-content: space-between;
   align-items: center;
   background: var(--color-bg-secondary);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   padding: 4px;
   margin-bottom: 20px;
 }
@@ -7719,7 +7719,7 @@ p {
 
 .segmented-tab {
   padding: 8px 22px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-muted);
@@ -10348,7 +10348,7 @@ p {
   gap:8px;
   margin:0 0 var(--spacing-md);
   padding:10px 16px;
-  border:1px solid color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+  border:0;
   border-radius:var(--radius-lg);
   background:#fff;
   color:var(--color-primary);
@@ -10359,9 +10359,9 @@ p {
   cursor:pointer;
   transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease;
 }
-.home-refresh-notice:hover { border-color:var(--color-primary);box-shadow:var(--shadow-hover);transform:translateY(-1px) }
+.home-refresh-notice:hover { box-shadow:var(--shadow-hover);transform:translateY(-1px) }
 .home-refresh-notice:focus-visible { outline:3px solid color-mix(in srgb, var(--color-primary) 22%, transparent);outline-offset:2px }
-[data-theme="dark"] .home-refresh-notice { background:var(--color-card);color:var(--color-primary);border-color:color-mix(in srgb, var(--color-primary) 38%, var(--color-border)) }
+[data-theme="dark"] .home-refresh-notice { background:var(--color-card);color:var(--color-primary) }
 
 #page-create .type-cards {
   display: grid;
