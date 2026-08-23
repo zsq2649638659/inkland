@@ -90,9 +90,13 @@
 .previewBody textarea, .draftBody textarea { width: 100%; min-height: 150px; box-sizing: border-box; border: 1px solid #d7cfca; padding: 12px; resize: vertical; line-height: 1.65; }
 .fileMeta { margin: 7px 0 10px; color: #847a75; font-size: 13px; }
 .warning { color: #8a5d22; font-size: 13px; }
-.bulkTagBar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; align-items: center; margin-bottom: 14px; padding: 12px; border: 1px solid #d8cfca; background: #f4f0ed; }
+.bulkTagBar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 9px; align-items: center; margin-bottom: 14px; padding: 12px; border: 1px solid #d8cfca; background: #f4f0ed; }
 .bulkTagBar span { font-weight: 700; }
 .bulkTagBar input { min-width: 0; padding: 9px 10px; border: 1px solid #cfc5bf; background: #fff; }
+.bulkTagBar button { border: 1px solid #76584a; background: #fff; color: #5e4439; padding: 9px 12px; cursor: pointer; }
+.tagWorkList { display: grid; gap: 12px; }
+.tagWorkList > article { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(260px, 1.3fr); gap: 18px; align-items: start; padding: 16px; border: 1px solid #ddd5d0; background: #fff; }
+.tagWorkList p { margin: 5px 0 0; color: #81766f; font-size: 13px; }
 .groupInfoCard { display: grid; gap: 13px; margin-bottom: 14px; padding: 16px; border: 1px solid #bdaea6; background: #faf8f7; }
 .groupInfoCard > label { display: grid; grid-template-columns: 90px minmax(0, 1fr); align-items: start; gap: 10px; }
 .groupInfoCard > label > span { padding-top: 9px; font-weight: 700; }
@@ -347,9 +351,10 @@
 .draftBody details textarea { margin-top: 10px; }
 .tagsSection > strong { display: block; margin-bottom: 8px; }
 .tagsSection > strong span { color: #8a7e78; font-size: 12px; font-weight: 400; }
-.tagEditor { display: grid; gap: 8px; width: 100%; min-width: 0; }
-.tagInputWrapper { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid #cfc5bf; }
-.tagEditorHint { color: #8a7e78; font-size: 12px; line-height: 1.5; }
+.tagEditor { display: grid; gap: 8px; }
+.tagList { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagInputRow { display: flex; gap: 8px; }
+.tagInputRow input { flex: 1; min-width: 0; border: 1px solid #cfc5bf; padding: 9px 10px; }
 .cardActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .copyrightBox { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; color: #554a45; line-height: 1.55; cursor: pointer; }
 .copyrightBox input { margin-top: 4px; }
@@ -382,6 +387,7 @@
   .draftHeading { grid-template-columns: 1fr; }
   .sectionHeader { align-items: center; }
   .bulkTagBar { grid-template-columns: 1fr; }
+  .tagWorkList > article { grid-template-columns: 1fr; }
   .stepActions { flex-wrap: wrap; }
   .stepActions > span { width: 100%; }
   .groupInfoCard > label { grid-template-columns: 1fr; }
@@ -782,7 +788,7 @@
 .groupInfoCard input,
 .groupInfoCard textarea,
 .bulkBar input,
-.tagInputWrapper {
+.tagInputRow input {
   min-height: 44px;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1333,40 +1339,6 @@
   .importQueue li { align-items: flex-start; }
 }
 
-.tagsSection .tagInputWrapper input,
-.bulkTagBar .tagInputWrapper input {
-  flex: 1 1 160px;
-  width: auto;
-  min-width: 140px;
-  max-width: 100%;
-  height: 32px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  outline: none;
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 32px;
-  appearance: none;
-}
-
-.tagsSection .tagInputWrapper input:focus,
-.tagsSection .tagInputWrapper input:focus-visible,
-.bulkTagBar .tagInputWrapper input:focus,
-.bulkTagBar .tagInputWrapper input:focus-visible {
-  border-color: transparent;
-  box-shadow: none;
-  outline: none;
-}
-
-.tagsSection .tagInputWrapper:focus-within,
-.bulkTagBar .tagInputWrapper:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
-}
 
 @keyframes importCalendarIn {
   from { opacity: 0; transform: translateY(-4px); }

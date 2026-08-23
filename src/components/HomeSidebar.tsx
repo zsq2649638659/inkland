@@ -142,7 +142,6 @@ export default function HomeSidebar() {
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
-    if (pathname.startsWith("/profile/edit")) return page === "settings";
     return pathname.startsWith(`/${page}`);
   };
 

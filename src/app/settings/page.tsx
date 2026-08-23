@@ -7,9 +7,8 @@ import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
-import ProfileEditForm from "@/components/ProfileEditForm";
 
-type SettingsTab = "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+type SettingsTab = "password" | "blocked" | "notifications" | "about" | "contact";
 
 const siteContactEmail = "inkland@163.com";
 
@@ -17,7 +16,7 @@ export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("password");
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
@@ -46,13 +45,39 @@ export default function SettingsPage() {
   }, []);
 
   const tabs: { key: SettingsTab; label: string }[] = [
-    { key: "profile", label: "编辑资料" },
     { key: "password", label: "修改密码" },
     { key: "blocked", label: "屏蔽管理" },
     { key: "notifications", label: "通知设置" },
     { key: "about", label: "关于我们" },
     { key: "contact", label: "联系我们" },
   ];
+
+  // 未登录状态
+  if (!user) {
+    return (
+      <div id="page-settings" className="min-h-screen bg-paper pb-20 lg:pb-0">
+        <div className="main-container">
+          <HomeSidebar />
+          <div className="content-area">
+            <div className="feed-empty-state">
+              <div className="feed-empty-illustration">
+                <div className="feed-empty-tag-ring">
+                  <div className="feed-empty-ring-outer"></div>
+                  <div className="feed-empty-ring-inner">
+                    <i className="fa-solid fa-gear"></i>
+                  </div>
+                </div>
+              </div>
+              <h2 className="feed-empty-title">登录后查看设置</h2>
+              <p className="feed-empty-desc">登录后即可管理你的账户设置</p>
+              <Link href="/login" className="feed-empty-action">登录</Link>
+              <Link href="/register" className="feed-empty-register">还没有账号？立即注册 →</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleFeedbackSubmit = async () => {
     if (feedbackText.trim().length < 2) {
@@ -82,6 +107,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!user || activeTab !== "blocked") return;
     let active = true;
+    setBlockedLoading(true);
     void (async () => {
       const { data: blocked } = await supabase
         .from("blocked_users")
@@ -115,7 +141,6 @@ export default function SettingsPage() {
   };
 
   const handlePasswordChange = async () => {
-    if (!user) return;
     setPasswordMessage("");
     if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
       setPasswordMessage("请确认当前密码、新密码和确认密码填写正确；新密码至少 8 位。");
@@ -140,33 +165,6 @@ export default function SettingsPage() {
     setPasswordSaving(false);
   };
 
-  // 所有 Hooks 必须在条件返回之前执行，避免登录状态变化时破坏调用顺序。
-  if (!user) {
-    return (
-      <div id="page-settings" className="min-h-screen bg-paper pb-20 lg:pb-0">
-        <div className="main-container">
-          <HomeSidebar />
-          <div className="content-area">
-            <div className="feed-empty-state">
-              <div className="feed-empty-illustration">
-                <div className="feed-empty-tag-ring">
-                  <div className="feed-empty-ring-outer"></div>
-                  <div className="feed-empty-ring-inner">
-                    <i className="fa-solid fa-gear"></i>
-                  </div>
-                </div>
-              </div>
-              <h2 className="feed-empty-title">登录后查看设置</h2>
-              <p className="feed-empty-desc">登录后即可管理你的账户设置</p>
-              <Link href="/login" className="feed-empty-action">登录</Link>
-              <Link href="/register" className="feed-empty-register">还没有账号？立即注册 →</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div id="page-settings" className="min-h-screen bg-paper pb-20 lg:pb-0">
       <div className="main-container">
@@ -185,25 +183,13 @@ export default function SettingsPage() {
                 <button
                   key={t.key}
                   className={`tab-btn${activeTab === t.key ? " active" : ""}`}
-                  onClick={() => {
-                    if (t.key === "blocked") setBlockedLoading(true);
-                    setActiveTab(t.key);
-                  }}
+                  onClick={() => setActiveTab(t.key)}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* ---- Panel: 编辑资料 ---- */}
-          <section className="settings-panel" style={{ display: activeTab === "profile" ? "block" : "none" }}>
-            <h2 className="settings-panel-title">编辑资料</h2>
-            <p className="settings-panel-desc">修改你在 Inkland 展示的头像、昵称和个人简介。</p>
-            <div id="page-profile-edit" className="profile-edit-content">
-              <ProfileEditForm />
-            </div>
-          </section>
 
           {/* ---- Panel: 修改密码 ---- */}
           <form

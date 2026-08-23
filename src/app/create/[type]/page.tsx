@@ -1,4 +1,4 @@
-import { CreateWorkspace } from "@/app/create/CreateWorkspace";
+import CreatePage from "@/app/create/page";
 
 const viewByType = {
   article: "text",
@@ -15,8 +15,8 @@ export default async function CreateTypePage({
   const initialView = viewByType[type as keyof typeof viewByType];
 
   if (!initialView) {
-    return <CreateWorkspace />;
+    return <CreatePage />;
   }
 
-  return <CreateWorkspace initialView={initialView} />;
+  return <CreatePage initialView={initialView} />;
 }
