@@ -385,6 +385,8 @@
   .previewList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .resultList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .resultList li { flex-wrap: wrap; }
+  .resultList .success .workMsg { display: none; }
+  .stepPage > .textPlanList { max-height: none; overflow-y: visible; scrollbar-gutter: auto; padding-right: 0; }
   .bulkTagBar { grid-template-columns: 1fr; }
   .stepActions { flex-wrap: wrap; }
   .stepActions > span { width: 100%; order: -1; }
