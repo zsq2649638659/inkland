@@ -257,8 +257,8 @@ BEGIN
     details TEXT,
     metadata JSONB
   ) ON COMMIT DROP;
-  DELETE FROM pg_temp.tmp_post_moderation_hits;
-  DELETE FROM pg_temp.tmp_post_moderation_findings;
+  DELETE FROM pg_temp.tmp_post_moderation_hits WHERE 1=1;
+  DELETE FROM pg_temp.tmp_post_moderation_findings WHERE 1=1;
 
   -- ---- 标题与作者的话：整段扫描 ----
   FOR segment_text,
@@ -663,8 +663,8 @@ BEGIN
     details TEXT,
     metadata JSONB
   ) ON COMMIT DROP;
-  DELETE FROM pg_temp.tmp_series_moderation_hits;
-  DELETE FROM pg_temp.tmp_series_moderation_findings;
+  DELETE FROM pg_temp.tmp_series_moderation_hits WHERE 1=1;
+  DELETE FROM pg_temp.tmp_series_moderation_findings WHERE 1=1;
 
   segment_text := combined_text;
   v_segment_details := '连载名称或简介命中审核关键词';

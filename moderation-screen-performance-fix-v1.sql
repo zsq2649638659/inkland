@@ -134,8 +134,8 @@ BEGIN
     details TEXT,
     metadata JSONB
   ) ON COMMIT DROP;
-  DELETE FROM pg_temp.tmp_post_moderation_hits;
-  DELETE FROM pg_temp.tmp_post_moderation_findings;
+  DELETE FROM pg_temp.tmp_post_moderation_hits WHERE 1=1;
+  DELETE FROM pg_temp.tmp_post_moderation_findings WHERE 1=1;
 
   -- 候选规则：只对整篇合并文本做一次 52k 条规则扫描，
   -- 之后各段落只检查候选规则，避免段落数 × 规则数的全表扫描。
@@ -147,7 +147,7 @@ BEGIN
     risk_level TEXT NOT NULL,
     min_hits INTEGER NOT NULL
   ) ON COMMIT DROP;
-  DELETE FROM pg_temp.tmp_post_moderation_rule_candidates;
+  DELETE FROM pg_temp.tmp_post_moderation_rule_candidates WHERE 1=1;
 
   combined_text := COALESCE(NEW.title, '') || E'\n'
     || COALESCE(content_without_note, '') || E'\n'
@@ -539,8 +539,8 @@ BEGIN
     details TEXT,
     metadata JSONB
   ) ON COMMIT DROP;
-  DELETE FROM pg_temp.tmp_series_moderation_hits;
-  DELETE FROM pg_temp.tmp_series_moderation_findings;
+  DELETE FROM pg_temp.tmp_series_moderation_hits WHERE 1=1;
+  DELETE FROM pg_temp.tmp_series_moderation_findings WHERE 1=1;
 
   -- 候选规则：连载名称 + 简介只做一次 52k 条规则扫描。
   CREATE TEMP TABLE IF NOT EXISTS tmp_series_moderation_rule_candidates (
@@ -551,7 +551,7 @@ BEGIN
     risk_level TEXT NOT NULL,
     min_hits INTEGER NOT NULL
   ) ON COMMIT DROP;
-  DELETE FROM pg_temp.tmp_series_moderation_rule_candidates;
+  DELETE FROM pg_temp.tmp_series_moderation_rule_candidates WHERE 1=1;
 
   INSERT INTO pg_temp.tmp_series_moderation_rule_candidates (
     rule_id, pattern, category, severity, risk_level, min_hits
