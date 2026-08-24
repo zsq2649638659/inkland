@@ -33,6 +33,7 @@ DECLARE
   requested_visibility TEXT;
   content_without_note TEXT;
   combined_text TEXT;
+  v_combined_lower TEXT;
   paragraphs TEXT[];
   paragraph_text TEXT;
   paragraph_index INTEGER;
@@ -40,6 +41,7 @@ DECLARE
   published_before BOOLEAN := FALSE;
   pending_message TEXT;
   segment_text TEXT;
+  v_segment_lower TEXT;
   segment_count INTEGER;
   search_from INTEGER;
   relative_offset INTEGER;
@@ -152,6 +154,7 @@ BEGIN
   combined_text := COALESCE(NEW.title, '') || E'\n'
     || COALESCE(content_without_note, '') || E'\n'
     || COALESCE(NEW.author_note, '');
+  v_combined_lower := lower(combined_text);
 
   INSERT INTO pg_temp.tmp_post_moderation_rule_candidates (
     rule_id, pattern, category, severity, risk_level, min_hits
@@ -162,7 +165,7 @@ BEGIN
   FROM public.moderation_rules keyword
   WHERE keyword.rule_type = 'keyword'
     AND keyword.enabled = TRUE
-    AND position(lower(keyword.pattern) IN lower(combined_text)) > 0
+    AND position(lower(keyword.pattern) IN v_combined_lower) > 0
     AND NOT EXISTS (
       SELECT 1 FROM public.moderation_rules whitelist
       WHERE whitelist.rule_type = 'whitelist'
@@ -187,12 +190,13 @@ BEGIN
     IF segment_text = '' THEN
       CONTINUE;
     END IF;
+    v_segment_lower := lower(segment_text);
 
     FOR rule_row IN
       SELECT cand.rule_id, cand.pattern, cand.category, cand.severity,
              cand.risk_level, cand.min_hits
       FROM pg_temp.tmp_post_moderation_rule_candidates cand
-      WHERE position(lower(cand.pattern) IN lower(segment_text)) > 0
+      WHERE position(lower(cand.pattern) IN v_segment_lower) > 0
     LOOP
       segment_count := public.count_non_overlapping_matches(segment_text, rule_row.pattern);
       IF segment_count <= 0 THEN
@@ -223,7 +227,7 @@ BEGIN
       search_from := 1;
       WHILE search_from <= char_length(segment_text) LOOP
         relative_offset := position(
-          lower(rule_row.pattern) IN lower(substr(segment_text, search_from))
+          lower(rule_row.pattern) IN substr(v_segment_lower, search_from)
         );
         EXIT WHEN relative_offset = 0;
         absolute_offset := search_from + relative_offset - 1;
@@ -244,6 +248,7 @@ BEGIN
           WHERE h.rule_id = rule_row.id;
         END IF;
         search_from := search_from + relative_offset + char_length(rule_row.pattern);
+        EXIT WHEN finding_count >= v_finding_cap;
       END LOOP;
     END LOOP;
   END LOOP;
@@ -261,6 +266,7 @@ BEGIN
         END IF;
 
         segment_text := paragraph_text;
+        v_segment_lower := lower(paragraph_text);
         v_segment_field_name := 'content';
         v_segment_location_type := 'paragraph';
         v_segment_paragraph_index := paragraph_index;
@@ -274,7 +280,7 @@ BEGIN
           SELECT cand.rule_id, cand.pattern, cand.category, cand.severity,
                  cand.risk_level, cand.min_hits
           FROM pg_temp.tmp_post_moderation_rule_candidates cand
-          WHERE position(lower(cand.pattern) IN lower(paragraph_text)) > 0
+          WHERE position(lower(cand.pattern) IN v_segment_lower) > 0
         LOOP
           segment_count := public.count_non_overlapping_matches(paragraph_text, rule_row.pattern);
           IF segment_count <= 0 THEN
@@ -305,7 +311,7 @@ BEGIN
           search_from := 1;
           WHILE search_from <= char_length(paragraph_text) LOOP
             relative_offset := position(
-              lower(rule_row.pattern) IN lower(substr(paragraph_text, search_from))
+              lower(rule_row.pattern) IN substr(v_segment_lower, search_from)
             );
             EXIT WHEN relative_offset = 0;
             absolute_offset := search_from + relative_offset - 1;
@@ -326,6 +332,7 @@ BEGIN
               WHERE h.rule_id = rule_row.id;
             END IF;
             search_from := search_from + relative_offset + char_length(rule_row.pattern);
+            EXIT WHEN finding_count >= v_finding_cap;
           END LOOP;
         END LOOP;
 
@@ -476,10 +483,12 @@ SET search_path = public
 AS $$
 DECLARE
   combined_text TEXT;
+  v_combined_lower TEXT;
   next_submission INTEGER;
   case_id UUID;
   rule_row RECORD;
   segment_text TEXT;
+  v_segment_lower TEXT;
   segment_count INTEGER;
   search_from INTEGER;
   relative_offset INTEGER;
@@ -510,6 +519,7 @@ BEGIN
   END IF;
 
   combined_text := COALESCE(NEW.name, '') || E'\n' || COALESCE(NEW.description, '');
+  v_combined_lower := lower(combined_text);
   next_submission := GREATEST(COALESCE(NEW.review_submission_number, 0), 0) + 1;
   -- 修改后重新提交时，关闭上一轮未完成案件，避免同一个连载同时存在多个活动案件。
   UPDATE public.series_moderation_review_cases
@@ -562,7 +572,7 @@ BEGIN
   FROM public.moderation_rules keyword
   WHERE keyword.rule_type = 'keyword'
     AND keyword.enabled = TRUE
-    AND position(lower(keyword.pattern) IN lower(combined_text)) > 0
+    AND position(lower(keyword.pattern) IN v_combined_lower) > 0
     AND NOT EXISTS (
       SELECT 1 FROM public.moderation_rules whitelist
       WHERE whitelist.rule_type = 'whitelist'
@@ -572,6 +582,7 @@ BEGIN
     );
 
   segment_text := combined_text;
+  v_segment_lower := lower(segment_text);
   v_segment_details := '连载名称或简介命中审核关键词';
 
   IF segment_text <> '' THEN
@@ -579,7 +590,7 @@ BEGIN
       SELECT cand.rule_id, cand.pattern, cand.category, cand.severity,
              cand.risk_level, cand.min_hits
       FROM pg_temp.tmp_series_moderation_rule_candidates cand
-      WHERE position(lower(cand.pattern) IN lower(segment_text)) > 0
+      WHERE position(lower(cand.pattern) IN v_segment_lower) > 0
     LOOP
       segment_count := public.count_non_overlapping_matches(segment_text, rule_row.pattern);
       IF segment_count <= 0 THEN
@@ -610,7 +621,7 @@ BEGIN
       search_from := 1;
       WHILE search_from <= char_length(segment_text) LOOP
         relative_offset := position(
-          lower(rule_row.pattern) IN lower(substr(segment_text, search_from))
+          lower(rule_row.pattern) IN substr(v_segment_lower, search_from)
         );
         EXIT WHEN relative_offset = 0;
         absolute_offset := search_from + relative_offset - 1;
@@ -631,6 +642,7 @@ BEGIN
           WHERE h.rule_id = rule_row.id;
         END IF;
         search_from := search_from + relative_offset + char_length(rule_row.pattern);
+        EXIT WHEN finding_count >= v_finding_cap;
       END LOOP;
     END LOOP;
   END IF;
