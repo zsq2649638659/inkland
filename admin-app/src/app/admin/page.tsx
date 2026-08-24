@@ -11,13 +11,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const initialQuery = (q || query || "").trim().slice(0, 100);
   const { supabase, user, account } = await getAdminContext();
   if (!user || !account) redirect("/admin/login");
-  const [postsResult, reviewCasesResult, seriesCasesResult, reportCasesResult, feedbacksResult, rulesResult] = await Promise.all([
+  const [postsResult, reviewCasesResult, seriesCasesResult, reportCasesResult, feedbacksResult, rulesResult, rulesCountResult] = await Promise.all([
     supabase.from("posts").select("id, title, content, post_type, status, review_status, review_reason, created_at, user_id, author:profiles!posts_user_id_fkey(nickname)").eq("review_status", "pending").order("created_at", { ascending: false }).limit(50),
     supabase.from("moderation_review_cases").select("post_id, status, screening_status, priority, route_reason").in("status", ["pending", "service_error"]).in("screening_status", ["completed", "failed"]).order("created_at", { ascending: false }).limit(100),
     supabase.from("series_moderation_review_cases").select("id, series_id, status, screening_status, priority, route_reason, created_at").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(100),
     supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at").in("status", ["pending", "reviewing"]).order("last_reported_at", { ascending: false }).limit(50),
     supabase.from("feedbacks").select("id, type, content, status, created_at, user_id").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(50),
-    supabase.from("moderation_rules").select("id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at").order("created_at", { ascending: false }).limit(200),
+    supabase.from("moderation_rules").select("id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at").order("created_at", { ascending: false }).limit(100),
+    supabase.from("moderation_rules").select("id", { count: "exact", head: true }),
   ]);
   const reportCaseIds = (reportCasesResult.data || []).map((item) => item.id);
   const { data: reportSnapshots } = reportCaseIds.length
@@ -63,7 +64,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     initialReports={reportCases as never[]}
     initialFeedbacks={(feedbacksResult.data || []) as never[]}
     initialRules={(rulesResult.data || []) as never[]}
-    rulesReady={!rulesResult.error}
+    initialRuleTotal={rulesCountResult.count ?? (rulesResult.data || []).length}
+    rulesReady={!rulesResult.error && !rulesCountResult.error}
     loadErrors={[postsResult.error?.message, reviewCasesResult.error?.message, seriesCasesResult.error?.message, reportCasesResult.error?.message, feedbacksResult.error?.message].filter(Boolean) as string[]}
   />;
 }

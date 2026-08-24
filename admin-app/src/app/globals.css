@@ -460,3 +460,37 @@
   .admin-bulk-form-grid-3 { grid-template-columns:1fr; }
   .admin-rule-risk-fields { grid-template-columns:1fr; }
 }
+
+/* 敏感词管理：筛选、批量操作与分页 */
+.admin-rule-toolbar { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:15px 23px 16px; border-bottom:1px solid var(--border); }
+.admin-rule-filters { display:flex; flex-wrap:wrap; gap:5px; }
+.admin-rule-bulkbar { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+.admin-rule-select-all { display:inline-flex; align-items:center; gap:7px; min-height:32px; padding:0 9px; border:1px solid var(--border); border-radius:7px; background:#fff; color:#7c7c85; font-size:11px; cursor:pointer; user-select:none; }
+.admin-rule-select-all input { width:14px; height:14px; margin:0; accent-color:var(--accent); }
+.admin-rule-selected { color:#8f8f98; font-size:11px; white-space:nowrap; }
+.admin-rule-bulk-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.admin-rule-bulk-actions .admin-btn { min-height:32px; padding:0 10px; font-size:11px; }
+.admin-rule-bulk-actions .is-danger { border-color:#f0c5bd; color:var(--danger); }
+.admin-rule-bulk-actions .is-danger:hover { background:#fff5f3; }
+.admin-rule-checkbox { flex:none; width:15px; height:15px; margin:0; accent-color:var(--accent); cursor:pointer; }
+.admin-rule-loading { display:grid; place-items:center; min-height:150px; color:#a0a0a8; font-size:11px; }
+.admin-rule-list { padding-bottom:0; }
+.admin-rule-pagination { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:14px 23px 20px; }
+.admin-rule-pageinfo { color:#9898a0; font-size:11px; }
+.admin-rule-pager { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.admin-pagination-btn { min-height:32px; padding:0 11px; border:1px solid var(--border); border-radius:7px; background:#fff; color:#72727c; font-size:11px; transition:all .2s; }
+.admin-pagination-btn:hover:not(:disabled) { border-color:#d5b6ac; color:var(--accent); }
+.admin-rule-page-size { display:inline-flex; align-items:center; gap:6px; color:#9898a0; font-size:10px; white-space:nowrap; }
+.admin-rule-page-size select { min-height:30px; padding:3px 7px; border:1px solid var(--border); border-radius:7px; background:#fff; color:#6d6d76; font-size:11px; outline:0; }
+.admin-rule-page-size select:focus { border-color:#d5b6ac; box-shadow:0 0 0 3px #fdf0ec; }
+
+@media (max-width:700px) {
+  .admin-rule-toolbar { flex-direction:column; padding-left:16px; padding-right:16px; }
+  .admin-rule-bulkbar { justify-content:flex-start; width:100%; }
+  .admin-rule-pagination { padding-left:16px; padding-right:16px; }
+  .admin-rule-row { flex-wrap:wrap; align-items:flex-start; padding:13px 16px; }
+  .admin-rule-row .admin-rule-checkbox { margin-top:3px; }
+  .admin-rule-row .admin-queue-main { order:2; width:calc(100% - 32px); }
+  .admin-rule-row .admin-rule-status { margin-left:auto; }
+  .admin-rule-row .admin-actions { margin-left:auto; }
+}
