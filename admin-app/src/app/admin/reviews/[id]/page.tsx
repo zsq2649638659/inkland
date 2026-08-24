@@ -50,12 +50,22 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
     .select("id, post_id, post_version_id, author_id, status, priority, route_reason, screening_status, screening_sources, screening_result, rules_version, model_name, model_version, submission_number, assigned_admin_id, decided_by, decided_at, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
+  if (!reviewCase) {
+    const fallback = await db
+      .from("moderation_review_cases")
+      .select("id")
+      .eq("post_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (fallback.data) redirect(`/admin/reviews/${fallback.data.id}`);
+  }
   if (!reviewCase) notFound();
 
   const [{ data: version }, { data: post }, { data: findings }, { data: historyCases }, { data: historyVersions }] = await Promise.all([
     db.from("post_versions").select("id, post_id, author_id, version_number, submission_number, title, content, author_note, series_name, chapter_number, chapter_title, word_count, published_at, visibility, post_type, snapshot, source, created_at, submitted_at").eq("id", reviewCase.post_version_id).maybeSingle(),
     db.from("posts").select("id, user_id, title, content, author_note, post_type, series_name, chapter_number, chapter_title, status, review_status, review_reason, pending_review_status, pending_review_reason, visibility, pending_visibility, content_rating, word_count, created_at, published_at, current_version_number, review_submission_number, published_version_number, author:profiles!posts_user_id_fkey(nickname)").eq("id", reviewCase.post_id).maybeSingle(),
-    db.from("moderation_findings").select("id, source, category, severity, status, location_type, field_name, paragraph_index, start_offset, end_offset, image_index, quoted_text, details, metadata, confirmed_by, confirmed_at, created_at").eq("review_case_id", id).order("created_at", { ascending: true }),
+    db.from("moderation_findings").select("id, source, category, severity, status, location_type, field_name, paragraph_index, start_offset, end_offset, image_index, quoted_text, details, metadata, confirmed_by, confirmed_at, created_at").eq("review_case_id", reviewCase.id).order("created_at", { ascending: true }),
     db.from("moderation_review_cases").select("id, status, priority, route_reason, submission_number, decided_by, decided_at, created_at").eq("post_id", reviewCase.post_id).order("created_at", { ascending: false }).limit(20),
     db.from("post_versions").select("id, version_number, submission_number, title, word_count, submitted_at, created_at").eq("post_id", reviewCase.post_id).order("version_number", { ascending: false }).limit(20),
   ]);
