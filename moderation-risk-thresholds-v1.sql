@@ -315,9 +315,9 @@ BEGIN
         WHERE rule_id = rule_row.id;
       END IF;
 
-      SELECT finding_count INTO finding_count
-      FROM pg_temp.tmp_post_moderation_hits
-      WHERE rule_id = rule_row.id;
+      SELECT h.finding_count INTO finding_count
+      FROM pg_temp.tmp_post_moderation_hits h
+      WHERE h.rule_id = rule_row.id;
 
       search_from := 1;
       WHILE search_from <= char_length(segment_text) LOOP
@@ -338,9 +338,9 @@ BEGIN
             rule_row.pattern, v_segment_details,
             jsonb_build_object('rule_id', rule_row.id, 'pattern', rule_row.pattern)
           );
-          UPDATE pg_temp.tmp_post_moderation_hits
-          SET finding_count = finding_count + 1
-          WHERE rule_id = rule_row.id;
+          UPDATE pg_temp.tmp_post_moderation_hits AS h
+          SET finding_count = h.finding_count + 1
+          WHERE h.rule_id = rule_row.id;
         END IF;
         search_from := search_from + relative_offset + char_length(rule_row.pattern);
       END LOOP;
@@ -407,9 +407,9 @@ BEGIN
             WHERE rule_id = rule_row.id;
           END IF;
 
-          SELECT finding_count INTO finding_count
-          FROM pg_temp.tmp_post_moderation_hits
-          WHERE rule_id = rule_row.id;
+          SELECT h.finding_count INTO finding_count
+          FROM pg_temp.tmp_post_moderation_hits h
+          WHERE h.rule_id = rule_row.id;
 
           search_from := 1;
           WHILE search_from <= char_length(paragraph_text) LOOP
@@ -430,9 +430,9 @@ BEGIN
                 rule_row.pattern, v_segment_details,
                 jsonb_build_object('rule_id', rule_row.id, 'pattern', rule_row.pattern)
               );
-              UPDATE pg_temp.tmp_post_moderation_hits
-              SET finding_count = finding_count + 1
-              WHERE rule_id = rule_row.id;
+              UPDATE pg_temp.tmp_post_moderation_hits AS h
+              SET finding_count = h.finding_count + 1
+              WHERE h.rule_id = rule_row.id;
             END IF;
             search_from := search_from + relative_offset + char_length(rule_row.pattern);
           END LOOP;
@@ -708,9 +708,9 @@ BEGIN
         WHERE rule_id = rule_row.id;
       END IF;
 
-      SELECT finding_count INTO finding_count
-      FROM pg_temp.tmp_series_moderation_hits
-      WHERE rule_id = rule_row.id;
+      SELECT h.finding_count INTO finding_count
+      FROM pg_temp.tmp_series_moderation_hits h
+      WHERE h.rule_id = rule_row.id;
 
       search_from := 1;
       WHILE search_from <= char_length(segment_text) LOOP
@@ -731,9 +731,9 @@ BEGIN
             rule_row.pattern, v_segment_details,
             jsonb_build_object('rule_id', rule_row.id, 'pattern', rule_row.pattern)
           );
-          UPDATE pg_temp.tmp_series_moderation_hits
-          SET finding_count = finding_count + 1
-          WHERE rule_id = rule_row.id;
+          UPDATE pg_temp.tmp_series_moderation_hits AS h
+          SET finding_count = h.finding_count + 1
+          WHERE h.rule_id = rule_row.id;
         END IF;
         search_from := search_from + relative_offset + char_length(rule_row.pattern);
       END LOOP;
