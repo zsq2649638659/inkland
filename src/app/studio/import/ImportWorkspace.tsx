@@ -86,6 +86,13 @@ interface ImportStatus {
   feishu: ProviderStatus;
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "string" && error) return error;
+  return error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message
+    ? error.message
+    : fallback;
+}
+
 function getExtension(fileName: string) {
   return fileName.toLowerCase().split(".").pop() || "";
 }
@@ -654,7 +661,7 @@ export default function ImportWorkspace() {
         nextWorks.push(...parsed.works.map((work) => ({ ...work, sourceBatchId })));
         if (parsed.textPlan) nextTextPlans.push(parsed.textPlan);
       }
-      catch (parseError) { failures.push(parseError instanceof Error ? parseError.message : `${file.name} 解析失败`); }
+      catch (parseError) { failures.push(getErrorMessage(parseError, `${file.name} 解析失败`)); }
     }
     const existingHashes = new Set(parsedWorks.map((work) => work.sourceHash));
     const uniqueWorks = nextWorks.filter((work) => {
@@ -695,7 +702,7 @@ export default function ImportWorkspace() {
         ? `已按 ${encoding.toUpperCase()} 重新读取“${current.fileName}”，识别到 ${chapters.length} 个章节。`
         : `已更新“${current.fileName}”的拆分方式，共生成 ${works.length} 篇内容。`);
     } catch (planError) {
-      setError(planError instanceof Error ? planError.message : "重新检测和拆分内容失败");
+      setError(getErrorMessage(planError, "重新检测和拆分内容失败"));
     } finally {
       setBusy(false);
     }
@@ -787,7 +794,7 @@ export default function ImportWorkspace() {
         ? "文档已加入当前导入批次；章节检测和拆分方式将在第二步确认。"
         : "文档已加入当前导入批次；你可以继续选择其他导入方式，完成后再进入下一步。");
     } catch (readError) {
-      setError(readError instanceof Error ? readError.message : "在线文档读取失败");
+      setError(getErrorMessage(readError, "在线文档读取失败"));
     } finally {
       setBusy(false);
     }
@@ -1021,7 +1028,7 @@ export default function ImportWorkspace() {
         setPublishResults((results) => results.map((result) => result.workId === work.id ? {
           ...result,
           status: "failed",
-          message: publishError instanceof Error ? publishError.message : "处理失败",
+          message: getErrorMessage(publishError, "处理失败"),
         } : result));
       }
       setPublishProgress(Math.round(((index + 1) / items.length) * 100));
