@@ -13,7 +13,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (!user || !account) redirect("/admin/login");
   const [postsResult, reviewCasesResult, seriesCasesResult, reportCasesResult, feedbacksResult, rulesResult, rulesCountResult] = await Promise.all([
     supabase.from("posts").select("id, title, content, post_type, status, review_status, review_reason, created_at, user_id, author:profiles!posts_user_id_fkey(nickname)").eq("review_status", "pending").order("created_at", { ascending: false }).limit(50),
-    supabase.from("moderation_review_cases").select("post_id, status, screening_status, priority, route_reason").in("status", ["pending", "service_error"]).in("screening_status", ["completed", "failed"]).order("created_at", { ascending: false }).limit(100),
+    supabase.from("moderation_review_cases").select("id, post_id, status, screening_status, priority, route_reason").in("status", ["pending", "service_error"]).in("screening_status", ["completed", "failed"]).order("created_at", { ascending: false }).limit(100),
     supabase.from("series_moderation_review_cases").select("id, series_id, status, screening_status, priority, route_reason, created_at").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(100),
     supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at").in("status", ["pending", "reviewing"]).order("last_reported_at", { ascending: false }).limit(50),
     supabase.from("feedbacks").select("id, type, content, status, created_at, user_id").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(50),
@@ -47,8 +47,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     }
     return { ...item, target_title: targetTitle, target_summary: targetSummary.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\s+/g, " ").trim().slice(0, 160), author_nickname: authorNickname };
   });
-  const humanReviewPostIds = new Set((reviewCasesResult.data || []).map((reviewCase) => reviewCase.post_id));
-  const humanReviewPosts = (postsResult.data || []).filter((post) => humanReviewPostIds.has(post.id));
+  const reviewCaseByPostId = new Map<string, string>();
+  for (const reviewCase of reviewCasesResult.data || []) {
+    if (!reviewCaseByPostId.has(reviewCase.post_id)) reviewCaseByPostId.set(reviewCase.post_id, reviewCase.id);
+  }
+  const humanReviewPosts = (postsResult.data || []).flatMap((post) => {
+    const reviewCaseId = reviewCaseByPostId.get(post.id);
+    return reviewCaseId ? [{ ...post, review_case_id: reviewCaseId }] : [];
+  });
   const seriesIds = (seriesCasesResult.data || []).map((item) => item.series_id);
   const { data: reviewSeries } = seriesIds.length
     ? await supabase.from("series").select("id, name, description, user_id, created_at, review_status").in("id", seriesIds)
