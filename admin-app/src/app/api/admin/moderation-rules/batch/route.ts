@@ -12,11 +12,20 @@ const MAX_BATCH_SIZE = 5000;
 const ERROR_STATUS: Record<string, number> = {
   not_admin: 403,
   invalid_category: 400,
-  invalid_severity: 400,
+  invalid_risk_level: 400,
+  invalid_min_hits: 400,
   empty_batch: 400,
   batch_too_large: 400,
   description_too_long: 400,
 };
+const riskLevels = new Set(["low", "medium", "high"]);
+const riskDefaultMinHits: Record<string, number> = { low: 5, medium: 3, high: 1 };
+
+function parseMinHits(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 999 ? parsed : NaN;
+}
 
 type BulkImportRpcResult = {
   ok?: boolean;
@@ -30,11 +39,16 @@ type BulkImportRpcResult = {
   duplicated_in_batch?: number;
   total_input?: number;
   category?: string;
-  severity?: string;
+  risk_level?: string;
+  min_hits?: number;
 };
 
 function isMissingBulkImportFunction(error: { message?: string } | null) {
   return error?.message?.includes("admin_bulk_import_moderation_rules") === true;
+}
+
+function isMissingRiskColumns(error: { message?: string } | null) {
+  return error?.message?.includes("risk_level") === true || error?.message?.includes("min_hits") === true;
 }
 
 export async function POST(request: Request) {
@@ -58,12 +72,16 @@ export async function POST(request: Request) {
   }
 
   const category = body.category;
-  const severity = body.severity;
+  const riskLevel = body.riskLevel;
+  const rawMinHits = parseMinHits(body.minHits);
   if (typeof category !== "string" || !categories.has(category)) {
     return Response.json({ error: "问题分类不正确。" }, { status: 400 });
   }
-  if (severity !== "review" && severity !== "high") {
+  if (typeof riskLevel !== "string" || !riskLevels.has(riskLevel)) {
     return Response.json({ error: "风险级别不正确。" }, { status: 400 });
+  }
+  if (Number.isNaN(rawMinHits)) {
+    return Response.json({ error: "最低命中次数必须是 1 至 999 的整数。" }, { status: 400 });
   }
 
   const description = typeof body.description === "string" ? body.description.trim() : null;
@@ -71,16 +89,21 @@ export async function POST(request: Request) {
     return Response.json({ error: "备注不能超过 500 个字符。" }, { status: 400 });
   }
 
+  const minHits = rawMinHits ?? riskDefaultMinHits[riskLevel];
   const { data, error } = await supabase.rpc("admin_bulk_import_moderation_rules", {
     p_admin_id: user.id,
     p_texts: texts,
     p_category: category,
-    p_severity: severity,
+    p_risk_level: riskLevel,
+    p_min_hits: minHits,
     p_description: description,
   });
   const result = data as BulkImportRpcResult | null;
 
   if (error || !result?.ok) {
+    if (isMissingRiskColumns(error)) {
+      return Response.json({ error: "风险分级功能尚未启用，请先执行 moderation-risk-thresholds-v1.sql。" }, { status: 503 });
+    }
     if (isMissingBulkImportFunction(error)) {
       return Response.json({ error: "敏感词批量导入功能尚未启用，请先执行 moderation-rules-bulk-import-v1.sql。" }, { status: 503 });
     }
@@ -103,7 +126,8 @@ export async function POST(request: Request) {
       duplicatedInBatch: result.duplicated_in_batch ?? 0,
       totalInput: result.total_input ?? texts.length,
       category: result.category ?? category,
-      severity: result.severity ?? severity,
+      riskLevel: result.risk_level ?? riskLevel,
+      minHits: result.min_hits ?? minHits,
     },
   });
 }

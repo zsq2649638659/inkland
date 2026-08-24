@@ -17,7 +17,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     supabase.from("series_moderation_review_cases").select("id, series_id, status, screening_status, priority, route_reason, created_at").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(100),
     supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at").in("status", ["pending", "reviewing"]).order("last_reported_at", { ascending: false }).limit(50),
     supabase.from("feedbacks").select("id, type, content, status, created_at, user_id").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(50),
-    supabase.from("moderation_rules").select("id, rule_type, pattern, category, severity, description, enabled, hit_count, updated_at").order("created_at", { ascending: false }).limit(200),
+    supabase.from("moderation_rules").select("id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at").order("created_at", { ascending: false }).limit(200),
   ]);
   const reportCaseIds = (reportCasesResult.data || []).map((item) => item.id);
   const { data: reportSnapshots } = reportCaseIds.length

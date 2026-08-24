@@ -43,11 +43,14 @@ export type ModerationRule = {
   pattern: string;
   category: string;
   severity: "review" | "high";
+  risk_level: "low" | "medium" | "high";
+  min_hits: number;
   description: string | null;
   enabled: boolean;
   hit_count: number;
   updated_at: string;
 };
+export type ModerationRiskLevel = ModerationRule["risk_level"];
 type GlobalSearchResults = {
   posts: Array<{ id: string; title: string; post_type: string; status: string; review_status: string; author_nickname: string; href: string | null }>;
   series: Array<{ id: string; name: string; status: string; review_status: string; href: string | null }>;
@@ -64,7 +67,8 @@ type BulkImportResult = {
   duplicatedInBatch: number;
   totalInput: number;
   category: string;
-  severity: string;
+  riskLevel: ModerationRiskLevel;
+  minHits: number;
 };
 export type AdminView = "reviews" | "reports" | "users" | "feedbacks" | "rules";
 
@@ -96,6 +100,13 @@ const viewCopy: Record<AdminView, { title: string; description: string }> = {
   feedbacks: { title: "用户反馈", description: "查看用户提交的网站问题和建议。" },
   rules: { title: "审核规则", description: "维护关键词与白名单；命中规则只会进入人工审核，不会自动删除作品。" },
 };
+const riskLabels: Record<ModerationRiskLevel, { label: string; shortLabel: string; hits: number }> = {
+  low: { label: "低风险 · 满 5 次进审核", shortLabel: "低风险", hits: 5 },
+  medium: { label: "中风险 · 满 3 次进审核", shortLabel: "中风险", hits: 3 },
+  high: { label: "高风险 · 命中 1 次进审核", shortLabel: "高风险", hits: 1 },
+};
+const formatRiskRule = (risk: ModerationRiskLevel, hits: number) =>
+  risk === "high" ? `高风险 · 命中 ${hits} 次进审核` : `${riskLabels[risk].shortLabel} · 满 ${hits} 次进审核`;
 const fmt = (value: string) => new Date(value).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 
 function Icon({ name }: { name: "file" | "flag" | "users" | "message" | "search" | "arrow" | "check" | "x" | "lock" | "logout" | "upload" }) {
@@ -154,8 +165,10 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   const [ruleType, setRuleType] = useState<ModerationRule["rule_type"]>("keyword");
   const [rulePattern, setRulePattern] = useState("");
   const [ruleCategory, setRuleCategory] = useState("广告与导流");
-  const [ruleSeverity, setRuleSeverity] = useState<ModerationRule["severity"]>("review");
+  const [ruleRiskLevel, setRuleRiskLevel] = useState<ModerationRiskLevel>("low");
+  const [ruleMinHits, setRuleMinHits] = useState("5");
   const [ruleDescription, setRuleDescription] = useState("");
+  const [editingRule, setEditingRule] = useState<ModerationRule | null>(null);
   const [userQuery, setUserQuery] = useState("");
   const [userResults, setUserResults] = useState<UserSearchRow[]>([]);
   const [userLoading, setUserLoading] = useState(false);
@@ -172,7 +185,8 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   const [bulkFileName, setBulkFileName] = useState("");
   const [bulkFileMode, setBulkFileMode] = useState<"txt" | "csv" | null>(null);
   const [bulkCategory, setBulkCategory] = useState("广告与导流");
-  const [bulkSeverity, setBulkSeverity] = useState<ModerationRule["severity"]>("review");
+  const [bulkRiskLevel, setBulkRiskLevel] = useState<ModerationRiskLevel>("low");
+  const [bulkMinHits, setBulkMinHits] = useState("5");
   const [bulkDescription, setBulkDescription] = useState("");
   const [bulkError, setBulkError] = useState("");
   const [bulkResult, setBulkResult] = useState<BulkImportResult | null>(null);
@@ -228,7 +242,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   };
 
   const resetRuleForm = () => {
-    setRuleError(""); setRuleType("keyword"); setRulePattern(""); setRuleCategory("广告与导流"); setRuleSeverity("review"); setRuleDescription("");
+    setRuleError(""); setRuleType("keyword"); setRulePattern(""); setRuleCategory("广告与导流"); setRuleRiskLevel("low"); setRuleMinHits("5"); setRuleDescription(""); setEditingRule(null);
   };
 
   const parseBulkLines = () => {
@@ -252,7 +266,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   };
 
   const openBulkImport = () => {
-    setBulkText(""); setBulkFileName(""); setBulkFileMode(null); setBulkCategory("广告与导流"); setBulkSeverity("review"); setBulkDescription(""); setBulkError(""); setBulkResult(null); setBulkImportOpen(true);
+    setBulkText(""); setBulkFileName(""); setBulkFileMode(null); setBulkCategory("广告与导流"); setBulkRiskLevel("low"); setBulkMinHits("5"); setBulkDescription(""); setBulkError(""); setBulkResult(null); setBulkImportOpen(true);
   };
 
   const closeBulkImport = () => {
@@ -261,7 +275,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   };
 
   const resetBulkImport = () => {
-    setBulkText(""); setBulkFileName(""); setBulkFileMode(null); setBulkDescription(""); setBulkError(""); setBulkResult(null);
+    setBulkText(""); setBulkFileName(""); setBulkFileMode(null); setBulkRiskLevel("low"); setBulkMinHits("5"); setBulkDescription(""); setBulkError(""); setBulkResult(null);
   };
 
   const handleBulkFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -283,9 +297,14 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     const { values } = parseBulkLines();
     if (values.length === 0) { setBulkError("请粘贴敏感词或上传 .txt / .csv 文件。"); return; }
     if (values.length > 5000) { setBulkError("单批最多 5000 条，请分批导入。"); return; }
+    const parsedBulkMinHits = Number(bulkMinHits);
+    if (!Number.isInteger(parsedBulkMinHits) || parsedBulkMinHits < 1 || parsedBulkMinHits > 999) {
+      setBulkError("最低命中次数必须是 1 至 999 的整数。");
+      return;
+    }
     setBusy("bulk-import"); setBulkError(""); setBulkResult(null);
     try {
-      const response = await fetchWithTimeout("/api/admin/moderation-rules/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: values, category: bulkCategory, severity: bulkSeverity, description: bulkDescription.trim() || null }) });
+      const response = await fetchWithTimeout("/api/admin/moderation-rules/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: values, category: bulkCategory, riskLevel: bulkRiskLevel, minHits: parsedBulkMinHits, description: bulkDescription.trim() || null }) });
       const payload = await response.json().catch(() => null) as { error?: string; message?: string; result?: BulkImportResult } | null;
       setBusy(null);
       if (!response.ok || !payload?.result) { setBulkError(payload?.error || "批量导入失败，请稍后重试。"); return; }
@@ -298,22 +317,53 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     }
   };
 
-  const createRule = async (event: FormEvent<HTMLFormElement>) => {
+  const openEditRule = (rule: ModerationRule) => {
+    setRuleError(""); setRuleType(rule.rule_type); setRulePattern(rule.pattern); setRuleCategory(rule.category);
+    const currentRisk = rule.risk_level || "low";
+    setRuleRiskLevel(currentRisk);
+    setRuleMinHits(String(rule.min_hits ?? riskLabels[currentRisk].hits));
+    setRuleDescription(rule.description || "");
+    setEditingRule(rule);
+    setRuleDialogOpen(true);
+  };
+
+  const saveRule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const pattern = rulePattern.trim();
     if (!pattern) { setRuleError("请填写词语或短语。"); return; }
-    setBusy("create-rule"); setRuleError("");
+    const parsedMinHits = Number(ruleMinHits);
+    if (ruleType === "keyword" && (!Number.isInteger(parsedMinHits) || parsedMinHits < 1 || parsedMinHits > 999)) {
+      setRuleError("最低命中次数必须是 1 至 999 的整数。");
+      return;
+    }
+    const busyKey = editingRule ? editingRule.id : "create-rule";
+    setBusy(busyKey); setRuleError("");
     try {
-      const response = await fetchWithTimeout("/api/admin/moderation-rules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleType, pattern, category: ruleCategory, severity: ruleSeverity, description: ruleDescription.trim() || null }) });
-      const payload = await response.json().catch(() => null) as { error?: string; rule?: ModerationRule } | null;
+      const payload = editingRule
+        ? { id: editingRule.id, riskLevel: ruleRiskLevel, minHits: parsedMinHits, description: ruleDescription.trim() || null }
+        : ruleType === "whitelist"
+          ? { ruleType, pattern, category: ruleCategory, description: ruleDescription.trim() || null }
+          : { ruleType, pattern, category: ruleCategory, riskLevel: ruleRiskLevel, minHits: parsedMinHits, description: ruleDescription.trim() || null };
+      const response = await fetchWithTimeout("/api/admin/moderation-rules", { method: editingRule ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await response.json().catch(() => null) as { error?: string; rule?: ModerationRule } | null;
       setBusy(null);
-      if (!response.ok || !payload?.rule) { setRuleError(payload?.error || "规则保存失败，请稍后重试。"); return; }
+      if (!response.ok || !result?.rule) { setRuleError(result?.error || "规则保存失败，请稍后重试。"); return; }
       router.refresh();
-      setRuleDialogOpen(false); resetRuleForm(); setMessage("规则已添加。新规则只会影响之后提交的内容。");
+      setRuleDialogOpen(false); resetRuleForm(); setMessage(editingRule ? "规则已更新。新设置只影响之后提交的内容。" : "规则已添加。新规则只会影响之后提交的内容。");
     } catch (error) {
       setBusy(null);
       setRuleError(error instanceof Error ? error.message : "规则保存失败，请稍后重试。");
     }
+  };
+
+  const handleRuleRiskChange = (risk: ModerationRiskLevel) => {
+    setRuleRiskLevel(risk);
+    setRuleMinHits(String(riskLabels[risk].hits));
+  };
+
+  const handleBulkRiskChange = (risk: ModerationRiskLevel) => {
+    setBulkRiskLevel(risk);
+    setBulkMinHits(String(riskLabels[risk].hits));
   };
 
   const updateRuleEnabled = async (rule: ModerationRule) => {
@@ -440,7 +490,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
 
   const feedbacksView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div className="admin-heading-line"><span className="admin-section-dot dot-blue" /><h2>反馈收件箱</h2></div></div><div className="admin-queue-list">{filteredFeedbacks.length === 0 ? <div className="admin-empty"><strong>没有符合条件的用户反馈</strong></div> : filteredFeedbacks.map((item) => <div className="admin-queue-row" key={item.id}><div className="admin-queue-badge badge-blue">{item.type}</div><div className="admin-queue-main"><strong>{item.content}</strong><span>{fmt(item.created_at)} · 用户 {item.user_id.slice(0, 8)}</span></div><button className="admin-btn admin-btn-light" disabled={busy === item.id} onClick={() => void handleFeedback(item.id)}>标记已处理</button></div>)}</div></section>;
 
-  const rulesView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-green" /><h2>关键词与白名单</h2><span className="admin-count-pill">{filteredRules.length} 条</span></div><p>关键词命中会进入人工审核；白名单可排除明确的误判表达。</p></div>{rulesReady && <div className="admin-actions"><button className="admin-btn admin-btn-light admin-bulk-import-btn" type="button" onClick={openBulkImport}><Icon name="upload" />批量导入</button><button className="admin-btn admin-btn-primary" type="button" onClick={() => { resetRuleForm(); setRuleDialogOpen(true); }}>添加规则</button></div>}</div>{!rulesReady ? <div className="admin-empty"><strong>审核规则数据表尚未启用</strong><span>本地功能已完成；待确认数据库迁移后即可开始维护词库。</span></div> : <div className="admin-queue-list">{filteredRules.length === 0 ? <div className="admin-empty"><strong>还没有规则</strong><span>建议先添加少量明确的广告导流或诈骗关键词，全部先设为“进入人工审核”。</span></div> : filteredRules.map((rule) => <div className="admin-rule-row" key={rule.id}><div className={`admin-rule-kind ${rule.rule_type === "whitelist" ? "is-whitelist" : ""}`}>{rule.rule_type === "whitelist" ? "白名单" : "关键词"}</div><div className="admin-queue-main"><strong>{rule.pattern}</strong><span>{rule.category} · {rule.severity === "high" ? "高风险，优先审核" : "命中后人工审核"}{rule.description ? ` · ${rule.description}` : ""}</span></div><span className={`admin-rule-status ${rule.enabled ? "is-enabled" : ""}`}>{rule.enabled ? "已启用" : "已停用"}</span><div className="admin-actions"><button className="admin-btn admin-btn-light" disabled={busy === rule.id} onClick={() => void updateRuleEnabled(rule)}>{rule.enabled ? "停用" : "启用"}</button><button className="admin-btn admin-btn-light" disabled={busy === rule.id} onClick={() => void removeRule(rule)}>删除</button></div></div>)}</div>}</section>;
+  const rulesView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-green" /><h2>关键词与白名单</h2><span className="admin-count-pill">{filteredRules.length} 条</span></div><p>关键词按风险等级与最低命中次数进入人工审核；白名单可排除明确的误判表达。</p></div>{rulesReady && <div className="admin-actions"><button className="admin-btn admin-btn-light admin-bulk-import-btn" type="button" onClick={openBulkImport}><Icon name="upload" />批量导入</button><button className="admin-btn admin-btn-primary" type="button" onClick={() => { resetRuleForm(); setRuleDialogOpen(true); }}>添加规则</button></div>}</div>{!rulesReady ? <div className="admin-empty"><strong>审核规则数据表尚未启用</strong><span>风险分级功能需先执行 moderation-risk-thresholds-v1.sql。</span></div> : <div className="admin-queue-list">{filteredRules.length === 0 ? <div className="admin-empty"><strong>还没有规则</strong><span>低风险词默认满 5 次进审核，中风险 3 次，高风险 1 次。</span></div> : filteredRules.map((rule) => <div className="admin-rule-row" key={rule.id}><div className={`admin-rule-kind ${rule.rule_type === "whitelist" ? "is-whitelist" : ""}`}>{rule.rule_type === "whitelist" ? "白名单" : "关键词"}</div>{rule.rule_type === "keyword" ? <span className={`admin-risk-badge is-${rule.risk_level || "low"}`}>{riskLabels[rule.risk_level || "low"].shortLabel}</span> : null}<div className="admin-queue-main"><strong>{rule.pattern}</strong><span>{rule.category} · {rule.rule_type === "whitelist" ? "白名单，排除误判表达" : formatRiskRule(rule.risk_level || "low", rule.min_hits ?? riskLabels[rule.risk_level || "low"].hits)}{rule.description ? ` · ${rule.description}` : ""}</span></div><span className={`admin-rule-status ${rule.enabled ? "is-enabled" : ""}`}>{rule.enabled ? "已启用" : "已停用"}</span><div className="admin-actions">{rule.rule_type === "keyword" ? <button className="admin-btn admin-btn-light" disabled={busy === rule.id} onClick={() => openEditRule(rule)}>编辑</button> : null}<button className="admin-btn admin-btn-light" disabled={busy === rule.id} onClick={() => void updateRuleEnabled(rule)}>{rule.enabled ? "停用" : "启用"}</button><button className="admin-btn admin-btn-light" disabled={busy === rule.id} onClick={() => void removeRule(rule)}>删除</button></div></div>)}</div>}</section>;
 
   const usersView = <section className="admin-card admin-full-card"><div className="admin-card-heading"><div><div className="admin-heading-line"><span className="admin-section-dot dot-teal" /><h2>用户搜索</h2><span className="admin-count-pill">{userSearched ? `${userResults.length} 位用户` : "输入关键词查询"}</span></div><p>按昵称或用户 ID 搜索；打开详情页可查看举报、违规与限制记录并执行处罚。</p></div></div><form className="admin-user-search" onSubmit={searchUsers}><input value={userQuery} onChange={(event) => setUserQuery(event.target.value)} placeholder="昵称或完整用户 ID" aria-label="搜索用户" /><button className="admin-btn admin-btn-primary" type="submit" disabled={userLoading}>{userLoading ? "搜索中…" : "搜索"}</button></form>{userError ? <div className="admin-alert admin-alert-error" role="alert">{userError}</div> : null}<div className="admin-queue-list">{!userSearched ? <div className="admin-empty"><strong>还没有搜索</strong><span>输入昵称或用户 ID 后开始查询。</span></div> : userResults.length === 0 ? <div className="admin-empty"><strong>没有找到该用户</strong><span>昵称支持模糊匹配，ID 支持完整值。</span></div> : userResults.map((user) => <div className="admin-queue-row" key={user.id}><span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span><div className="admin-queue-main"><strong>{user.nickname || "未命名用户"}</strong><span className="admin-mono">{user.id}</span><span>{userStatusLabels[user.moderation_status] || user.moderation_status} · 举报案件 {user.total_report_cases} · 待处理 {user.pending_report_cases} · 有效违规 {user.active_violations} · 有效限制 {user.active_restrictions}</span></div><Link className="admin-btn admin-btn-primary" href={`/admin/users/${user.id}`}>查看详情</Link></div>)}</div></section>;
 
@@ -454,9 +504,9 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     </aside>
     <main className="admin-main"><header className="admin-topbar"><div className="admin-breadcrumb"><span>管理后台</span><Icon name="arrow" /><strong>{viewCopy[initialView].title}</strong></div><div className="admin-top-actions"><button className="admin-btn admin-btn-light admin-global-search-btn" type="button" onClick={() => { setGlobalQuery(""); setGlobalError(""); setGlobalResults(null); setGlobalSearchOpen(true); }}><Icon name="search" />全局搜索</button><label className="admin-search"><Icon name="search" /><input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="搜索当前列表" aria-label="搜索当前列表" /></label><span className="admin-live"><i />后台已连接</span></div></header><div className="admin-content"><div className="admin-page-title"><div><p className="admin-eyebrow">INKLAND OPERATIONS</p><h1>{viewCopy[initialView].title}</h1><p>{viewCopy[initialView].description}</p></div><button className="admin-btn admin-btn-light" type="button" onClick={() => window.location.reload()}>刷新数据</button></div>{loadErrors.length > 0 && <div className="admin-alert admin-alert-error" role="alert">部分数据加载失败，请检查数据库配置。</div>}{message && <div className="admin-toast" role="status">{message}</div>}{content}</div></main>
     {passwordDialogOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPasswordDialogOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="change-password-title" onSubmit={changePassword}><div className="admin-modal-header"><div><h2 id="change-password-title">修改管理员密码</h2><p className="admin-modal-desc">需要先验证当前密码。新密码至少8位。</p></div></div><label className="admin-field">当前密码<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label><label className="admin-field">新密码<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required /></label><label className="admin-field">再次输入新密码<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} required /></label>{passwordError && <div className="admin-alert admin-alert-error" role="alert">{passwordError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "password"} onClick={() => setPasswordDialogOpen(false)}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === "password"}>{busy === "password" ? "保存中…" : "确认修改"}</button></div></form></div>}
-    {ruleDialogOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRuleDialogOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="create-rule-title" onSubmit={createRule}><div className="admin-modal-header"><div><h2 id="create-rule-title">添加审核规则</h2><p className="admin-modal-desc">先从少量明确的表达开始。除非以后另行调整，规则不会自动删除内容。</p></div></div><label className="admin-field">规则类型<select value={ruleType} onChange={(event) => setRuleType(event.target.value as ModerationRule["rule_type"])}><option value="keyword">关键词：命中后进入人工审核</option><option value="whitelist">白名单：排除已知误判表达</option></select></label><label className="admin-field">词语或短语<input value={rulePattern} onChange={(event) => setRulePattern(event.target.value)} maxLength={500} required /></label><label className="admin-field">问题分类<select value={ruleCategory} onChange={(event) => setRuleCategory(event.target.value)}><option>广告与导流</option><option>诈骗与交易风险</option><option>人身攻击与骚扰</option><option>暴力与威胁</option><option>成人与不当内容</option><option>其他</option></select></label><label className="admin-field">风险级别<select value={ruleSeverity} disabled={ruleType === "whitelist"} onChange={(event) => setRuleSeverity(event.target.value as ModerationRule["severity"])}><option value="review">进入人工审核</option><option value="high">高风险，优先审核</option></select></label><label className="admin-field">备注（可选）<input value={ruleDescription} onChange={(event) => setRuleDescription(event.target.value)} maxLength={500} /></label>{ruleError && <div className="admin-alert admin-alert-error" role="alert">{ruleError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "create-rule"} onClick={() => setRuleDialogOpen(false)}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === "create-rule"}>{busy === "create-rule" ? "保存中…" : "保存规则"}</button></div></form></div>}
+    {ruleDialogOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRuleDialogOpen(false); }}><form className="admin-modal admin-rule-modal" role="dialog" aria-modal="true" aria-labelledby="rule-dialog-title" onSubmit={saveRule}><div className="admin-modal-header"><div><h2 id="rule-dialog-title">{editingRule ? "编辑规则" : "添加审核规则"}</h2><p className="admin-modal-desc">{editingRule ? "当前可修改风险等级和最低命中次数；修改后只影响之后提交的内容。" : "先从少量明确的表达开始。除非以后另行调整，规则不会自动删除内容。"}</p></div></div><label className="admin-field">规则类型<select value={ruleType} disabled={Boolean(editingRule)} onChange={(event) => setRuleType(event.target.value as ModerationRule["rule_type"])}><option value="keyword">关键词：命中后进入人工审核</option><option value="whitelist">白名单：排除已知误判表达</option></select></label><label className="admin-field">词语或短语<input value={rulePattern} disabled={Boolean(editingRule)} onChange={(event) => setRulePattern(event.target.value)} maxLength={500} required /></label><label className="admin-field">问题分类<select value={ruleCategory} disabled={Boolean(editingRule)} onChange={(event) => setRuleCategory(event.target.value)}><option>广告与导流</option><option>诈骗与交易风险</option><option>人身攻击与骚扰</option><option>暴力与威胁</option><option>成人与不当内容</option><option>其他</option></select></label>{ruleType === "keyword" ? <div className="admin-rule-risk-fields"><label className="admin-field">风险级别<select value={ruleRiskLevel} onChange={(event) => handleRuleRiskChange(event.target.value as ModerationRiskLevel)}><option value="low">低风险 · 满 5 次进审核</option><option value="medium">中风险 · 满 3 次进审核</option><option value="high">高风险 · 命中 1 次进审核</option></select></label><label className="admin-field">最低命中次数<input type="number" min={1} max={999} step={1} value={ruleMinHits} onChange={(event) => setRuleMinHits(event.target.value)} /></label></div> : null}<label className="admin-field">备注（可选）<input value={ruleDescription} onChange={(event) => setRuleDescription(event.target.value)} maxLength={500} /></label>{ruleError && <div className="admin-alert admin-alert-error" role="alert">{ruleError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === (editingRule ? editingRule.id : "create-rule")} onClick={() => { setRuleDialogOpen(false); resetRuleForm(); }}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === (editingRule ? editingRule.id : "create-rule")}>{busy === (editingRule ? editingRule.id : "create-rule") ? "保存中…" : "保存规则"}</button></div></form></div>}
     {deleteRule ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && busy !== deleteRule.id) setDeleteRule(null); }}><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="delete-rule-title"><div className="admin-modal-header"><div><h2 id="delete-rule-title">删除这条规则？</h2><p className="admin-modal-desc">确定删除规则“{deleteRule.pattern}”吗？删除后不影响已有审核记录。</p></div></div><div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === deleteRule.id} onClick={() => setDeleteRule(null)}>取消</button><button className="admin-btn admin-btn-danger-fill" type="button" disabled={busy === deleteRule.id} onClick={() => void confirmRemoveRule()}>{busy === deleteRule.id ? "删除中…" : "确认删除"}</button></div></div></div> : null}
-    {bulkImportOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && busy !== "bulk-import") setBulkImportOpen(false); }}><div className="admin-modal admin-bulk-import-modal" role="dialog" aria-modal="true" aria-labelledby="bulk-import-title"><div className="admin-modal-header"><div><h2 id="bulk-import-title">批量导入敏感词</h2><p className="admin-modal-desc">整批统一使用同一组分类、风险级别和备注。</p></div></div>{bulkResult ? <div className="admin-bulk-result"><div className="admin-bulk-result-head"><div className="is-inserted"><strong>{bulkResult.inserted}</strong><span>新增</span></div><div><strong>{bulkResult.skipped}</strong><span>跳过</span></div><div><strong>{bulkResult.invalidLines}</strong><span>无效</span></div></div>{bulkResult.invalidExamples.length > 0 ? <div className="admin-bulk-result-invalid"><strong>无效行示例</strong>{bulkResult.invalidExamples.map((value, index) => <span key={`${value}-${index}`}>{value}</span>)}</div> : null}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "bulk-import"} onClick={closeBulkImport}>完成</button><button className="admin-btn admin-btn-primary" type="button" disabled={busy === "bulk-import"} onClick={resetBulkImport}>再导一批</button></div></div> : <form onSubmit={(event) => { event.preventDefault(); void runBulkImport(); }}><label className="admin-field admin-bulk-source-field">敏感词文本<textarea value={bulkText} onChange={(event) => { setBulkText(event.target.value); setBulkError(""); }} placeholder="每行一个敏感词" rows={8} autoFocus /></label><div className="admin-bulk-file-row"><label className="admin-btn admin-btn-light admin-bulk-file-btn"><Icon name="upload" />选择文件<input type="file" accept=".txt,.csv,text/plain,text/csv" onChange={handleBulkFile} /></label>{bulkFileName ? <span className="admin-bulk-file-name">{bulkFileName}</span> : <span className="admin-bulk-file-hint">支持 .txt / .csv，每行一个</span>}</div><div className="admin-bulk-form-grid"><label className="admin-field">问题分类<select value={bulkCategory} onChange={(event) => setBulkCategory(event.target.value)}><option>广告与导流</option><option>诈骗与交易风险</option><option>人身攻击与骚扰</option><option>暴力与威胁</option><option>成人与不当内容</option><option>其他</option></select></label><label className="admin-field">风险级别<select value={bulkSeverity} onChange={(event) => setBulkSeverity(event.target.value as ModerationRule["severity"])}><option value="review">进入人工审核</option><option value="high">高风险，优先审核</option></select></label></div><label className="admin-field admin-bulk-note-field">本批备注（可选）<input value={bulkDescription} onChange={(event) => setBulkDescription(event.target.value)} maxLength={500} /></label>{bulkPreview.values.length > 0 ? <div className="admin-bulk-preview"><div className="admin-bulk-preview-stats"><span>候选 <b>{bulkValidCount}</b> 条</span>{bulkPreview.duplicatedInBatch > 0 ? <span>重复已合并 <b>{bulkPreview.duplicatedInBatch}</b> 条</span> : null}{bulkInvalidCount > 0 ? <span>无效 <b>{bulkInvalidCount}</b> 条</span> : null}</div><div className="admin-bulk-preview-list">{bulkPreview.values.slice(0, 40).map((value, index) => <div className={`admin-bulk-preview-row ${value.length > 500 ? "is-invalid" : ""}`} key={`${value}-${index}`}><span>{value.length > 500 ? "超长" : index + 1}</span><strong>{value}</strong></div>)}{bulkPreview.values.length > 40 ? <div className="admin-bulk-preview-more">还有 {bulkPreview.values.length - 40} 条未显示</div> : null}</div></div> : null}{bulkError && <div className="admin-alert admin-alert-error" role="alert">{bulkError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "bulk-import"} onClick={closeBulkImport}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === "bulk-import" || bulkPreview.values.length === 0}>{busy === "bulk-import" ? "导入中…" : "确认导入"}</button></div></form>}</div></div>}
+    {bulkImportOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && busy !== "bulk-import") setBulkImportOpen(false); }}><div className="admin-modal admin-bulk-import-modal" role="dialog" aria-modal="true" aria-labelledby="bulk-import-title"><div className="admin-modal-header"><div><h2 id="bulk-import-title">批量导入敏感词</h2><p className="admin-modal-desc">整批统一使用同一组分类、风险级别和最低命中次数。</p></div></div>{bulkResult ? <div className="admin-bulk-result"><div className="admin-bulk-result-head"><div className="is-inserted"><strong>{bulkResult.inserted}</strong><span>新增</span></div><div><strong>{bulkResult.skipped}</strong><span>跳过</span></div><div><strong>{bulkResult.invalidLines}</strong><span>无效</span></div></div>{bulkResult.invalidExamples.length > 0 ? <div className="admin-bulk-result-invalid"><strong>无效行示例</strong>{bulkResult.invalidExamples.map((value, index) => <span key={`${value}-${index}`}>{value}</span>)}</div> : null}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "bulk-import"} onClick={closeBulkImport}>完成</button><button className="admin-btn admin-btn-primary" type="button" disabled={busy === "bulk-import"} onClick={resetBulkImport}>再导一批</button></div></div> : <form onSubmit={(event) => { event.preventDefault(); void runBulkImport(); }}><label className="admin-field admin-bulk-source-field">敏感词文本<textarea value={bulkText} onChange={(event) => { setBulkText(event.target.value); setBulkError(""); }} placeholder="每行一个敏感词" rows={8} autoFocus /></label><div className="admin-bulk-file-row"><label className="admin-btn admin-btn-light admin-bulk-file-btn"><Icon name="upload" />选择文件<input type="file" accept=".txt,.csv,text/plain,text/csv" onChange={handleBulkFile} /></label>{bulkFileName ? <span className="admin-bulk-file-name">{bulkFileName}</span> : <span className="admin-bulk-file-hint">支持 .txt / .csv，每行一个</span>}</div><div className="admin-bulk-form-grid admin-bulk-form-grid-3"><label className="admin-field">问题分类<select value={bulkCategory} onChange={(event) => setBulkCategory(event.target.value)}><option>广告与导流</option><option>诈骗与交易风险</option><option>人身攻击与骚扰</option><option>暴力与威胁</option><option>成人与不当内容</option><option>其他</option></select></label><label className="admin-field">风险级别<select value={bulkRiskLevel} onChange={(event) => handleBulkRiskChange(event.target.value as ModerationRiskLevel)}><option value="low">低风险 · 满 5 次</option><option value="medium">中风险 · 满 3 次</option><option value="high">高风险 · 命中 1 次</option></select></label><label className="admin-field">最低命中次数<input type="number" min={1} max={999} step={1} value={bulkMinHits} onChange={(event) => setBulkMinHits(event.target.value)} /></label></div><label className="admin-field admin-bulk-note-field">本批备注（可选）<input value={bulkDescription} onChange={(event) => setBulkDescription(event.target.value)} maxLength={500} /></label>{bulkPreview.values.length > 0 ? <div className="admin-bulk-preview"><div className="admin-bulk-preview-stats"><span>候选 <b>{bulkValidCount}</b> 条</span>{bulkPreview.duplicatedInBatch > 0 ? <span>重复已合并 <b>{bulkPreview.duplicatedInBatch}</b> 条</span> : null}{bulkInvalidCount > 0 ? <span>无效 <b>{bulkInvalidCount}</b> 条</span> : null}</div><div className="admin-bulk-preview-list">{bulkPreview.values.slice(0, 40).map((value, index) => <div className={`admin-bulk-preview-row ${value.length > 500 ? "is-invalid" : ""}`} key={`${value}-${index}`}><span>{value.length > 500 ? "超长" : index + 1}</span><strong>{value}</strong></div>)}{bulkPreview.values.length > 40 ? <div className="admin-bulk-preview-more">还有 {bulkPreview.values.length - 40} 条未显示</div> : null}</div></div> : null}{bulkError && <div className="admin-alert admin-alert-error" role="alert">{bulkError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "bulk-import"} onClick={closeBulkImport}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === "bulk-import" || bulkPreview.values.length === 0}>{busy === "bulk-import" ? "导入中…" : "确认导入"}</button></div></form>}</div></div>}
     {globalSearchOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !globalLoading) setGlobalSearchOpen(false); }}><div className="admin-modal admin-global-search-modal" role="dialog" aria-modal="true" aria-labelledby="global-search-title"><div className="admin-modal-header"><div><h2 id="global-search-title">全局搜索</h2><p className="admin-modal-desc">搜索作品、连载、用户、举报案件与用户反馈。</p></div></div><form className="admin-global-search-form" onSubmit={runGlobalSearch}><input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} placeholder="输入关键词" aria-label="全局搜索关键词" autoFocus /><button className="admin-btn admin-btn-primary" type="submit" disabled={globalLoading}>{globalLoading ? "搜索中…" : "搜索"}</button></form>{globalError ? <div className="admin-alert admin-alert-error" role="alert">{globalError}</div> : null}{globalResults ? <div className="admin-global-search-results">{(() => {
         const groups = [
           { key: "posts", label: "作品", rows: globalResults.posts.map((item) => ({ key: item.id, title: item.title, meta: `${item.post_type || "作品"} · ${item.review_status === "pending" ? "待审核" : item.status || "已发布"}${item.author_nickname ? ` · ${item.author_nickname}` : ""}`, href: item.href })) },
