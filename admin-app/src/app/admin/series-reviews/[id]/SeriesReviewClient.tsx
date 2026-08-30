@@ -184,7 +184,7 @@ export default function SeriesReviewClient({ pendingCount, series, reviewCase, r
         </div>
         <div className="admin-detail-meta-line">
           <p className="admin-detail-meta">
-            连载信息 · 第 {currentSubmissionNumber} 次入审 · {new Date(reviewCase?.created_at || series.created_at).toLocaleString("zh-CN")} · 入审方式：{reviewCase?.route_reason || "自动命中"}
+            连载信息 · 第 {currentSubmissionNumber} 次入审 · {new Date(reviewCase?.created_at || series.created_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })} · 入审方式：{reviewCase?.route_reason || "自动命中"}
           </p>
           <div className="admin-entity-ids">
             <button type="button" className={`admin-copy-id${copiedKey === "series" ? " is-copied" : ""}`} title="点击复制连载 ID" onClick={() => void copyId("series", series.id)}>
@@ -235,7 +235,7 @@ export default function SeriesReviewClient({ pendingCount, series, reviewCase, r
 
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row"><h2>审核轨迹</h2><span>{reviewHistory.length} 条</span></div>
-            <ul className="admin-timeline">{reviewHistory.length ? reviewHistory.map((item) => <li key={item.id}><b>{reviewStatusLabel(item.status)} · 第 {item.submission_number || currentSubmissionNumber} 次提交</b><span>{new Date(item.decided_at || item.created_at).toLocaleString("zh-CN")} · {reviewActorLabel(item.decided_by)}</span></li>) : <li><b>未记录审核轨迹</b><span>—</span></li>}</ul>
+            <ul className="admin-timeline">{reviewHistory.length ? reviewHistory.map((item) => <li key={item.id}><b>{reviewStatusLabel(item.status)} · 第 {item.submission_number || currentSubmissionNumber} 次提交</b><span>{new Date(item.decided_at || item.created_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })} · {reviewActorLabel(item.decided_by)}</span></li>) : <li><b>未记录审核轨迹</b><span>—</span></li>}</ul>
           </section>
           <section className="admin-detail-panel admin-audit">
             <div className="admin-panel-title-row"><h2>审计元数据</h2><span>系统记录</span></div>

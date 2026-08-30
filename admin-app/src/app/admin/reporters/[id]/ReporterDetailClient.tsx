@@ -95,8 +95,8 @@ const riskLabels: Record<string, string> = { normal: "正常", high: "高风险"
 const targetTypeLabels: Record<string, string> = { post: "作品", comment: "评论", user: "用户" };
 const reportStatusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", resolved: "已处理", cancelled: "已取消" };
 
-const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
-const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "—";
+const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }) : "—";
+const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false }) : "—";
 
 export default function ReporterDetailClient({ detail, adminInitial = "A" }: { detail: ReporterDetailPayload; adminInitial?: string }) {
   const [modal, setModal] = useState<ModalKind>(null);
