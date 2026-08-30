@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import AdminDetailFrame from "../../AdminDetailFrame";
 
 type CaseRow = {
   id: string;
@@ -96,6 +97,9 @@ type UserDetailPayload = {
     total_violations: number;
     deleted_items: number;
     active_restrictions: number;
+    published_posts_count?: number | null;
+    following_count?: number | null;
+    followers_count?: number | null;
   };
   restrictions: Array<{
     id: string;
@@ -160,12 +164,16 @@ type Props = {
   profileRevisions: ProfileRevisionRow[];
   targetReporterDetail: ReporterDetailPayload | null;
   operationRecord?: ReportOperationRecord | null;
+  adminInitial?: string;
 };
 
 type ReportAction = "keep" | "remind" | "delete" | "dismiss" | "no_violation" | "convert_content" | "profile_revision" | "warn" | "restrict" | "suspend" | "ban" | "mark_suspicious" | "temporary_hide" | "restore";
+type ReportGovernanceTone = "neutral" | "low" | "medium" | "high" | "critical" | "aux";
 
 const targetLabels: Record<string, string> = { post: "作品", comment: "评论", user: "用户" };
 const statusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", resolved: "已处理", cancelled: "已取消" };
+const accountStatusLabels: Record<string, string> = { active: "正常", normal: "正常", warned: "已警告", restricted: "功能受限", suspended: "已暂停", banned: "已永久封禁", deleted: "已注销", inactive: "未激活" };
+const autoRiskLabels: Record<string, string> = { normal: "正常", low: "低", minor: "轻微", medium: "中", standard: "普通", high: "高", serious: "严重", major: "严重", critical: "紧急" };
 const priorityLabels: Record<string, string> = { normal: "普通", high: "优先", urgent: "紧急" };
 const outcomeLabels: Record<string, string> = { kept: "保留", reminded: "已提醒", deleted: "已删除", no_violation: "举报不成立", content_case: "已转为内容案件", profile_changes: "已要求修改资料", warned: "已警告", restricted: "已限制功能", suspended: "已暂停", banned: "已永久封禁" };
 const severityLabels: Record<string, string> = { minor: "轻微", standard: "普通", serious: "严重", critical: "紧急" };
@@ -204,19 +212,86 @@ const auditActionLabels: Record<string, string> = {
 };
 const restrictionTypeLabels: Record<string, string> = { comment: "评论功能", publish: "发布功能", report: "举报功能", account: "账号", profile_edit: "修改资料", interact: "互动功能" };
 const restrictionStatusLabelsFull: Record<string, string> = { active: "生效中", expired: "已到期", lifted: "已解除" };
+const userReportGovernanceGroups: Array<{
+  level: string;
+  label: string;
+  description: string;
+  tone: ReportGovernanceTone;
+  actions: ReportAction[];
+}> = [
+  { level: "结论", label: "审核结论", description: "", tone: "neutral", actions: ["no_violation", "convert_content"] },
+  { level: "低", label: "提醒与整改", description: "提醒或整改", tone: "low", actions: ["warn", "profile_revision"] },
+  { level: "中", label: "限制功能", description: "功能和期限", tone: "medium", actions: ["restrict"] },
+  { level: "高", label: "暂停账号", description: "临时停用，到期恢复", tone: "high", actions: ["suspend"] },
+  { level: "极高", label: "永久封禁", description: "永久停用，需二次确认", tone: "critical", actions: ["ban"] },
+  { level: "附加", label: "举报人治理", description: "仅处理举报人", tone: "aux", actions: ["mark_suspicious"] },
+];
+const userReportActionDescriptions: Partial<Record<ReportAction, string>> = {
+  no_violation: "结束案件，不产生账号处罚",
+  convert_content: "转到作品或评论层面处理",
+  warn: "记录警告并通知用户",
+  profile_revision: "要求修改不合规资料",
+  restrict: "按功能和期限限制账号",
+  suspend: "临时停用账号，到期恢复",
+  ban: "永久停用账号，需要二次确认",
+  mark_suspicious: "标记举报人进入复核",
+};
+const contentReportGovernanceGroups: Array<{
+  level: string;
+  label: string;
+  description: string;
+  tone: ReportGovernanceTone;
+  actions: ReportAction[];
+}> = [
+  { level: "结论", label: "审核结论", description: "", tone: "neutral", actions: ["dismiss"] },
+  { level: "低", label: "保留与提醒", description: "保留内容并提醒", tone: "low", actions: ["remind"] },
+  { level: "中", label: "暂时隐藏", description: "可逆，待复核", tone: "medium", actions: ["temporary_hide"] },
+  { level: "高", label: "删除内容", description: "删除后不可恢复", tone: "critical", actions: ["delete"] },
+];
+const contentReportActionDescriptions: Partial<Record<ReportAction, string>> = {
+  dismiss: "举报不成立，恢复该内容",
+  remind: "保留内容并通知发布者",
+  temporary_hide: "暂时移出公开页面",
+  restore: "恢复公开展示内容",
+  delete: "删除内容并记录违规",
+};
+const reportReasonPresets: Partial<Record<ReportAction, string[]>> = {
+  dismiss: ["内容未违反社区规范", "举报理由与内容不符", "举报证据不足", "重复举报或误报"],
+  remind: ["存在轻微不当表达", "语气可能引发冲突", "需要提醒友善交流", "内容可保留但需注意措辞"],
+  delete: ["违反社区规范", "包含人身攻击或辱骂", "广告、引流或骚扰", "内容涉及违法违规"],
+  profile_revision: ["包含不适宜内容", "资料含广告或引流", "资料含人身攻击或辱骂", "资料与作品或账号无关"],
+  warn: ["发布违规内容", "辱骂或人身攻击", "广告或引流", "盗用他人作品", "恶意举报", "重复提交违规内容"],
+  restrict: ["持续发布违规内容", "多次违规且未整改", "绕过内容审核", "滥用互动或举报功能"],
+  suspend: ["多项功能持续违规", "绕过限制继续违规", "严重扰乱社区秩序", "累计违规达到暂停标准"],
+  ban: ["严重违规", "多次违规且拒不整改", "绕过限制持续违规", "恶意破坏社区秩序"],
+  mark_suspicious: ["短时间大量重复举报", "举报理由与内容明显无关", "反复举报已判定无问题内容", "证据明显不成立"],
+  temporary_hide: ["命中高风险关键词", "等待人工复核", "内容可能涉及违规", "举报证据不足，先行隐藏"],
+};
+const reportReasonPresetLabels: Partial<Record<ReportAction, string>> = {
+  dismiss: "常见驳回原因",
+  remind: "常见提醒原因",
+  delete: "常见删除依据",
+  profile_revision: "常见修改原因",
+  warn: "常见处罚依据",
+  restrict: "常见处罚依据",
+  suspend: "常见处罚依据",
+  ban: "常见处罚依据",
+  mark_suspicious: "常见标记依据",
+  temporary_hide: "常见隐藏原因",
+};
 
 function text(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
-function reviewBasisLabel(value: unknown) {
-  if (value == null || value === "") return "未记录";
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (!entries.length) return "未记录";
-    return entries.map(([key, item]) => `${key}: ${typeof item === "string" ? item : JSON.stringify(item)}`).join("；");
-  }
-  return String(value);
+function accountStatusLabel(value: unknown) {
+  const status = text(value).trim();
+  return accountStatusLabels[status.toLowerCase()] || status || "未记录";
+}
+
+function autoRiskLabel(value: unknown) {
+  const risk = text(value).trim();
+  return autoRiskLabels[risk.toLowerCase()] || risk || "未触发";
 }
 
 function fmtDateTime(value: string | null | undefined) {
@@ -252,7 +327,7 @@ function plainText(content: string) {
   return content.replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").trim();
 }
 
-export default function ReportDetailClient({ reportCase, snapshot, reports, violations, reporterStats, userContent, userDetail, profileRevisions, targetReporterDetail, operationRecord }: Props) {
+export default function ReportDetailClient({ reportCase, snapshot, reports, violations, reporterStats, userContent, userDetail, profileRevisions, targetReporterDetail, operationRecord, adminInitial = "A" }: Props) {
   const [pendingAction, setPendingAction] = useState<ReportAction | null>(null);
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
@@ -268,6 +343,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   const [hideContent, setHideContent] = useState(false);
   const [countViolation, setCountViolation] = useState(true);
   const [banArmed, setBanArmed] = useState(false);
+  const [reasonCustom, setReasonCustom] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [riskOpen, setRiskOpen] = useState(false);
   const [modalError, setModalError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -278,11 +355,29 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   const [reminderError, setReminderError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const copyId = async (key: string, value: string) => {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(value);
+      setCopiedId(key);
+      setSuccess("已复制 ID");
+      window.setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      setSuccess("复制失败，请手动复制。");
+    }
+  };
+
   const object = (snapshot?.object_snapshot || {}) as Record<string, unknown>;
   const context = (snapshot?.context_snapshot || {}) as Record<string, unknown>;
   const isPost = reportCase.target_type === "post";
   const isComment = reportCase.target_type === "comment";
   const isUser = reportCase.target_type === "user";
+  const isReadOnly = !["pending", "reviewing"].includes(reportCase.status);
+  const reportListHref = isComment
+    ? "/admin?view=reportcomment"
+    : isUser
+      ? "/admin?view=reportuser"
+      : "/admin?view=reportwork";
 
   const targetTitle = isPost
     ? text(object.title) || "未知作品"
@@ -305,7 +400,6 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
 
   const actions: Array<{ key: ReportAction; label: string; danger?: boolean }> = isComment
     ? [
-        { key: "keep", label: "保留评论" },
         { key: "remind", label: "保留并提醒" },
         { key: "delete", label: "删除评论", danger: true },
         ...(reportCase.hidden_for_review ? [{ key: "restore" as const, label: "恢复展示" }] : [{ key: "temporary_hide" as const, label: "暂时隐藏评论" }]),
@@ -313,7 +407,6 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
       ]
     : isPost
       ? [
-          { key: "keep", label: "保留作品" },
           { key: "delete", label: "删除作品", danger: true },
           ...(reportCase.hidden_for_review ? [{ key: "restore" as const, label: "恢复展示" }] : [{ key: "temporary_hide" as const, label: "暂时隐藏作品" }]),
           { key: "dismiss", label: "驳回举报" },
@@ -328,6 +421,11 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
           { key: "ban", label: "永久封禁", danger: true },
           { key: "mark_suspicious", label: "标记恶意举报" },
         ];
+  const actionLabel = (action: (typeof actions)[number]) => {
+    if (isPost && action.key === "dismiss") return "驳回举报并放行内容";
+    if (isComment && action.key === "dismiss") return "驳回举报并恢复评论";
+    return action.label;
+  };
 
   const modalCopy: Record<ReportAction, { title: string; desc: string; confirm: string; danger?: boolean }> = {
     keep: {
@@ -404,11 +502,12 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   };
 
   const openAction = (action: ReportAction) => {
+    if (isReadOnly) return;
     setNote(""); setModalError(""); setReason("");
     setIssueType("avatar"); setHideProfile(true);
     setContentTargetType("post"); setContentTargetId(""); setContentAction("remind");
     setRestrictionTypes([]); setImmediate(true); setStartsAt(""); setEndsAt("");
-    setHideContent(false); setCountViolation(true); setBanArmed(false);
+    setHideContent(false); setCountViolation(true); setBanArmed(false); setReasonCustom(false);
     if (action === "profile_revision") setReason("包含不适宜内容");
     if (action === "convert_content") {
       const first = userContent[0];
@@ -416,6 +515,29 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     }
     setPendingAction(action);
   };
+
+  const reasonPresets = pendingAction ? reportReasonPresets[pendingAction] || [] : [];
+  const reasonPresetLabel = pendingAction ? reportReasonPresetLabels[pendingAction] || "常见原因" : "常见原因";
+  const reasonFieldLabel = pendingAction === "profile_revision"
+    ? "问题类型 / 修改原因"
+    : pendingAction === "mark_suspicious"
+      ? "标记原因"
+      : pendingAction === "temporary_hide"
+        ? "隐藏原因"
+        : pendingAction === "dismiss"
+          ? "驳回原因"
+          : pendingAction === "remind"
+            ? "提醒原因"
+            : pendingAction === "delete"
+              ? "删除依据"
+        : "处罚依据";
+  const reasonPresetField = reasonPresets.length ? <div className="admin-field admin-report-reason-field">
+    <span className="admin-field-label">{reasonPresetLabel}</span>
+    <div className="admin-warn-reason-options">
+      {reasonPresets.map((item) => <button className={reason === item && !reasonCustom ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => { setReason(item); setReasonCustom(false); setBanArmed(false); }}>{item}</button>)}
+      <button className={reasonCustom ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={busy} onClick={() => { setReason(""); setReasonCustom(true); setBanArmed(false); }}>其他原因</button>
+    </div>
+  </div> : null;
 
   const advanceToNextCase = async () => {
     try {
@@ -430,10 +552,14 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     } catch {
       // 读取失败时回到举报中心列表，不阻断处理流程。
     }
-    window.location.assign("/admin?view=reports");
+    window.location.assign(reportListHref);
   };
 
   const runAction = async (action: ReportAction, options: Record<string, unknown>) => {
+    if (isReadOnly) {
+      setModalError("该举报案件已经处理，不能再次处置。");
+      return;
+    }
     setBusy(true);
     setModalError("");
     try {
@@ -529,6 +655,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
       if (!reason.trim()) { setModalError("请填写标记原因，该原因会写入案件记录。"); return; }
     } else if (pendingAction === "temporary_hide") {
       if (!reason.trim()) { setModalError("请填写隐藏原因，该原因会写入案件记录。"); return; }
+    } else if (pendingAction === "dismiss" || pendingAction === "remind" || pendingAction === "delete") {
+      if (!reason.trim()) { setModalError(`请填写${pendingAction === "dismiss" ? "驳回原因" : pendingAction === "remind" ? "提醒原因" : "删除依据"}，该内容会写入案件处理记录。`); return; }
     }
     void runAction(pendingAction, options);
   };
@@ -592,48 +720,136 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     }
     return "未解除";
   };
+  const reporterCount = new Set(reports.map((report) => report.reporter_id).filter(Boolean)).size || reports.length || reportCase.report_count;
+  const reportScale = reporterCount > 1 ? `${reporterCount} 人 / ${reportCase.report_count} 次` : `${reportCase.report_count} 次`;
+  const reportSummary = reports.find((report) => report.details)?.details || "举报明细已保存，请结合下方冻结快照进行人工判断。";
+  const reportPrimaryReason = reportCase.primary_reason_category || "未填写";
+  const reportSupplement = reportSummary !== reportPrimaryReason && reportSummary !== "举报明细已保存，请结合下方冻结快照进行人工判断。" ? reportSummary : "";
+  const reportVisibility = reportCase.hidden_for_review ? "处置期间对读者不可见" : "待处置，当前对读者可见";
+  const violationOwnerLabel = isComment ? "评论作者" : isPost ? "作品作者" : "被举报用户";
+  const activeView = reportCase.target_type === "comment" ? "reportcomment" : reportCase.target_type === "user" ? "reportuser" : "reportwork";
+  const detailLabel = `${targetLabels[reportCase.target_type] || "举报"}举报`;
+  const overviewSubjectLabel = isPost ? "被举报作品" : isComment ? "被举报评论" : "被举报用户";
+  const overviewSubjectName = isPost || isComment ? targetTitle : targetAuthor;
+  const overviewOwnerLabel = isPost ? "作者" : "评论作者";
+  const overviewSubjectUserId = reportCase.target_user_id || snapshot?.author_id || "";
+  const overviewContentText = contentText
+    ? `${contentText.slice(0, 180)}${contentText.length > 180 ? "…" : ""}`
+    : isUser ? "未填写个人简介" : "快照中没有可读取的文字内容";
 
   return (
-    <main className="admin-detail-shell">
-      <header className="admin-detail-top">
-        <Link href="/admin?view=reports" className="admin-back-link">← 返回举报中心</Link>
-        <span className="admin-detail-status">{statusLabels[reportCase.status] || reportCase.status}</span>
-      </header>
+    <AdminDetailFrame activeView={activeView} breadcrumb={`管理后台 / ${detailLabel} / 详情`} adminInitial={adminInitial}>
+      <div className={`admin-report-detail-page admin-detail-shell admin-report-type-${reportCase.target_type}`}>
+        <header className="admin-detail-top">
+          <Link href={reportListHref} className="admin-btn admin-btn-light">← 返回{detailLabel}</Link>
+          <span className="admin-detail-queue-label">{isReadOnly ? "只读举报记录" : "当前举报案件详情"}</span>
+          <button className="admin-btn admin-btn-light" type="button" disabled>下一个案件 →</button>
+        </header>
 
-      <div className="admin-review-heading">
-        <div className="admin-detail-kicker">REPORT CASE · {targetLabels[reportCase.target_type]?.toUpperCase() || "OBJECT"}</div>
-        <h1>{targetTitle}</h1>
-        <div className="admin-detail-meta">
-          目标作者：{targetAuthor} · {reportCase.report_count} 人举报 · 首次 {fmtDateTime(reportCase.first_reported_at)} · 最近 {fmtDateTime(reportCase.last_reported_at)}
-          {isUser && userDetail ? ` · 注册于 ${fmtDate(userDetail.user.created_at || "")} · 当前功能限制 ${userDetail.stats.active_restrictions || 0} 项` : null}
+        <div className="admin-review-heading">
+          <div className="admin-detail-title-line">
+            <span className={`admin-risk-pill${reportCase.priority === "urgent" || reportCase.priority === "high" ? " is-high" : ""}`}>{priorityLabels[reportCase.priority] || "一般"}</span>
+            <span className="admin-report-status-pill">{statusLabels[reportCase.status] || reportCase.status}</span>
+            <h1>{targetTitle}</h1>
+          </div>
+          <div className="admin-detail-meta-line">
+            <p className="admin-detail-meta">{detailLabel} · 已保存快照 · 最近举报：{fmtDateTime(reportCase.last_reported_at)} · 累计 {reportScale}</p>
+            <div className="admin-entity-ids">
+              <button type="button" className={`admin-copy-id${copiedId === "case" ? " is-copied" : ""}`} title="点击复制案件 ID" onClick={() => void copyId("case", reportCase.id)}>{copiedId === "case" ? "已复制案件 ID" : `案件 ${reportCase.id}`}</button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="admin-review-layout">
+        <div className="admin-review-layout">
         <aside className="admin-review-summary-column">
           <section className="admin-detail-panel">
-            <h2>案件信息</h2>
-            <dl>
-              <dt>案件状态</dt>
-              <dd>{statusLabels[reportCase.status] || reportCase.status}</dd>
-              <dt>优先级</dt>
-              <dd>{priorityLabels[reportCase.priority] || reportCase.priority}</dd>
-              <dt>主要原因</dt>
-              <dd>{reportCase.primary_reason_category || "未填写"}</dd>
-              <dt>目标 ID</dt>
-              <dd className="admin-mono">{reportCase.target_id}</dd>
-              {reportCase.outcome ? <><dt>处理结果</dt><dd>{outcomeLabels[reportCase.outcome] || reportCase.outcome}</dd></> : null}
-              {reportCase.resolved_at ? <><dt>处理时间</dt><dd>{fmtDateTime(reportCase.resolved_at)}</dd></> : null}
-            </dl>
+            <h2>举报概况</h2>
+            {isComment ? <div className="admin-comment-report-overview">
+              <div className="admin-comment-overview-head">
+                <div className="admin-comment-overview-subject">
+                  <span className="admin-comment-overview-badge">评论</span>
+                  <div>
+                    <span className="admin-comment-overview-kicker">被举报评论</span>
+                    <strong>{targetAuthor === "未知用户" ? "匿名用户的评论" : `${targetAuthor} 的评论`}</strong>
+                  </div>
+                </div>
+                <div className="admin-comment-overview-ids" aria-label="评论与用户 ID">
+                  <button type="button" className={`admin-copy-id${copiedId === "overview-target" ? " is-copied" : ""}`} title="点击复制对象 ID" onClick={() => void copyId("overview-target", reportCase.target_id)}>{copiedId === "overview-target" ? "已复制对象 ID" : `对象 ${reportCase.target_id}`}</button>
+                  {overviewSubjectUserId ? <button type="button" className={`admin-copy-id${copiedId === "overview-user" ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyId("overview-user", overviewSubjectUserId)}>{copiedId === "overview-user" ? "已复制用户 ID" : `用户 ${overviewSubjectUserId}`}</button> : null}
+                </div>
+              </div>
+              <div className="admin-comment-overview-quote">
+                <div className="admin-comment-overview-quote-head"><span>原始评论</span></div>
+                <blockquote>{overviewContentText}</blockquote>
+                <div className="admin-comment-overview-context"><span>评论于</span><strong>{text(context.post_title) || "未知作品"}</strong></div>
+              </div>
+              <div className="admin-comment-overview-facts">
+                <div><span>举报原因</span><strong>{reportPrimaryReason}</strong></div>
+                <div><span>举报规模</span><strong>{reportScale}</strong></div>
+                <div><span>评论当下状况</span><strong>{reportVisibility}</strong></div>
+                {reportCase.outcome ? <div><span>处理结果</span><strong>{outcomeLabels[reportCase.outcome] || reportCase.outcome}</strong></div> : null}
+                {reportCase.resolved_at ? <div><span>处理时间</span><strong>{fmtDateTime(reportCase.resolved_at)}</strong></div> : null}
+              </div>
+              {reportSupplement ? <div className="admin-comment-overview-summary"><span>补充说明</span><p>{reportSupplement}</p></div> : null}
+            </div> : <>
+              <div className="admin-comment-report-overview">
+                <div className="admin-comment-overview-head">
+                  <div className="admin-comment-overview-subject">
+                    {!isPost ? <span className={`admin-comment-overview-badge is-${reportCase.target_type}`}>用户</span> : null}
+                    {isPost ? <div className="admin-post-overview-meta">
+                      <span><em>标题</em><strong>{overviewSubjectName}</strong></span>
+                      <span><em>作者</em><strong>{targetAuthor}</strong></span>
+                      <span><em>发布时间</em><strong>{text(object.published_at) ? fmtDateTime(text(object.published_at)) : "未记录"}</strong></span>
+                    </div> : <div>
+                      <span className="admin-comment-overview-kicker">{overviewSubjectLabel}</span>
+                      <strong>{overviewSubjectName}</strong>
+                      {!isUser ? <span>{overviewOwnerLabel}：{targetAuthor}</span> : null}
+                    </div>}
+                  </div>
+                  <div className="admin-comment-overview-ids" aria-label="对象与用户 ID">
+                    <button type="button" className={`admin-copy-id${copiedId === "overview-target" ? " is-copied" : ""}`} title={`点击复制${isUser ? "用户" : "对象"} ID`} onClick={() => void copyId("overview-target", reportCase.target_id)}>{copiedId === "overview-target" ? `已复制${isUser ? "用户" : "对象"} ID` : `${isUser ? "用户" : "对象"} ${reportCase.target_id}`}</button>
+                    {!isUser && overviewSubjectUserId ? <button type="button" className={`admin-copy-id${copiedId === "overview-user" ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyId("overview-user", overviewSubjectUserId)}>{copiedId === "overview-user" ? "已复制用户 ID" : `用户 ${overviewSubjectUserId}`}</button> : null}
+                  </div>
+                </div>
+                <div className="admin-comment-overview-quote">
+                  <div className="admin-comment-overview-quote-head"><span>{isUser ? "个人资料" : isPost ? "完整作品证据" : "评论内容"}</span>{isPost ? <small>举报时保存</small> : null}</div>
+                  {isUser ? <div className="admin-report-overview-user-facts">
+                    <span>注册时间<strong>{text(object.created_at) ? fmtDate(text(object.created_at)) : "未记录"}</strong></span>
+                    <span>个人简介<strong>{overviewContentText}</strong></span>
+                    <span>发布作品<strong>{userDetail?.stats.published_posts_count ?? "未记录"}</strong></span>
+                    <span>关注数<strong>{userDetail?.stats.following_count ?? "未记录"}</strong></span>
+                    <span>粉丝数<strong>{userDetail?.stats.followers_count ?? "未记录"}</strong></span>
+                  </div> : isPost ? <div className="admin-post-inline-evidence">
+                    {contentText ? <div className="admin-long-content">{contentText}</div> : <p className="admin-detail-empty">快照中没有可读取的文字内容。</p>}
+                    {text(object.author_note) ? <section className="admin-author-note"><h3>作者的话</h3><p>{text(object.author_note)}</p></section> : null}
+                    {images.length ? <div className="admin-detail-images">{images.map((url, index) => {
+                      const unavailable = url.startsWith("private://");
+                      return <figure key={`${url}-${index}`}>
+                        {unavailable ? <div className="admin-image-unavailable"><strong>图片 {index + 1} 暂时无法显示</strong><span>原图已迁移或需要私有访问配置。</span></div> : <a href={url} target="_blank" rel="noreferrer" title="打开原图"><img src={url} alt={`被举报作品图片 ${index + 1}`} /></a>}
+                        <figcaption>图片 {index + 1}</figcaption>
+                      </figure>;
+                    })}</div> : null}
+                  </div> : <blockquote>{overviewContentText}</blockquote>}
+                </div>
+                <div className="admin-comment-overview-facts">
+                  <div><span>举报原因</span><strong>{reportPrimaryReason}</strong></div>
+                  <div><span>举报规模</span><strong>{reportScale}</strong></div>
+                  <div><span>{isUser ? "账号当前状况" : "作品当前状况"}</span><strong>{isUser ? accountStatusLabel(object.moderation_status) : reportVisibility}</strong></div>
+                  {reportCase.outcome ? <div><span>处理结果</span><strong>{outcomeLabels[reportCase.outcome] || reportCase.outcome}</strong></div> : null}
+                  {reportCase.resolved_at ? <div><span>处理时间</span><strong>{fmtDateTime(reportCase.resolved_at)}</strong></div> : null}
+                </div>
+                {reportSupplement ? <div className="admin-comment-overview-summary"><span>补充说明</span><p>{reportSupplement}</p></div> : null}
+              </div>
+            </>}
           </section>
 
-          <section className="admin-detail-panel">
-            <div className="admin-panel-title-row"><h2>举报明细</h2><span>{reports.length} 条</span></div>
+          <section className="admin-detail-panel admin-report-reporter-panel">
+            <div className="admin-panel-title-row"><h2>举报人清单</h2><span>{reports.length} 条</span></div>
             {reports.length ? <div className="admin-risk-list">{reports.map((report) => {
               const stat = reporterStats.find((item) => item.user_id === report.reporter_id);
               const reporterId = report.reporter_id;
               return <div className="admin-risk-item" key={report.id}>
-                <strong>{report.kind === "comment" ? "评论举报" : report.target_type === "post" ? "作品举报" : "用户举报"} · {report.reporter?.nickname || "匿名用户"}</strong>
+                <div className="admin-report-reporter-meta"><strong>{report.reporter?.nickname || "匿名用户"}</strong><code className="admin-mono">{reporterId || "未记录举报人 ID"}</code></div>
                 <div className="admin-risk-tags"><span>{report.reason_category || report.reason || "未填写原因"}</span><span>{reportStatusLabel(report.status)}</span></div>
                 {report.details && report.details !== report.reason ? <small>补充说明：{report.details}</small> : null}
                 <small>提交于 {fmtDateTime(report.created_at)}</small>
@@ -647,49 +863,21 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
           </section>
 
           <section className="admin-detail-panel">
-            <div className="admin-panel-title-row"><h2>目标用户违规记录</h2><span>{violations.length} 条</span></div>
+            <div className="admin-panel-title-row"><h2>{violationOwnerLabel}违规记录</h2><span>{violations.length} 条</span></div>
+            {isComment || isPost ? <p className="admin-report-role-note">这里指{isComment ? "发布该评论" : "发布该作品"}的账号，不是举报人。</p> : null}
             {violations.length ? <div className="admin-risk-list">{violations.map((item) => <div className="admin-risk-item" key={item.id}>
               <strong>{item.content_type ? targetLabels[item.content_type] || item.content_type : "账号"} · {item.category}</strong>
               <div className="admin-risk-tags"><span>{severityLabels[item.severity] || item.severity}</span><span>{item.status === "active" ? "有效" : "已撤销"}</span></div>
               {item.summary ? <small>{item.summary}</small> : null}
               <small>确认于 {fmtDateTime(item.confirmed_at)}</small>
-            </div>)}</div> : <p className="admin-detail-empty">该用户没有确认违规记录。</p>}
+            </div>)}</div> : <p className="admin-detail-empty">该{violationOwnerLabel}没有确认违规记录。</p>}
           </section>
         </aside>
 
         <article className="admin-detail-content admin-review-main">
-          <section className="admin-evidence-document">
-            <div className="admin-document-label">举报内容快照 · {fmtDateTime(snapshot?.captured_at || reportCase.created_at)}</div>
-            <h2>{isPost ? "作品全文" : isComment ? "评论原文" : "用户资料"}</h2>
-
-            {isPost ? <dl className="admin-snapshot-meta">
-              <dt>内容评级</dt><dd>{text(object.content_rating) || "未记录"}</dd>
-              {text(object.series_name) ? <><dt>所属连载</dt><dd>{text(object.series_name)}{text(object.chapter_number) ? ` · 第 ${text(object.chapter_number)} 章` : ""}</dd></> : null}
-              {text(object.published_at) ? <><dt>发布时间</dt><dd>{fmtDateTime(text(object.published_at))}</dd></> : null}
-              {text(object.visibility) ? <><dt>可见范围</dt><dd>{text(object.visibility)}</dd></> : null}
-            </dl> : null}
-
-            {isUser ? <div className="admin-user-profile">
-              {text(object.avatar_url) ? <img src={text(object.avatar_url)} alt="用户头像" className="admin-user-avatar" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="admin-user-avatar admin-user-avatar-empty">{targetAuthor.slice(0, 1)}</span>}
-              <div><strong>{targetAuthor}</strong><span>{text(object.moderation_status) ? `账号状态：${text(object.moderation_status)}` : "账号状态：未记录"}{text(object.created_at) ? ` · 注册于 ${fmtDate(text(object.created_at))}` : ""}</span></div>
-            </div> : null}
-
-            {contentText ? <div className="admin-long-content">{contentText}</div> : <p className="admin-detail-empty">{isUser ? "该用户没有填写个人简介。" : "快照中没有可读取的文字内容。"}</p>}
-            {isPost && text(object.author_note) ? <section className="admin-author-note"><h3>作者的话</h3><p>{text(object.author_note)}</p></section> : null}
-
-            {images.length ? <div className="admin-detail-images">{images.map((url, index) => {
-              const unavailable = url.startsWith("private://");
-              return <figure key={`${url}-${index}`}>
-                {unavailable ? <div className="admin-image-unavailable"><strong>图片 {index + 1} 暂时无法显示</strong><span>原图已迁移或需要私有访问配置。</span></div> : <a href={url} target="_blank" rel="noreferrer" title="打开原图"><img src={url} alt={`被举报内容图片 ${index + 1}`} /></a>}
-                <figcaption>图片 {index + 1}</figcaption>
-              </figure>;
-            })}</div> : null}
-
-          {isComment ? <div className="admin-context-card"><span>评论所属作品</span><strong>{text(context.post_title) || "未知作品"}</strong><p>以下是被举报评论提交时的原文快照，作品后续修改不影响本证据。</p></div> : null}
-          </section>
-
           {operationRecord ? <section className="admin-detail-panel admin-operation-record-panel">
-            <div className="admin-panel-title-row"><h2>完整操作记录</h2><span>飞书 2.8 · 3.20 全量留痕</span></div>
+            <div className="admin-panel-title-row"><h2>案件处理记录</h2><span>只读，供复核</span></div>
+            <p className="admin-operation-record-intro">这里汇总举报接收、自动审核和管理员处置的历史记录，仅用于回溯与复核，不会直接执行操作。</p>
             <div className="admin-operation-record-grid">
               <div className="admin-operation-cell">
                 <h3>案件留痕</h3>
@@ -712,7 +900,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <div className="admin-operation-cell">
                 <h3>自动审核依据</h3>
                 <dl>
-                  <dt>自动风险</dt><dd>{text(recordCase.auto_review_risk) || "未触发"}</dd>
+                  <dt>自动风险</dt><dd>{autoRiskLabel(recordCase.auto_review_risk)}</dd>
                   <dt>风险分</dt><dd>{recordCase.risk_score == null ? "未记录" : String(recordCase.risk_score)}</dd>
                   <dt>规则版本</dt><dd>{text((recordCase.review_basis as Record<string, unknown> | undefined)?.rules_version) || "未记录"}</dd>
                   <dt>扫描时间</dt><dd>{fmtDateTime(text((recordCase.review_basis as Record<string, unknown> | undefined)?.scanned_at))}</dd>
@@ -732,7 +920,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                   <span>解除状态：{restrictionLiftInfo(record)}</span>
                 </div>)}</div></> : <p className="admin-detail-empty">没有确认违规或处罚记录。</p>}
               </div>
-              <div className="admin-operation-cell">
+              <div className="admin-operation-cell admin-operation-cell-wide">
                 <h3>资料整改 / 通知 / 审计</h3>
                 {recordProfileRevisions.length ? <div className="admin-operation-list">{recordProfileRevisions.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
                   <strong>{issueLabels[text(record.issue_type)] || text(record.issue_type)} · {revisionStatusLabels[text(record.status)] || text(record.status)}</strong>
@@ -750,43 +938,47 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               </div>
             </div>
           </section> : <section className="admin-detail-panel">
-            <div className="admin-panel-title-row"><h2>完整操作记录</h2><span>读取失败或尚未生成</span></div>
-            <p className="admin-detail-empty">该案件暂时没有可展示的完整操作记录，不影响其他证据查看。</p>
+            <div className="admin-panel-title-row"><h2>案件处理记录</h2><span>暂不可用</span></div>
+            <p className="admin-operation-record-intro">这里用于回溯举报接收、自动审核和管理员处置记录；当前暂未生成，不影响其他证据查看。</p>
+            <p className="admin-detail-empty">该案件暂时没有处理记录，不影响其他证据查看。</p>
           </section>}
 
           {isUser ? <>
             <section className="admin-detail-panel admin-user-detail-panel">
               <div className="admin-panel-title-row"><h2>账号资料</h2><span>实时 + 举报快照</span></div>
               <div className="admin-profile-compare">
-                <div className="admin-profile-compare-card">
+                <div className="admin-profile-compare-corner" aria-hidden="true" />
+                <div className="admin-profile-compare-column-head">
                   <h3>当前资料</h3>
                   <div className="admin-profile-compare-head">
                     {userDetail?.user.avatar_url ? <img src={userDetail.user.avatar_url} alt="当前头像" className="admin-user-avatar" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="admin-user-avatar admin-user-avatar-empty">{(userDetail?.user.nickname || targetAuthor).slice(0, 1)}</span>}
                     <strong>{userDetail?.user.nickname || targetAuthor}</strong>
                   </div>
-                  <dl>
-                    <dt>注册时间</dt><dd>{userDetail?.user.created_at ? fmtDateTime(userDetail.user.created_at) : "未记录"}</dd>
-                    <dt>账号状态</dt><dd>{userDetail?.user.moderation_status || "正常"}{userDetail?.user.moderated_at ? ` · ${fmtDateTime(userDetail.user.moderated_at)}` : ""}</dd>
-                    <dt>个人简介</dt><dd>{userDetail?.user.bio || "未填写"}</dd>
-                    <dt>当前功能限制</dt><dd>{userDetail?.stats.active_restrictions ? `${userDetail.stats.active_restrictions} 项生效中` : "无"}</dd>
-                  </dl>
                 </div>
-                <div className="admin-profile-compare-card is-snapshot">
+                <div className="admin-profile-compare-column-head is-snapshot">
                   <h3>举报时快照</h3>
                   <div className="admin-profile-compare-head">
                     {text(object.avatar_url) ? <img src={text(object.avatar_url)} alt="举报时头像" className="admin-user-avatar" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="admin-user-avatar admin-user-avatar-empty">{targetAuthor.slice(0, 1)}</span>}
                     <strong>{targetAuthor}</strong>
                   </div>
-                  <dl>
-                    <dt>快照时间</dt><dd>{snapshot?.captured_at ? fmtDateTime(snapshot.captured_at) : "未记录"}</dd>
-                    <dt>资料修改状态</dt><dd>{profileRevisions.some((item) => item.status === "submitted") ? "已提交修改，待确认" : profileRevisions.length ? "有历史整改记录" : "无"}</dd>
-                    <dt>简介快照</dt><dd>{text(object.bio) || "未填写"}</dd>
-                  </dl>
                 </div>
+                <span className="admin-profile-compare-row-label">时间</span>
+                <div className="admin-profile-compare-value"><small>注册时间</small><strong>{userDetail?.user.created_at ? fmtDateTime(userDetail.user.created_at) : "未记录"}</strong></div>
+                <div className="admin-profile-compare-value is-snapshot"><small>快照时间</small><strong>{snapshot?.captured_at ? fmtDateTime(snapshot.captured_at) : "未记录"}</strong></div>
+                <span className="admin-profile-compare-row-label">账号状态</span>
+                <div className="admin-profile-compare-value"><strong>{accountStatusLabel(userDetail?.user.moderation_status)}{userDetail?.user.moderated_at ? ` · ${fmtDateTime(userDetail.user.moderated_at)}` : ""}</strong></div>
+                <div className="admin-profile-compare-value is-snapshot"><strong>{accountStatusLabel(object.moderation_status)}</strong></div>
+                <span className="admin-profile-compare-row-label">个人简介</span>
+                <div className="admin-profile-compare-value"><strong>{userDetail?.user.bio || "未填写"}</strong></div>
+                <div className="admin-profile-compare-value is-snapshot"><strong>{text(object.bio) || "未填写"}</strong></div>
+                <span className="admin-profile-compare-row-label">功能限制</span>
+                <div className="admin-profile-compare-value"><strong>{userDetail?.stats.active_restrictions ? `${userDetail.stats.active_restrictions} 项生效中` : "无"}</strong></div>
+                <div className="admin-profile-compare-value is-snapshot"><strong>快照未记录</strong></div>
               </div>
 
               <div className="admin-detail-subsection">
                 <h3>资料修改记录</h3>
+                <p className="admin-profile-revision-intro">有记录时会显示修改项、具体内容、处理状态和申请／确认时间。</p>
                 {profileRevisions.length ? <div className="admin-history-list">{profileRevisions.map((item) => <div className="admin-history-item" key={item.id}>
                   <strong>{issueLabels[item.issue_type] || item.issue_type}{item.issue_detail ? ` · ${item.issue_detail}` : ""}</strong>
                   <span>状态：{revisionStatusLabels[item.status || ""] || item.status || "未知"} · 申请于 {item.created_at ? fmtDateTime(item.created_at) : "未知"}{item.confirmed_at ? ` · 确认于 ${fmtDateTime(item.confirmed_at)}` : ""}</span>
@@ -795,12 +987,12 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
 
               <div className="admin-system-marks">
                 <h3>系统自动标记</h3>
+                <p className="admin-system-marks-intro">系统根据举报来源、历史行为和自动审核生成的风险信号，用于排序和复核，不等于最终处罚结论。</p>
                 <div className="admin-mark-chips">
-                  <span className="admin-mark-chip is-warning">自动风险：{reportCase.auto_review_risk || "未触发"}</span>
+                  <span className="admin-mark-chip is-warning">自动风险：{autoRiskLabel(reportCase.auto_review_risk)}</span>
                   <span className={reportCase.risk_score && reportCase.risk_score >= 10 ? "admin-mark-chip is-danger" : "admin-mark-chip"}>风险分：{reportCase.risk_score ?? "未记录"}</span>
                   <span className={reportCase.suspicious_report ? "admin-mark-chip is-danger" : "admin-mark-chip is-ok"}>可疑举报：{reportCase.suspicious_report ? "是" : "否"}</span>
                   <span className={reportCase.low_quality_queue ? "admin-mark-chip is-warning" : "admin-mark-chip is-ok"}>低质量队列：{reportCase.low_quality_queue ? "是" : "否"}</span>
-                  <span className="admin-mark-chip">审核依据：{reviewBasisLabel(reportCase.review_basis)}</span>
                 </div>
               </div>
 
@@ -826,13 +1018,13 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               </div>
               <div className="admin-related-content">
                 <div>
-                  <h3>相关作品</h3>
+                  <h3>被举报用户的相关作品</h3>
                   <div className="admin-content-list">{recentPosts.length ? recentPosts.slice(0, 6).map((item) => <div className="admin-content-row" key={`post-${item.id}`}>
                     <strong>{item.title}</strong><span>{fmtDateTime(item.created_at)}</span>
                   </div>) : <p className="admin-detail-empty">没有相关作品。</p>}</div>
                 </div>
                 <div>
-                  <h3>相关评论</h3>
+                  <h3>被举报用户的相关评论</h3>
                   <div className="admin-content-list">{recentComments.length ? recentComments.slice(0, 6).map((item) => <div className="admin-content-row" key={`comment-${item.id}`}>
                     <strong>{item.title}</strong><span>{fmtDateTime(item.created_at)}</span>
                   </div>) : <p className="admin-detail-empty">没有相关评论。</p>}</div>
@@ -911,13 +1103,51 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         </article>
 
         <aside className="admin-review-action-column">
-          <section className="admin-detail-panel">
-            <h2>处理举报</h2>
-            <p>请先阅读左侧完整证据，再选择处理动作。</p>
-            <div className="admin-report-actions-column">
-              {actions.map((action) => <button className={action.danger ? "admin-detail-danger" : "admin-detail-secondary"} key={action.key} disabled={busy} onClick={() => openAction(action.key)}>{action.label}</button>)}
-            </div>
-            <small>用户举报支持 7 种处理结果；限制、暂停、封禁会先展示处罚确认信息。处理完成后，举报人收到统一受理通知。</small>
+          <section className={`admin-detail-panel ${isReadOnly ? "admin-readonly-decision" : ""}`}>
+            {isReadOnly ? <>
+              <div className="admin-panel-title-row"><h2>案件结果</h2><span>只读记录</span></div>
+              <div className="admin-report-readonly-result">{outcomeLabels[reportCase.outcome || ""] || statusLabels[reportCase.status] || "已处理"}</div>
+              <p>该举报案件已经处理完成，不提供再次处置。</p>
+            </> : <>
+            <h2>处置决定</h2>
+            <p>请先阅读左侧完整证据，再选择具体处置动作；需要填写原因的动作会在确认弹窗中展示通知预览。</p>
+            {isUser ? <div className="admin-governance-groups admin-report-governance-groups">
+              {userReportGovernanceGroups.map((group) => {
+                const groupActions = group.actions.map((key) => actions.find((action) => action.key === key)).filter((action): action is (typeof actions)[number] => Boolean(action));
+                if (!groupActions.length) return null;
+                return <div className={`admin-governance-group is-${group.tone}`} key={group.tone}>
+                  <div className="admin-governance-group-head">
+                    <div className="admin-governance-group-label"><span className="admin-governance-level">{group.level}</span><strong>{group.label}</strong></div>
+                    {group.description ? <span className="admin-governance-group-description">{group.description}</span> : null}
+                  </div>
+                  <div className="admin-report-actions-column">
+                    {groupActions.map((action) => <button className={`admin-governance-action is-${group.tone}`} type="button" key={action.key} disabled={busy} onClick={() => openAction(action.key)}>
+                      <span>{actionLabel(action)}</span>
+                      <small>{userReportActionDescriptions[action.key]}</small>
+                    </button>)}
+                  </div>
+                </div>;
+              })}
+            </div> : <div className="admin-governance-groups admin-report-governance-groups admin-content-report-governance-groups">
+              {contentReportGovernanceGroups.map((group) => {
+                const groupActions = group.actions.map((key) => actions.find((action) => action.key === key)).filter((action): action is (typeof actions)[number] => Boolean(action));
+                if (!groupActions.length) return null;
+                return <div className={`admin-governance-group is-${group.tone}`} key={group.tone}>
+                  <div className="admin-governance-group-head">
+                    <div className="admin-governance-group-label"><span className="admin-governance-level">{group.level}</span><strong>{group.label}</strong></div>
+                    {group.description ? <span className="admin-governance-group-description">{group.description}</span> : null}
+                  </div>
+                  <div className="admin-report-actions-column">
+                    {groupActions.map((action) => <button className={`admin-governance-action is-${group.tone}`} type="button" key={action.key} disabled={busy} onClick={() => openAction(action.key)}>
+                      <span>{actionLabel(action)}</span>
+                      <small>{contentReportActionDescriptions[action.key]}</small>
+                    </button>)}
+                  </div>
+                </div>;
+              })}
+            </div>}
+            <small>{isUser ? "用户举报已按“结论 → 提醒与整改 → 功能限制 → 暂停 → 永久封禁”分级；附加动作只标记举报人。处理完成后，举报人收到统一受理通知。" : "内容举报已按“结论 → 提醒 → 暂时隐藏 → 删除”分级；删除不可恢复，处理完成后举报人收到统一受理通知。"}</small>
+            </>}
           </section>
         </aside>
       </div>
@@ -933,20 +1163,33 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
           <div className="admin-field"><span className="admin-field-label">处理方式</span><div className="admin-warn-reason-options">{(["keep", "remind", "delete"] as const).map((item) => <button type="button" className={`admin-warn-reason-chip ${contentAction === item ? "is-selected" : ""}`} key={item} onClick={() => { setContentAction(item); setBanArmed(false); }}>{contentActionLabels[item]}</button>)}</div></div>
         </> : null}
 
+        {(pendingAction === "dismiss" || pendingAction === "remind" || pendingAction === "delete") ? <>
+          {reasonPresetField}
+          <label className="admin-field">{reasonFieldLabel}<input value={reason} onChange={(event) => { setReason(event.target.value); setReasonCustom(true); }} maxLength={500} placeholder="请选择上方常见原因，或自行填写" disabled={busy} /></label>
+        </> : null}
+
         {pendingAction === "profile_revision" ? <>
           <div className="admin-field"><span className="admin-field-label">需要修改的位置</span><div className="admin-warn-reason-options">{(Object.keys(issueLabels) as Array<"avatar" | "nickname" | "bio" | "external_link">).map((item) => <button type="button" className={`admin-warn-reason-chip ${issueType === item ? "is-selected" : ""}`} key={item} onClick={() => setIssueType(item)}>{issueLabels[item]}</button>)}</div></div>
-          <label className="admin-field">问题类型 / 修改原因<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="例如：包含不适宜内容" /></label>
+          {reasonPresetField}
+          <label className="admin-field">{reasonFieldLabel}<input value={reason} onChange={(event) => { setReason(event.target.value); setReasonCustom(true); }} maxLength={500} placeholder="请选择上方常见原因，或自行填写" disabled={busy} /></label>
           <label className="admin-field admin-toggle-row"><input type="checkbox" checked={hideProfile} onChange={(event) => setHideProfile(event.target.checked)} /><span>完成修改前暂时隐藏该资料</span></label>
         </> : null}
 
         {(pendingAction === "warn" || pendingAction === "restrict" || pendingAction === "suspend" || pendingAction === "ban") ? <>
           <div className="admin-confirm-account"><span className="admin-field-label">将处罚账号</span><strong>{targetAuthor}</strong><span className="admin-mono">{reportCase.target_user_id || reportCase.target_id}</span></div>
-          <label className="admin-field">处罚依据<input value={reason} onChange={(event) => { setReason(event.target.value); setBanArmed(false); }} maxLength={500} placeholder="该内容会写入通知并展示给用户" /></label>
+          {reasonPresetField}
+          <label className="admin-field">{reasonFieldLabel}<input value={reason} onChange={(event) => { setReason(event.target.value); setReasonCustom(true); setBanArmed(false); }} maxLength={500} placeholder="请选择上方常见依据，或自行填写" disabled={busy} /></label>
         </> : null}
 
-        {pendingAction === "mark_suspicious" ? <label className="admin-field">标记原因<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="例如：多次举报同一用户、证据明显不成立" /></label> : null}
+        {pendingAction === "mark_suspicious" ? <>
+          {reasonPresetField}
+          <label className="admin-field">{reasonFieldLabel}<input value={reason} onChange={(event) => { setReason(event.target.value); setReasonCustom(true); }} maxLength={500} placeholder="请选择上方常见依据，或自行填写" disabled={busy} /></label>
+        </> : null}
 
-        {pendingAction === "temporary_hide" ? <label className="admin-field">隐藏原因<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="例如：命中高风险关键词，等待人工复核" /></label> : null}
+        {pendingAction === "temporary_hide" ? <>
+          {reasonPresetField}
+          <label className="admin-field">{reasonFieldLabel}<input value={reason} onChange={(event) => { setReason(event.target.value); setReasonCustom(true); }} maxLength={500} placeholder="请选择上方常见原因，或自行填写" disabled={busy} /></label>
+        </> : null}
 
         {pendingAction === "restrict" ? <>
           <div className="admin-field"><span className="admin-field-label">限制功能</span><div className="admin-warn-reason-options">{(["profile_edit", "report", "interact"] as const).map((item) => <button type="button" className={`admin-warn-reason-chip ${restrictionTypes.includes(item) ? "is-selected" : ""}`} key={item} onClick={() => toggleRestrictionType(item)}>{restrictionLabels[item]}</button>)}</div></div>
@@ -986,6 +1229,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
       </form></div> : null}
 
       {success ? <div className="admin-toast" role="status">{success}</div> : null}
-    </main>
+      </div>
+    </AdminDetailFrame>
   );
 }

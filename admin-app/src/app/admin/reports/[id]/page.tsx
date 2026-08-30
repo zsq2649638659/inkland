@@ -23,6 +23,9 @@ type UserDetailPayload = {
     total_violations: number;
     deleted_items: number;
     active_restrictions: number;
+    published_posts_count?: number | null;
+    following_count?: number | null;
+    followers_count?: number | null;
   };
   recent_posts: Array<{
     id: string;
@@ -163,12 +166,15 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
   let targetReporterDetail: ReporterDetailPayload | null = null;
   let operationRecord: ReportOperationRecord | null = null;
   if (targetUserId && reportCase.target_type === "user") {
-    const [{ data: posts }, { data: comments }, userDetailResult, revisionResult, reporterDetailResult] = await Promise.all([
+    const [{ data: posts }, { data: comments }, userDetailResult, revisionResult, reporterDetailResult, publishedPostsCountResult, followingCountResult, followersCountResult] = await Promise.all([
       supabase.from("posts").select("id, title, content, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
       supabase.from("comments").select("id, content, created_at, post_id").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
       supabase.rpc("admin_user_detail", { p_user_id: targetUserId }),
       supabase.from("profile_revision_requests").select("id, case_id, issue_type, issue_detail, original_profile, hidden_fields, status, confirmed_by, confirmed_at, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
       supabase.rpc("admin_reporter_detail_v1", { p_user_id: targetUserId }),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", targetUserId).eq("status", "published"),
+      supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", targetUserId),
+      supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", targetUserId),
     ]);
     const postIds = [...new Set((comments || []).map((comment) => comment.post_id).filter((value): value is string => Boolean(value)))];
     const titleMap: Record<string, string> = {};
@@ -182,7 +188,15 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
       ...(comments || []).map((comment) => ({ id: comment.id, type: "comment" as const, title: `评论于《${titleMap[comment.post_id] || "未知作品"}》`, snippet: strip(comment.content || "").slice(0, 160), created_at: comment.created_at })),
     ].sort((a, b) => b.created_at.localeCompare(a.created_at));
     const ud = userDetailResult.data as UserDetailPayload | null;
-    userDetail = ud && ud.ok ? ud : null;
+    userDetail = ud && ud.ok ? {
+      ...ud,
+      stats: {
+        ...ud.stats,
+        published_posts_count: publishedPostsCountResult.error ? null : publishedPostsCountResult.count ?? 0,
+        following_count: followingCountResult.error ? null : followingCountResult.count ?? 0,
+        followers_count: followersCountResult.error ? null : followersCountResult.count ?? 0,
+      },
+    } : null;
     profileRevisions = (revisionResult.data || []) as ProfileRevisionRow[];
     const rd = reporterDetailResult.data as ReporterDetailPayload | null;
     targetReporterDetail = rd && rd.ok ? rd : null;
@@ -205,5 +219,6 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
     profileRevisions={profileRevisions as never}
     targetReporterDetail={targetReporterDetail as never}
     operationRecord={operationRecord as never}
+    adminInitial={user.email?.slice(0, 1).toUpperCase() || "A"}
   />;
 }

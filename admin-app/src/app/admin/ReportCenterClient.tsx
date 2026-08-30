@@ -1,20 +1,16 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 
-type ReportTab = "posts" | "comments" | "reporters" | "targetUsers";
-
-type FilterState = {
-  status: "all" | "pending" | "reviewing" | "kept" | "reminded" | "deleted" | "no_violation" | "content_case" | "profile_changes" | "warned" | "restricted" | "suspended" | "banned";
+type ReportPageKind = "post" | "comment" | "user";
+type ReportMode = "pending" | "history";
+type ReportFilterState = {
+  reason: string;
   priority: "all" | "normal" | "high" | "urgent";
-  suspicious: boolean;
-  serviceError: boolean;
-  multiReport: boolean;
-  lowQuality: boolean;
-  hidden: boolean;
-  query: string;
+  outcome: string;
+  sort: "latest" | "priority";
 };
 
 type ReportCenterCase = {
@@ -28,6 +24,9 @@ type ReportCenterCase = {
   outcome?: string | null;
   primary_reason_category?: string | null;
   report_count: number;
+  reporter_count?: number;
+  latest_reporter_id?: string | null;
+  latest_reporter_nickname?: string | null;
   first_reported_at: string;
   last_reported_at: string;
   created_at: string;
@@ -35,138 +34,94 @@ type ReportCenterCase = {
   target_title?: string;
   target_summary?: string;
   target_nickname?: string;
-  auto_review_risk?: string;
-  risk_score?: number;
-  suspicious_report?: boolean;
-  multi_report?: boolean;
-  service_error?: boolean;
-  low_quality_queue?: boolean;
-  hidden_for_review?: boolean;
-  reporter_anomalies?: string[];
-};
-
-type ReporterRiskRow = {
-  user_id: string;
-  nickname?: string | null;
-  avatar_url?: string | null;
-  moderation_status?: string;
-  created_at?: string | null;
-  total_reports: number;
-  pending_reports: number;
-  valid_reports: number;
-  invalid_reports: number;
-  duplicate_attempts: number;
-  reports_last_24h: number;
-  reports_last_30d: number;
-  report_restricted_until?: string | null;
-  low_quality?: boolean;
-  distinct_target_users?: number;
-  focused_target?: { target_user_id: string; nickname: string; count: number } | null;
-  risk_score?: number;
-  risk_level?: "normal" | "high" | "urgent";
-  suspicious_flags?: string[];
-};
-
-type TargetUserRow = {
-  user_id: string;
-  nickname?: string | null;
-  avatar_url?: string | null;
-  moderation_status?: string;
-  created_at?: string | null;
-  total_cases: number;
-  pending_cases: number;
-  recent30_cases: number;
-  recent90_cases: number;
-  recent_confirmed_violations: number;
-  active_violations: number;
-  deleted_items: number;
-  active_restrictions: number;
-  latest_case_at?: string | null;
-  latest_priority?: string | null;
-  risk_score?: number;
-  risk_level?: "normal" | "high" | "urgent";
+  snapshot_post_id?: string | null;
+  snapshot_post_title?: string | null;
 };
 
 type ReportCenterPayload = {
   success: boolean;
   cases: ReportCenterCase[];
-  reporters: ReporterRiskRow[];
-  targetUsers: TargetUserRow[];
+  reporters: unknown[];
+  targetUsers: unknown[];
   counts: Record<string, number>;
   filtered: { cases: number; reporters: number; target_users: number };
 };
 
-const defaultFilters = (): FilterState => ({ status: "all", priority: "all", suspicious: false, serviceError: false, multiReport: false, lowQuality: false, hidden: false, query: "" });
+type Props = { initialKind: ReportPageKind };
 
-const tabs: Array<{ key: ReportTab; label: string; hint: string }> = [
-  { key: "posts", label: "作品举报", hint: "被举报对象为作品" },
-  { key: "comments", label: "评论举报", hint: "被举报对象为评论" },
-  { key: "reporters", label: "举报者风险", hint: "按举报行为识别风险举报者" },
-  { key: "targetUsers", label: "被举报用户风险", hint: "近期案件与确认违规集中的用户" },
-];
-
-const statusLabels: Record<string, string> = {
-  pending: "待处理",
-  reviewing: "处理中",
-  kept: "已保留",
-  reminded: "已提醒",
-  deleted: "已删除",
+const PAGE_SIZE = 20;
+const defaultFilters = (): ReportFilterState => ({ reason: "all", priority: "all", outcome: "all", sort: "latest" });
+const priorityLabels: Record<string, string> = { normal: "一般", high: "中", urgent: "高" };
+const priorityRank: Record<string, number> = { normal: 1, high: 2, urgent: 3 };
+const outcomeLabels: Record<string, string> = {
+  kept: "保留内容",
+  reminded: "保留并提醒",
+  deleted: "删除并警告",
   no_violation: "举报不成立",
   content_case: "已转为内容案件",
   profile_changes: "已要求修改资料",
-  warned: "已警告",
+  warned: "警告并记录",
   restricted: "已限制功能",
-  suspended: "已暂停",
-  banned: "已永久封禁",
-  cancelled: "已取消",
-  resolved: "已处理",
+  suspended: "已暂停账号",
+  banned: "永久封禁账号",
 };
-const priorityLabels: Record<string, string> = { normal: "普通", high: "优先", urgent: "紧急" };
-const riskLabels: Record<string, string> = { normal: "正常", high: "高风险", urgent: "紧急风险" };
-const userStatusLabels: Record<string, string> = { active: "正常", warned: "已警告", restricted: "受限", suspended: "已暂停", banned: "已封禁" };
+const statusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", resolved: "已处置", cancelled: "已取消" };
 
-const fmt = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+const pageConfig: Record<ReportPageKind, { label: string; headers: string[] }> = {
+  post: { label: "作品举报", headers: ["案件", "作品", "作者", "举报原因", "最新举报人", "规模", "优先级 / 结论", "时间"] },
+  comment: { label: "评论举报", headers: ["案件", "原评论", "所属作品", "发布者", "举报原因", "最新举报人", "规模", "优先级 / 结论", "时间"] },
+  user: { label: "用户举报", headers: ["案件", "被举报人", "举报原因", "最新举报人", "规模", "优先级 / 结论", "时间"] },
+};
 
-function Icon({ name }: { name: "flag" | "search" | "check" | "users" }) {
-  const paths: Record<string, string> = {
-    flag: "M5 21V4m0 0c5-3 8 3 14 0v9c-6 3-9-3-14 0",
-    search: "m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z",
-    check: "m5 12 4 4L19 6",
-    users: "M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8a3 3 0 0 1 0 6M21 21v-2a4 4 0 0 0-3-3",
-  };
-  return <svg className="admin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
+function Icon({ name }: { name: "check" }) {
+  const path = name === "check" ? "m5 12 4 4L19 6" : "";
+  return <svg className="admin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
 }
 
-export default function ReportCenterClient() {
-  const [tab, setTab] = useState<ReportTab>("posts");
-  const [applied, setApplied] = useState<FilterState>(defaultFilters);
-  const [draft, setDraft] = useState<FilterState>(defaultFilters);
+function relativeTime(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  const now = new Date();
+  const start = (item: Date) => new Date(item.getFullYear(), item.getMonth(), item.getDate()).getTime();
+  const days = Math.round((start(now) - start(date)) / 86_400_000);
+  const time = date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  if (days === 0) return `今天 ${time}`;
+  if (days === 1) return `昨天 ${time}`;
+  if (days === 2) return `前天 ${time}`;
+  return `${date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })} ${time}`;
+}
+
+function CopyId({ value, copied, onCopy }: { value?: string | null; copied: string | null; onCopy: (value: string) => void }) {
+  if (!value) return null;
+  return <button className={`admin-report-id ${copied === value ? "is-copied" : ""}`} type="button" title={copied === value ? "已复制" : `复制 ${value}`} aria-label={`复制 ID ${value}`} onClick={(event) => { event.stopPropagation(); onCopy(value); }}>{value}</button>;
+}
+
+function CellText({ primary, secondary, copied, onCopy, className = "" }: { primary?: string | null; secondary?: string | null; copied: string | null; onCopy: (value: string) => void; className?: string }) {
+  return <div className={`admin-report-cell ${className}`}>
+    {primary ? <strong title={primary}>{primary}</strong> : <span className="admin-report-muted">—</span>}
+    {secondary ? <CopyId value={secondary} copied={copied} onCopy={onCopy} /> : null}
+  </div>;
+}
+
+export default function ReportCenterClient({ initialKind }: Props) {
+  const router = useRouter();
+  const config = pageConfig[initialKind];
+  const [mode, setMode] = useState<ReportMode>("pending");
+  const [filters, setFilters] = useState<ReportFilterState>(defaultFilters);
+  const [queryDraft, setQueryDraft] = useState("");
+  const [query, setQuery] = useState("");
   const [data, setData] = useState<ReportCenterPayload>({ success: true, cases: [], reporters: [], targetUsers: [], counts: {}, filtered: { cases: 0, reporters: 0, target_users: 0 } });
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    const params = new URLSearchParams();
-    if (tab === "posts" || tab === "comments") {
-      params.set("tab", "cases");
-      params.set("targetType", tab === "posts" ? "post" : "comment");
-      params.set("status", applied.status);
-      params.set("priority", applied.priority);
-    } else {
-      params.set("tab", tab === "reporters" ? "reporters" : "target_users");
-      params.set("targetType", "all");
-    }
-    if (applied.suspicious) params.set("suspicious", "1");
-    if (applied.serviceError) params.set("serviceError", "1");
-    if (applied.multiReport) params.set("multiReport", "1");
-    if (applied.lowQuality) params.set("lowQuality", "1");
-    if (applied.hidden) params.set("hidden", "1");
-    if (applied.query.trim()) params.set("q", applied.query.trim());
-    params.set("limit", "100");
-
+    const params = new URLSearchParams({ tab: "cases", targetType: initialKind, status: "all", priority: "all", limit: "200" });
+    if (query) params.set("q", query);
     fetchWithTimeout(`/api/admin/report-center?${params.toString()}`)
       .then(async (response) => {
         const payload = await response.json().catch(() => null) as (ReportCenterPayload & { error?: string }) | null;
@@ -177,140 +132,116 @@ export default function ReportCenterClient() {
           return;
         }
         setData(payload);
+        setPage(1);
       })
       .catch((reason: unknown) => {
         if (cancelled) return;
         setError(reason instanceof Error ? reason.message : "举报中心数据读取失败，请稍后重试。");
         setData({ success: true, cases: [], reporters: [], targetUsers: [], counts: {}, filtered: { cases: 0, reporters: 0, target_users: 0 } });
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [tab, applied]);
+  }, [initialKind, query]);
 
-  const switchTab = (key: ReportTab) => {
-    const next = defaultFilters();
-    setDraft(next);
-    setApplied(next);
-    setTab(key);
+  const pendingRows = useMemo(() => data.cases.filter((row) => row.status === "pending" || row.status === "reviewing"), [data.cases]);
+  const historyRows = useMemo(() => data.cases.filter((row) => row.status === "resolved" || row.status === "cancelled" || Boolean(row.outcome)), [data.cases]);
+  const sourceRows = mode === "pending" ? pendingRows : historyRows;
+  const reasons = useMemo(() => [...new Set(data.cases.map((row) => row.primary_reason_category).filter((value): value is string => Boolean(value)))], [data.cases]);
+  const outcomes = useMemo(() => [...new Set(historyRows.map((row) => row.outcome).filter((value): value is string => Boolean(value)))], [historyRows]);
+  const filteredRows = useMemo(() => {
+    const rows = sourceRows.filter((row) => {
+      const normalizedQuery = queryDraft.trim().toLowerCase();
+      const searchable = [
+        row.id,
+        row.target_id,
+        row.target_user_id,
+        row.target_title,
+        row.target_summary,
+        row.target_nickname,
+        row.primary_reason_category,
+        row.latest_reporter_id,
+        row.latest_reporter_nickname,
+        row.snapshot_post_id,
+        row.snapshot_post_title,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
+      const priority = row.effective_priority || row.priority || "normal";
+      if (filters.reason !== "all" && row.primary_reason_category !== filters.reason) return false;
+      if (mode === "pending" && filters.priority !== "all" && priority !== filters.priority) return false;
+      if (mode === "history" && filters.outcome !== "all" && row.outcome !== filters.outcome) return false;
+      return true;
+    });
+    return rows.sort((a, b) => {
+      if (mode === "pending" && filters.sort === "priority") {
+        const priorityDiff = (priorityRank[b.effective_priority || b.priority || "normal"] || 0) - (priorityRank[a.effective_priority || a.priority || "normal"] || 0);
+        if (priorityDiff) return priorityDiff;
+      }
+      return new Date(b.resolved_at || b.last_reported_at).getTime() - new Date(a.resolved_at || a.last_reported_at).getTime();
+    });
+  }, [filters, mode, queryDraft, sourceRows]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const visibleRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const updateFilters = (next: Partial<ReportFilterState>) => { setFilters((current) => ({ ...current, ...next })); setPage(1); };
+  const switchMode = (next: ReportMode) => { setMode(next); setPage(1); };
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setQuery(queryDraft.trim()); setPage(1); };
+  const copyId = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(value);
+      window.setTimeout(() => setCopied((current) => current === value ? null : current), 1400);
+    } catch {
+      setError("ID 复制失败，请手动选择复制。");
+    }
+  };
+  const openCase = (id: string) => router.push(`/admin/reports/${id}`);
+  const onRowKeyDown = (event: KeyboardEvent<HTMLDivElement>, id: string) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCase(id); } };
+
+  const renderPriorityOrOutcome = (row: ReportCenterCase) => mode === "history"
+    ? <span className="admin-report-outcome" title={outcomeLabels[row.outcome || ""] || statusLabels[row.status] || row.outcome || "已处置"}>{outcomeLabels[row.outcome || ""] || statusLabels[row.status] || row.outcome || "已处置"}</span>
+    : <span className={`admin-report-priority is-${row.effective_priority || row.priority || "normal"}`}>{priorityLabels[row.effective_priority || row.priority || "normal"] || "一般"}</span>;
+
+  const renderRow = (row: ReportCenterCase) => {
+    const reporter = row.latest_reporter_nickname || "举报人";
+    const reporterId = row.latest_reporter_id || null;
+    const reporterCount = row.reporter_count || 0;
+    const scale = row.report_count > 0 ? reporterCount > 1 ? `${reporterCount} 人 · ${row.report_count} 次` : `${row.report_count} 次` : "—";
+    const reason = row.primary_reason_category || "未填写原因";
+    const caseCell = <div className="admin-report-cell is-case"><CopyId value={row.id} copied={copied} onCopy={copyId} /></div>;
+    const reporterCell = <CellText primary={reporter} secondary={reporterId} copied={copied} onCopy={copyId} />;
+    const contentCell = initialKind === "post"
+      ? <CellText primary={row.target_title || "未知作品"} secondary={row.target_id} copied={copied} onCopy={copyId} />
+      : initialKind === "comment"
+        ? <CellText primary={row.target_summary || "评论内容已不存在"} secondary={row.target_id} copied={copied} onCopy={copyId} className="is-comment" />
+        : <CellText primary={row.target_nickname || row.target_title || "未知用户"} secondary={row.target_user_id || row.target_id} copied={copied} onCopy={copyId} />;
+    const cells = initialKind === "post"
+      ? [caseCell, contentCell, <CellText key="author" primary={row.target_nickname || "未知作者"} secondary={row.target_user_id} copied={copied} onCopy={copyId} />, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>]
+      : initialKind === "comment"
+        ? [caseCell, contentCell, <CellText key="work" primary={row.snapshot_post_title || row.target_title?.replace(/^评论于/, "") || "未知作品"} secondary={row.snapshot_post_id} copied={copied} onCopy={copyId} />, <CellText key="author" primary={row.target_nickname || "未知用户"} secondary={row.target_user_id} copied={copied} onCopy={copyId} />, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>]
+        : [caseCell, contentCell, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>];
+    return <div className="admin-report-table-row" role="button" tabIndex={0} key={row.id} onClick={() => openCase(row.id)} onKeyDown={(event) => onRowKeyDown(event, row.id)}>{cells.map((cell, index) => <div key={`${row.id}-${index}`}>{cell}</div>)}</div>;
   };
 
-  const applyFilters = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setApplied({ ...draft });
-  };
-
-  const currentTab = tabs.find((item) => item.key === tab) || tabs[0];
-  const rows = tab === "posts" || tab === "comments"
-    ? data.cases
-    : tab === "reporters"
-      ? data.reporters
-      : data.targetUsers;
-  const currentCount = tab === "posts" || tab === "comments"
-    ? data.filtered.cases
-    : tab === "reporters"
-      ? data.filtered.reporters
-      : data.filtered.target_users;
-
-  return <section className="admin-card admin-full-card">
-    <div className="admin-card-heading">
-      <div>
-        <div className="admin-heading-line"><span className="admin-section-dot dot-purple" /><h2>举报中心</h2><span className="admin-count-pill">{currentCount} 条</span></div>
-        <p>举报按对象和风险拆分为四个入口；同一对象的多条举报仍会合并为一个案件。</p>
+  return <section className="admin-report-page">
+    <div className="admin-report-list-tabs" role="tablist" aria-label={`${config.label}状态`}>
+      <button className={mode === "pending" ? "is-active" : ""} type="button" role="tab" aria-selected={mode === "pending"} onClick={() => switchMode("pending")}>待处理举报（{pendingRows.length}）</button>
+      <button className={mode === "history" ? "is-active" : ""} type="button" role="tab" aria-selected={mode === "history"} onClick={() => switchMode("history")}>举报记录（{historyRows.length}）</button>
+      {mode === "history" ? <span className="admin-report-view-note">只读举报记录，不提供再次处置</span> : null}
+      <form className="admin-report-search" onSubmit={submitSearch}><input value={queryDraft} onChange={(event) => setQueryDraft(event.target.value)} placeholder="搜索案件编号 / 标题 / 当事人 / ID" aria-label="搜索举报案件" maxLength={100} /></form>
+      {mode === "pending" ? <button className="admin-report-sort" type="button" onClick={() => updateFilters({ sort: filters.sort === "latest" ? "priority" : "latest" })}>{filters.sort === "latest" ? "按最新" : "按优先级"} ⇄</button> : null}
+    </div>
+    <div className="admin-report-filter-card">
+      <div className="admin-report-filter-groups">
+        <div className="admin-report-filter-group"><span>举报原因</span><div role="group" aria-label="举报原因"><button className={filters.reason === "all" ? "is-selected" : ""} type="button" onClick={() => updateFilters({ reason: "all" })}>全部</button>{reasons.map((reason) => <button className={filters.reason === reason ? "is-selected" : ""} type="button" key={reason} onClick={() => updateFilters({ reason })}>{reason}</button>)}</div></div>
+        {mode === "pending" ? <div className="admin-report-filter-group"><span>优先级</span><div role="group" aria-label="优先级"><button className={filters.priority === "all" ? "is-selected" : ""} type="button" onClick={() => updateFilters({ priority: "all" })}>全部</button>{(["urgent", "high", "normal"] as const).map((priority) => <button className={filters.priority === priority ? "is-selected" : ""} type="button" key={priority} onClick={() => updateFilters({ priority })}>{priorityLabels[priority]}</button>)}</div></div> : <div className="admin-report-filter-group"><span>处置结论</span><div role="group" aria-label="处置结论"><button className={filters.outcome === "all" ? "is-selected" : ""} type="button" onClick={() => updateFilters({ outcome: "all" })}>全部</button>{outcomes.map((outcome) => <button className={filters.outcome === outcome ? "is-selected" : ""} type="button" key={outcome} onClick={() => updateFilters({ outcome })}>{outcomeLabels[outcome] || outcome}</button>)}</div></div>}
       </div>
     </div>
-    <div className="admin-report-tabs" role="tablist" aria-label="举报中心分类">
-      {tabs.map((item) => <button
-        className={`admin-report-tab ${tab === item.key ? "is-active" : ""}`}
-        type="button"
-        role="tab"
-        aria-selected={tab === item.key}
-        key={item.key}
-        onClick={() => switchTab(item.key)}
-      ><span>{item.label}</span><small>{item.hint}</small></button>)}
-    </div>
-    <form className="admin-report-filters" onSubmit={applyFilters}>
-      {(tab === "posts" || tab === "comments") ? <>
-        <label className="admin-report-filter-field">处理状态<select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as FilterState["status"] })} disabled={loading}>
-          <option value="all">全部状态</option>
-          <option value="pending">待处理</option>
-          <option value="reviewing">处理中</option>
-          <option value="kept">已保留</option>
-          <option value="reminded">已提醒</option>
-          <option value="deleted">已删除</option>
-          <option value="no_violation">举报不成立</option>
-          <option value="content_case">已转为内容案件</option>
-          <option value="profile_changes">已要求修改资料</option>
-          <option value="warned">已警告</option>
-          <option value="restricted">已限制功能</option>
-          <option value="suspended">已暂停</option>
-          <option value="banned">已永久封禁</option>
-        </select></label>
-        <label className="admin-report-filter-field">优先级<select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as FilterState["priority"] })} disabled={loading}>
-          <option value="all">全部优先级</option>
-          <option value="normal">普通</option>
-          <option value="high">优先</option>
-          <option value="urgent">紧急</option>
-        </select></label>
-        <label className="admin-report-toggle"><input type="checkbox" checked={draft.multiReport} onChange={(event) => setDraft({ ...draft, multiReport: event.target.checked })} disabled={loading} /><span>多人集中举报</span></label>
-      </> : null}
-      <label className="admin-report-toggle"><input type="checkbox" checked={draft.suspicious} onChange={(event) => setDraft({ ...draft, suspicious: event.target.checked })} disabled={loading} /><span>疑似恶意举报</span></label>
-      {(tab === "posts" || tab === "comments") ? <label className="admin-report-toggle"><input type="checkbox" checked={draft.serviceError} onChange={(event) => setDraft({ ...draft, serviceError: event.target.checked })} disabled={loading} /><span>审核服务异常</span></label> : null}
-      {(tab === "posts" || tab === "comments") ? <label className="admin-report-toggle"><input type="checkbox" checked={draft.lowQuality} onChange={(event) => setDraft({ ...draft, lowQuality: event.target.checked })} disabled={loading} /><span>低质量队列</span></label> : null}
-      {(tab === "posts" || tab === "comments") ? <label className="admin-report-toggle"><input type="checkbox" checked={draft.hidden} onChange={(event) => setDraft({ ...draft, hidden: event.target.checked })} disabled={loading} /><span>暂时隐藏</span></label> : null}
-      <label className="admin-report-query">关键词<input value={draft.query} onChange={(event) => setDraft({ ...draft, query: event.target.value })} maxLength={100} placeholder="对象标题 / 原因 / ID" disabled={loading} /></label>
-      <button className="admin-btn admin-btn-primary" type="submit" disabled={loading}>{loading ? "查询中…" : "应用筛选"}</button>
-    </form>
     {error ? <div className="admin-alert admin-alert-error" role="alert">{error}</div> : null}
-    <div className="admin-queue-list">
-      {loading ? <div className="admin-empty"><strong>正在加载{currentTab.label}…</strong><span>读取举报中心数据。</span></div>
-        : rows.length === 0 ? <div className="admin-empty"><div className="admin-empty-icon"><Icon name="check" /></div><strong>没有符合条件的{currentTab.label}</strong><span>{applied.lowQuality && (tab === "posts" || tab === "comments") ? "当前没有低质量队列案件，可以取消该筛选后查看全部案件。" : "可以调整筛选条件后重新查询。"}</span></div>
-          : tab === "posts" || tab === "comments"
-            ? (rows as ReportCenterCase[]).map((row) => <div className="admin-queue-row" key={row.id}>
-              <div className="admin-queue-badge">{row.target_type === "post" ? "作品" : "评论"}</div>
-              <div className="admin-queue-main">
-                <strong>{row.target_title || "未知对象"}</strong>
-                <span>{row.primary_reason_category || "未填写原因"} · {row.report_count} 人举报 · 最近 {fmt(row.last_reported_at)}{row.target_nickname ? ` · ${row.target_nickname}` : ""}</span>
-                <div className="admin-queue-tags">
-                  <span className="admin-queue-tag">{statusLabels[row.status] || row.status || "未知"}</span>
-                  {(row.effective_priority || row.priority) !== "normal" ? <span className="admin-queue-tag is-danger">{(row.effective_priority || row.priority) === "urgent" ? "紧急" : "优先"}</span> : null}
-                  {row.multi_report ? <span className="admin-queue-tag">多人集中</span> : null}
-                  {row.suspicious_report ? <span className="admin-queue-tag is-danger">疑似恶意</span> : null}
-                  {row.service_error ? <span className="admin-queue-tag is-danger">服务异常</span> : null}
-                  {row.low_quality_queue ? <span className="admin-queue-tag">低质量队列</span> : null}
-                  {row.hidden_for_review ? <span className="admin-queue-tag is-danger">暂隐中</span> : null}
-                  {(row.reporter_anomalies || []).map((flag) => <span className="admin-queue-tag is-danger" key={flag}>{flag}</span>)}
-                </div>
-              </div>
-              <Link className="admin-btn admin-btn-primary" href={`/admin/reports/${row.id}`}>打开详情页</Link>
-            </div>)
-            : tab === "reporters"
-              ? (rows as ReporterRiskRow[]).map((row) => <div className="admin-queue-row" key={row.user_id}>
-                <span className="admin-user-avatar admin-user-avatar-empty">{(row.nickname || "用").slice(0, 1)}</span>
-                <div className="admin-queue-main">
-                  <strong>{row.nickname || "未命名用户"}<span className="admin-mono"> · {row.user_id.slice(0, 8)}</span></strong>
-                  <span>{userStatusLabels[row.moderation_status || ""] || row.moderation_status || "未知"} · 举报 {row.total_reports} · 成立 {row.valid_reports} · 不成立 {row.invalid_reports} · 24h {row.reports_last_24h} · 30天 {row.reports_last_30d}{row.focused_target ? ` · 集中举报 ${row.focused_target.nickname} ×${row.focused_target.count}` : ""}</span>
-                  <div className="admin-queue-tags">
-                    <span className={`admin-queue-tag ${row.risk_level === "urgent" ? "is-danger" : row.risk_level === "high" ? "is-danger" : ""}`}>{riskLabels[row.risk_level || "normal"] || "正常"}</span>
-                    {row.low_quality ? <span className="admin-queue-tag is-danger">低质量队列</span> : null}
-                    {(row.suspicious_flags || []).map((flag) => <span className="admin-queue-tag is-danger" key={flag}>{flag}</span>)}
-                  </div>
-                </div>
-                <Link className="admin-btn admin-btn-primary" href={`/admin/reporters/${row.user_id}`}>查看详情</Link>
-              </div>)
-              : (rows as TargetUserRow[]).map((row) => <div className="admin-queue-row" key={row.user_id}>
-                <span className="admin-user-avatar admin-user-avatar-empty">{(row.nickname || "用").slice(0, 1)}</span>
-                <div className="admin-queue-main">
-                  <strong>{row.nickname || "未命名用户"}<span className="admin-mono"> · {row.user_id.slice(0, 8)}</span></strong>
-                  <span>{userStatusLabels[row.moderation_status || ""] || row.moderation_status || "未知"} · 案件 {row.total_cases} · 待处理 {row.pending_cases} · 30天 {row.recent30_cases} · 确认违规 {row.recent_confirmed_violations} · 有效限制 {row.active_restrictions}</span>
-                  <div className="admin-queue-tags">
-                    <span className={`admin-queue-tag ${row.risk_level === "urgent" || row.risk_level === "high" ? "is-danger" : ""}`}>{riskLabels[row.risk_level || "normal"] || "正常"}</span>
-                    {row.latest_priority && row.latest_priority !== "normal" ? <span className="admin-queue-tag is-danger">{row.latest_priority === "urgent" ? "最近紧急案件" : "最近优先案件"}</span> : null}
-                  </div>
-                </div>
-                <Link className="admin-btn admin-btn-primary" href={`/admin/users/${row.user_id}`}>查看详情</Link>
-              </div>)}
+    <div className={`admin-report-table admin-report-table-${initialKind}`}>
+      <div className="admin-report-table-head">{config.headers.map((header) => <span key={header}>{header}</span>)}</div>
+      {loading ? <div className="admin-report-table-state"><strong>正在加载{config.label}…</strong><span>读取真实举报案件。</span></div> : visibleRows.length ? visibleRows.map(renderRow) : <div className="admin-report-table-state"><div className="admin-empty-icon"><Icon name="check" /></div><strong>当前筛选下暂无{config.label}</strong><span>{query || filters.reason !== "all" || (mode === "pending" ? filters.priority !== "all" : filters.outcome !== "all") ? "可以调整筛选条件后重新查询。" : "目前没有需要展示的真实举报案件。"}</span></div>}
     </div>
+    <div className="admin-report-pagination"><span>共 {filteredRows.length} 条 · 第 {Math.min(page, pageCount)} / {pageCount} 页</span><div><button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>上一页</button><button type="button" disabled={page >= pageCount || loading} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>下一页</button></div></div>
   </section>;
 }

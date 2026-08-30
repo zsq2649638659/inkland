@@ -448,7 +448,8 @@ function manualRangesIntersect(item: ManualFindingDraft, context: SelectionConte
 
 const makeClientId = () => `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-export default function ReviewDetailClient({ post, version, reviewCase, findings, historyCases, historyVersions, comparison, imageAccessError }: {
+export default function ReviewDetailClient({ pendingCount, post, version, reviewCase, findings, historyCases, historyVersions, comparison, imageAccessError }: {
+  pendingCount: number;
   post: Post;
   version: Version;
   reviewCase: ReviewCase;
@@ -458,6 +459,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   comparison?: PostComparison;
   imageAccessError?: string | null;
 }) {
+  const isReadOnly = !["pending", "reviewing", "service_error"].includes(reviewCase?.status || "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmApprove, setConfirmApprove] = useState(false);
@@ -471,6 +473,7 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
   const [selectionInfo, setSelectionInfo] = useState<SelectionInfo | null>(null);
   const [cancelMarkInfo, setCancelMarkInfo] = useState<{ clientId: string; x: number; y: number } | null>(null);
   const [rejectView, setRejectView] = useState<"issues" | "preview">("issues");
+  const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectPreviewLines, setRejectPreviewLines] = useState<Array<{ type: string; text: string }>>([]);
   const rejectPanelRef = useRef<HTMLElement | null>(null);
   const rejectBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -851,41 +854,289 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
 
   const screeningSources = (reviewCase?.screening_sources || []).map((source) => sourceLabel(source)).join("、") || "未记录";
   const imageFindingsByIndex = (index: number) => findings.filter((f) => (f.location_type === "image" || f.location_type === "image_ocr") && (f.image_index ?? 0) === index);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copyId = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value || "");
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 1600);
+    } catch {
+      // 剪贴板不可用时静默失败
+    }
+  };
 
   return (
-    <main className="admin-review-detail-page admin-detail-shell">
-      <header className="admin-detail-top">
-        <Link href="/admin?view=reviews" className="admin-back-link">← 返回作品审核</Link>
-        <span className="admin-detail-status">{statusLabels[reviewCase?.status || ""] || "待人工审核"}</span>
+    <div className="admin-app-shell">
+      <aside className="admin-sidebar">
+        <div className="admin-brand"><span className="admin-brand-mark"><svg viewBox="0 0 1535 857" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M253 848C278.56 726.64 291.64 598.27 319.94 477.94C340.59 390.11 383.9 316.25 462.37 268.37C590.46 190.21 798.39 207.91 841.07 374.94C866.81 475.66 796.07 590.94 900.35 663.66C1008.05 738.76 1144.21 668.58 1231.02 597.02C1258.43 574.42 1284.44 529.68 1325.43 542.57L1338.05 549.95L1490.94 845.01L1310.99 847L1230.02 689.9C1174.48 744.13 1114.63 795.5 1042.33 826.33C869.05 900.22 671.92 843.47 691.05 625.05C697.88 547.05 757.52 410.78 644.51 379.48C557.04 355.26 495.68 418.68 475.63 497.62C446.93 610.64 440.1 734.58 410 847.99H253V848Z"/><path d="M1185 0L1099.01 487.99L1346 240H1535C1443.66 336.03 1351.46 442.56 1251.02 529.02C1161.29 606.26 958.98 728.81 930.89 530.97L1025 0.01H1185V0Z"/><path d="M301 60L158 848H0L137 60H301Z"/></svg></span><span>Inkland 管理后台</span></div>
+        <div className="admin-nav-group"><p>后台功能</p><nav aria-label="后台主导航">
+          <Link className="admin-nav-item is-active" href="/admin?view=reviews"><span>作品审核</span>{pendingCount > 0 ? <b>{pendingCount}</b> : null}</Link>
+          <Link className="admin-nav-item" href="/admin?view=comments"><span>评论审核</span></Link>
+          <Link className="admin-nav-item" href="/admin?view=reportwork"><span>作品举报</span></Link>
+          <Link className="admin-nav-item" href="/admin?view=reportcomment"><span>评论举报</span></Link>
+          <Link className="admin-nav-item" href="/admin?view=reportuser"><span>用户举报</span></Link>
+          <Link className="admin-nav-item" href="/admin?view=users"><span>用户管理</span></Link>
+          <Link className="admin-nav-item" href="/admin?view=feedbacks"><span>用户反馈</span></Link>
+          <Link className="admin-nav-item" href="/admin?view=rules"><span>审核规则</span></Link>
+        </nav></div>
+        <div className="admin-sidebar-foot">Inkland 内容治理后台<br />设计稿 · uicraft</div>
+      </aside>
+      <main className="admin-main">
+        <header className="admin-topbar"><div className="admin-breadcrumb"><strong>管理后台 / 作品审核 / 详情</strong></div><div className="admin-top-actions"><button className="admin-btn admin-btn-light" type="button">全局搜索 <span className="admin-shortcut">⌘ K</span></button><button className="admin-btn admin-btn-light" type="button" onClick={() => window.location.reload()}>刷新</button><span className="admin-last-updated">上次更新 10:24</span><button className="admin-account-trigger" type="button">管理员 A <span aria-hidden="true">⌄</span></button></div></header>
+        <div className="admin-review-detail-page admin-detail-shell">
+      <header className="admin-detail-head">
+        <div className="admin-detail-nav">
+          <Link href="/admin?view=reviews" className="admin-btn admin-btn-light">← 返回作品审核</Link>
+          <span className="admin-detail-queue-label">{isReadOnly ? "历史审核记录 · 只读" : "当前作品审核详情"}</span>
+          <button className="admin-btn admin-btn-light" type="button" disabled>下一个作品 →</button>
+        </div>
+        <div className="admin-detail-title-line">
+          <span className={`admin-risk-pill${reviewCase?.priority === "high" ? " is-high" : ""}`}>
+            风险等级：{reviewCase?.priority === "high" ? "高" : "普通"}
+          </span>
+          <h1>
+            <MarkedText
+              text={version.title || "无标题"}
+              systemRanges={titleSystemRanges}
+              marks={titleManualMarks}
+              onManualMarkClick={isReadOnly ? undefined : handleManualMarkClick}
+              onManualMarkDoubleClick={isReadOnly ? undefined : handleManualMarkDoubleClick}
+              onSystemMarkClick={isReadOnly ? undefined : handleSystemMarkClick}
+            />
+          </h1>
+        </div>
+        <div className="admin-detail-meta-line">
+          <p className="admin-detail-meta">
+            {typeLabels[version.post_type || post.post_type || ""] || "作品"} · 作者 {post.author?.nickname || "未知作者"}
+            {version.post_type === "serial" && version.series_name ? ` · 连载《${version.series_name}》` : ""}
+            {version.post_type === "serial" && version.chapter_number != null ? ` · 第 ${version.chapter_number} 章` : ""}
+            {version.chapter_title ? ` · ${version.chapter_title}` : ""}
+            {" · "}{post.content_rating || "未评级"}
+            {" · "}第 {reviewCase?.submission_number || 1} 次入审
+            {" · "}{formatDate(version.submitted_at || version.created_at)}
+            {" · "}入审方式：{reviewCase?.route_reason || "自动命中"}（{screeningSources}）
+          </p>
+          <div className="admin-entity-ids">
+            <button type="button" className={`admin-copy-id${copiedKey === "post" ? " is-copied" : ""}`} title="点击复制作品 ID" onClick={() => void copyId("post", post.id)}>
+              {copiedKey === "post" ? "已复制作品 ID" : `作品 ${post.id}`}
+            </button>
+            <button type="button" className={`admin-copy-id${copiedKey === "user" ? " is-copied" : ""}`} title="点击复制作者 ID" onClick={() => void copyId("user", post.user_id || "")}>
+              {copiedKey === "user" ? "已复制作者 ID" : `作者 ${post.user_id || "—"}`}
+            </button>
+          </div>
+        </div>
       </header>
 
-      <div className="admin-review-heading">
-        <div className="admin-detail-kicker">
-          POST-PUBLISH REVIEW · {typeLabels[version.post_type || post.post_type || ""] || "作品"} · 冻结版本 v{version.version_number ?? 1}
-        </div>
-        <h1>
-          <MarkedText
-            text={version.title || "无标题"}
-            systemRanges={titleSystemRanges}
-            marks={titleManualMarks}
-            onManualMarkClick={handleManualMarkClick}
-            onManualMarkDoubleClick={handleManualMarkDoubleClick}
-            onSystemMarkClick={handleSystemMarkClick}
-          />
-        </h1>
-        <div className="admin-detail-meta">
-          作者：{post.author?.nickname || "未知作者"}
-          {version.post_type === "serial" && version.series_name ? ` · 连载《${version.series_name}》` : ""}
-          {version.post_type === "serial" && version.chapter_number != null ? ` · 第 ${version.chapter_number} 章` : ""}
-          {version.chapter_title ? ` · ${version.chapter_title}` : ""}
-          {" · "}{post.content_rating || "未评级"}
-          {" · "}第 {reviewCase?.submission_number || 1} 次提交
-          {" · "}提交于 {formatDate(version.submitted_at || version.created_at)}
-        </div>
-      </div>
-
       <div className="admin-review-layout">
-        <aside className="admin-review-summary-column">
+        <div className="admin-review-doc">
+          <section className="admin-detail-panel">
+            <div className="admin-panel-title-row">
+              <h2>送审原因</h2>
+            </div>
+            <div className="admin-evidence">
+              {reviewCase?.route_reason || "自动命中"}触发人工审核；审核来源：{screeningSources}；自动审核状态：{screeningStatusLabels[reviewCase?.screening_status || ""] || "—"}；规则/模型版本：{reviewCase?.rules_version || reviewCase?.model_version || "—"}。
+            </div>
+          </section>
+
+          <section className="admin-detail-panel">
+            <div className="admin-panel-title-row">
+              <h2>机审标记 · 人工核对</h2>
+              <span>{findings.length} 项</span>
+            </div>
+            {findings.length ? (
+              <div className="admin-finding-list admin-mark-list">
+                {findings.map((finding) => {
+                  const status = statusOf(finding);
+                  const confidence = ocrConfidence(finding);
+                  return (
+                    <div className={`admin-finding-item ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`} key={finding.id}>
+                      <div className="admin-finding-head">
+                        <strong>{locationTitle(finding)}</strong>
+                        <span className={`admin-finding-status ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`}>
+                          {findingStatusLabels[status] || "待确认"}
+                        </span>
+                      </div>
+                      <div className="admin-finding-tags">
+                        <span>{riskLabel(finding.category)}</span>
+                        <span className="is-source">{sourceLabel(finding.source)}</span>
+                        {confidence !== null && <span>OCR 置信度 {Math.round(confidence * 100)}%</span>}
+                      </div>
+                      {finding.quoted_text ? <blockquote>{finding.quoted_text}</blockquote> : null}
+                      {finding.details ? <small>{finding.details}</small> : null}
+                      {!isReadOnly ? (
+                        <div className="admin-finding-actions">
+                          <button className={status === "confirmed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleConfirm(finding)}>
+                            {status === "confirmed" ? "取消确认" : "确认"}
+                          </button>
+                          <button className={status === "dismissed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleDismiss(finding)}>
+                            {status === "dismissed" ? "取消忽略" : "忽略"}
+                          </button>
+                          <button className="is-muted" type="button" onClick={() => scrollTo(finding)}>定位</button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p>{isReadOnly ? "本次审核没有系统标记。" : "系统没有自动标记。可直接放行，或框选正文/点击图片添加人工标记。"}</p>
+            )}
+            {!isReadOnly && (manualFindings.length ? (
+              <div className="admin-finding-list admin-manual-list">
+                {manualFindings.map((item) => (
+                  <div className="admin-finding-item is-confirmed" key={item.clientId}>
+                    <div className="admin-finding-head">
+                      <strong>{manualFindingLabel(item)}</strong>
+                      <span className="admin-finding-status is-confirmed">已确认</span>
+                    </div>
+                    <div className="admin-finding-tags">
+                      <span className="is-source">管理员</span>
+                    </div>
+                    {item.quoted_text ? <blockquote>{item.quoted_text}</blockquote> : null}
+                    <div className="admin-finding-actions">
+                      <button className="is-muted" type="button" onClick={() => removeManualFinding(item.clientId)}>移除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="admin-manual-empty">还没有人工标记。框选正文文字试试，气泡会出现在选中文字上方。</div>
+            ))}
+          </section>
+
+          <section className="admin-detail-panel admin-snapshot">
+            <div className="admin-panel-title-row">
+              <h2>内容快照（冻结版本）</h2>
+              <span>v{version.version_number ?? 1}</span>
+            </div>
+            <section className="admin-evidence-document">
+              <div className="admin-document-label">FROZEN VERSION · 审核中固定版本</div>
+              <h2 id="field-title" data-mark-field="title" onMouseUp={handleDocumentMouseUp}>
+                <MarkedText
+                  text={version.title || "无标题"}
+                  systemRanges={titleSystemRanges}
+                  marks={titleManualMarks}
+                  onManualMarkClick={isReadOnly ? undefined : handleManualMarkClick}
+                  onManualMarkDoubleClick={isReadOnly ? undefined : handleManualMarkDoubleClick}
+                  onSystemMarkClick={isReadOnly ? undefined : handleSystemMarkClick}
+                />
+              </h2>
+              {imageAccessError ? <div className="admin-image-access-error" role="alert">{imageAccessError}</div> : null}
+
+              {paragraphs.length > 0 && (
+                <div className="admin-field-block" id="field-content">
+                  <h3>正文（{paragraphs.length} 段）</h3>
+                  {paragraphs.map((paragraph, index) => (
+                    <div className="admin-paragraph" id={`para-${index + 1}`} key={`para-${index + 1}`}>
+                      <span className="admin-paragraph-num">{index + 1}</span>
+                        <div className="admin-long-content" data-mark-field="content" data-mark-index={index + 1} onMouseUp={isReadOnly ? undefined : handleDocumentMouseUp}>
+                        <MarkedText
+                          text={paragraph}
+                          systemRanges={paragraphSystemRanges(index + 1, paragraph)}
+                          marks={paragraphManualMarks(index + 1)}
+                          onManualMarkClick={isReadOnly ? undefined : handleManualMarkClick}
+                          onManualMarkDoubleClick={isReadOnly ? undefined : handleManualMarkDoubleClick}
+                          onSystemMarkClick={isReadOnly ? undefined : handleSystemMarkClick}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {version.author_note ? (
+                <div className="admin-field-block" id="field-author-note">
+                  <h3>作者的话</h3>
+                  <div className="admin-long-content" data-mark-field="author_note" onMouseUp={handleDocumentMouseUp}>
+                    <MarkedText
+                      text={version.author_note}
+                      systemRanges={noteSystemRanges}
+                      marks={noteManualMarks}
+                      onManualMarkClick={isReadOnly ? undefined : handleManualMarkClick}
+                      onManualMarkDoubleClick={isReadOnly ? undefined : handleManualMarkDoubleClick}
+                      onSystemMarkClick={isReadOnly ? undefined : handleSystemMarkClick}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {imageUrls.length ? (
+                <div className="admin-field-block">
+                  <h3>全部图片（{imageUrls.length} 张）</h3>
+                  <div className="admin-detail-images">
+                    {imageUrls.map((url, index) => {
+                      const risks = imageFindingsByIndex(index);
+                      const unavailable = url.startsWith("private://") || brokenImages.includes(index);
+                      const ocrNotes = findings.filter((f) => f.location_type === "image_ocr" && (f.image_index ?? 0) === index);
+                      const isManuallyMarked = manualFindings.some((item) => item.field_name === "image" && (item.image_index ?? 0) === index);
+                      return (
+                        <figure
+                          key={`${url}-${index}`}
+                          id={`img-${index}`}
+                          className={[risks.length ? "is-flagged" : "", isManuallyMarked ? "is-manual-marked" : ""].filter(Boolean).join(" ")}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isManuallyMarked}
+                          title={isManuallyMarked ? "取消标记这张图片" : "标记这张图片"}
+                          onClick={() => toggleImageMark(index, url)}
+                          onKeyDown={toggleImageMarkKeyboard(index, url)}
+                        >
+                          <span className="admin-image-mark-badge">已标记</span>
+                          {unavailable ? (
+                            <div className="admin-image-unavailable">
+                              <strong>图片 {index + 1} 暂时无法显示</strong>
+                              <span>请检查后台私有图片访问配置后重新加载页面。</span>
+                            </div>
+                          ) : (
+                            <img
+                              src={url}
+                              alt={`作品图片 ${index + 1}${isManuallyMarked ? "（已人工标记）" : ""}`}
+                              onError={() => setBrokenImages((items) => items.includes(index) ? items : [...items, index])}
+                            />
+                          )}
+                          <figcaption>
+                            图片 {index + 1}
+                            {risks.length ? ` · 系统提示：${risks.filter((r) => r.location_type === "image").map((r) => riskLabel(r.category)).join("、") || "文字识别命中"}` : ""}
+                          </figcaption>
+                          {ocrNotes.length > 0 && (
+                            <div className="admin-ocr-note">
+                              {ocrNotes.map((note, noteIndex) => {
+                                const confidence = ocrConfidence(note);
+                                const ocrText = `图片文字：${note.quoted_text || "（无引用文本）"}${confidence !== null ? `（置信度 ${Math.round(confidence * 100)}%）` : ""}${note.details ? ` · ${note.details}` : ""}`;
+                                return (
+                                  <div
+                                    key={note.id}
+                                    className="admin-ocr-line"
+                                    data-mark-field="image_ocr"
+                                    data-mark-image-index={index}
+                                    data-mark-ocr-index={noteIndex}
+                                    onClick={(event) => event.stopPropagation()}
+                                    onMouseUp={isReadOnly ? undefined : handleDocumentMouseUp}
+                                  >
+                                    <MarkedText
+                                      text={ocrText}
+                                      marks={ocrManualMarks(index, noteIndex)}
+                                      onManualMarkClick={isReadOnly ? undefined : handleManualMarkClick}
+                                      onManualMarkDoubleClick={isReadOnly ? undefined : handleManualMarkDoubleClick}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </figure>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {!paragraphs.length && !imageUrls.length && !version.author_note ? (
+                <p className="admin-detail-empty">版本内容已不存在或无法读取。</p>
+              ) : null}
+            </section>
+          </section>
+
           {comparison?.available ? (
             <section className={`admin-detail-panel admin-repeat-comparison ${comparison.is_identical ? "is-identical" : "is-modified"}`}>
               <div className="admin-panel-title-row">
@@ -907,357 +1158,167 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
 
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row">
-              <h2>作品信息</h2>
-              <span>{reviewCase?.priority === "high" ? "高风险" : "普通"}</span>
+              <h2>审核轨迹</h2>
+              <span>{historyCases.length + historyVersions.length} 条</span>
+            </div>
+            {historyCases.length || historyVersions.length ? (
+              <ul className="admin-timeline">
+                {historyCases.map((item) => (
+                  <li key={item.id}>
+                    <b>{statusLabels[item.status || ""] || item.status || "已处理"} · 第 {item.submission_number || 1} 次提交</b>
+                    <span>{item.route_reason || "—"} · {formatDate(item.decided_at || item.created_at)}</span>
+                  </li>
+                ))}
+                {historyVersions.slice(0, 8).map((item) => (
+                  <li key={item.id}>
+                    <b>{item.title || "无标题"} · v{item.version_number ?? "?"}</b>
+                    <span>字数 {item.word_count ?? 0} · {formatDate(item.submitted_at || item.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>暂无审核轨迹。</p>
+            )}
+          </section>
+
+          <section className="admin-detail-panel admin-audit">
+            <div className="admin-panel-title-row">
+              <h2>审计元数据</h2>
+              <span>系统记录</span>
             </div>
             <dl>
-              <dt>作者</dt>
-              <dd>{post.author?.nickname || "未知作者"}</dd>
-              <dt>类型</dt>
-              <dd>{typeLabels[version.post_type || post.post_type || ""] || "作品"}</dd>
-              <dt>提交版本</dt>
-              <dd>v{version.version_number ?? 1} · 第 {reviewCase?.submission_number || 1} 次提交</dd>
-              <dt>评级</dt>
-              <dd>{post.content_rating || "未评级"}</dd>
-              <dt>审核状态</dt>
-              <dd>{statusLabels[reviewCase?.status || ""] || reviewCase?.status || "待人工审核"}</dd>
-              <dt>自动审核状态</dt>
-              <dd>{screeningStatusLabels[reviewCase?.screening_status || ""] || "—"}</dd>
-              <dt>触发来源</dt>
-              <dd>{reviewCase?.route_reason || "—"}</dd>
-              <dt>审核来源</dt>
-              <dd>{screeningSources}</dd>
-              <dt>规则/模型版本</dt>
-              <dd>{reviewCase?.rules_version || reviewCase?.model_version || "—"}</dd>
-              <dt>版本</dt>
-              <dd>v{version.version_number ?? 1} · 字数 {version.word_count ?? post.word_count ?? 0}</dd>
-              <dt>可见范围</dt>
-              <dd>{post.pending_visibility || version.visibility || "public"}</dd>
+              <div>
+                <dt>审核服务</dt>
+                <dd>{screeningSources}</dd>
+              </div>
+              <div>
+                <dt>模型版本</dt>
+                <dd>{reviewCase?.model_version || "—"}</dd>
+              </div>
+              <div>
+                <dt>规则版本</dt>
+                <dd>{reviewCase?.rules_version || "—"}</dd>
+              </div>
+              <div>
+                <dt>冻结版本</dt>
+                <dd>frozen-{(version.id || post.id || "").slice(-8)}</dd>
+              </div>
+              <div>
+                <dt>入审方式</dt>
+                <dd>{reviewCase?.route_reason || "自动命中"}（{screeningSources}）</dd>
+              </div>
+              <div>
+                <dt>提交编号</dt>
+                <dd>{reviewCase?.submission_number ?? "—"}</dd>
+              </div>
             </dl>
           </section>
+        </div>
 
-          <section className="admin-detail-panel">
+        <aside className="admin-review-decision">
+          {isReadOnly ? (
+            <section className="admin-detail-panel admin-decision-panel admin-readonly-decision">
+              <div className="admin-panel-title-row">
+                <h2>审核结果</h2>
+                <span>只读记录</span>
+              </div>
+              <div className="admin-readonly-result">{statusLabels[reviewCase?.status || ""] || "已处理"}</div>
+              <p>该审核已完成，当前记录仅供查看，不能再次处置。</p>
+            </section>
+          ) : (
+          <section className="admin-detail-panel admin-decision-panel" ref={rejectPanelRef}>
             <div className="admin-panel-title-row">
-              <h2>系统标记与风险</h2>
-              <span>{findings.length} 项</span>
+              <h2>审核决定</h2>
             </div>
-            <p>确认需要作者修改的标记；其余可以忽略。已确认标记会进入打回问题清单。</p>
-            {findings.length ? (
-              <div className="admin-finding-list">
-                {findings.map((finding) => {
-                  const status = statusOf(finding);
-                  const confidence = ocrConfidence(finding);
-                  return (
-                    <div className={`admin-finding-item ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`} key={finding.id}>
-                      <div className="admin-finding-head">
-                        <strong>{locationTitle(finding)}</strong>
-                        <span className={`admin-finding-status ${status === "confirmed" ? "is-confirmed" : status === "dismissed" ? "is-dismissed" : ""}`}>
-                          {findingStatusLabels[status] || "待确认"}
-                        </span>
-                      </div>
-                      <div className="admin-finding-tags">
-                        <span>{riskLabel(finding.category)}</span>
-                        <span className="is-source">{sourceLabel(finding.source)}</span>
-                        {confidence !== null && <span>OCR 置信度 {Math.round(confidence * 100)}%</span>}
-                      </div>
-                      {finding.quoted_text ? <blockquote>{finding.quoted_text}</blockquote> : null}
-                      {finding.details ? <small>{finding.details}</small> : null}
-                      <div className="admin-finding-actions">
-                        <button className={status === "confirmed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleConfirm(finding)}>
-                          {status === "confirmed" ? "取消确认" : "确认"}
-                        </button>
-                        <button className={status === "dismissed" ? "is-active" : ""} type="button" disabled={busy} onClick={() => toggleDismiss(finding)}>
-                          {status === "dismissed" ? "取消忽略" : "忽略"}
-                        </button>
-                        <button className="is-muted" type="button" onClick={() => scrollTo(finding)}>定位</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p>系统没有自动标记。可直接放行，或使用下方人工标记添加问题。</p>
-            )}
-          </section>
-
-          <section className="admin-detail-panel">
-            <div className="admin-panel-title-row">
-              <h2>添加人工标记</h2>
-              {manualFindings.length ? <span>{manualFindings.length} 项</span> : null}
-            </div>
-            <p>在中间作品内容里框选标题、正文、作者的话等文字，或直接点击图片进行标记；标记时无需选择问题类型。</p>
-            {manualFindings.length ? (
-              <div className="admin-finding-list admin-manual-findings">
-                {manualFindings.map((item) => (
-                  <div className="admin-finding-item is-confirmed" key={item.clientId}>
-                    <div className="admin-finding-head">
-                      <strong>{manualFindingLabel(item)}</strong>
-                      <span className="admin-finding-status is-confirmed">已确认</span>
-                    </div>
-                    <div className="admin-finding-tags">
-                      <span className="is-source">管理员</span>
-                    </div>
-                    {item.quoted_text ? <blockquote>{item.quoted_text}</blockquote> : null}
-                    <div className="admin-finding-actions">
-                      <button className="is-muted" type="button" onClick={() => removeManualFinding(item.clientId)}>移除</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="admin-manual-empty">还没有人工标记。框选正文文字试试，气泡会出现在选中文字上方。</div>
-            )}
-          </section>
-
-          <section className="admin-detail-panel">
-            <div className="admin-panel-title-row">
-              <h2>历史审核记录</h2>
-              <span>{historyCases.length} 条</span>
-            </div>
-            {historyCases.length ? (
-              <div className="admin-history-list">
-                {historyCases.map((item) => (
-                  <div className="admin-history-item" key={item.id}>
-                    <strong>{statusLabels[item.status || ""] || item.status || "已处理"} · 第 {item.submission_number || 1} 次提交</strong>
-                    <span>{item.route_reason || "—"} · {formatDate(item.decided_at || item.created_at)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p>暂无历史审核记录。</p>
-            )}
-            {historyVersions.length > 0 && (
-              <div className="admin-history-list" style={{ marginTop: 12 }}>
-                {historyVersions.slice(0, 8).map((item) => (
-                  <div className="admin-history-item" key={item.id}>
-                    <strong>{item.title || "无标题"} · v{item.version_number ?? "?"}</strong>
-                    <span>字数 {item.word_count ?? 0} · {formatDate(item.submitted_at || item.created_at)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </aside>
-
-        <article className="admin-detail-content admin-review-main">
-          <section className="admin-evidence-document">
-            <div className="admin-document-label">FROZEN VERSION · 审核中固定版本</div>
-            <h2 id="field-title" data-mark-field="title" onMouseUp={handleDocumentMouseUp}>
-              <MarkedText
-                text={version.title || "无标题"}
-                systemRanges={titleSystemRanges}
-                marks={titleManualMarks}
-                onManualMarkClick={handleManualMarkClick}
-                onManualMarkDoubleClick={handleManualMarkDoubleClick}
-                onSystemMarkClick={handleSystemMarkClick}
-              />
-            </h2>
-            {imageAccessError ? <div className="admin-image-access-error" role="alert">{imageAccessError}</div> : null}
-
-            {paragraphs.length > 0 && (
-              <div className="admin-field-block" id="field-content">
-                <h3>正文（{paragraphs.length} 段）</h3>
-                {paragraphs.map((paragraph, index) => (
-                  <div className="admin-paragraph" id={`para-${index + 1}`} key={`para-${index + 1}`}>
-                    <span className="admin-paragraph-num">{index + 1}</span>
-                    <div className="admin-long-content" data-mark-field="content" data-mark-index={index + 1} onMouseUp={handleDocumentMouseUp}>
-                      <MarkedText
-                        text={paragraph}
-                        systemRanges={paragraphSystemRanges(index + 1, paragraph)}
-                        marks={paragraphManualMarks(index + 1)}
-                        onManualMarkClick={handleManualMarkClick}
-                        onManualMarkDoubleClick={handleManualMarkDoubleClick}
-                        onSystemMarkClick={handleSystemMarkClick}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {version.author_note ? (
-              <div className="admin-field-block" id="field-author-note">
-                <h3>作者的话</h3>
-                <div className="admin-long-content" data-mark-field="author_note" onMouseUp={handleDocumentMouseUp}>
-                  <MarkedText
-                    text={version.author_note}
-                    systemRanges={noteSystemRanges}
-                    marks={noteManualMarks}
-                    onManualMarkClick={handleManualMarkClick}
-                    onManualMarkDoubleClick={handleManualMarkDoubleClick}
-                    onSystemMarkClick={handleSystemMarkClick}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            {imageUrls.length ? (
-              <div className="admin-field-block">
-                <h3>全部图片（{imageUrls.length} 张）</h3>
-                <div className="admin-detail-images">
-                  {imageUrls.map((url, index) => {
-                    const risks = imageFindingsByIndex(index);
-                    const unavailable = url.startsWith("private://") || brokenImages.includes(index);
-                    const ocrNotes = findings.filter((f) => f.location_type === "image_ocr" && (f.image_index ?? 0) === index);
-                    const isManuallyMarked = manualFindings.some((item) => item.field_name === "image" && (item.image_index ?? 0) === index);
-                    return (
-                      <figure
-                        key={`${url}-${index}`}
-                        id={`img-${index}`}
-                        className={[risks.length ? "is-flagged" : "", isManuallyMarked ? "is-manual-marked" : ""].filter(Boolean).join(" ")}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={isManuallyMarked}
-                        title={isManuallyMarked ? "取消标记这张图片" : "标记这张图片"}
-                        onClick={() => toggleImageMark(index, url)}
-                        onKeyDown={toggleImageMarkKeyboard(index, url)}
-                      >
-                        <span className="admin-image-mark-badge">已标记</span>
-                        {unavailable ? (
-                          <div className="admin-image-unavailable">
-                            <strong>图片 {index + 1} 暂时无法显示</strong>
-                            <span>请检查后台私有图片访问配置后重新加载页面。</span>
-                          </div>
-                        ) : (
-                          <img
-                            src={url}
-                            alt={`作品图片 ${index + 1}${isManuallyMarked ? "（已人工标记）" : ""}`}
-                            onError={() => setBrokenImages((items) => items.includes(index) ? items : [...items, index])}
-                          />
-                        )}
-                        <figcaption>
-                          图片 {index + 1}
-                          {risks.length ? ` · 系统提示：${risks.filter((r) => r.location_type === "image").map((r) => riskLabel(r.category)).join("、") || "文字识别命中"}` : ""}
-                        </figcaption>
-                        {ocrNotes.length > 0 && (
-                          <div className="admin-ocr-note">
-                            {ocrNotes.map((note, noteIndex) => {
-                              const confidence = ocrConfidence(note);
-                              const ocrText = `图片文字：${note.quoted_text || "（无引用文本）"}${confidence !== null ? `（置信度 ${Math.round(confidence * 100)}%）` : ""}${note.details ? ` · ${note.details}` : ""}`;
-                              return (
-                                <div
-                                  key={note.id}
-                                  className="admin-ocr-line"
-                                  data-mark-field="image_ocr"
-                                  data-mark-image-index={index}
-                                  data-mark-ocr-index={noteIndex}
-                                  onClick={(event) => event.stopPropagation()}
-                                  onMouseUp={handleDocumentMouseUp}
-                                >
-                                  <MarkedText
-                                    text={ocrText}
-                                    marks={ocrManualMarks(index, noteIndex)}
-                                    onManualMarkClick={handleManualMarkClick}
-                                    onManualMarkDoubleClick={handleManualMarkDoubleClick}
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </figure>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            {!paragraphs.length && !imageUrls.length && !version.author_note ? (
-              <p className="admin-detail-empty">版本内容已不存在或无法读取。</p>
-            ) : null}
-          </section>
-          {selectionInfo ? (
-            <div className="admin-mark-bubble" style={{ left: selectionInfo.x, top: selectionInfo.y }}>
-              <button type="button" onClick={markSelection}>标记</button>
-              <button type="button" disabled={!selectionInfo.alreadyMarked} onClick={cancelSelectionMarks}>取消标记</button>
-            </div>
-          ) : null}
-          {cancelMarkInfo ? (
-            <div className="admin-cancel-mark-bubble" style={{ left: cancelMarkInfo.x, top: cancelMarkInfo.y }}>
-              <span>取消这条人工标记？</span>
-              <button
-                type="button"
-                onClick={() => {
-                  removeManualFinding(cancelMarkInfo.clientId);
-                  setCancelMarkInfo(null);
-                }}
-              >
-                取消标记
-              </button>
-            </div>
-          ) : null}
-        </article>
-
-        <aside className="admin-review-action-column">
-          <section className="admin-detail-panel admin-reject-panel" ref={rejectPanelRef}>
-            <div className="admin-panel-title-row">
-              <h2>标记问题并打回</h2>
-              <span>人工标记 {manualFindings.length} 项</span>
-            </div>
-            <div className="admin-reject-issue-view" style={rejectView === "preview" ? { display: "none" } : undefined}>
-              <h3 className="admin-reject-section-title">问题类型（{selectedIssueTypes.length} 项）</h3>
-              <div className="admin-issue-buttons">
-                {issueTypes.map((issueType) => (
-                  <button
-                    key={issueType}
-                    type="button"
-                    disabled={busy}
-                    className={selectedIssueTypes.includes(issueType) ? "is-selected" : undefined}
-                    onClick={() => toggleIssueType(issueType)}
-                  >
-                    {issueType}
-                  </button>
-                ))}
-              </div>
-              <label className="admin-field">
-                打回说明（选填）
-                <textarea value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="补充需要作者修改的说明" maxLength={200} />
-              </label>
-              <div className="admin-reject-bottom">
-                <p className={`admin-reject-rule${canReject ? " is-ready" : ""}`}>{rejectRuleText}</p>
-                <button ref={rejectBtnRef} className="admin-detail-danger admin-reject-submit" type="button" disabled={busy || !canReject} onClick={openRejectPreview}>
-                  {busy ? "处理中…" : "标记问题并打回"}
-                </button>
-              </div>
-            </div>
-            <div className="admin-reject-preview" style={rejectView === "preview" ? undefined : { display: "none" }}>
-              <h3 className="admin-preview-title">打回内容预览（将发送给作者）</h3>
-              <div className="admin-preview-lines">
-                {rejectPreviewLines.slice(0, 4).map((line, index) => (
-                  <div className="admin-preview-line" key={`${line.type}-${index}`}>
-                    <span><b>[{line.type}]</b> {line.text}</span>
-                  </div>
-                ))}
-                {rejectPreviewLines.length > 4 ? (
-                  <div className="admin-preview-line admin-preview-more">
-                    <span>… 还有 {rejectPreviewLines.length - 4} 项（打回时将全部发送）</span>
-                  </div>
-                ) : null}
-              </div>
-              <div className="admin-reject-bottom admin-preview-actions-slot" ref={rejectPreviewSlotRef}>
-                <div className="admin-preview-actions">
-                  <button className="admin-preview-confirm" type="button" disabled={busy} onClick={confirmReject}>
-                    确认打回
-                  </button>
-                  <button className="admin-preview-cancel" type="button" disabled={busy} onClick={() => setRejectView("issues")}>
-                    返回修改
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="admin-detail-panel admin-approve-panel">
-            <h2>确认无违规</h2>
-            <p>仅在确认审核版本没有违规时放行。放行后作品将按冻结版本公开发布。</p>
-            <button className="admin-detail-secondary" type="button" disabled={busy} onClick={() => { setApproveError(""); setConfirmApprove(true); }}>
-              {busy ? "处理中…" : "确认无违规并放行"}
+            <button className="admin-decision-approve" type="button" disabled={busy} onClick={() => { setApproveError(""); setConfirmApprove(true); }}>
+              {busy ? "处理中…" : "放行（无问题）"}
             </button>
-          </section>
+            <button className="admin-decision-reject" type="button" disabled={busy} onClick={() => { setRejectOpen(true); setRejectView("issues"); }}>
+              退回作者修改…
+            </button>
 
-          {message ? <div className="admin-detail-message" role="status">{message}</div> : null}
+            {rejectOpen ? (
+              <div className="admin-reject-zone">
+                <div className="admin-reject-issue-view" style={rejectView === "preview" ? { display: "none" } : undefined}>
+                  <h3 className="admin-reject-section-title">问题类型（{selectedIssueTypes.length} 项）</h3>
+                  <div className="admin-issue-buttons">
+                    {issueTypes.map((issueType) => (
+                      <button
+                        key={issueType}
+                        type="button"
+                        disabled={busy}
+                        className={selectedIssueTypes.includes(issueType) ? "is-selected" : undefined}
+                        onClick={() => toggleIssueType(issueType)}
+                      >
+                        {issueType}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="admin-field">
+                    打回说明（选填）
+                    <textarea value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="补充需要作者修改的说明" maxLength={200} />
+                  </label>
+                  <div className="admin-reject-bottom">
+                    <p className={`admin-reject-rule${canReject ? " is-ready" : ""}`}>{rejectRuleText}</p>
+                    <button ref={rejectBtnRef} className="admin-detail-danger admin-reject-submit" type="button" disabled={busy || !canReject} onClick={openRejectPreview}>
+                      {busy ? "处理中…" : "生成打回预览"}
+                    </button>
+                  </div>
+                </div>
+                <div className="admin-reject-preview" style={rejectView === "preview" ? undefined : { display: "none" }}>
+                  <h3 className="admin-preview-title">打回内容预览（将发送给作者）</h3>
+                  <div className="admin-preview-lines">
+                    {rejectPreviewLines.slice(0, 4).map((line, index) => (
+                      <div className="admin-preview-line" key={`${line.type}-${index}`}>
+                        <span><b>[{line.type}]</b> {line.text}</span>
+                      </div>
+                    ))}
+                    {rejectPreviewLines.length > 4 ? (
+                      <div className="admin-preview-line admin-preview-more">
+                        <span>… 还有 {rejectPreviewLines.length - 4} 项（打回时将全部发送）</span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="admin-reject-bottom admin-preview-actions-slot" ref={rejectPreviewSlotRef}>
+                    <div className="admin-preview-actions">
+                      <button className="admin-preview-confirm" type="button" disabled={busy} onClick={confirmReject}>
+                        确认打回
+                      </button>
+                      <button className="admin-preview-cancel" type="button" disabled={busy} onClick={() => setRejectView("issues")}>
+                        返回修改
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {message ? <div className="admin-detail-message" role="status">{message}</div> : null}
+          </section>
+          )}
         </aside>
       </div>
+
+      {!isReadOnly && selectionInfo ? (
+        <div className="admin-mark-bubble" style={{ left: selectionInfo.x, top: selectionInfo.y }}>
+          <button type="button" onClick={markSelection}>标记</button>
+          <button type="button" disabled={!selectionInfo.alreadyMarked} onClick={cancelSelectionMarks}>取消标记</button>
+        </div>
+      ) : null}
+      {cancelMarkInfo ? (
+        <div className="admin-cancel-mark-bubble" style={{ left: cancelMarkInfo.x, top: cancelMarkInfo.y }}>
+          <span>取消这条人工标记？</span>
+          <button
+            type="button"
+            onClick={() => {
+              removeManualFinding(cancelMarkInfo.clientId);
+              setCancelMarkInfo(null);
+            }}
+          >
+            取消标记
+          </button>
+        </div>
+      ) : null}
 
       {confirmApprove ? (
         <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmApprove(false); }}>
@@ -1276,6 +1337,8 @@ export default function ReviewDetailClient({ post, version, reviewCase, findings
           </div>
         </div>
       ) : null}
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }

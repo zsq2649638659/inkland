@@ -1,12 +1,16 @@
 import { getAdminContext } from "@/lib/supabase/admin-server";
 
 const categories = new Set([
-  "广告与导流",
-  "诈骗与交易风险",
-  "人身攻击与骚扰",
-  "暴力与威胁",
-  "成人与不当内容",
-  "其他",
+  "政治敏感",
+  "淫秽色情",
+  "涉未成年人不良信息",
+  "低俗恶趣",
+  "暴力血腥",
+  "欺诈广告",
+  "人身攻击",
+  "恶意营销",
+  "抄袭信息",
+  "其他违规",
 ]);
 const MAX_BATCH_SIZE = 5000;
 const ERROR_STATUS: Record<string, number> = {
