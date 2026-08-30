@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
-import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
 type ReviewCase = {
   id: string; comment_id: string | null; post_id: string | null; author_id: string | null; parent_id: string | null; paragraph_index: number | null;

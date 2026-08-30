@@ -1,5 +1,5 @@
 import { getAdminContext } from "@/lib/supabase/admin-server";
-import { getModerationReasonAliases, MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
+import { getModerationReasonAliases, MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
 const categories = new Set<string>(MODERATION_REASON_OPTIONS);
 const riskLevels = new Set(["low", "medium", "high"]);

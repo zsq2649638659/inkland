@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminServiceClient, getAdminContext } from "@/lib/supabase/admin-server";
 import { healBrokenPrivateImageMarkers } from "@/lib/review-images";
-import { normalizeModerationReason } from "@shared/moderationReasons";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 
 type ManualFinding = {
   category?: string;

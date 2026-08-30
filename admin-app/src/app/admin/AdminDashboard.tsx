@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin-browser";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import ReportCenterClient from "./ReportCenterClient";
-import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
 type PostItem = { id: string; review_case_id: string; title: string; post_type: string | null; created_at: string; user_id: string; review_reason?: string | null; review_priority?: string | null; review_route_reason?: string | null; screening_status?: string | null; review_submission_number?: number | null; author?: { nickname?: string } | null };
 type ReportItem = {

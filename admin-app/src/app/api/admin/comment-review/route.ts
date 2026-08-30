@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminServiceClient, getAdminContext } from "@/lib/supabase/admin-server";
-import { normalizeModerationReason } from "@shared/moderationReasons";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 
 const actions = ["approve", "remind", "delete"] as const;
 type CommentReviewAction = (typeof actions)[number];

@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
-import { normalizeModerationReason } from "@shared/moderationReasons";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type RecentReportRow = {

@@ -1,5 +1,5 @@
 import { getAdminContext } from "@/lib/supabase/admin-server";
-import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
 const categories = new Set<string>(MODERATION_REASON_OPTIONS);
 const MAX_BATCH_SIZE = 5000;

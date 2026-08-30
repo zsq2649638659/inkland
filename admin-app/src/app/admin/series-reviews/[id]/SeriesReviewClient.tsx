@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
-import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
 const issueTypes = [...MODERATION_REASON_OPTIONS];
 const categoryLabels: Record<string, string> = { adult: "色情、淫秽与低俗", porn: "色情、淫秽与低俗" };

@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
-import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
 /* ==================== 类型 ==================== */
 

@@ -3,7 +3,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/adminFetch";
-import { normalizeModerationReason } from "@shared/moderationReasons";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 
 type ReportPageKind = "post" | "comment" | "user";
 type ReportMode = "pending" | "history";
