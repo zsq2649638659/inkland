@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   description: "一个干净、无广告、尊重阅读体验的同人创作社区。支持图文创作、标签搜索、段评互动。",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   alternates: { canonical: "/" },
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
   openGraph: {
     title: "inkland — 同人创作社区",
     description: "一个干净、无广告、尊重阅读体验的同人创作社区。",
