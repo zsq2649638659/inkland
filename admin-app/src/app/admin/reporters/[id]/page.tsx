@@ -32,5 +32,23 @@ export default async function ReporterDetailPage({ params }: { params: Promise<{
   }
   if (!detail.user) redirect("/admin?view=reportwork");
 
+  const { data: publicProfile } = await supabase.from("profiles").select("public_id").eq("id", id).maybeSingle();
+  const recentReports = Array.isArray(detail.recent_reports) ? detail.recent_reports : [];
+  const reportTargets = recentReports
+    .map((item) => ({ type: typeof item.target_type === "string" ? item.target_type : "", id: typeof item.target_id === "string" ? item.target_id : "" }))
+    .filter((item) => item.id);
+  const [{ data: targetPosts }, { data: targetComments }, { data: targetUsers }] = await Promise.all([
+    reportTargets.some((item) => item.type === "post") ? supabase.from("posts").select("id, public_id").in("id", reportTargets.filter((item) => item.type === "post").map((item) => item.id)) : Promise.resolve({ data: [] }),
+    reportTargets.some((item) => item.type === "comment") ? supabase.from("comments").select("id, public_id").in("id", reportTargets.filter((item) => item.type === "comment").map((item) => item.id)) : Promise.resolve({ data: [] }),
+    reportTargets.some((item) => item.type === "user") ? supabase.from("profiles").select("id, public_id").in("id", reportTargets.filter((item) => item.type === "user").map((item) => item.id)) : Promise.resolve({ data: [] }),
+  ]);
+  const targetPublicIdMap = new Map([
+    ...(targetPosts || []).map((item) => [item.id, item.public_id] as const),
+    ...(targetComments || []).map((item) => [item.id, item.public_id] as const),
+    ...(targetUsers || []).map((item) => [item.id, item.public_id] as const),
+  ]);
+  detail.user = { ...detail.user, public_id: publicProfile?.public_id || detail.user.public_id };
+  detail.recent_reports = recentReports.map((item) => ({ ...item, target_public_id: targetPublicIdMap.get(String(item.target_id || "")) || null }));
+
   return <ReporterDetailClient detail={detail as never} adminInitial={user.email?.slice(0, 1).toUpperCase() || "A"} />;
 }

@@ -4,6 +4,7 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import { normalizeModerationReason } from "@/lib/moderationReasons";
+import { displayPublicId } from "@/lib/publicIds";
 
 type ReportPageKind = "post" | "comment" | "user";
 type ReportMode = "pending" | "history";
@@ -16,9 +17,12 @@ type ReportFilterState = {
 
 type ReportCenterCase = {
   id: string;
+  public_id?: string | null;
   target_type: "post" | "comment" | "user";
   target_id: string;
+  target_public_id?: string | null;
   target_user_id?: string | null;
+  target_user_public_id?: string | null;
   status: string;
   priority: string;
   effective_priority?: string;
@@ -27,6 +31,7 @@ type ReportCenterCase = {
   report_count: number;
   reporter_count?: number;
   latest_reporter_id?: string | null;
+  latest_reporter_public_id?: string | null;
   latest_reporter_nickname?: string | null;
   first_reported_at: string;
   last_reported_at: string;
@@ -36,6 +41,7 @@ type ReportCenterCase = {
   target_summary?: string;
   target_nickname?: string;
   snapshot_post_id?: string | null;
+  snapshot_post_public_id?: string | null;
   snapshot_post_title?: string | null;
 };
 
@@ -160,9 +166,10 @@ export default function ReportCenterClient({ initialKind }: Props) {
     const rows = sourceRows.filter((row) => {
       const normalizedQuery = queryDraft.trim().toLowerCase();
       const searchable = [
-        row.id,
-        row.target_id,
-        row.target_user_id,
+      row.id,
+        displayPublicId(row.public_id, row.id),
+        displayPublicId(row.target_public_id, row.target_id),
+        displayPublicId(row.target_user_public_id, row.target_user_id),
         row.target_title,
         row.target_summary,
         row.target_nickname,
@@ -213,20 +220,21 @@ export default function ReportCenterClient({ initialKind }: Props) {
   const renderRow = (row: ReportCenterCase) => {
     const reporter = row.latest_reporter_nickname || "举报人";
     const reporterId = row.latest_reporter_id || null;
+    const reporterDisplayId = displayPublicId(row.latest_reporter_public_id, reporterId);
     const reporterCount = row.reporter_count || 0;
     const scale = row.report_count > 0 ? reporterCount > 1 ? `${reporterCount} 人 · ${row.report_count} 次` : `${row.report_count} 次` : "—";
     const reason = row.primary_reason_category || "未填写原因";
-    const caseCell = <div className="admin-report-cell is-case"><CopyId value={row.id} copied={copied} onCopy={copyId} /></div>;
-    const reporterCell = <CellText primary={reporter} secondary={reporterId} copied={copied} onCopy={copyId} />;
+    const caseCell = <div className="admin-report-cell is-case"><CopyId value={displayPublicId(row.public_id, row.id)} copied={copied} onCopy={copyId} /></div>;
+    const reporterCell = <CellText primary={reporter} secondary={reporterId ? reporterDisplayId : null} copied={copied} onCopy={copyId} />;
     const contentCell = initialKind === "post"
-      ? <CellText primary={row.target_title || "未知作品"} secondary={row.target_id} copied={copied} onCopy={copyId} />
+      ? <CellText primary={row.target_title || "未知作品"} secondary={displayPublicId(row.target_public_id, row.target_id)} copied={copied} onCopy={copyId} />
       : initialKind === "comment"
-        ? <CellText primary={row.target_summary || "评论内容已不存在"} secondary={row.target_id} copied={copied} onCopy={copyId} className="is-comment" />
-        : <CellText primary={row.target_nickname || row.target_title || "未知用户"} secondary={row.target_user_id || row.target_id} copied={copied} onCopy={copyId} />;
+        ? <CellText primary={row.target_summary || "评论内容已不存在"} secondary={displayPublicId(row.target_public_id, row.target_id)} copied={copied} onCopy={copyId} className="is-comment" />
+        : <CellText primary={row.target_nickname || row.target_title || "未知用户"} secondary={displayPublicId(row.target_public_id, row.target_id)} copied={copied} onCopy={copyId} />;
     const cells = initialKind === "post"
-      ? [caseCell, contentCell, <CellText key="author" primary={row.target_nickname || "未知作者"} secondary={row.target_user_id} copied={copied} onCopy={copyId} />, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>]
+      ? [caseCell, contentCell, <CellText key="author" primary={row.target_nickname || "未知作者"} secondary={displayPublicId(row.target_user_public_id, row.target_user_id)} copied={copied} onCopy={copyId} />, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>]
       : initialKind === "comment"
-        ? [caseCell, contentCell, <CellText key="work" primary={row.snapshot_post_title || row.target_title?.replace(/^评论于/, "") || "未知作品"} secondary={row.snapshot_post_id} copied={copied} onCopy={copyId} />, <CellText key="author" primary={row.target_nickname || "未知用户"} secondary={row.target_user_id} copied={copied} onCopy={copyId} />, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>]
+        ? [caseCell, contentCell, <CellText key="work" primary={row.snapshot_post_title || row.target_title?.replace(/^评论于/, "") || "未知作品"} secondary={displayPublicId(row.snapshot_post_public_id, row.snapshot_post_id)} copied={copied} onCopy={copyId} />, <CellText key="author" primary={row.target_nickname || "未知用户"} secondary={displayPublicId(row.target_user_public_id, row.target_user_id)} copied={copied} onCopy={copyId} />, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>]
         : [caseCell, contentCell, <span key="reason" className="admin-report-plain">{reason}</span>, reporterCell, <span key="scale" className="admin-report-plain">{scale}</span>, <span key="decision">{renderPriorityOrOutcome(row)}</span>, <span key="time" className="admin-report-plain">{relativeTime(mode === "history" ? row.resolved_at || row.last_reported_at : row.last_reported_at)}</span>];
     return <div className="admin-report-table-row" role="button" tabIndex={0} key={row.id} onClick={() => openCase(row.id)} onKeyDown={(event) => onRowKeyDown(event, row.id)}>{cells.map((cell, index) => <div key={`${row.id}-${index}`}>{cell}</div>)}</div>;
   };

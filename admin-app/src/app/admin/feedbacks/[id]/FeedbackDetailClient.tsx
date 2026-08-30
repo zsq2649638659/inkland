@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { displayPublicId } from "@/lib/publicIds";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type FeedbackRow = {
   id: string;
+  public_id?: string | null;
   type: string;
   content: string;
   status: string;
@@ -25,7 +27,7 @@ type AuditLog = {
 
 type Props = {
   feedback: FeedbackRow;
-  profile?: { id: string; nickname?: string | null } | null;
+  profile?: { id: string; public_id?: string | null; nickname?: string | null } | null;
   auditLogs: AuditLog[];
   adminInitial?: string;
 };
@@ -64,7 +66,9 @@ export default function FeedbackDetailClient({ feedback, profile, auditLogs, adm
   const isPending = feedback.status === "pending" || feedback.status === "reviewing";
   const statusLabel = statusLabels[feedback.status] || feedback.status;
   const typeLabel = feedbackTypeLabel(feedback.type);
-  const submitterLabel = profile?.nickname || `用户 ${feedback.user_id.slice(0, 8)}`;
+  const feedbackId = displayPublicId(feedback.public_id, feedback.id);
+  const userId = displayPublicId(profile?.public_id, feedback.user_id);
+  const submitterLabel = profile?.nickname || `用户 ${userId}`;
 
   const copyId = async (key: string, value: string) => {
     try {
@@ -127,8 +131,8 @@ export default function FeedbackDetailClient({ feedback, profile, auditLogs, adm
           <div className="admin-detail-meta-line">
             <p className="admin-detail-meta">由 {submitterLabel} 提交 · 提交于 {fullDate(feedback.created_at)}</p>
             <div className="admin-entity-ids">
-              <button type="button" className={`admin-copy-id${copiedId === "feedback" ? " is-copied" : ""}`} title="点击复制反馈 ID" onClick={() => void copyId("feedback", feedback.id)}>{copiedId === "feedback" ? "已复制反馈 ID" : `反馈 ${feedback.id}`}</button>
-              <button type="button" className={`admin-copy-id${copiedId === "user" ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyId("user", feedback.user_id)}>{copiedId === "user" ? "已复制用户 ID" : `用户 ${feedback.user_id}`}</button>
+              <button type="button" className={`admin-copy-id${copiedId === "feedback" ? " is-copied" : ""}`} title="点击复制反馈 ID" onClick={() => void copyId("feedback", feedbackId)}>{copiedId === "feedback" ? "已复制反馈 ID" : `反馈 ${feedbackId}`}</button>
+              <button type="button" className={`admin-copy-id${copiedId === "user" ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyId("user", userId)}>{copiedId === "user" ? "已复制用户 ID" : `用户 ${userId}`}</button>
             </div>
           </div>
         </div>
@@ -152,8 +156,8 @@ export default function FeedbackDetailClient({ feedback, profile, auditLogs, adm
               <div className="admin-panel-title-row"><h2>提交信息</h2><span>保留查询记录</span></div>
               <dl className="admin-feedback-detail-facts">
                 <dt>提交人</dt><dd>{profile?.nickname || "未读取到昵称"}</dd>
-                <dt>用户 ID</dt><dd className="admin-mono">{feedback.user_id}</dd>
-                <dt>反馈 ID</dt><dd className="admin-mono">{feedback.id}</dd>
+                <dt>用户 ID</dt><dd className="admin-mono">{userId}</dd>
+                <dt>反馈 ID</dt><dd className="admin-mono">{feedbackId}</dd>
                 <dt>首次提交</dt><dd>{fullDate(feedback.created_at)}</dd>
               </dl>
             </section>

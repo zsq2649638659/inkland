@@ -5,12 +5,14 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import { normalizeModerationReason } from "@/lib/moderationReasons";
+import { displayPublicId } from "@/lib/publicIds";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type RecentReportRow = {
   id: string;
   target_type?: string | null;
   target_id?: string | null;
+  target_public_id?: string | null;
   target_title?: string | null;
   target_nickname?: string | null;
   reason_category?: string | null;
@@ -52,6 +54,7 @@ type ReporterDetailPayload = {
   ok: boolean;
   user: {
     id: string;
+    public_id?: string | null;
     nickname?: string | null;
     avatar_url?: string | null;
     bio?: string | null;
@@ -115,7 +118,7 @@ export default function ReporterDetailClient({ detail, adminInitial = "A" }: { d
   const copyUserId = async () => {
     try {
       if (!navigator.clipboard) throw new Error("clipboard unavailable");
-      await navigator.clipboard.writeText(user.id);
+      await navigator.clipboard.writeText(displayPublicId(user.public_id, user.id));
       setCopiedId(true);
       setSuccess("已复制用户 ID");
       window.setTimeout(() => setCopiedId(false), 1500);
@@ -172,12 +175,12 @@ export default function ReporterDetailClient({ detail, adminInitial = "A" }: { d
           <span className="admin-reporter-risk-pill">{riskLabels[stats.risk_level || "normal"] || "正常"}</span>
           <h1>{user.nickname || "未命名用户"}</h1>
         </div>
-        <div className="admin-detail-meta-line">
+      <div className="admin-detail-meta-line">
           <p className="admin-detail-meta">
             举报者风险 · 注册于 {fullDate(user.created_at)} · 举报权限：{isRestricted ? `受限${detail.report_permission.restricted_until ? `至 ${dateText(detail.report_permission.restricted_until)}` : ""}` : "正常"}
             {user.moderated_at ? ` · 最近处置 ${fullDate(user.moderated_at)}` : ""}
           </p>
-          <div className="admin-entity-ids"><button type="button" className={`admin-copy-id${copiedId ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyUserId()}>{copiedId ? "已复制用户 ID" : `用户 ${user.id}`}</button></div>
+          <div className="admin-entity-ids"><button type="button" className={`admin-copy-id${copiedId ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyUserId()}>{copiedId ? "已复制用户 ID" : `用户 ${displayPublicId(user.public_id, user.id)}`}</button></div>
         </div>
       </div>
 
@@ -186,7 +189,7 @@ export default function ReporterDetailClient({ detail, adminInitial = "A" }: { d
           <section className="admin-detail-panel">
             <div className="admin-user-profile">
               {user.avatar_url ? <img src={user.avatar_url} alt="用户头像" className="admin-user-avatar" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span>}
-              <div><strong>{user.nickname || "未命名用户"}</strong><span>用户 ID</span><code className="admin-mono">{user.id}</code></div>
+              <div><strong>{user.nickname || "未命名用户"}</strong><span>用户 ID</span><code className="admin-mono">{displayPublicId(user.public_id, user.id)}</code></div>
             </div>
             {user.bio ? <p className="admin-user-bio">{user.bio}</p> : <p>该用户没有填写个人简介。</p>}
             {user.moderation_note ? <div className="admin-moderation-note"><strong>最近处置说明</strong><span>{user.moderation_note}</span></div> : null}
@@ -214,7 +217,7 @@ export default function ReporterDetailClient({ detail, adminInitial = "A" }: { d
               <strong>{targetTypeLabels[row.target_type || ""] || "内容"}举报 · {reportStatusLabels[row.status || ""] || row.status || "未知"}</strong>
               <span>{row.target_title || "未知对象"}{row.target_nickname ? ` · ${row.target_nickname}` : ""}</span>
               <small>{normalizeModerationReason(row.reason_category) || "未填写原因"}{row.details ? ` · ${row.details}` : ""}</small>
-              <small className="admin-mono">{dateText(row.created_at)} · 对象 ID {row.target_id || "—"}</small>
+              <small className="admin-mono">{dateText(row.created_at)} · 对象 ID {displayPublicId(row.target_public_id, row.target_id)}</small>
             </div>)}</div> : <p className="admin-detail-empty">该用户还没有举报记录。</p>}
           </section>
 

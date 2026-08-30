@@ -5,13 +5,17 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
+import { displayPublicId } from "@/lib/publicIds";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type CaseRow = {
   id: string;
+  public_id?: string | null;
   target_type: "post" | "comment" | "user";
   target_id: string;
+  target_public_id?: string | null;
   target_user_id?: string | null;
+  target_user_public_id?: string | null;
   status: string;
   priority: string;
   outcome?: string | null;
@@ -42,9 +46,10 @@ type SnapshotRow = {
 
 type ReportRow = {
   id: string;
+  public_id?: string | null;
   kind: "content" | "comment";
   reporter_id?: string | null;
-  reporter?: { nickname?: string | null } | null;
+  reporter?: { nickname?: string | null; public_id?: string | null } | null;
   reason?: string | null;
   reason_category?: string | null;
   details?: string | null;
@@ -56,6 +61,7 @@ type ReportRow = {
 
 type ViolationRow = {
   id: string;
+  public_id?: string | null;
   source_type: string;
   content_type?: string | null;
   category: string;
@@ -83,6 +89,7 @@ type UserDetailPayload = {
   ok: boolean;
   user: {
     id: string;
+    public_id?: string | null;
     nickname?: string | null;
     avatar_url?: string | null;
     bio?: string | null;
@@ -130,6 +137,7 @@ type ReporterDetailPayload = {
 
 type ProfileRevisionRow = {
   id: string;
+  public_id?: string | null;
   case_id?: string | null;
   issue_type: string;
   issue_detail?: string | null;
@@ -160,7 +168,7 @@ type Props = {
   reports: ReportRow[];
   violations: ViolationRow[];
   reporterStats: ReporterStatRow[];
-  userContent: Array<{ id: string; type: "post" | "comment"; title: string; snippet: string; created_at: string }>;
+  userContent: Array<{ id: string; public_id?: string | null; type: "post" | "comment"; title: string; snippet: string; created_at: string }>;
   userDetail: UserDetailPayload | null;
   profileRevisions: ProfileRevisionRow[];
   targetReporterDetail: ReporterDetailPayload | null;
@@ -374,6 +382,9 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
 
   const object = (snapshot?.object_snapshot || {}) as Record<string, unknown>;
   const context = (snapshot?.context_snapshot || {}) as Record<string, unknown>;
+  const reporterPublicIdMap = new Map(reports
+    .filter((report) => Boolean(report.reporter_id))
+    .map((report) => [report.reporter_id as string, report.reporter?.public_id || null] as const));
   const isPost = reportCase.target_type === "post";
   const isComment = reportCase.target_type === "comment";
   const isUser = reportCase.target_type === "user";
@@ -735,9 +746,11 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   const activeView = reportCase.target_type === "comment" ? "reportcomment" : reportCase.target_type === "user" ? "reportuser" : "reportwork";
   const detailLabel = `${targetLabels[reportCase.target_type] || "举报"}举报`;
   const overviewSubjectLabel = isPost ? "被举报作品" : isComment ? "被举报评论" : "被举报用户";
+  const caseDisplayId = displayPublicId(reportCase.public_id, reportCase.id);
+  const targetDisplayId = displayPublicId(reportCase.target_public_id, reportCase.target_id);
   const overviewSubjectName = isPost || isComment ? targetTitle : targetAuthor;
   const overviewOwnerLabel = isPost ? "作者" : "评论作者";
-  const overviewSubjectUserId = reportCase.target_user_id || snapshot?.author_id || "";
+  const overviewSubjectUserId = reportCase.target_user_public_id || reportCase.target_user_id || snapshot?.author_id || "";
   const overviewContentText = contentText
     ? `${contentText.slice(0, 180)}${contentText.length > 180 ? "…" : ""}`
     : isUser ? "未填写个人简介" : "快照中没有可读取的文字内容";
@@ -760,7 +773,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
           <div className="admin-detail-meta-line">
             <p className="admin-detail-meta">{detailLabel} · 已保存快照 · 最近举报：{fmtDateTime(reportCase.last_reported_at)} · 累计 {reportScale}</p>
             <div className="admin-entity-ids">
-              <button type="button" className={`admin-copy-id${copiedId === "case" ? " is-copied" : ""}`} title="点击复制案件 ID" onClick={() => void copyId("case", reportCase.id)}>{copiedId === "case" ? "已复制案件 ID" : `案件 ${reportCase.id}`}</button>
+              <button type="button" className={`admin-copy-id${copiedId === "case" ? " is-copied" : ""}`} title="点击复制案件 ID" onClick={() => void copyId("case", caseDisplayId)}>{copiedId === "case" ? "已复制案件 ID" : `案件 ${caseDisplayId}`}</button>
             </div>
           </div>
         </div>
@@ -779,7 +792,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                   </div>
                 </div>
                 <div className="admin-comment-overview-ids" aria-label="评论与用户 ID">
-                  <button type="button" className={`admin-copy-id${copiedId === "overview-target" ? " is-copied" : ""}`} title="点击复制对象 ID" onClick={() => void copyId("overview-target", reportCase.target_id)}>{copiedId === "overview-target" ? "已复制对象 ID" : `对象 ${reportCase.target_id}`}</button>
+                  <button type="button" className={`admin-copy-id${copiedId === "overview-target" ? " is-copied" : ""}`} title="点击复制对象 ID" onClick={() => void copyId("overview-target", targetDisplayId)}>{copiedId === "overview-target" ? "已复制对象 ID" : `对象 ${targetDisplayId}`}</button>
                   {overviewSubjectUserId ? <button type="button" className={`admin-copy-id${copiedId === "overview-user" ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyId("overview-user", overviewSubjectUserId)}>{copiedId === "overview-user" ? "已复制用户 ID" : `用户 ${overviewSubjectUserId}`}</button> : null}
                 </div>
               </div>
@@ -812,7 +825,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                     </div>}
                   </div>
                   <div className="admin-comment-overview-ids" aria-label="对象与用户 ID">
-                    <button type="button" className={`admin-copy-id${copiedId === "overview-target" ? " is-copied" : ""}`} title={`点击复制${isUser ? "用户" : "对象"} ID`} onClick={() => void copyId("overview-target", reportCase.target_id)}>{copiedId === "overview-target" ? `已复制${isUser ? "用户" : "对象"} ID` : `${isUser ? "用户" : "对象"} ${reportCase.target_id}`}</button>
+                    <button type="button" className={`admin-copy-id${copiedId === "overview-target" ? " is-copied" : ""}`} title={`点击复制${isUser ? "用户" : "对象"} ID`} onClick={() => void copyId("overview-target", targetDisplayId)}>{copiedId === "overview-target" ? `已复制${isUser ? "用户" : "对象"} ID` : `${isUser ? "用户" : "对象"} ${targetDisplayId}`}</button>
                     {!isUser && overviewSubjectUserId ? <button type="button" className={`admin-copy-id${copiedId === "overview-user" ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyId("overview-user", overviewSubjectUserId)}>{copiedId === "overview-user" ? "已复制用户 ID" : `用户 ${overviewSubjectUserId}`}</button> : null}
                   </div>
                 </div>
@@ -853,8 +866,9 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
             {reports.length ? <div className="admin-risk-list">{reports.map((report) => {
               const stat = reporterStats.find((item) => item.user_id === report.reporter_id);
               const reporterId = report.reporter_id;
+              const reporterDisplayId = displayPublicId(report.reporter?.public_id, reporterId);
               return <div className="admin-risk-item" key={report.id}>
-                <div className="admin-report-reporter-meta"><strong>{report.reporter?.nickname || "匿名用户"}</strong><code className="admin-mono">{reporterId || "未记录举报人 ID"}</code></div>
+                <div className="admin-report-reporter-meta"><strong>{report.reporter?.nickname || "匿名用户"}</strong><code className="admin-mono">{reporterId ? reporterDisplayId : "未记录举报人 ID"}</code></div>
                 <div className="admin-risk-tags"><span>{moderationReasonLabel(report.reason_category || report.reason)}</span><span>{reportStatusLabel(report.status)}</span></div>
                 {report.details && report.details !== report.reason ? <small>补充说明：{report.details}</small> : null}
                 <small>提交于 {fmtDateTime(report.created_at)}</small>
@@ -897,7 +911,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <div className="admin-operation-cell">
                 <h3>举报人记录</h3>
                 {recordReports.length ? <div className="admin-operation-list">{recordReports.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
-                  <strong>{index + 1}. {record.kind === "comment" ? "评论举报" : record.target_type === "post" ? "作品举报" : "用户举报"} · 举报人 {text(record.reporter_id).slice(0, 8)}</strong>
+                  <strong>{index + 1}. {record.kind === "comment" ? "评论举报" : record.target_type === "post" ? "作品举报" : "用户举报"} · 举报人 {displayPublicId(reporterPublicIdMap.get(text(record.reporter_id)) || text(record.reporter_public_id) || null, text(record.reporter_id))}</strong>
                   <span>理由：{moderationReasonLabel(record.reason_category || record.reason)}{text(record.details) && text(record.details) !== text(record.reason) ? ` · ${text(record.details)}` : ""}</span>
                   <span>提交 {fmtDateTime(text(record.created_at))}{record.resolved_at ? ` · 处理 ${fmtDateTime(text(record.resolved_at))}` : ""}</span>
                 </div>)}</div> : <p className="admin-detail-empty">没有举报人记录。</p>}
@@ -1162,7 +1176,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         {pendingAction === "convert_content" ? <>
           <div className="admin-field">
             <span className="admin-field-label">具体违规内容</span>
-            {userContent.length ? <div className="admin-warn-reason-options">{userContent.map((item) => <button type="button" className={`admin-warn-reason-chip ${contentTargetId === item.id ? "is-selected" : ""}`} key={item.id} onClick={() => { setContentTargetId(item.id); setContentTargetType(item.type); setBanArmed(false); }}>{item.type === "post" ? "作品" : "评论"} · {item.title}</button>)}</div> : <span className="admin-field-hint">没有找到该用户的近期作品或评论，请先在举报明细中补充证据。</span>}
+            {userContent.length ? <div className="admin-warn-reason-options">{userContent.map((item) => <button type="button" className={`admin-warn-reason-chip ${contentTargetId === item.id ? "is-selected" : ""}`} key={item.id} onClick={() => { setContentTargetId(item.id); setContentTargetType(item.type); setBanArmed(false); }}>{item.type === "post" ? "作品" : "评论"} · {item.title} · {displayPublicId(item.public_id, item.id)}</button>)}</div> : <span className="admin-field-hint">没有找到该用户的近期作品或评论，请先在举报明细中补充证据。</span>}
             {contentTargetId ? <small className="admin-content-snippet">{(userContent.find((item) => item.id === contentTargetId)?.snippet || "").slice(0, 120) || "该内容没有文字摘要。"}</small> : null}
           </div>
           <div className="admin-field"><span className="admin-field-label">处理方式</span><div className="admin-warn-reason-options">{(["keep", "remind", "delete"] as const).map((item) => <button type="button" className={`admin-warn-reason-chip ${contentAction === item ? "is-selected" : ""}`} key={item} onClick={() => { setContentAction(item); setBanArmed(false); }}>{contentActionLabels[item]}</button>)}</div></div>
@@ -1181,7 +1195,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
         </> : null}
 
         {(pendingAction === "warn" || pendingAction === "restrict" || pendingAction === "suspend" || pendingAction === "ban") ? <>
-          <div className="admin-confirm-account"><span className="admin-field-label">将处罚账号</span><strong>{targetAuthor}</strong><span className="admin-mono">{reportCase.target_user_id || reportCase.target_id}</span></div>
+              <div className="admin-confirm-account"><span className="admin-field-label">将处罚账号</span><strong>{targetAuthor}</strong><span className="admin-mono">{displayPublicId(reportCase.target_user_public_id, reportCase.target_user_id || reportCase.target_id)}</span></div>
           {reasonPresetField}
           <label className="admin-field">{reasonFieldLabel}<input value={reason} onChange={(event) => { setReason(event.target.value); setReasonCustom(true); setBanArmed(false); }} maxLength={500} placeholder="请选择上方常见依据，或自行填写" disabled={busy} /></label>
         </> : null}

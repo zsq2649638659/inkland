@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const users = (Array.isArray(result.users) ? result.users : []) as Array<Record<string, unknown> & { id: string; created_at?: string | null }>;
   const ids = users.map((item) => item.id).filter(Boolean);
   const [{ data: profiles }, { data: reporterStats }] = await Promise.all([
-    ids.length ? supabase.from("profiles").select("id, moderation_note, moderated_at").in("id", ids) : Promise.resolve({ data: [] }),
+    ids.length ? supabase.from("profiles").select("id, public_id, moderation_note, moderated_at").in("id", ids) : Promise.resolve({ data: [] }),
     ids.length ? supabase.from("user_reporter_stats").select("user_id, total_reports, last_report_at").in("user_id", ids) : Promise.resolve({ data: [] }),
   ]);
   const profileMap = new Map((profiles || []).map((item) => [item.id, item]));

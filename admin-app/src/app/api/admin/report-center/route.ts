@@ -55,19 +55,22 @@ export async function GET(request: Request) {
 
   const cases = Array.isArray(result.cases) ? result.cases as Array<Record<string, unknown>> : [];
   const caseIds = cases.map((item) => typeof item.id === "string" ? item.id : "").filter(Boolean);
-  const [contentReportsResult, commentReportsResult, snapshotsResult] = await Promise.all([
+  const [{ data: caseDetails }, contentReportsResult, commentReportsResult, snapshotsResult] = await Promise.all([
     caseIds.length
-      ? supabase.from("content_reports").select("case_id, reporter_id, created_at, reporter:profiles!content_reports_reporter_id_fkey(nickname)").in("case_id", caseIds).order("created_at", { ascending: true })
+      ? supabase.from("moderation_report_cases").select("id, public_id, target_type, target_id, target_user_id").in("id", caseIds)
       : Promise.resolve({ data: [], error: null }),
     caseIds.length
-      ? supabase.from("comment_reports").select("case_id, reporter_id, created_at, reporter:profiles!comment_reports_reporter_id_fkey(nickname)").in("case_id", caseIds).order("created_at", { ascending: true })
+      ? supabase.from("content_reports").select("case_id, reporter_id, created_at, reporter:profiles!content_reports_reporter_id_fkey(nickname, public_id)").in("case_id", caseIds).order("created_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    caseIds.length
+      ? supabase.from("comment_reports").select("case_id, reporter_id, created_at, reporter:profiles!comment_reports_reporter_id_fkey(nickname, public_id)").in("case_id", caseIds).order("created_at", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
     caseIds.length
       ? supabase.from("moderation_report_snapshots").select("case_id, post_id, context_snapshot").in("case_id", caseIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  type ReportDetail = { case_id?: string | null; reporter_id?: string | null; created_at?: string | null; reporter?: { nickname?: string | null } | Array<{ nickname?: string | null }> | null };
+  type ReportDetail = { case_id?: string | null; reporter_id?: string | null; created_at?: string | null; reporter?: { nickname?: string | null; public_id?: string | null } | Array<{ nickname?: string | null; public_id?: string | null }> | null };
   const latestReportByCase = new Map<string, { reporterId: string | null; reporterNickname: string | null; reporterCount: number; latestTime: number }>();
   const reportsByCase = new Map<string, Set<string>>();
   for (const report of [...(contentReportsResult.data || []), ...(commentReportsResult.data || [])] as ReportDetail[]) {
@@ -94,18 +97,54 @@ export async function GET(request: Request) {
     snapshotByCase.set(snapshot.case_id, { postId: snapshot.post_id || null, postTitle: title });
   }
 
+  const caseDetailMap = new Map((caseDetails || []).map((item) => [item.id, item]));
+  const snapshotPostIds = [...new Set([...snapshotByCase.values()].map((item) => item.postId).filter((value): value is string => Boolean(value)))];
+  const targetIdsByType = {
+    post: [...new Set([
+      ...(caseDetails || []).filter((item) => item.target_type === "post").map((item) => item.target_id),
+      ...snapshotPostIds,
+    ])],
+    comment: (caseDetails || []).filter((item) => item.target_type === "comment").map((item) => item.target_id),
+    user: (caseDetails || []).filter((item) => item.target_type === "user").map((item) => item.target_id),
+  };
+  const targetUserIds = [...new Set((caseDetails || []).map((item) => item.target_user_id).filter((value): value is string => Boolean(value)))];
+  const [{ data: targetPosts }, { data: targetComments }, { data: targetUsers }, { data: targetUserProfiles }] = await Promise.all([
+    targetIdsByType.post.length ? supabase.from("posts").select("id, public_id").in("id", targetIdsByType.post) : Promise.resolve({ data: [] }),
+    targetIdsByType.comment.length ? supabase.from("comments").select("id, public_id").in("id", targetIdsByType.comment) : Promise.resolve({ data: [] }),
+    targetIdsByType.user.length ? supabase.from("profiles").select("id, public_id").in("id", targetIdsByType.user) : Promise.resolve({ data: [] }),
+    targetUserIds.length ? supabase.from("profiles").select("id, public_id").in("id", targetUserIds) : Promise.resolve({ data: [] }),
+  ]);
+  const targetPublicIdMap = new Map([
+    ...(targetPosts || []).map((item) => [item.id, item.public_id] as const),
+    ...(targetComments || []).map((item) => [item.id, item.public_id] as const),
+    ...(targetUsers || []).map((item) => [item.id, item.public_id] as const),
+    ...(targetUserProfiles || []).map((item) => [item.id, item.public_id] as const),
+  ]);
   const enrichedCases = cases.map((item) => {
     const caseId = typeof item.id === "string" ? item.id : "";
     const reporter = latestReportByCase.get(caseId);
     const snapshot = snapshotByCase.get(caseId);
+    const detail = caseDetailMap.get(caseId);
+    const nestedReporter = reporter?.reporterId
+      ? [...(contentReportsResult.data || []), ...(commentReportsResult.data || [])].find((row) => row.reporter_id === reporter.reporterId)?.reporter
+      : null;
+    const reporterProfile = Array.isArray(nestedReporter) ? nestedReporter[0] : nestedReporter;
     return {
       ...item,
+      public_id: item.public_id || detail?.public_id || null,
+      target_public_id: targetPublicIdMap.get(String(item.target_id || detail?.target_id || "")) || null,
+      target_user_public_id: (detail?.target_user_id || String(item.target_user_id || "")) ? targetPublicIdMap.get(detail?.target_user_id || String(item.target_user_id || "")) || null : null,
       ...(reporter ? {
         reporter_count: reporter.reporterCount,
         latest_reporter_id: reporter.reporterId,
         latest_reporter_nickname: reporter.reporterNickname,
+        latest_reporter_public_id: reporterProfile?.public_id || null,
       } : {}),
-      ...(snapshot ? { snapshot_post_id: snapshot.postId, snapshot_post_title: snapshot.postTitle } : {}),
+      ...(snapshot ? {
+        snapshot_post_id: snapshot.postId,
+        snapshot_post_public_id: snapshot.postId ? targetPublicIdMap.get(snapshot.postId) || null : null,
+        snapshot_post_title: snapshot.postTitle,
+      } : {}),
     };
   });
   return NextResponse.json({

@@ -8,6 +8,7 @@ type UserDetailPayload = {
   ok: boolean;
   user: {
     id: string;
+    public_id?: string | null;
     nickname?: string | null;
     avatar_url?: string | null;
     bio?: string | null;
@@ -29,6 +30,7 @@ type UserDetailPayload = {
   };
   recent_posts: Array<{
     id: string;
+    public_id?: string | null;
     title?: string | null;
     post_type?: string | null;
     status?: string | null;
@@ -39,6 +41,7 @@ type UserDetailPayload = {
   }>;
   recent_comments: Array<{
     id: string;
+    public_id?: string | null;
     post_id?: string | null;
     parent_id?: string | null;
     content?: string | null;
@@ -46,6 +49,7 @@ type UserDetailPayload = {
   }>;
   violations: Array<{
     id: string;
+    public_id?: string | null;
     source_type?: string | null;
     content_type?: string | null;
     category?: string | null;
@@ -86,6 +90,7 @@ type ReporterDetailPayload = {
 
 type ProfileRevisionRow = {
   id: string;
+  public_id?: string | null;
   case_id?: string | null;
   issue_type: string;
   issue_detail?: string | null;
@@ -116,10 +121,10 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
   if (!user) redirect("/admin/login");
 
   const [{ data: reportCase }, { data: snapshot }, contentReportsResult, commentReportsResult] = await Promise.all([
-    supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at, resolved_by, resolved_at, metadata, auto_review_risk, risk_score, suspicious_report, low_quality_queue, hidden_for_review, review_basis").eq("id", id).maybeSingle(),
+    supabase.from("moderation_report_cases").select("id, public_id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at, resolved_by, resolved_at, metadata, auto_review_risk, risk_score, suspicious_report, low_quality_queue, hidden_for_review, review_basis").eq("id", id).maybeSingle(),
     supabase.from("moderation_report_snapshots").select("target_type, target_id, author_id, post_id, object_snapshot, context_snapshot, captured_at").eq("case_id", id).maybeSingle(),
-    supabase.from("content_reports").select("id, target_type, target_id, reporter_id, reason, reason_category, details, evidence, status, created_at, reporter:profiles!content_reports_reporter_id_fkey(nickname)").eq("case_id", id).order("created_at", { ascending: true }),
-    supabase.from("comment_reports").select("id, comment_id, reporter_id, reason, reason_category, details, evidence, status, created_at, reporter:profiles!comment_reports_reporter_id_fkey(nickname)").eq("case_id", id).order("created_at", { ascending: true }),
+    supabase.from("content_reports").select("id, public_id, target_type, target_id, reporter_id, reason, reason_category, details, evidence, status, created_at, reporter:profiles!content_reports_reporter_id_fkey(nickname, public_id)").eq("case_id", id).order("created_at", { ascending: true }),
+    supabase.from("comment_reports").select("id, public_id, comment_id, reporter_id, reason, reason_category, details, evidence, status, created_at, reporter:profiles!comment_reports_reporter_id_fkey(nickname, public_id)").eq("case_id", id).order("created_at", { ascending: true }),
   ]);
 
   if (reportCase === null || reportCase === undefined) {
@@ -128,6 +133,21 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
     }
   }
   if (!reportCase) notFound();
+
+  const targetPublicIdResult = reportCase.target_type === "post"
+    ? await supabase.from("posts").select("public_id").eq("id", reportCase.target_id).maybeSingle()
+    : reportCase.target_type === "comment"
+      ? await supabase.from("comments").select("public_id").eq("id", reportCase.target_id).maybeSingle()
+      : await supabase.from("profiles").select("public_id").eq("id", reportCase.target_id).maybeSingle();
+  const targetUserIdForDisplay = reportCase.target_user_id || snapshot?.author_id || null;
+  const { data: targetUserPublic } = targetUserIdForDisplay
+    ? await supabase.from("profiles").select("public_id").eq("id", targetUserIdForDisplay).maybeSingle()
+    : { data: null };
+  const reportCaseWithPublicIds = {
+    ...reportCase,
+    target_public_id: targetPublicIdResult.data?.public_id || null,
+    target_user_public_id: targetUserPublic?.public_id || null,
+  };
 
   const reportRows = [
     ...((contentReportsResult.data || []).map((report) => ({ ...report, kind: "content" as const }))),
@@ -156,26 +176,27 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
   const targetUserId = reportCase.target_user_id || snapshot?.author_id || null;
   let violations: Array<{ id: string; source_type: string; content_type: string | null; category: string; severity: string; summary: string | null; status: string; confirmed_at: string; metadata?: Record<string, unknown> | null }> = [];
   if (targetUserId) {
-    const { data } = await supabase.from("user_violations").select("id, source_type, content_type, category, severity, summary, status, confirmed_at, metadata").eq("user_id", targetUserId).order("confirmed_at", { ascending: false }).limit(30);
+    const { data } = await supabase.from("user_violations").select("id, public_id, source_type, content_type, category, severity, summary, status, confirmed_at, metadata").eq("user_id", targetUserId).order("confirmed_at", { ascending: false }).limit(30);
     violations = (data || []) as typeof violations;
   }
 
-  let userContent: Array<{ id: string; type: "post" | "comment"; title: string; snippet: string; created_at: string }> = [];
+  let userContent: Array<{ id: string; public_id?: string | null; type: "post" | "comment"; title: string; snippet: string; created_at: string }> = [];
   let userDetail: UserDetailPayload | null = null;
   let profileRevisions: ProfileRevisionRow[] = [];
   let targetReporterDetail: ReporterDetailPayload | null = null;
   let operationRecord: ReportOperationRecord | null = null;
   if (targetUserId && reportCase.target_type === "user") {
     const [{ data: posts }, { data: comments }, userDetailResult, revisionResult, reporterDetailResult, publishedPostsCountResult, followingCountResult, followersCountResult] = await Promise.all([
-      supabase.from("posts").select("id, title, content, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
-      supabase.from("comments").select("id, content, created_at, post_id").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
+      supabase.from("posts").select("id, public_id, title, content, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
+      supabase.from("comments").select("id, public_id, content, created_at, post_id").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
       supabase.rpc("admin_user_detail", { p_user_id: targetUserId }),
-      supabase.from("profile_revision_requests").select("id, case_id, issue_type, issue_detail, original_profile, hidden_fields, status, confirmed_by, confirmed_at, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
+      supabase.from("profile_revision_requests").select("id, public_id, case_id, issue_type, issue_detail, original_profile, hidden_fields, status, confirmed_by, confirmed_at, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
       supabase.rpc("admin_reporter_detail_v1", { p_user_id: targetUserId }),
       supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", targetUserId).eq("status", "published"),
       supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", targetUserId),
       supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", targetUserId),
     ]);
+    const { data: targetProfile } = await supabase.from("profiles").select("public_id").eq("id", targetUserId).maybeSingle();
     const postIds = [...new Set((comments || []).map((comment) => comment.post_id).filter((value): value is string => Boolean(value)))];
     const titleMap: Record<string, string> = {};
     if (postIds.length) {
@@ -184,12 +205,13 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
     }
     const strip = (value: string) => value.replace(/!\[[^\]]*\]\([^)]+\)/g, "").trim();
     userContent = [
-      ...(posts || []).map((post) => ({ id: post.id, type: "post" as const, title: post.title || "未命名作品", snippet: strip(post.content || "").slice(0, 160), created_at: post.created_at })),
-      ...(comments || []).map((comment) => ({ id: comment.id, type: "comment" as const, title: `评论于《${titleMap[comment.post_id] || "未知作品"}》`, snippet: strip(comment.content || "").slice(0, 160), created_at: comment.created_at })),
+      ...(posts || []).map((post) => ({ id: post.id, public_id: post.public_id, type: "post" as const, title: post.title || "未命名作品", snippet: strip(post.content || "").slice(0, 160), created_at: post.created_at })),
+      ...(comments || []).map((comment) => ({ id: comment.id, public_id: comment.public_id, type: "comment" as const, title: `评论于《${titleMap[comment.post_id] || "未知作品"}》`, snippet: strip(comment.content || "").slice(0, 160), created_at: comment.created_at })),
     ].sort((a, b) => b.created_at.localeCompare(a.created_at));
     const ud = userDetailResult.data as UserDetailPayload | null;
     userDetail = ud && ud.ok ? {
       ...ud,
+      user: { ...ud.user, public_id: targetProfile?.public_id || ud.user.public_id },
       stats: {
         ...ud.stats,
         published_posts_count: publishedPostsCountResult.error ? null : publishedPostsCountResult.count ?? 0,
@@ -209,7 +231,7 @@ export default async function ReportCasePage({ params }: { params: Promise<{ id:
   }
 
   return <ReportDetailClient
-    reportCase={reportCase as never}
+    reportCase={reportCaseWithPublicIds as never}
     snapshot={snapshot as never}
     reports={reportRows as never}
     violations={violations as never}

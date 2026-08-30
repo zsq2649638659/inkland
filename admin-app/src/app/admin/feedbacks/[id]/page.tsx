@@ -11,13 +11,13 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
 
   const { data: feedback, error } = await supabase
     .from("feedbacks")
-    .select("id, type, content, status, created_at, user_id")
+    .select("id, public_id, type, content, status, created_at, user_id")
     .eq("id", id)
     .maybeSingle();
   if (error || !feedback) notFound();
 
   const [{ data: profile }, { data: auditLogs }] = await Promise.all([
-    supabase.from("profiles").select("id, nickname").eq("id", feedback.user_id).maybeSingle(),
+    supabase.from("profiles").select("id, public_id, nickname").eq("id", feedback.user_id).maybeSingle(),
     supabase.from("admin_audit_logs").select("id, admin_id, action, note, created_at").eq("target_type", "feedback").eq("target_id", id).order("created_at", { ascending: true }),
   ]);
 

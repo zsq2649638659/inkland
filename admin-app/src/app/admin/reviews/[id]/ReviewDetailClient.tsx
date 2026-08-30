@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
+import { displayPublicId } from "@/lib/publicIds";
 
 /* ==================== 类型 ==================== */
 
-type NamedUser = { nickname?: string | null } | null;
+type NamedUser = { nickname?: string | null; public_id?: string | null } | null;
 
 type Finding = {
   id: string;
@@ -32,6 +33,7 @@ type Finding = {
 
 type ReviewCase = {
   id: string;
+  public_id?: string | null;
   post_id: string;
   post_version_id: string;
   author_id?: string;
@@ -54,6 +56,7 @@ type ReviewCase = {
 
 type Post = {
   id: string;
+  public_id?: string | null;
   user_id?: string;
   title?: string | null;
   content?: string | null;
@@ -81,6 +84,7 @@ type Post = {
 
 type Version = {
   id: string;
+  public_id?: string | null;
   post_id?: string;
   author_id?: string;
   version_number?: number | null;
@@ -925,11 +929,11 @@ export default function ReviewDetailClient({ pendingCount, post, version, previo
             {" · "}入审方式：{reviewCase?.route_reason || "自动命中"}（{screeningSources}）
           </p>
           <div className="admin-entity-ids">
-            <button type="button" className={`admin-copy-id${copiedKey === "post" ? " is-copied" : ""}`} title="点击复制作品 ID" onClick={() => void copyId("post", post.id)}>
-              {copiedKey === "post" ? "已复制作品 ID" : `作品 ${post.id}`}
+            <button type="button" className={`admin-copy-id${copiedKey === "post" ? " is-copied" : ""}`} title="点击复制作品 ID" onClick={() => void copyId("post", displayPublicId(post.public_id, post.id))}>
+              {copiedKey === "post" ? "已复制作品 ID" : `作品 ${displayPublicId(post.public_id, post.id)}`}
             </button>
-            <button type="button" className={`admin-copy-id${copiedKey === "user" ? " is-copied" : ""}`} title="点击复制作者 ID" onClick={() => void copyId("user", post.user_id || "")}>
-              {copiedKey === "user" ? "已复制作者 ID" : `作者 ${post.user_id || "—"}`}
+            <button type="button" className={`admin-copy-id${copiedKey === "user" ? " is-copied" : ""}`} title="点击复制作者 ID" onClick={() => void copyId("user", displayPublicId(post.author?.public_id, post.user_id))}>
+              {copiedKey === "user" ? "已复制作者 ID" : `作者 ${displayPublicId(post.author?.public_id, post.user_id)}`}
             </button>
           </div>
         </div>
@@ -1233,7 +1237,7 @@ export default function ReviewDetailClient({ pendingCount, post, version, previo
               </div>
               <div>
                 <dt>冻结版本</dt>
-                <dd>frozen-{(version.id || post.id || "").slice(-8)}</dd>
+                <dd>{displayPublicId(version.public_id, version.id)}</dd>
               </div>
               <div>
                 <dt>入审方式</dt>
