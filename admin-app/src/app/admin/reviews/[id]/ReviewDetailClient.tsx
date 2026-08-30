@@ -752,10 +752,6 @@ export default function ReviewDetailClient({ pendingCount, post, version, previo
       setMessage("请先勾选至少一项问题类型。");
       return;
     }
-    if (confirmedIds.length === 0 && manualFindings.length === 0 && !reason) {
-      setMessage("请先确认一项系统标记、添加一项人工标记，或填写打回说明。");
-      return;
-    }
     const lines: Array<{ type: string; text: string }> = [];
     confirmedFindings.forEach((finding) => lines.push({ type: "系统标记", text: riskLabel(finding.category) }));
     manualFindings.forEach((item) => lines.push({
@@ -774,22 +770,15 @@ export default function ReviewDetailClient({ pendingCount, post, version, previo
     void reject();
   };
 
-  const rejectBasisReady = confirmedIds.length > 0 || manualFindings.length > 0 || rejectReason.trim().length > 0;
-  const canReject = rejectBasisReady && selectedIssueTypes.length > 0;
-  const rejectRuleText = !rejectBasisReady
-    ? "请先框选标记问题，或确认系统标记，或填写打回说明。"
-    : selectedIssueTypes.length === 0
-      ? "已具备打回依据，请至少勾选一项问题类型。"
-      : "已就绪：系统标记、人工标记或打回说明 + 问题类型均可作为打回依据。";
+  const canReject = selectedIssueTypes.length > 0;
+  const rejectRuleText = selectedIssueTypes.length === 0
+    ? "请选择至少一项问题类型；机审确认、人工标记和打回说明均可作为补充依据。"
+    : "已就绪：可直接生成预览，也可以同时带上机审确认、人工标记或打回说明。";
 
   const reject = async () => {
     const reason = rejectReason.trim();
     if (selectedIssueTypes.length === 0) {
       setMessage("请先勾选至少一项问题类型。");
-      return;
-    }
-    if (confirmedIds.length === 0 && manualFindings.length === 0 && !reason) {
-      setMessage("请先确认一项系统标记、添加一项人工标记，或填写打回说明。");
       return;
     }
     setBusy(true);
