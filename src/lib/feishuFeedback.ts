@@ -44,6 +44,10 @@ type FeishuResponse = {
   data?: {
     record?: FeishuRecord;
     items?: FeishuRecord[];
+    node?: {
+      obj_token?: string;
+      obj_type?: string;
+    };
   };
 };
 
@@ -72,6 +76,7 @@ class FeishuApiError extends Error {
 }
 
 let tokenCache: { token: string; expiresAt: number } | null = null;
+const bitableAppTokenCache = new Map<string, string>();
 
 function getConfig(): FeishuConfig | null {
   const appId = process.env.FEISHU_FEEDBACK_APP_ID?.trim();
@@ -123,6 +128,29 @@ async function getTenantAccessToken(config: FeishuConfig): Promise<string> {
   if (!token) throw new FeishuApiError("飞书没有返回访问令牌", 502);
   tokenCache = { token, expiresAt: Date.now() + Math.max(60, (payload.expire || 7_200) - 60) * 1_000 };
   return token;
+}
+
+async function resolveBitableAppToken(config: FeishuConfig, tenantToken: string): Promise<string> {
+  if (config.appToken.startsWith("bas")) return config.appToken;
+  const cached = bitableAppTokenCache.get(config.appToken);
+  if (cached) return cached;
+
+  const payload = await fetchJson(`${FEISHU_API_BASE}/wiki/v2/spaces/get_node?token=${encodeURIComponent(config.appToken)}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${tenantToken}` },
+  });
+  const node = payload.data?.node;
+  if (!node?.obj_token || node.obj_type !== "bitable") {
+    throw new FeishuApiError("飞书 Wiki 节点没有解析为多维表格，请检查 Wiki 链接和权限", 400);
+  }
+  bitableAppTokenCache.set(config.appToken, node.obj_token);
+  return node.obj_token;
+}
+
+async function bitableApiPath(config: FeishuConfig, suffix = ""): Promise<string> {
+  const tenantToken = await getTenantAccessToken(config);
+  const appToken = await resolveBitableAppToken(config, tenantToken);
+  return `/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(config.tableId)}/records${suffix}`;
 }
 
 async function bitableRequest(config: FeishuConfig, path: string, init: RequestInit = {}): Promise<FeishuResponse> {
@@ -184,13 +212,13 @@ async function findExistingRecord(config: FeishuConfig, feedbackNumber: string):
   const query = new URLSearchParams();
   query.set("page_size", "100");
   query.set("filter", `CurrentValue.[反馈编号] = "${escapeFilterValue(feedbackNumber)}"`);
-  const path = `/bitable/v1/apps/${encodeURIComponent(config.appToken)}/tables/${encodeURIComponent(config.tableId)}/records`;
+  const path = await bitableApiPath(config);
   const payload = await bitableRequest(config, `${path}?${query.toString()}`, { method: "GET" });
   return payload.data?.items?.[0] || null;
 }
 
 async function createRecord(config: FeishuConfig, fields: Record<string, string>): Promise<FeishuRecord> {
-  const payload = await bitableRequest(config, `/bitable/v1/apps/${encodeURIComponent(config.appToken)}/tables/${encodeURIComponent(config.tableId)}/records`, {
+  const payload = await bitableRequest(config, await bitableApiPath(config), {
     method: "POST",
     body: JSON.stringify({ fields }),
   });
@@ -200,7 +228,7 @@ async function createRecord(config: FeishuConfig, fields: Record<string, string>
 }
 
 async function updateRecord(config: FeishuConfig, recordId: string, fields: Record<string, string>): Promise<FeishuRecord> {
-  const payload = await bitableRequest(config, `/bitable/v1/apps/${encodeURIComponent(config.appToken)}/tables/${encodeURIComponent(config.tableId)}/records/${encodeURIComponent(recordId)}`, {
+  const payload = await bitableRequest(config, await bitableApiPath(config, `/${encodeURIComponent(recordId)}`), {
     method: "PUT",
     body: JSON.stringify({ fields }),
   });
