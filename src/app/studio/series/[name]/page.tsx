@@ -7,6 +7,7 @@ import { SkeletonSeriesDetail } from "@/components/Skeleton";
 import { useAuth } from "@/components/AuthProvider";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { normalizeModerationReason } from "@shared/moderationReasons";
 
 interface ChapterInfo {
   id: string;
@@ -407,7 +408,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                             </span>
                             {ch.review_status === "rejected" && ch.review_reason && (
                               <p className="text-xs text-red-500 mt-0.5" style={{ margin: "2px 0 0" }}>
-                                <i className="fa-solid fa-circle-exclamation mr-1" />{ch.review_reason}
+                                <i className="fa-solid fa-circle-exclamation mr-1" />{normalizeModerationReason(ch.review_reason) || ch.review_reason}
                               </p>
                             )}
                           </td>

@@ -9,6 +9,7 @@ import { renderSafeMarkdown } from "@/lib/markdown";
 import { useMarkdownEditor } from "@/lib/useMarkdownEditor";
 import { screenImageLocally, type LocalImageScreening } from "@/lib/localImageScreening";
 import { assertCanPublish } from "@/lib/userRestrictions";
+import { normalizeModerationReason } from "@shared/moderationReasons";
 
 function notifyStatsChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("inkland:stats-changed"));
@@ -588,9 +589,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           setPendingReviewStatus(pendingReviewStatus);
           setPublishedVersionNumber((p.published_version_number as number) ?? null);
           if (pendingReviewStatus === "rejected") {
-            setReviewRejectionReason((p.pending_review_reason as string) || (p.review_reason as string) || "未提供原因");
+            const pendingReason = (p.pending_review_reason as string) || (p.review_reason as string) || "未提供原因";
+            setReviewRejectionReason(normalizeModerationReason(pendingReason) || pendingReason);
           } else if (p.review_status === "rejected") {
-            setReviewRejectionReason((p.review_reason as string) || "未提供原因");
+            const reason = (p.review_reason as string) || "未提供原因";
+            setReviewRejectionReason(normalizeModerationReason(reason) || reason);
           }
           if (p.post_type === "illustration") {
             setView("image");

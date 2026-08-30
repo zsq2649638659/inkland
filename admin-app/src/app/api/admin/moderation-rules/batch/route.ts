@@ -1,17 +1,7 @@
 import { getAdminContext } from "@/lib/supabase/admin-server";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
-const categories = new Set([
-  "政治敏感",
-  "淫秽色情",
-  "涉未成年人不良信息",
-  "低俗恶趣",
-  "暴力血腥",
-  "欺诈广告",
-  "人身攻击",
-  "恶意营销",
-  "抄袭信息",
-  "其他违规",
-]);
+const categories = new Set<string>(MODERATION_REASON_OPTIONS);
 const MAX_BATCH_SIZE = 5000;
 const ERROR_STATUS: Record<string, number> = {
   not_admin: 403,
@@ -75,7 +65,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "单批最多 5000 条，请分批导入。" }, { status: 400 });
   }
 
-  const category = body.category;
+  const category = typeof body.category === "string" ? normalizeModerationReason(body.category) : body.category;
   const riskLevel = body.riskLevel;
   const rawMinHits = parseMinHits(body.minHits);
   if (typeof category !== "string" || !categories.has(category)) {

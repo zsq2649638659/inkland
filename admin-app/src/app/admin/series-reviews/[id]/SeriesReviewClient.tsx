@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
-const issueTypes = ["连载名称或简介违规", "成人或不当内容", "攻击、骚扰或歧视性内容", "广告、诈骗或导流", "其他需要修改的问题"];
-const categoryLabels: Record<string, string> = { adult: "成人或不当内容", porn: "成人或不当内容" };
+const issueTypes = [...MODERATION_REASON_OPTIONS];
+const categoryLabels: Record<string, string> = { adult: "色情、淫秽与低俗", porn: "色情、淫秽与低俗" };
 
 type SeriesProps = {
   series: { id: string; user_id: string; name: string; description: string | null; tags: string[]; series_type: string; created_at: string; review_reason: string | null; review_submission_number?: number | null };
@@ -202,7 +203,7 @@ export default function SeriesReviewClient({ pendingCount, series, reviewCase, r
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row"><h2>送审原因</h2></div>
             <div className="admin-evidence">
-              {reviewCase?.route_reason || series.review_reason || "连载信息命中审核关键词"}；审核来源：{(reviewCase?.screening_sources || []).map(screeningSourceLabel).join("、") || "未记录"}；自动审核状态：{reviewCase?.screening_status === "failed" ? "自动审核异常，等待人工处理" : reviewCase?.screening_status === "completed" ? "已完成自动审核，等待人工决定" : "未记录自动审核状态"}；规则版本：{reviewCase?.rules_version || "keyword-v1"}。
+              {reviewCase?.route_reason || normalizeModerationReason(series.review_reason) || series.review_reason || "连载信息命中审核关键词"}；审核来源：{(reviewCase?.screening_sources || []).map(screeningSourceLabel).join("、") || "未记录"}；自动审核状态：{reviewCase?.screening_status === "failed" ? "自动审核异常，等待人工处理" : reviewCase?.screening_status === "completed" ? "已完成自动审核，等待人工决定" : "未记录自动审核状态"}；规则版本：{reviewCase?.rules_version || "keyword-v1"}。
             </div>
           </section>
 
@@ -213,7 +214,7 @@ export default function SeriesReviewClient({ pendingCount, series, reviewCase, r
               <div className="admin-finding-list">
                 {findings.map((finding) => (
                   <div className="admin-finding-item" key={finding.id}>
-                    <div className="admin-finding-head"><strong>{categoryLabels[finding.category] || finding.category}</strong><span className="admin-finding-status">待确认</span></div>
+                    <div className="admin-finding-head"><strong>{normalizeModerationReason(categoryLabels[finding.category] || finding.category)}</strong><span className="admin-finding-status">待确认</span></div>
                     <div className="admin-finding-tags"><span>{finding.severity === "high" ? "高风险" : "命中规则"}</span><span className="is-source">{screeningSourceLabel(finding.source)}</span></div>
                     {finding.quoted_text ? <blockquote>{finding.quoted_text}</blockquote> : null}
                     {finding.details ? <small>{finding.details}</small> : null}

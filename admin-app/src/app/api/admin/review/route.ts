@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminServiceClient, getAdminContext } from "@/lib/supabase/admin-server";
 import { healBrokenPrivateImageMarkers } from "@/lib/review-images";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 
 type ManualFinding = {
   category?: string;
@@ -34,7 +35,7 @@ function normalizeManualFindings(value: unknown) {
   return value.slice(0, 20).flatMap((item): ManualFinding[] => {
     if (!item || typeof item !== "object") return [];
     const finding = item as Record<string, unknown>;
-    const category = typeof finding.category === "string" ? finding.category.trim().slice(0, 100) : "";
+    const category = typeof finding.category === "string" ? normalizeModerationReason(finding.category).slice(0, 100) : "";
     if (!category) return [];
     const severity = finding.severity === "high" ? "high" : "review";
     const locationType = finding.location_type === "image" || finding.location_type === "image_ocr" ? finding.location_type : "text_range";
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
   }
 
   const rejected = body.decision === "rejected";
-  let reason = rejected ? (body.reason?.trim().slice(0, 200) || "") : null;
+  let reason = rejected ? normalizeModerationReason(body.reason?.trim().slice(0, 200) || "") : null;
   const confirmedFindingIds = normalizeIds(body.confirmedFindingIds);
   const dismissedFindingIds = normalizeIds(body.dismissedFindingIds);
   const manualFindings = normalizeManualFindings(body.manualFindings);
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
     // 只有打回说明时，自动生成一条人工标记，作者端能收到可读的修改意见。
     if (manualFindings.length === 0 && confirmedFindingIds.length === 0 && reason) {
       manualFindings.push({
-        category: "其他需要修改的问题",
+        category: "其他违规",
         severity: "review",
         location_type: "text_range",
         field_name: "content",

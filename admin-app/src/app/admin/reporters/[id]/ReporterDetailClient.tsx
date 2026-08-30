@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type RecentReportRow = {
@@ -212,7 +213,7 @@ export default function ReporterDetailClient({ detail, adminInitial = "A" }: { d
             {detail.recent_reports.length ? <div className="admin-risk-list">{detail.recent_reports.map((row) => <div className="admin-risk-item" key={row.id}>
               <strong>{targetTypeLabels[row.target_type || ""] || "内容"}举报 · {reportStatusLabels[row.status || ""] || row.status || "未知"}</strong>
               <span>{row.target_title || "未知对象"}{row.target_nickname ? ` · ${row.target_nickname}` : ""}</span>
-              <small>{row.reason_category || "未填写原因"}{row.details ? ` · ${row.details}` : ""}</small>
+              <small>{normalizeModerationReason(row.reason_category) || "未填写原因"}{row.details ? ` · ${row.details}` : ""}</small>
               <small className="admin-mono">{dateText(row.created_at)} · 对象 ID {row.target_id || "—"}</small>
             </div>)}</div> : <p className="admin-detail-empty">该用户还没有举报记录。</p>}
           </section>
@@ -229,7 +230,7 @@ export default function ReporterDetailClient({ detail, adminInitial = "A" }: { d
           <section className="admin-detail-panel admin-content-panel">
             <div className="admin-panel-title-row"><h2>恶意举报历史</h2><span>{detail.malicious_history.length} 条</span></div>
             {detail.malicious_history.length ? <div className="admin-risk-list">{detail.malicious_history.map((row) => <div className="admin-risk-item" key={row.id}>
-              <strong>{row.category || "恶意举报"} · {row.status === "active" ? "有效" : "已撤销"}</strong>
+              <strong>{normalizeModerationReason(row.category) || "恶意举报"} · {row.status === "active" ? "有效" : "已撤销"}</strong>
               {row.summary ? <small>{row.summary}</small> : null}
               <small>确认于 {fullDate(row.confirmed_at)}</small>
             </div>)}</div> : <p className="admin-detail-empty">没有恶意举报确认记录。</p>}

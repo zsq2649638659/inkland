@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminServiceClient, getAdminContext } from "@/lib/supabase/admin-server";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 
 const actions = ["approve", "remind", "delete"] as const;
 type CommentReviewAction = (typeof actions)[number];
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "评论审核参数无效" }, { status: 400 });
   }
 
-  const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 200) : null;
+  const reason = typeof body?.reason === "string" ? normalizeModerationReason(body.reason.trim().slice(0, 200)) : null;
   const db = createAdminServiceClient() || supabase;
   const { data, error } = await db.rpc("admin_decide_comment_review", {
     p_case_id: caseId,

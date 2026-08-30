@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { normalizeModerationReason } from "@/lib/moderationReasons";
 
 type ReportPageKind = "post" | "comment" | "user";
 type ReportMode = "pending" | "history";
@@ -138,7 +139,7 @@ export default function ReportCenterClient({ initialKind }: Props) {
           setData({ success: true, cases: [], reporters: [], targetUsers: [], counts: {}, filtered: { cases: 0, reporters: 0, target_users: 0 } });
           return;
         }
-        setData(payload);
+        setData({ ...payload, cases: payload.cases.map((row) => ({ ...row, primary_reason_category: normalizeModerationReason(row.primary_reason_category) || null })) });
         setPage(1);
       })
       .catch((reason: unknown) => {
