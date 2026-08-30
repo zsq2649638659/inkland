@@ -405,10 +405,17 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     setBusy(id); setMessage("");
     try {
       const response = await fetchWithTimeout("/api/admin/feedbacks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feedbackId: id, status: "resolved" }) });
+      const payload = await response.json().catch(() => null) as { error?: string; notification?: string; feishuSync?: string } | null;
       setBusy(null);
-      if (!response.ok) { setMessage("反馈处理失败，请稍后重试。"); return; }
+      if (!response.ok) { setMessage(payload?.error || "反馈处理失败，请稍后重试。"); return; }
       router.refresh();
-      setMessage("反馈已标记为处理完成。");
+      if (payload?.notification === "failed") {
+        setMessage("反馈已处理，但用户通知发送失败，请检查后台服务配置。");
+      } else if (payload?.feishuSync === "failed") {
+        setMessage("反馈已处理，飞书暂未同步成功，系统会在每日任务中重试。");
+      } else {
+        setMessage("反馈已标记为处理完成。");
+      }
     } catch (error) {
       setBusy(null);
       setMessage(error instanceof Error ? error.message : "反馈处理失败，请稍后重试。");

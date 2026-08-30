@@ -88,13 +88,18 @@ export default function FeedbackDetailClient({ feedback, profile, auditLogs, adm
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feedbackId: feedback.id, status: "resolved" }),
       });
-      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      const payload = await response.json().catch(() => null) as { error?: string; notification?: string; feishuSync?: string } | null;
       if (!response.ok) {
         setError(payload?.error || "反馈处理失败，请稍后重试。");
         setBusy(false);
         return;
       }
-      setSuccess("反馈已标记为处理完成，正在返回反馈列表。");
+      const suffix = payload?.notification === "failed"
+        ? "，但用户通知发送失败"
+        : payload?.feishuSync === "failed"
+          ? "，飞书将在每日任务中重试"
+          : "";
+      setSuccess(`反馈已标记为处理完成${suffix}，正在返回反馈列表。`);
       window.setTimeout(() => router.push("/admin?view=feedbacks"), 650);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "反馈处理失败，请稍后重试。");

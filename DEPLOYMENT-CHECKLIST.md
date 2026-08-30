@@ -3,6 +3,7 @@
 ## 需要在 Supabase 控制台完成
 
 - 执行 `feedbacks.sql`，创建反馈表和 RLS 策略。
+- 若启用反馈同步，执行 `feedback-feishu-sync-v1.sql`，增加飞书同步状态和反馈处理通知字段。
 - 执行 `storage-policies.sql`，配置 `post-images` bucket、文件大小和对象权限。
 - 执行 `private-images.sql`，配置 `private-post-images` bucket 和登录可见作品规则。
 - 在 Authentication → URL Configuration 中设置正式 Site URL 和 Redirect URLs。
@@ -16,6 +17,7 @@
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_SITE_URL`
+- 反馈飞书同步变量见 [`docs/飞书反馈同步配置.md`](./docs/飞书反馈同步配置.md)；飞书密钥只能配置在服务端 Vercel 环境变量中。
 
 不要配置 `NODE_TLS_REJECT_UNAUTHORIZED=0`，也不要把 Supabase service role key 放入前端或 `NEXT_PUBLIC_*` 变量。
 
