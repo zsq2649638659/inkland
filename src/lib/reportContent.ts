@@ -9,7 +9,7 @@ type ReportTargetType = "post" | "comment" | "user";
  */
 export async function submitReportV1(
   supabase: ReturnType<typeof createClient>,
-  input: { targetType: ReportTargetType; targetId: string; reason: string }
+  input: { targetType: ReportTargetType; targetId: string; reason: string; details?: string }
 ) {
   const reason = input.reason.trim();
   if (!reason) return { ok: false, message: "请选择举报原因。" };
@@ -21,7 +21,7 @@ export async function submitReportV1(
     p_target_type: input.targetType,
     p_target_id: input.targetId,
     p_reason_category: reason,
-    p_details: reason,
+    p_details: input.details?.trim() || reason,
     p_evidence: {},
   });
 

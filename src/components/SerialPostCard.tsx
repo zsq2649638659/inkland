@@ -116,11 +116,11 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     setModerationModal({ mode: "block", userId: blockedUserId });
   };
 
-  const submitModeration = async (reason: string) => {
+  const submitModeration = async (reason: string, details?: string) => {
     if (!moderationModal || !user || (moderationModal.mode === "report" && !reason.trim())) return;
     setModerationSubmitting(true);
     if (moderationModal.mode === "report") {
-      const result = await submitReportV1(supabase, { targetType: moderationModal.targetType, targetId: moderationModal.targetId, reason });
+      const result = await submitReportV1(supabase, { targetType: moderationModal.targetType, targetId: moderationModal.targetId, reason, details });
       setModerationSubmitting(false);
       if (!result.ok) { setToastMessage(result.message); return; }
       setModerationModal(null);

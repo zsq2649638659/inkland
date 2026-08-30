@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { submitReportV1 } from "@/lib/reportContent";
+import ModerationReasonModal from "@/components/ModerationReasonModal";
 
 interface FollowUser {
   id: string;
@@ -28,6 +29,8 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
   const supabase = createClient();
   const dialog = useAppDialog();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭popup
@@ -62,12 +65,17 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
     dialog.toast("已屏蔽该用户");
   };
 
-  const handleReport = async () => {
+  const handleReport = () => {
     setMoreOpen(false);
-    const reason = await dialog.prompt({ title:"举报用户", message:`请说明举报 ${user.nickname} 的原因。`, placeholder:"请尽量描述具体情况…", confirmLabel:"提交举报", required:true });
-    if (!reason || !reason.trim()) return;
-    const result = await submitReportV1(supabase, { targetType: "user", targetId: user.id, reason });
+    setReportOpen(true);
+  };
+
+  const submitReport = async (reason: string, details?: string) => {
+    setReportSubmitting(true);
+    const result = await submitReportV1(supabase, { targetType: "user", targetId: user.id, reason, details });
+    setReportSubmitting(false);
     if (!result.ok) { await dialog.alert({ title: "举报失败", message: result.message, variant: "danger" }); return; }
+    setReportOpen(false);
     dialog.toast(result.message);
   };
 
@@ -105,6 +113,13 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
           </button>
         </div>
       </div>
+      <ModerationReasonModal
+        open={reportOpen}
+        mode="report"
+        submitting={reportSubmitting}
+        onClose={() => setReportOpen(false)}
+        onSubmit={submitReport}
+      />
     </div>
   );
 }

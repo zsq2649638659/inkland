@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { MODERATION_REASON_OPTIONS } from "@shared/moderationReasons";
 
 type ModerationMode = "report" | "block";
 
@@ -10,10 +11,9 @@ interface ModerationReasonModalProps {
   mode: ModerationMode;
   submitting?: boolean;
   onClose: () => void;
-  onSubmit: (reason: string) => void;
+  onSubmit: (reason: string, details?: string) => void;
 }
-
-const REPORT_REASONS = ["垃圾广告", "色情低俗内容", "人身攻击与辱骂", "违法违规内容", "引战与恶意引战", "其他"];
+const OTHER_REASON = "其他违规";
 
 export default function ModerationReasonModal({ open, mode, submitting = false, onClose, onSubmit }: ModerationReasonModalProps) {
   const [selectedReason, setSelectedReason] = useState("");
@@ -26,11 +26,6 @@ export default function ModerationReasonModal({ open, mode, submitting = false, 
     }
   }, [open, mode]);
 
-  const finalReason = useMemo(
-    () => selectedReason === "其他" ? customReason.trim() : selectedReason,
-    [customReason, selectedReason],
-  );
-
   if (!open) return null;
 
   return createPortal(
@@ -42,7 +37,7 @@ export default function ModerationReasonModal({ open, mode, submitting = false, 
           {mode === "report" ? (
             <>
               <ul className="report-reason-list">
-                {REPORT_REASONS.map((reason) => (
+                {MODERATION_REASON_OPTIONS.map((reason) => (
                   <li
                     key={reason}
                     className={`report-reason-item${selectedReason === reason ? " selected" : ""}`}
@@ -53,7 +48,7 @@ export default function ModerationReasonModal({ open, mode, submitting = false, 
                   </li>
                 ))}
               </ul>
-              {selectedReason === "其他" && (
+              {selectedReason === OTHER_REASON && (
                 <textarea
                   className="moderation-custom-reason"
                   value={customReason}
@@ -72,8 +67,8 @@ export default function ModerationReasonModal({ open, mode, submitting = false, 
           <button className="btn-modal btn-modal-cancel" onClick={onClose}>取消</button>
           <button
             className={`btn-modal ${mode === "report" ? "btn-modal-primary" : "btn-modal-danger"}`}
-            onClick={() => onSubmit(mode === "report" ? finalReason : "")}
-            disabled={submitting || (mode === "report" && !finalReason)}
+            onClick={() => onSubmit(mode === "report" ? selectedReason : "", mode === "report" && selectedReason === OTHER_REASON ? customReason.trim() : undefined)}
+            disabled={submitting || (mode === "report" && (!selectedReason || (selectedReason === OTHER_REASON && !customReason.trim())))}
           >
             {submitting ? "提交中..." : mode === "report" ? "提交举报" : "确认屏蔽"}
           </button>

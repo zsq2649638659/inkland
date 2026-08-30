@@ -781,7 +781,7 @@ BEGIN
   END IF;
 
   -- 按飞书 3.4.2 固定模板组装“举报已处理”通知
-  v_reason_label := COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他问题');
+  v_reason_label := COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他违规');
   IF snapshot_record.id IS NULL THEN
     v_object_label := '未知对象';
   ELSIF snapshot_record.target_type = 'comment' THEN
@@ -956,7 +956,7 @@ BEGIN
       ) VALUES (
         target_owner_id, 'report_case', p_case_id,
         case_record.target_type, case_record.target_id,
-        COALESCE(case_record.primary_reason_category, '其他问题'), 'standard',
+        COALESCE(case_record.primary_reason_category, '其他违规'), 'standard',
         CASE WHEN case_record.target_type = 'comment'
           THEN '举报确认后删除评论：' || left(COALESCE(target_content, ''), 120)
           ELSE '举报确认后删除作品：' || COALESCE(target_title, '') END,

@@ -742,9 +742,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
         </div>
-        <ModerationReasonModal open={reportOpen} mode="report" onClose={() => setReportOpen(false)} onSubmit={async (reason) => {
+        <ModerationReasonModal open={reportOpen} mode="report" onClose={() => setReportOpen(false)} onSubmit={async (reason, details) => {
           if (!currentUser) return;
-          const result = await submitReportV1(supabase, { targetType: "user", targetId: id, reason });
+          const result = await submitReportV1(supabase, { targetType: "user", targetId: id, reason, details });
           setReportOpen(false);
           setBlockDialogMessage(result.message);
           setBlockDialog("success");

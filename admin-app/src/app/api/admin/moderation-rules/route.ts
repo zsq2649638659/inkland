@@ -1,29 +1,7 @@
 import { getAdminContext } from "@/lib/supabase/admin-server";
+import { getModerationReasonAliases, MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
 
-const categories = new Set([
-  "政治敏感",
-  "淫秽色情",
-  "涉未成年人不良信息",
-  "低俗恶趣",
-  "暴力血腥",
-  "欺诈广告",
-  "人身攻击",
-  "恶意营销",
-  "抄袭信息",
-  "其他违规",
-]);
-const categoryAliases: Record<string, string[]> = {
-  "政治敏感": ["政治敏感"],
-  "淫秽色情": ["淫秽色情", "成人与不当内容"],
-  "涉未成年人不良信息": ["涉未成年人不良信息"],
-  "低俗恶趣": ["低俗恶趣"],
-  "暴力血腥": ["暴力血腥", "暴力与威胁"],
-  "欺诈广告": ["欺诈广告", "诈骗与交易风险"],
-  "人身攻击": ["人身攻击", "人身攻击与骚扰"],
-  "恶意营销": ["恶意营销", "广告与导流"],
-  "抄袭信息": ["抄袭信息"],
-  "其他违规": ["其他违规", "其他"],
-};
+const categories = new Set<string>(MODERATION_REASON_OPTIONS);
 const riskLevels = new Set(["low", "medium", "high"]);
 const riskFilters = new Set(["all", "low", "medium", "high", "whitelist"]);
 const riskDefaultMinHits: Record<string, number> = { low: 5, medium: 3, high: 1 };
@@ -77,7 +55,7 @@ export async function GET(request: Request) {
   const pageSize = Math.max(1, Math.min(500, Number(url.searchParams.get("pageSize")) || 100));
   const risk = url.searchParams.get("risk") ?? "all";
   if (!riskFilters.has(risk)) return Response.json({ error: "风险筛选条件不正确。" }, { status: 400 });
-  const category = (url.searchParams.get("category") ?? "").trim().slice(0, 100);
+  const category = normalizeModerationReason((url.searchParams.get("category") ?? "").trim().slice(0, 100));
   if (category && !categories.has(category)) return Response.json({ error: "问题分类不正确。" }, { status: 400 });
   const enabledRaw = url.searchParams.get("enabled");
   if (enabledRaw !== null && !["true", "false", "1", "0"].includes(enabledRaw)) return Response.json({ error: "规则状态筛选条件不正确。" }, { status: 400 });
@@ -90,7 +68,7 @@ export async function GET(request: Request) {
   } else if (risk !== "all") {
     query = query.eq("rule_type", "keyword").eq("risk_level", risk);
   }
-  if (category) query = query.in("category", categoryAliases[category] || [category]);
+  if (category) query = query.in("category", getModerationReasonAliases(category));
   if (enabled !== null) query = query.eq("enabled", enabled);
   if (q) query = query.ilike("pattern", `%${escapeLike(q)}%`);
   const start = (page - 1) * pageSize;
@@ -134,7 +112,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const ruleType = body?.ruleType;
   const pattern = typeof body?.pattern === "string" ? body.pattern.trim() : "";
-  const category = body?.category;
+  const category = typeof body?.category === "string" ? normalizeModerationReason(body.category) : body?.category;
   const riskLevel = body?.riskLevel;
   const rawMinHits = parseMinHits(body?.minHits);
   const description = typeof body?.description === "string" ? body.description.trim() : null;
@@ -184,13 +162,14 @@ export async function PATCH(request: Request) {
     const hasRisk = body.riskLevel !== undefined;
     const hasMinHits = body.minHits !== undefined;
     if (hasEnabled && typeof body.enabled !== "boolean") return Response.json({ error: "规则状态不正确。" }, { status: 400 });
-    if (hasCategory && (typeof body.category !== "string" || !categories.has(body.category))) return Response.json({ error: "问题分类不正确。" }, { status: 400 });
+    const category = typeof body.category === "string" ? normalizeModerationReason(body.category) : body.category;
+    if (hasCategory && (typeof category !== "string" || !categories.has(category))) return Response.json({ error: "问题分类不正确。" }, { status: 400 });
     if (!hasEnabled && !hasCategory && !hasRisk && !hasMinHits) return Response.json({ error: "没有需要更新的规则内容。" }, { status: 400 });
     if (hasRisk && typeof body.riskLevel !== "string") return Response.json({ error: "风险级别不正确。" }, { status: 400 });
     if (hasRisk && !riskLevels.has(body.riskLevel as string)) return Response.json({ error: "风险级别不正确。" }, { status: 400 });
 
     const updates: Record<string, unknown> = { updated_by: adminId };
-    if (hasCategory) updates.category = body.category;
+    if (hasCategory) updates.category = category;
     if (hasRisk) {
       const riskLevel = body.riskLevel as string;
       const parsedMinHits = hasMinHits ? parseMinHits(body.minHits) : null;
@@ -239,11 +218,12 @@ export async function PATCH(request: Request) {
 
   if (typeof body?.id !== "string") return Response.json({ error: "缺少规则编号。" }, { status: 400 });
   if (body.enabled !== undefined && typeof body.enabled !== "boolean") return Response.json({ error: "规则状态不正确。" }, { status: 400 });
-  if (body.category !== undefined && (typeof body.category !== "string" || !categories.has(body.category))) return Response.json({ error: "问题分类不正确。" }, { status: 400 });
+  const category = typeof body.category === "string" ? normalizeModerationReason(body.category) : body.category;
+  if (body.category !== undefined && (typeof category !== "string" || !categories.has(category))) return Response.json({ error: "问题分类不正确。" }, { status: 400 });
 
   const updates: Record<string, unknown> = { updated_by: adminId };
   if (body.enabled !== undefined) updates.enabled = body.enabled;
-  if (body.category !== undefined) updates.category = body.category;
+  if (body.category !== undefined) updates.category = category;
   if (body.riskLevel !== undefined) {
     if (typeof body.riskLevel !== "string" || !riskLevels.has(body.riskLevel)) return Response.json({ error: "风险级别不正确。" }, { status: 400 });
     const riskLevel = body.riskLevel;

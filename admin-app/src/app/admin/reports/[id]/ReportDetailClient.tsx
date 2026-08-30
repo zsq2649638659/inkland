@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type CaseRow = {
@@ -257,10 +258,10 @@ const contentReportActionDescriptions: Partial<Record<ReportAction, string>> = {
 };
 const reportReasonPresets: Partial<Record<ReportAction, string[]>> = {
   dismiss: ["内容未违反社区规范", "举报理由与内容不符", "举报证据不足", "重复举报或误报"],
-  remind: ["存在轻微不当表达", "语气可能引发冲突", "需要提醒友善交流", "内容可保留但需注意措辞"],
-  delete: ["违反社区规范", "包含人身攻击或辱骂", "广告、引流或骚扰", "内容涉及违法违规"],
-  profile_revision: ["包含不适宜内容", "资料含广告或引流", "资料含人身攻击或辱骂", "资料与作品或账号无关"],
-  warn: ["发布违规内容", "辱骂或人身攻击", "广告或引流", "盗用他人作品", "恶意举报", "重复提交违规内容"],
+  remind: [...MODERATION_REASON_OPTIONS],
+  delete: [...MODERATION_REASON_OPTIONS],
+  profile_revision: [...MODERATION_REASON_OPTIONS],
+  warn: [...MODERATION_REASON_OPTIONS],
   restrict: ["持续发布违规内容", "多次违规且未整改", "绕过内容审核", "滥用互动或举报功能"],
   suspend: ["多项功能持续违规", "绕过限制继续违规", "严重扰乱社区秩序", "累计违规达到暂停标准"],
   ban: ["严重违规", "多次违规且拒不整改", "绕过限制持续违规", "恶意破坏社区秩序"],
@@ -282,6 +283,10 @@ const reportReasonPresetLabels: Partial<Record<ReportAction, string>> = {
 
 function text(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
+function moderationReasonLabel(value: unknown) {
+  return normalizeModerationReason(text(value)) || "未填写原因";
 }
 
 function accountStatusLabel(value: unknown) {
@@ -508,7 +513,6 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
     setContentTargetType("post"); setContentTargetId(""); setContentAction("remind");
     setRestrictionTypes([]); setImmediate(true); setStartsAt(""); setEndsAt("");
     setHideContent(false); setCountViolation(true); setBanArmed(false); setReasonCustom(false);
-    if (action === "profile_revision") setReason("包含不适宜内容");
     if (action === "convert_content") {
       const first = userContent[0];
       if (first) { setContentTargetType(first.type); setContentTargetId(first.id); }
@@ -699,7 +703,8 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   }).length;
   const needsMaliciousReview = Boolean(reportCase.suspicious_report) || maliciousReporterCount > 0 || Boolean(targetReporterDetail?.focused_target && targetReporterDetail.focused_target.count >= 3);
   const violationCounts = violations.reduce<Record<string, number>>((acc, item) => {
-    acc[item.category] = (acc[item.category] || 0) + 1;
+    const category = moderationReasonLabel(item.category);
+    acc[category] = (acc[category] || 0) + 1;
     return acc;
   }, {});
   const recentPosts = userContent.filter((item) => item.type === "post");
@@ -723,7 +728,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
   const reporterCount = new Set(reports.map((report) => report.reporter_id).filter(Boolean)).size || reports.length || reportCase.report_count;
   const reportScale = reporterCount > 1 ? `${reporterCount} 人 / ${reportCase.report_count} 次` : `${reportCase.report_count} 次`;
   const reportSummary = reports.find((report) => report.details)?.details || "举报明细已保存，请结合下方冻结快照进行人工判断。";
-  const reportPrimaryReason = reportCase.primary_reason_category || "未填写";
+  const reportPrimaryReason = normalizeModerationReason(reportCase.primary_reason_category) || "未填写";
   const reportSupplement = reportSummary !== reportPrimaryReason && reportSummary !== "举报明细已保存，请结合下方冻结快照进行人工判断。" ? reportSummary : "";
   const reportVisibility = reportCase.hidden_for_review ? "处置期间对读者不可见" : "待处置，当前对读者可见";
   const violationOwnerLabel = isComment ? "评论作者" : isPost ? "作品作者" : "被举报用户";
@@ -850,7 +855,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               const reporterId = report.reporter_id;
               return <div className="admin-risk-item" key={report.id}>
                 <div className="admin-report-reporter-meta"><strong>{report.reporter?.nickname || "匿名用户"}</strong><code className="admin-mono">{reporterId || "未记录举报人 ID"}</code></div>
-                <div className="admin-risk-tags"><span>{report.reason_category || report.reason || "未填写原因"}</span><span>{reportStatusLabel(report.status)}</span></div>
+                <div className="admin-risk-tags"><span>{moderationReasonLabel(report.reason_category || report.reason)}</span><span>{reportStatusLabel(report.status)}</span></div>
                 {report.details && report.details !== report.reason ? <small>补充说明：{report.details}</small> : null}
                 <small>提交于 {fmtDateTime(report.created_at)}</small>
                 {stat ? <small>该举报人累计 {stat.total_reports} 次 · 成立 {stat.valid_reports} · 不成立 {stat.invalid_reports} · 24 小时 {stat.reports_last_24h} 次{stat.report_restricted_until ? ` · 举报受限至 ${fmtDate(stat.report_restricted_until)}` : ""}</small> : null}
@@ -866,7 +871,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
             <div className="admin-panel-title-row"><h2>{violationOwnerLabel}违规记录</h2><span>{violations.length} 条</span></div>
             {isComment || isPost ? <p className="admin-report-role-note">这里指{isComment ? "发布该评论" : "发布该作品"}的账号，不是举报人。</p> : null}
             {violations.length ? <div className="admin-risk-list">{violations.map((item) => <div className="admin-risk-item" key={item.id}>
-              <strong>{item.content_type ? targetLabels[item.content_type] || item.content_type : "账号"} · {item.category}</strong>
+              <strong>{item.content_type ? targetLabels[item.content_type] || item.content_type : "账号"} · {moderationReasonLabel(item.category)}</strong>
               <div className="admin-risk-tags"><span>{severityLabels[item.severity] || item.severity}</span><span>{item.status === "active" ? "有效" : "已撤销"}</span></div>
               {item.summary ? <small>{item.summary}</small> : null}
               <small>确认于 {fmtDateTime(item.confirmed_at)}</small>
@@ -893,7 +898,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                 <h3>举报人记录</h3>
                 {recordReports.length ? <div className="admin-operation-list">{recordReports.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
                   <strong>{index + 1}. {record.kind === "comment" ? "评论举报" : record.target_type === "post" ? "作品举报" : "用户举报"} · 举报人 {text(record.reporter_id).slice(0, 8)}</strong>
-                  <span>理由：{text(record.reason_category) || text(record.reason) || "未填写"}{text(record.details) && text(record.details) !== text(record.reason) ? ` · ${text(record.details)}` : ""}</span>
+                  <span>理由：{moderationReasonLabel(record.reason_category || record.reason)}{text(record.details) && text(record.details) !== text(record.reason) ? ` · ${text(record.details)}` : ""}</span>
                   <span>提交 {fmtDateTime(text(record.created_at))}{record.resolved_at ? ` · 处理 ${fmtDateTime(text(record.resolved_at))}` : ""}</span>
                 </div>)}</div> : <p className="admin-detail-empty">没有举报人记录。</p>}
               </div>
@@ -911,7 +916,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <div className="admin-operation-cell">
                 <h3>确认违规与处罚</h3>
                 {recordViolations.length || recordRestrictions.length ? <><div className="admin-operation-list">{recordViolations.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
-                  <strong>{record.content_type ? targetLabels[text(record.content_type)] || text(record.content_type) : "账号"} · {text(record.category)} · {record.status === "active" ? "有效" : "已撤销"}</strong>
+                  <strong>{record.content_type ? targetLabels[text(record.content_type)] || text(record.content_type) : "账号"} · {moderationReasonLabel(record.category)} · {record.status === "active" ? "有效" : "已撤销"}</strong>
                   <span>{text(record.summary) || "未填写摘要"}{record.confirmed_by_nickname ? ` · 确认人 ${text(record.confirmed_by_nickname)}` : ""}</span>
                   <span>{fmtDateTime(text(record.confirmed_at))}{text(record.revoked_at) !== "未记录" ? ` · 撤销于 ${fmtDateTime(text(record.revoked_at))}` : ""}</span>
                 </div>)}</div><div className="admin-operation-list">{recordRestrictions.map((record, index) => <div className="admin-operation-item" key={String(record.id || index)}>
@@ -999,7 +1004,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
               <div className="admin-detail-subsection">
                 <h3>管理员确认的问题</h3>
                 {violations.length ? <div className="admin-risk-list">{violations.slice(0, 12).map((item) => <div className="admin-risk-item" key={item.id}>
-                  <strong>{item.content_type ? targetLabels[item.content_type] || item.content_type : "账号"} · {item.category}</strong>
+                  <strong>{item.content_type ? targetLabels[item.content_type] || item.content_type : "账号"} · {moderationReasonLabel(item.category)}</strong>
                   <div className="admin-risk-tags"><span>{severityLabels[item.severity] || item.severity}</span><span>{item.status === "active" ? "有效" : "已撤销"}</span></div>
                   {item.summary ? <small>{item.summary}</small> : null}
                   <small>确认于 {fmtDateTime(item.confirmed_at)}</small>
@@ -1013,7 +1018,7 @@ export default function ReportDetailClient({ reportCase, snapshot, reports, viol
                 {reports.length ? reports.map((report) => <div className="admin-evidence-item" key={report.id}>
                   <strong>{report.kind === "comment" ? "评论举报" : report.target_type === "post" ? "作品举报" : "用户举报"} · {report.reporter?.nickname || "匿名用户"}</strong>
                   <span>提交人：{report.reporter?.nickname || "匿名用户"} · 提交时间：{fmtDateTime(report.created_at)}</span>
-                  <p>原因：{report.reason_category || report.reason || "未填写"}{report.details && report.details !== report.reason ? ` · ${report.details}` : ""}</p>
+                  <p>原因：{moderationReasonLabel(report.reason_category || report.reason)}{report.details && report.details !== report.reason ? ` · ${report.details}` : ""}</p>
                 </div>) : <p className="admin-detail-empty">没有找到该案件的举报证据。</p>}
               </div>
               <div className="admin-related-content">

@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
 
 /* ==================== 类型 ==================== */
 
@@ -208,14 +209,7 @@ const riskLabels: Record<string, string> = {
   hentai: "成人漫画内容",
   sexy: "性暗示内容",
 };
-const issueTypes = [
-  "内容评级与实际内容不符",
-  "成人或不当内容",
-  "暴力、血腥或威胁性内容",
-  "攻击、骚扰或歧视性内容",
-  "广告、诈骗或导流",
-  "其他需要修改的问题",
-];
+const issueTypes = [...MODERATION_REASON_OPTIONS];
 const statusLabels: Record<string, string> = {
   pending: "待人工审核",
   reviewing: "审核中",
@@ -251,7 +245,7 @@ function sourceLabel(source?: string | null) {
 
 function riskLabel(category?: string | null) {
   if (!category) return "待确认问题";
-  return riskLabels[category.toLowerCase()] || category.replaceAll("_", " ");
+  return riskLabels[category.toLowerCase()] || normalizeModerationReason(category) || category.replaceAll("_", " ");
 }
 
 function locationTitle(finding: Finding) {

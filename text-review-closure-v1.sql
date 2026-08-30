@@ -667,7 +667,7 @@ BEGIN
       details, metadata, status, confirmed_by, confirmed_at
     ) VALUES (
       review_case_id, 'admin',
-      COALESCE(NULLIF(btrim(COALESCE(manual_finding->>'category', '')), ''), '其他需要修改的问题'),
+      COALESCE(NULLIF(btrim(COALESCE(manual_finding->>'category', '')), ''), '其他违规'),
       COALESCE(NULLIF(manual_finding->>'severity', ''), 'high'),
       COALESCE(NULLIF(manual_finding->>'location_type', ''), 'text_range'),
       NULLIF(manual_finding->>'field_name', ''),

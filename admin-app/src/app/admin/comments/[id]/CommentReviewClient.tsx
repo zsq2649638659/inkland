@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
 
 type ReviewCase = {
   id: string; comment_id: string | null; post_id: string | null; author_id: string | null; parent_id: string | null; paragraph_index: number | null;
@@ -43,10 +44,11 @@ export default function CommentReviewClient({ adminName, adminEmail, pendingCoun
   const paragraphIndex = comment?.paragraph_index ?? reviewCase.paragraph_index ?? (typeof snapshot.paragraph_index === "number" ? snapshot.paragraph_index : null);
   const authorName = author?.nickname || "未知用户";
   const findingGroups = Object.values(findings.reduce<Record<string, FindingGroup>>((groups, finding) => {
-    const key = `${finding.category}|${finding.source}|${finding.quoted_text || ""}`;
+    const normalizedCategory = normalizeModerationReason(finding.category);
+    const key = `${normalizedCategory}|${finding.source}|${finding.quoted_text || ""}`;
     const current = groups[key];
     if (current) { current.ids.push(finding.id); current.count += 1; }
-    else groups[key] = { ...finding, ids: [finding.id], count: 1 };
+    else groups[key] = { ...finding, category: normalizedCategory, ids: [finding.id], count: 1 };
     return groups;
   }, {}));
 
@@ -85,8 +87,10 @@ export default function CommentReviewClient({ adminName, adminEmail, pendingCoun
     catch { setMessage("当前环境无法复制 ID，请手动选择文本。"); }
   };
   const actionText = confirmAction === "approve" ? "放行评论" : confirmAction === "remind" ? "放行并提醒发布者" : "删除评论并警告发布者";
+  const needsReason = confirmAction === "remind" || confirmAction === "delete";
   const execute = async () => {
     if (!confirmAction) return;
+    if (needsReason && !reason.trim()) { setMessage("请选择或填写一个处理原因。"); return; }
     setBusy(true); setMessage("");
     try {
       const response = await fetchWithTimeout("/api/admin/comment-review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ caseId: reviewCase.id, action: confirmAction, reason: reason.trim() || null }) });
@@ -122,9 +126,9 @@ export default function CommentReviewClient({ adminName, adminEmail, pendingCoun
           </section>
           <section className="admin-detail-panel"><div className="admin-panel-title-row"><h2>审核轨迹</h2></div><ul className="admin-timeline">{history.length ? history.map((item) => <li key={item.id}><b>{statusLabels[item.status] || item.status} · 第 {item.submission_number || 1} 次提交</b><span>{dateLabel(item.decided_at || item.created_at)} · {item.decided_by ? `管理员 ${item.decided_by.slice(0, 8)}` : "系统"}</span></li>) : <li><b>未记录审核轨迹</b><span>—</span></li>}</ul></section>
           <section className="admin-detail-panel admin-audit"><div className="admin-panel-title-row"><h2>审计元数据</h2><span>系统记录</span></div><dl><div><dt>审核服务</dt><dd>{sourceLabel(reviewCase.screening_sources, reviewCase.screening_status)}</dd></div><div><dt>规则版本</dt><dd>{reviewCase.rules_version || "—"}</dd></div><div><dt>冻结对象</dt><dd>{commentId}</dd></div><div><dt>入审方式</dt><dd>{reviewCase.route_reason || "自动命中"}</dd></div><div><dt>提交编号</dt><dd>{reviewCase.submission_number || 1}</dd></div><div><dt>记录状态</dt><dd>{commentStatusLabel(reviewCase.status)}</dd></div></dl></section>
-        </div><aside className="admin-review-decision"><section className="admin-detail-panel admin-decision-panel"><h2>{active ? "审核决定" : "只读审核记录"}</h2>{active ? <><p>① 无问题 → 放行 / 放行并轻提醒：均为一键确认，不需要任何说明<br />② 有问题 → 选择处置动作，确认后才会写入审计记录。</p><button className="admin-decision-approve" type="button" disabled={busy} onClick={() => { setReason(""); setConfirmAction("approve"); }}>放行（无问题）</button><button className="admin-decision-reject admin-comment-remind" type="button" disabled={busy} onClick={() => { setReason("评论已通过审核，但请注意文明交流。"); setConfirmAction("remind"); }}>放行并轻提醒发布者</button><button className="admin-preview-confirm admin-comment-delete" type="button" disabled={busy} onClick={() => { setReason("评论命中审核规则，经人工复核后删除。"); setConfirmAction("delete"); }}>删除并警告…</button><small>放行同样写入留底；删除的评论不可恢复，提醒与删除都会通知评论发布者并写入管理员审计记录。</small></> : <><p>该评论审核已经完成，不提供再次放行、提醒或删除。</p><div className="admin-comment-history-result">处理结果：{commentStatusLabel(reviewCase.status)}{reviewCase.decision_reason ? ` · ${reviewCase.decision_reason}` : ""}</div><small>删除结果保留的是处理时冻结快照，不会恢复原评论。</small></>}</section>{message ? <div className="admin-detail-message" role="status">{message}</div> : null}</aside></div>
+        </div><aside className="admin-review-decision"><section className="admin-detail-panel admin-decision-panel"><h2>{active ? "审核决定" : "只读审核记录"}</h2>{active ? <><p>① 无问题 → 放行 / 放行并轻提醒：均为一键确认，不需要任何说明<br />② 有问题 → 选择处置动作，确认后才会写入审计记录。</p><button className="admin-decision-approve" type="button" disabled={busy} onClick={() => { setReason(""); setConfirmAction("approve"); }}>放行（无问题）</button><button className="admin-decision-reject admin-comment-remind" type="button" disabled={busy} onClick={() => { setReason(""); setConfirmAction("remind"); }}>放行并轻提醒发布者</button><button className="admin-preview-confirm admin-comment-delete" type="button" disabled={busy} onClick={() => { setReason(""); setConfirmAction("delete"); }}>删除并警告…</button><small>放行同样写入留底；删除的评论不可恢复，提醒与删除都会通知评论发布者并写入管理员审计记录。</small></> : <><p>该评论审核已经完成，不提供再次放行、提醒或删除。</p><div className="admin-comment-history-result">处理结果：{commentStatusLabel(reviewCase.status)}{reviewCase.decision_reason ? ` · ${reviewCase.decision_reason}` : ""}</div><small>删除结果保留的是处理时冻结快照，不会恢复原评论。</small></>}</section>{message ? <div className="admin-detail-message" role="status">{message}</div> : null}</aside></div>
       </div>
     </main>
-    {confirmAction ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmAction(null); }}><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="comment-action-title"><div className="admin-modal-header"><div><h2 id="comment-action-title">确认{actionText}？</h2><p className="admin-modal-desc">对象：{authorName} 在《{post?.title || "未知作品"}》下的{typeLabel(parentId, paragraphIndex)}。确认后会写入审核记录{confirmAction === "remind" || confirmAction === "delete" ? "并通知发布者" : ""}。</p></div></div><label className="admin-field">处理说明（可修改）<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={200} /></label><div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy} onClick={() => setConfirmAction(null)}>取消</button><button className={`admin-btn ${confirmAction === "delete" ? "admin-btn-danger-fill" : "admin-btn-primary"}`} type="button" disabled={busy} onClick={() => void execute()}>{busy ? "处理中…" : "确认执行"}</button></div></div></div> : null}
+              {confirmAction ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmAction(null); }}><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="comment-action-title"><div className="admin-modal-header"><div><h2 id="comment-action-title">确认{actionText}？</h2><p className="admin-modal-desc">对象：{authorName} 在《{post?.title || "未知作品"}》下的{typeLabel(parentId, paragraphIndex)}。确认后会写入审核记录{confirmAction === "remind" || confirmAction === "delete" ? "并通知发布者" : ""}。</p></div></div>{needsReason ? <div className="admin-field admin-report-reason-field"><span className="admin-field-label">常见处理原因</span><div className="admin-warn-reason-options">{MODERATION_REASON_OPTIONS.map((item) => <button className={reason === item ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => setReason(item)}>{item}</button>)}</div></div> : null}<label className="admin-field">处理说明（可修改）<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={200} placeholder={needsReason ? "也可以直接填写处理说明" : undefined} /></label><div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy} onClick={() => setConfirmAction(null)}>取消</button><button className={`admin-btn ${confirmAction === "delete" ? "admin-btn-danger-fill" : "admin-btn-primary"}`} type="button" disabled={busy || (needsReason && !reason.trim())} onClick={() => void execute()}>{busy ? "处理中…" : "确认执行"}</button></div></div></div> : null}
   </div>;
 }

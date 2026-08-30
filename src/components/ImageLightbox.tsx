@@ -177,10 +177,10 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
     catch { setToast("复制失败，请稍后重试"); }
   };
 
-  const submitModeration = async (reason: string) => {
+  const submitModeration = async (reason: string, details?: string) => {
     if (!user || !moderation) return;
     if (moderation.mode === "report") {
-      const result = await submitReportV1(supabase, { targetType: moderation.targetType, targetId: moderation.targetId || post.id, reason });
+      const result = await submitReportV1(supabase, { targetType: moderation.targetType, targetId: moderation.targetId || post.id, reason, details });
       if (!result.ok) { setToast(result.message); return; }
       setModeration(null);
       setToast(result.message);

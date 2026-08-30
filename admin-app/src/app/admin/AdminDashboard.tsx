@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin-browser";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import ReportCenterClient from "./ReportCenterClient";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
 
 type PostItem = { id: string; review_case_id: string; title: string; post_type: string | null; created_at: string; user_id: string; review_reason?: string | null; review_priority?: string | null; review_route_reason?: string | null; screening_status?: string | null; review_submission_number?: number | null; author?: { nickname?: string } | null };
 type ReportItem = {
@@ -131,33 +132,10 @@ const riskLabels: Record<ModerationRiskLevel, { label: string; shortLabel: strin
   medium: { label: "中风险 · 满 3 次进审核", shortLabel: "中风险", hits: 3 },
   high: { label: "高风险 · 命中 1 次进审核", shortLabel: "高风险", hits: 1 },
 };
-const ruleCategoryOptions = [
-  { value: "政治敏感", label: "政治敏感" },
-  { value: "淫秽色情", label: "淫秽色情" },
-  { value: "涉未成年人不良信息", label: "涉未成年人不良信息" },
-  { value: "低俗恶趣", label: "低俗恶趣" },
-  { value: "暴力血腥", label: "暴力血腥" },
-  { value: "欺诈广告", label: "欺诈广告" },
-  { value: "人身攻击", label: "人身攻击" },
-  { value: "恶意营销", label: "恶意营销" },
-  { value: "抄袭信息", label: "抄袭信息" },
-  { value: "其他违规", label: "其他违规" },
-];
-const ruleCategoryAliases: Record<string, string[]> = {
-  "政治敏感": ["政治敏感"],
-  "淫秽色情": ["淫秽色情", "成人与不当内容"],
-  "涉未成年人不良信息": ["涉未成年人不良信息"],
-  "低俗恶趣": ["低俗恶趣"],
-  "暴力血腥": ["暴力血腥", "暴力与威胁"],
-  "欺诈广告": ["欺诈广告", "诈骗与交易风险"],
-  "人身攻击": ["人身攻击", "人身攻击与骚扰"],
-  "恶意营销": ["恶意营销", "广告与导流"],
-  "抄袭信息": ["抄袭信息"],
-  "其他违规": ["其他违规", "其他"],
-};
+const ruleCategoryOptions = MODERATION_REASON_OPTIONS.map((value) => ({ value, label: value }));
 
 function normalizeRuleCategory(category: string) {
-  return ruleCategoryOptions.find((item) => (ruleCategoryAliases[item.value] || []).includes(category))?.value || category;
+  return normalizeModerationReason(category);
 }
 const formatRiskRule = (risk: ModerationRiskLevel, hits: number) =>
   risk === "high" ? `高风险 · 命中 ${hits} 次进审核` : `${riskLabels[risk].shortLabel} · 满 ${hits} 次进审核`;
@@ -180,10 +158,11 @@ const reviewRisk = (priority?: string | null, routeReason?: string | null) => {
   return "中";
 };
 const reviewEntry = (routeReason?: string | null, reviewReason?: string | null) => {
-  if (routeReason === "service_error" || routeReason === "服务异常") return { label: "服务异常", source: reviewReason || "审核服务异常" };
-  if (routeReason === "resubmission" || routeReason === "修改重提") return { label: "修改重提", source: reviewReason || "作者重新提交" };
-  if (routeReason === "manual" || routeReason === "人工送审") return { label: "人工送审", source: reviewReason || "管理员提交" };
-  return { label: "自动命中", source: reviewReason || "关键词 / OCR" };
+  const normalizedReason = normalizeModerationReason(reviewReason) || reviewReason;
+  if (routeReason === "service_error" || routeReason === "服务异常") return { label: "服务异常", source: normalizedReason || "审核服务异常" };
+  if (routeReason === "resubmission" || routeReason === "修改重提") return { label: "修改重提", source: normalizedReason || "作者重新提交" };
+  if (routeReason === "manual" || routeReason === "人工送审") return { label: "人工送审", source: normalizedReason || "管理员提交" };
+  return { label: "自动命中", source: normalizedReason || "关键词 / OCR" };
 };
 const reviewDecision = (status?: string | null) => {
   if (status === "approved") return "已通过";
@@ -247,7 +226,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     if (typeof window === "undefined") return initialQuery ?? "";
     return sessionStorage.getItem(queryKey) ?? initialQuery ?? "";
   });
-  const [ruleRows, setRuleRows] = useState<ModerationRule[]>(initialRules);
+  const [ruleRows, setRuleRows] = useState<ModerationRule[]>(() => initialRules.map((rule) => ({ ...rule, category: normalizeRuleCategory(rule.category) })));
   const [ruleTotal, setRuleTotal] = useState(initialRuleTotal ?? initialRules.length);
   const [rulePage, setRulePage] = useState(1);
   const [rulePageSize, setRulePageSize] = useState(100);
@@ -261,7 +240,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   const [ruleError, setRuleError] = useState("");
   const [bulkRiskDialogOpen, setBulkRiskDialogOpen] = useState(false);
   const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false);
-  const [bulkTargetCategory, setBulkTargetCategory] = useState("欺诈广告");
+  const [bulkTargetCategory, setBulkTargetCategory] = useState<string>(MODERATION_REASON_OPTIONS[8]);
   const [bulkTargetRisk, setBulkTargetRisk] = useState<ModerationRiskLevel>("low");
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [message, setMessage] = useState("");
@@ -275,7 +254,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [ruleType, setRuleType] = useState<ModerationRule["rule_type"]>("keyword");
   const [rulePattern, setRulePattern] = useState("");
-  const [ruleCategory, setRuleCategory] = useState("欺诈广告");
+  const [ruleCategory, setRuleCategory] = useState<string>(MODERATION_REASON_OPTIONS[8]);
   const [ruleRiskLevel, setRuleRiskLevel] = useState<ModerationRiskLevel>("low");
   const [ruleMinHits, setRuleMinHits] = useState("5");
   const [ruleDescription, setRuleDescription] = useState("");
@@ -315,7 +294,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   const [bulkText, setBulkText] = useState("");
   const [bulkFileName, setBulkFileName] = useState("");
   const [bulkFileMode, setBulkFileMode] = useState<"txt" | "csv" | null>(null);
-  const [bulkCategory, setBulkCategory] = useState("欺诈广告");
+  const [bulkCategory, setBulkCategory] = useState<string>(MODERATION_REASON_OPTIONS[8]);
   const [bulkRiskLevel, setBulkRiskLevel] = useState<ModerationRiskLevel>("low");
   const [bulkMinHits, setBulkMinHits] = useState("5");
   const [bulkDescription, setBulkDescription] = useState("");
@@ -349,7 +328,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
         void loadRules({ page: payload.totalPages });
         return;
       }
-      setRuleRows(payload.rules);
+      setRuleRows(payload.rules.map((rule) => ({ ...rule, category: normalizeRuleCategory(rule.category) })));
       setRuleTotal(payload.total);
       setRulePage(payload.page);
       setRulePageSize(payload.pageSize);
@@ -437,7 +416,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   };
 
   const resetRuleForm = () => {
-    setRuleError(""); setRuleType("keyword"); setRulePattern(""); setRuleCategory("欺诈广告"); setRuleRiskLevel("low"); setRuleMinHits("5"); setRuleDescription(""); setEditingRule(null);
+    setRuleError(""); setRuleType("keyword"); setRulePattern(""); setRuleCategory(MODERATION_REASON_OPTIONS[8]); setRuleRiskLevel("low"); setRuleMinHits("5"); setRuleDescription(""); setEditingRule(null);
   };
 
   const parseBulkLines = () => {
@@ -461,7 +440,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   };
 
   const openBulkImport = () => {
-    setBulkText(""); setBulkFileName(""); setBulkFileMode(null); setBulkCategory("欺诈广告"); setBulkRiskLevel("low"); setBulkMinHits("5"); setBulkDescription(""); setBulkError(""); setBulkResult(null); setBulkImportOpen(true);
+    setBulkText(""); setBulkFileName(""); setBulkFileMode(null); setBulkCategory(MODERATION_REASON_OPTIONS[8]); setBulkRiskLevel("low"); setBulkMinHits("5"); setBulkDescription(""); setBulkError(""); setBulkResult(null); setBulkImportOpen(true);
   };
 
   const closeBulkImport = () => {
@@ -514,7 +493,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   };
 
   const openEditRule = (rule: ModerationRule) => {
-    setRuleError(""); setRuleType(rule.rule_type); setRulePattern(rule.pattern); setRuleCategory(rule.category);
+    setRuleError(""); setRuleType(rule.rule_type); setRulePattern(rule.pattern); setRuleCategory(normalizeRuleCategory(rule.category));
     const currentRisk = rule.risk_level || "low";
     setRuleRiskLevel(currentRisk);
     setRuleMinHits(String(rule.min_hits ?? riskLabels[currentRisk].hits));
@@ -688,7 +667,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
 
   const openBulkCategoryDialog = () => {
     if (selectedRuleIds.size === 0) return;
-    setBulkTargetCategory("欺诈广告");
+    setBulkTargetCategory(MODERATION_REASON_OPTIONS[8]);
     setBulkCategoryDialogOpen(true);
   };
 

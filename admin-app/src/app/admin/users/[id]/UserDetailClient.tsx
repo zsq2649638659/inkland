@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@shared/moderationReasons";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type UserDetailPayload = {
@@ -153,11 +154,11 @@ const governanceGroups: Array<{
   { level: "高", label: "暂停账号", description: "临时关闭评论、发布和举报。", tone: "high", actions: ["suspend"] },
   { level: "极高", label: "永久封禁", description: "永久停用账号功能，不设置结束时间。", tone: "critical", actions: ["ban"] },
 ];
-const warningQuickReasons = ["发布违规内容", "辱骂或人身攻击", "广告或引流", "盗用他人作品", "恶意举报", "重复提交违规内容"];
+const warningQuickReasons = [...MODERATION_REASON_OPTIONS];
 const enforcementReasonPresets: Record<EnforcementAction, string[]> = {
   warn: warningQuickReasons,
-  restrict_comment: ["辱骂或人身攻击", "刷屏或灌水", "持续发布违规评论", "重复提交违规评论"],
-  restrict_publish: ["发布违规内容", "重复提交违规内容", "盗用他人作品", "广告或引流"],
+  restrict_comment: ["人身攻击、骚扰与仇恨歧视", "无关内容、刷屏与恶意灌水", "其他违规"],
+  restrict_publish: ["色情、淫秽与低俗", "涉未成年人不良信息", "广告、导流与恶意营销", "抄袭、盗用与其他侵权", "其他违规"],
   restrict_report: ["恶意举报", "短时间大量重复举报", "举报理由与内容明显无关", "滥用举报功能"],
   suspend: ["多项功能持续违规", "绕过限制继续违规", "严重扰乱社区秩序", "累计违规达到暂停标准"],
   ban: ["严重违规", "多次违规且拒不整改", "绕过限制持续违规", "恶意破坏社区秩序"],
@@ -526,7 +527,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
             {detail.reporter_stats?.recent_reports?.length ? <div className="admin-recent-report-list">
               {detail.reporter_stats.recent_reports.map((report) => <div className="admin-recent-report-item" key={report.id}>
                 <strong>{targetShortLabels[report.target_type || ""] || "内容"}举报 · {reportStatusLabels[report.status || ""] || report.status || "未知"}</strong>
-                <span>{report.reason_category || "未填写原因"}{report.details ? ` · ${report.details}` : ""}</span>
+                <span>{normalizeModerationReason(report.reason_category) || "未填写原因"}{report.details ? ` · ${report.details}` : ""}</span>
                 <small>{fullDate(report.created_at)} · ID {report.target_id}</small>
               </div>)}
             </div> : null}
@@ -535,7 +536,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row"><h2>违规记录</h2><span>{detail.violations.length} 条</span></div>
             {detail.violations.length ? <div className="admin-risk-list">{detail.violations.map((item) => <div className="admin-risk-item" key={item.id}>
-              <strong>{item.content_type || "账号"} · {item.category || "未分类"}</strong>
+              <strong>{item.content_type || "账号"} · {normalizeModerationReason(item.category) || "未分类"}</strong>
               <div className="admin-risk-tags"><span>{severityLabels[item.severity || ""] || item.severity}</span><span>{item.status === "active" ? "有效" : "已撤销"}</span></div>
               {item.summary ? <small>{item.summary}</small> : null}
               <small>确认于 {fullDate(item.confirmed_at)}{item.revoked_at ? ` · 撤销于 ${fullDate(item.revoked_at)}` : ""}</small>

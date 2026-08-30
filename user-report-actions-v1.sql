@@ -300,7 +300,7 @@ BEGIN
             || '删除对象：你发布在《' || COALESCE(v_content_title, '某作品') || '》下的评论' || E'\n'
           ELSE '内容已被删除' || E'\n'
             || '删除对象：你的作品《' || COALESCE(v_content_title, '未命名作品') || '》' || E'\n' END
-          || '删除原因：违反社区规范（' || COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '内容违规') || '）' || E'\n'
+          || '删除原因：违反社区规范（' || COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他违规') || '）' || E'\n'
           || '已采取措施：该内容已被删除，不再公开展示。' || E'\n'
           || '下一步：如需提交复核，可通过设置页反馈或联系客服邮箱联系我们。',
         FALSE, now_ts,
@@ -314,7 +314,7 @@ BEGIN
         category, severity, summary, confirmed_by, confirmed_at, metadata
       ) VALUES (
         v_owner_id, 'report_case', p_case_id, v_content_target_type, v_content_target_id,
-        COALESCE(case_record.primary_reason_category, '内容违规'), 'standard',
+        COALESCE(case_record.primary_reason_category, '其他违规'), 'standard',
         CASE WHEN v_content_target_type = 'comment'
           THEN '用户举报转为内容案件后删除评论：' || left(COALESCE(v_content_snippet, ''), 120)
           ELSE '用户举报转为内容案件后删除作品：' || COALESCE(v_content_title, '') END,
@@ -511,7 +511,7 @@ BEGIN
   END IF;
 
   -- 按飞书 3.4.2 固定模板组装“举报已处理”通知（用户举报）
-  v_reporter_reason := COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他问题');
+  v_reporter_reason := COALESCE(NULLIF(btrim(COALESCE(case_record.primary_reason_category, '')), ''), '其他违规');
   v_reporter_object := '用户“' || COALESCE(NULLIF(btrim(COALESCE(snapshot_record.object_snapshot->>'nickname', '')), ''), '某用户') || '”';
   v_reporter_notify := '举报已处理' || E'\n'
     || '举报对象：' || v_reporter_object || E'\n'

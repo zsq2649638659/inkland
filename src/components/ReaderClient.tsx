@@ -11,6 +11,7 @@ import ParagraphCommentPanel from "@/components/ParagraphCommentPanel";
 import EmojiPicker from "@/components/EmojiPicker";
 import { createNotification } from "@/lib/notifications";
 import { submitReportV1 } from "@/lib/reportContent";
+import { MODERATION_REASON_OPTIONS } from "@shared/moderationReasons";
 import { assertCanComment } from "@/lib/userRestrictions";
 import type { Post, Comment } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
@@ -399,10 +400,11 @@ export default function ReaderClient({ post }: ReaderClientProps) {
   };
 
   const submitReport = async () => {
-    const reason = reportReason === "其他" ? reportCustomReason.trim() : reportReason.trim();
-    if (!reportModal || !reason) return;
+    const reason = reportReason.trim();
+    const details = reportReason === "其他违规" ? reportCustomReason.trim() : undefined;
+    if (!reportModal || !reason || (reportReason === "其他违规" && !details)) return;
     setReportSubmitting(true);
-    const result = await submitReportV1(supabase, { targetType: reportModal.targetType, targetId: reportModal.targetId, reason });
+    const result = await submitReportV1(supabase, { targetType: reportModal.targetType, targetId: reportModal.targetId, reason, details });
     setReportSubmitting(false);
     if (!result.ok) { showToast(result.message); return; }
     setReportModal(null);
@@ -1106,7 +1108,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
           <div className="modal-title">举报原因</div>
           <div className="modal-body">
             <ul className="report-reason-list">
-              {["垃圾广告", "色情低俗内容", "人身攻击与辱骂", "违法违规内容", "引战与恶意引战", "其他"].map((reason) => (
+              {MODERATION_REASON_OPTIONS.map((reason) => (
                 <li
                   key={reason}
                   className={`report-reason-item${reportReason === reason ? ' selected' : ''}`}
@@ -1118,7 +1120,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
                 </li>
               ))}
             </ul>
-            {reportReason === "其他" && (
+            {reportReason === "其他违规" && (
               <textarea
                 className="moderation-custom-reason"
                 value={reportCustomReason}
@@ -1134,7 +1136,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
             <button
               className="btn-modal btn-modal-primary"
               onClick={submitReport}
-              disabled={reportSubmitting || !reportReason || (reportReason === "其他" && !reportCustomReason.trim())}
+              disabled={reportSubmitting || !reportReason || (reportReason === "其他违规" && !reportCustomReason.trim())}
             >
               {reportSubmitting ? "提交中..." : "提交举报"}
             </button>
