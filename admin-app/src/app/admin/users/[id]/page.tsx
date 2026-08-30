@@ -41,5 +41,6 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   return <UserDetailClient
     detail={detail as never}
     profileRevisions={(profileRevisions || []) as never}
+    adminInitial={user.email?.slice(0, 1).toUpperCase() || "A"}
   />;
 }

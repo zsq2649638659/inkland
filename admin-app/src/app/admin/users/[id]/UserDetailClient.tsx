@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import AdminDetailFrame from "../../AdminDetailFrame";
 
 type UserDetailPayload = {
   ok: boolean;
@@ -133,21 +134,45 @@ const severityLabels: Record<string, string> = {
   critical: "紧急",
 };
 const actionCopy: Record<EnforcementAction, { label: string; title: string; desc: string; danger?: boolean }> = {
-  warn: { label: "发送警告", title: "向用户发送账号警告？", desc: "警告会写入违规记录并通知用户，账号状态变为“已警告”。可点选常见原因，或点“其他原因”自行输入。" },
-  restrict_comment: { label: "限制评论", title: "限制该用户发表评论？", desc: "选择结束时间。限制期间评论提交会被前台和数据库双重拦截。" },
+  warn: { label: "正式警告…", title: "向用户发送账号警告？", desc: "警告会写入违规记录并通知用户，账号状态变为“已警告”。可点选常见原因，或点“其他原因”自行输入。" },
+  restrict_comment: { label: "限制发言…", title: "限制该用户发表评论？", desc: "选择结束时间。限制期间评论提交会被前台和数据库双重拦截。" },
   restrict_publish: { label: "限制发布", title: "限制该用户发布内容？", desc: "选择结束时间。限制期间不能新发布、提交审核或重新提交连载审核。" },
   restrict_report: { label: "限制举报", title: "限制该用户提交举报？", desc: "选择结束时间。限制期间作品与评论举报都会被拦截。" },
   suspend: { label: "暂停账号", title: "暂停该用户账号？", desc: "选择结束时间。暂停期间评论、发布和举报均被拦截；未勾选隐藏时已发布内容保持展示。" },
-  ban: { label: "永久封禁", title: "永久封禁该用户账号？", desc: "永久封禁不需要结束时间。账号无法评论、发布或举报；未勾选隐藏时已发布内容保持展示。" },
+  ban: { label: "封禁账号…", title: "永久封禁该用户账号？", desc: "永久封禁不需要结束时间。账号无法评论、发布或举报；未勾选隐藏时已发布内容保持展示。", danger: true },
 };
+const governanceGroups: Array<{
+  level: string;
+  label: string;
+  description: string;
+  tone: "low" | "medium" | "high" | "critical";
+  actions: EnforcementAction[];
+}> = [
+  { level: "低", label: "提醒", description: "记录警告并通知用户，不限制功能。", tone: "low", actions: ["warn"] },
+  { level: "中", label: "单项功能限制", description: "只关闭所选功能，可设置结束时间。", tone: "medium", actions: ["restrict_comment", "restrict_publish", "restrict_report"] },
+  { level: "高", label: "暂停账号", description: "临时关闭评论、发布和举报。", tone: "high", actions: ["suspend"] },
+  { level: "极高", label: "永久封禁", description: "永久停用账号功能，不设置结束时间。", tone: "critical", actions: ["ban"] },
+];
 const warningQuickReasons = ["发布违规内容", "辱骂或人身攻击", "广告或引流", "盗用他人作品", "恶意举报", "重复提交违规内容"];
+const enforcementReasonPresets: Record<EnforcementAction, string[]> = {
+  warn: warningQuickReasons,
+  restrict_comment: ["辱骂或人身攻击", "刷屏或灌水", "持续发布违规评论", "重复提交违规评论"],
+  restrict_publish: ["发布违规内容", "重复提交违规内容", "盗用他人作品", "广告或引流"],
+  restrict_report: ["恶意举报", "短时间大量重复举报", "举报理由与内容明显无关", "滥用举报功能"],
+  suspend: ["多项功能持续违规", "绕过限制继续违规", "严重扰乱社区秩序", "累计违规达到暂停标准"],
+  ban: ["严重违规", "多次违规且拒不整改", "绕过限制持续违规", "恶意破坏社区秩序"],
+};
+const liftReasonPresets: Record<LiftMode, string[]> = {
+  lift: ["限制期满，自动解除", "申诉复核通过", "确认原限制不适用", "用户完成整改", "治理决定调整"],
+  restore: ["处罚期满，自动恢复", "申诉复核通过", "确认原处罚不适用", "用户完成整改", "治理决定调整"],
+};
 const reminderQuickReasons = ["举报理由与内容明显无关", "短时间大量重复举报", "反复举报已判定无问题内容", "补充说明含辱骂或威胁", "请勿滥用举报功能"];
 const targetShortLabels: Record<string, string> = { post: "作品", comment: "评论", user: "用户" };
 const reportStatusLabels: Record<string, string> = { pending: "待处理", reviewing: "处理中", resolved: "已处理", cancelled: "已取消" };
 const quickDurations = [
-  { label: "24 小时", hours: 24 },
   { label: "7 天", hours: 24 * 7 },
-  { label: "30 天", hours: 24 * 30 },
+  { label: "1 个月", hours: 24 * 30 },
+  { label: "半年", hours: 24 * 180 },
 ];
 
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }) : "—";
@@ -171,7 +196,7 @@ const toLocalInput = (date: Date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export default function UserDetailClient({ detail, profileRevisions }: { detail: UserDetailPayload; profileRevisions: ProfileRevisionRow[] }) {
+export default function UserDetailClient({ detail, profileRevisions, adminInitial = "A" }: { detail: UserDetailPayload; profileRevisions: ProfileRevisionRow[]; adminInitial?: string }) {
   const [enforceOpen, setEnforceOpen] = useState(false);
   const [liftOpen, setLiftOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -207,10 +232,40 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
   const [limitInput, setLimitInput] = useState("20");
   const [limitBusy, setLimitBusy] = useState(false);
   const [limitError, setLimitError] = useState("");
+  const [copiedId, setCopiedId] = useState(false);
 
   const user = detail.user;
   const stats = detail.stats;
   const needsEnds = ["restrict_comment", "restrict_publish", "restrict_report", "suspend"].includes(action);
+  const copyUserId = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(user.id);
+      setCopiedId(true);
+      setSuccess("已复制用户 ID");
+      window.setTimeout(() => setCopiedId(false), 1500);
+    } catch {
+      setSuccess("复制失败，请手动复制。");
+    }
+  };
+  const openEnforcement = (nextAction: EnforcementAction) => {
+    setAction(nextAction);
+    setReason("");
+    setCustomReason(false);
+    setEndsAt("");
+    setQuickHours(null);
+    setError("");
+    setSuccess("");
+    setEnforceOpen(true);
+  };
+  const pendingProfileRevisions = profileRevisions.filter((item) => item.status === "submitted").length;
+  const attentionText = [
+    stats.pending_report_cases ? `${stats.pending_report_cases} 个待处理举报案件` : "",
+    stats.active_restrictions ? `${stats.active_restrictions} 项功能限制生效中` : "",
+    pendingProfileRevisions ? `${pendingProfileRevisions} 条资料整改待确认` : "",
+  ].filter(Boolean).join("；") || "当前没有待处理治理事项。";
+  const governanceTrail = detail.restrictions.slice(0, 4).map((item) => `${dateText(item.starts_at || item.created_at)} · ${restrictionLabels[item.restriction_type || ""] || item.restriction_type || "账号处置"} · ${item.status === "active" ? "生效中" : item.status === "lifted" ? "已解除" : "已结束"}`);
+  if (!governanceTrail.length && user.moderated_at) governanceTrail.push(`${fullDate(user.moderated_at)} · ${user.moderation_note || "最近处置已记录"}`);
 
   const notificationPreview = () => {
     const reasonText = customReason ? reason : reason || "未填写";
@@ -383,30 +438,53 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
   const statusPill = (status?: string | null) => <span className={`admin-user-status ${status || ""}`}>{statusLabels[status || ""] || status || "未知"}</span>;
 
   return (
-    <main className="admin-detail-shell">
-      <header className="admin-detail-top">
-        <Link href="/admin?view=users" className="admin-back-link">← 返回用户管理</Link>
-        <span className="admin-detail-status">{statusPill(user.moderation_status)}</span>
-      </header>
+    <AdminDetailFrame activeView="users" breadcrumb="管理后台 / 用户管理 / 详情" adminInitial={adminInitial}>
+      <div className="admin-user-detail-page admin-detail-shell">
+        <header className="admin-detail-top">
+          <Link href="/admin?view=users" className="admin-btn admin-btn-light">← 上一个账号</Link>
+          <span className="admin-detail-queue-label">账号列表第 1 / 1 个</span>
+          <button className="admin-btn admin-btn-light" type="button" disabled>下一个账号 →</button>
+        </header>
 
-      <div className="admin-review-heading">
-        <div className="admin-detail-kicker">USER ACCOUNT · {user.id?.slice(0, 8).toUpperCase() || "USER"}</div>
-        <h1>{user.nickname || "未命名用户"}</h1>
-        <div className="admin-detail-meta">
-          注册于 {fullDate(user.created_at)} · 账号状态：{statusLabels[user.moderation_status || ""] || user.moderation_status || "未知"}
-          {user.moderated_at ? ` · 最近处置 ${fullDate(user.moderated_at)}` : ""}
+        <div className="admin-review-heading">
+          <div className="admin-detail-title-line">
+            {statusPill(user.moderation_status)}
+            <h1>{user.nickname || "未命名用户"}</h1>
+          </div>
+          <div className="admin-detail-meta-line">
+            <p className="admin-detail-meta">用户账号 · 注册于 {fullDate(user.created_at)} · 当前属于{statusLabels[user.moderation_status || ""] || user.moderation_status || "未知"}账号 · 最近处置 {user.moderated_at ? fullDate(user.moderated_at) : "未记录"}</p>
+            <div className="admin-entity-ids"><button type="button" className={`admin-copy-id${copiedId ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyUserId()}>{copiedId ? "已复制用户 ID" : `用户 ${user.id}`}</button></div>
+          </div>
         </div>
-      </div>
 
-      <div className="admin-review-layout">
+        <div className="admin-review-layout">
         <aside className="admin-review-summary-column">
           <section className="admin-detail-panel">
+            <h2>账号事实</h2>
             <div className="admin-user-profile">
               {user.avatar_url ? <img src={user.avatar_url} alt="用户头像" className="admin-user-avatar" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span>}
               <div><strong>{user.nickname || "未命名用户"}</strong><span>用户 ID</span><code className="admin-mono">{user.id}</code></div>
             </div>
             {user.bio ? <p className="admin-user-bio">{user.bio}</p> : <p>该用户没有填写个人简介。</p>}
             {user.moderation_note ? <div className="admin-moderation-note"><strong>最近处置说明</strong><span>{user.moderation_note}</span></div> : null}
+            <dl className="admin-user-facts">
+              <dt>当前状态</dt><dd>{statusLabels[user.moderation_status || ""] || user.moderation_status || "未知"}</dd>
+              <dt>有效违规</dt><dd>{stats.active_violations} 次</dd>
+              <dt>被举报</dt><dd>{stats.total_report_cases} 次</dd>
+              <dt>发起举报</dt><dd>{detail.reporter_stats?.total_reports ?? 0} 次</dd>
+              <dt>备注</dt><dd>{user.moderation_note || "暂无备注"}</dd>
+            </dl>
+          </section>
+
+          <section className="admin-detail-panel">
+            <h2>当前关注事项</h2>
+            <p>{attentionText}</p>
+            <p className="admin-detail-meta">关注事项不会自动将正常账号归入“受限账号”；是否受限只取决于当前账号状态。</p>
+          </section>
+
+          <section className="admin-detail-panel">
+            <h2>治理轨迹</h2>
+            {governanceTrail.length ? <ul className="admin-detail-timeline">{governanceTrail.map((item) => <li key={item}>{item}</li>)}</ul> : <p>暂无治理轨迹。</p>}
           </section>
 
           <section className="admin-detail-panel">
@@ -495,30 +573,37 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
 
         <aside className="admin-review-action-column">
           <section className="admin-detail-panel">
-            <h2>账号处置</h2>
+            <h2>治理操作</h2>
             <p>处罚会真实限制前台功能；是否计入确认违规由你勾选，不会自动累积。</p>
-            <div className="admin-report-actions-column">
-              {(Object.keys(actionCopy) as EnforcementAction[]).map((key) => <button className={actionCopy[key].danger ? "admin-detail-danger" : "admin-detail-secondary"} key={key} onClick={() => { setAction(key); setReason(""); setCustomReason(false); setEndsAt(""); setQuickHours(null); setError(""); setSuccess(""); setEnforceOpen(true); }}>{actionCopy[key].label}</button>)}
+            <div className="admin-governance-groups">
+              {governanceGroups.map((group) => <div className={`admin-governance-group is-${group.tone}`} key={group.tone}>
+                <div className="admin-governance-group-head">
+                  <div className="admin-governance-group-label"><span className="admin-governance-level">{group.level}</span><strong>{group.label}</strong></div>
+                  <span className="admin-governance-group-description">{group.description}</span>
+                </div>
+                <div className="admin-report-actions-column">
+                  {group.actions.map((key) => <button className={`admin-governance-action is-${group.tone}`} type="button" aria-label={`${group.label}：${actionCopy[key].label.replace("…", "")}`} key={key} onClick={() => openEnforcement(key)}>{actionCopy[key].label}</button>)}
+                </div>
+              </div>)}
             </div>
           </section>
 
           <section className="admin-detail-panel">
-            <h2>解除与恢复</h2>
-            <p>解除单项/全部功能限制，或恢复暂停、封禁账号。</p>
+            <h2>解除限制 / 恢复正常</h2>
+            <p>解除单项或全部功能限制；受限、暂停、封禁账号将恢复为正常状态。</p>
             <div className="admin-report-actions-column">
-              <button className="admin-detail-secondary" onClick={() => { setLiftMode("lift"); setLiftType("all"); setError(""); setSuccess(""); setLiftOpen(true); }}>解除功能限制</button>
-              <button className="admin-detail-secondary" onClick={() => { setLiftMode("restore"); setRestoreContent(false); setError(""); setSuccess(""); setLiftOpen(true); }}>恢复账号</button>
+              <button className="admin-detail-secondary" onClick={() => { const restore = user.moderation_status && user.moderation_status !== "active"; setLiftMode(restore ? "restore" : "lift"); setLiftType("all"); setRestoreContent(false); setError(""); setSuccess(""); setLiftOpen(true); }}>解除限制 / 恢复正常</button>
             </div>
+            <p className="admin-detail-meta">解除限制为纯确认操作；全部动作写入上方治理轨迹并注明操作人。</p>
           </section>
         </aside>
       </div>
 
       {enforceOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setEnforceOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="enforce-user-title" onSubmit={submitEnforce}>
         <div className="admin-modal-header"><div><h2 id="enforce-user-title">{actionCopy[action].title}</h2><p className="admin-modal-desc">{actionCopy[action].desc}</p></div></div>
-        <label className="admin-field">处罚类型<select value={action} onChange={(event) => setAction(event.target.value as EnforcementAction)} disabled={busy}><option value="warn">发送警告</option><option value="restrict_comment">限制评论</option><option value="restrict_publish">限制发布</option><option value="restrict_report">限制举报</option><option value="suspend">暂停账号</option><option value="ban">永久封禁</option></select></label>
-        {action === "warn" ? <div className="admin-field admin-warn-reason-field"><span className="admin-field-label">常见处罚原因</span><div className="admin-warn-reason-options">{warningQuickReasons.map((item) => <button className={reason === item && !customReason ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => { setReason(item); setCustomReason(false); }}>{item}</button>)}<button className={customReason ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={busy} onClick={() => { setCustomReason(true); if (!reason.trim()) setReason(""); }}>其他原因</button></div></div> : null}
-        <label className="admin-field">处罚依据{action === "warn" ? <input value={customReason ? reason : ""} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder={customReason ? "请输入其他处罚依据，会展示给用户并写入通知" : "请选择上方常见原因，或点“其他原因”输入"} disabled={busy || !customReason} /> : <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} />}</label>
-        {action === "restrict_report" ? <div className="admin-field"><span className="admin-field-label">快捷时长</span><div className="admin-duration-chips">{quickDurations.map((item) => <button className={quickHours === item.hours ? "admin-duration-chip is-selected" : "admin-duration-chip"} type="button" key={item.label} disabled={busy} onClick={() => { setQuickHours(item.hours); setEndsAt(toLocalInput(new Date(Date.now() + item.hours * 3600 * 1000))); }}>{item.label}</button>)}</div></div> : null}
+        <div className="admin-field admin-enforce-reason-field"><span className="admin-field-label">常见处罚依据</span><div className="admin-warn-reason-options">{enforcementReasonPresets[action].map((item) => <button className={reason === item && !customReason ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => { setReason(item); setCustomReason(false); }}>{item}</button>)}<button className={customReason ? "admin-warn-reason-chip is-other is-selected" : "admin-warn-reason-chip is-other"} type="button" disabled={busy} onClick={() => { setCustomReason(true); if (!reason.trim()) setReason(""); }}>其他原因</button></div></div>
+        <label className="admin-field">处罚依据<input value={reason} onChange={(event) => { setReason(event.target.value); setCustomReason(true); }} maxLength={500} placeholder={customReason || action !== "warn" ? "请输入处罚依据，会展示给用户并写入通知" : "请选择上方常见原因，或点“其他原因”输入"} disabled={busy || action === "warn" && !customReason} /></label>
+        {needsEnds ? <div className="admin-field"><span className="admin-field-label">快捷时长</span><div className="admin-duration-chips">{quickDurations.map((item) => <button className={quickHours === item.hours ? "admin-duration-chip is-selected" : "admin-duration-chip"} type="button" key={item.label} disabled={busy} onClick={() => { setQuickHours(item.hours); setEndsAt(toLocalInput(new Date(Date.now() + item.hours * 3600 * 1000))); }}>{item.label}</button>)}</div></div> : null}
         {needsEnds ? <label className="admin-field">结束时间<input type="datetime-local" value={endsAt} onChange={(event) => { setQuickHours(null); setEndsAt(event.target.value); }} disabled={busy} /></label> : null}
         <label className="admin-field admin-check-field"><input type="checkbox" checked={countViolation} onChange={(event) => setCountViolation(event.target.checked)} disabled={busy} /><span>计入确认违规（手动确认才累计，与收到举报次数无关）</span></label>
         {action === "suspend" || action === "ban" ? <label className="admin-field admin-check-field"><input type="checkbox" checked={hideContent} onChange={(event) => setHideContent(event.target.checked)} disabled={busy} /><span>隐藏该用户已发布的作品（不删除；未勾选时已发布内容保持展示，恢复时可选还原）</span></label> : null}
@@ -534,7 +619,8 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
       {liftOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setLiftOpen(false); }}><form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="lift-user-title" onSubmit={submitLift}>
         <div className="admin-modal-header"><div><h2 id="lift-user-title">{liftMode === "restore" ? "恢复该用户账号？" : "解除功能限制？"}</h2><p className="admin-modal-desc">{liftMode === "restore" ? "恢复后账号回到正常或警告状态；勾选可同时还原此前被隐藏的已发布作品。" : "可解除单项限制，或选择“全部”一次解除所有功能限制。"}</p></div></div>
         {liftMode === "lift" ? <label className="admin-field">解除类型<select value={liftType} onChange={(event) => setLiftType(event.target.value)} disabled={busy}><option value="all">全部限制</option><option value="comment">评论限制</option><option value="publish">发布限制</option><option value="report">举报限制</option><option value="profile_edit">资料编辑限制</option><option value="interact">互动限制</option><option value="account">账号处罚</option></select></label> : null}
-        <label className="admin-field">解除原因<input value={liftReason} onChange={(event) => setLiftReason(event.target.value)} maxLength={500} placeholder="必填，会展示给用户并写入通知" disabled={busy} /></label>
+        <div className="admin-field admin-lift-reason-field"><span className="admin-field-label">常见解除原因</span><div className="admin-warn-reason-options">{liftReasonPresets[liftMode].map((item) => <button className={liftReason === item ? "admin-warn-reason-chip is-selected" : "admin-warn-reason-chip"} type="button" key={item} disabled={busy} onClick={() => setLiftReason(item)}>{item}</button>)}</div></div>
+        <label className="admin-field">解除原因<input value={liftReason} onChange={(event) => setLiftReason(event.target.value)} maxLength={500} placeholder="请选择上方常见原因，或自行填写" disabled={busy} /></label>
         {liftMode === "restore" ? <label className="admin-field admin-check-field"><input type="checkbox" checked={restoreContent} onChange={(event) => setRestoreContent(event.target.checked)} disabled={busy} /><span>还原此前因暂停/封禁隐藏的已发布作品</span></label> : null}
         <label className="admin-field">内部备注（可选）<textarea value={liftNote} onChange={(event) => setLiftNote(event.target.value)} maxLength={500} placeholder="记录给审核日志的内部备注，不会展示给用户" disabled={busy} /></label>
         {error ? <div className="admin-alert admin-alert-error" role="alert">{error}</div> : null}
@@ -576,6 +662,7 @@ export default function UserDetailClient({ detail, profileRevisions }: { detail:
       </form></div> : null}
 
       {success ? <div className="admin-toast" role="status">{success}</div> : null}
-    </main>
+      </div>
+    </AdminDetailFrame>
   );
 }

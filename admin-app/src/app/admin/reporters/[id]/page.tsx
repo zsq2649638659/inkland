@@ -30,7 +30,7 @@ export default async function ReporterDetailPage({ params }: { params: Promise<{
     }
     return <div className="admin-detail-shell"><div className="admin-detail-top"><span className="admin-back-link">← 返回举报中心</span></div><div className="admin-alert admin-alert-error">{detail?.message || "举报者风险数据读取失败，请稍后重试。"}</div></div>;
   }
-  if (!detail.user) redirect("/admin?view=reports");
+  if (!detail.user) redirect("/admin?view=reportwork");
 
-  return <ReporterDetailClient detail={detail as never} />;
+  return <ReporterDetailClient detail={detail as never} adminInitial={user.email?.slice(0, 1).toUpperCase() || "A"} />;
 }

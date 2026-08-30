@@ -54,7 +54,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true, message: result.message || (hidden ? "该内容已暂时隐藏。" : "该内容已恢复公开展示。") });
   }
   const isUserAction = (userActions as readonly string[]).includes(body.action);
+  if (!isUserAction && ["dismiss", "remind", "delete"].includes(body.action) && !body.reason?.trim()) {
+    return NextResponse.json({ error: "请填写处理原因。" }, { status: 400 });
+  }
   const rpcName = isUserAction ? "admin_resolve_user_report_case" : "admin_resolve_report_case";
+  const contentNote = [body.reason?.trim(), body.note?.trim()].filter(Boolean).join("；") || null;
   const params = isUserAction ? {
     p_case_id: body.caseId,
     p_action: body.action,
@@ -64,7 +68,7 @@ export async function PATCH(request: Request) {
   } : {
     p_case_id: body.caseId,
     p_action: body.action,
-    p_note: body.note?.trim() || null,
+    p_note: contentNote,
   };
   const { data, error } = await supabase.rpc(rpcName, params);
   const result = data as { ok?: boolean; message?: string } | null;

@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import AdminDetailFrame from "../../AdminDetailFrame";
 
 type RecentReportRow = {
   id: string;
@@ -97,17 +98,30 @@ const reportStatusLabels: Record<string, string> = { pending: "待处理", revie
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 const fullDate = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "—";
 
-export default function ReporterDetailClient({ detail }: { detail: ReporterDetailPayload }) {
+export default function ReporterDetailClient({ detail, adminInitial = "A" }: { detail: ReporterDetailPayload; adminInitial?: string }) {
   const [modal, setModal] = useState<ModalKind>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [copiedId, setCopiedId] = useState(false);
 
   const user = detail.user;
   const stats = detail.reporter_stats;
   const lowQuality = Boolean(stats.low_quality);
   const isRestricted = detail.report_permission.status === "restricted";
+
+  const copyUserId = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(user.id);
+      setCopiedId(true);
+      setSuccess("已复制用户 ID");
+      window.setTimeout(() => setCopiedId(false), 1500);
+    } catch {
+      setSuccess("复制失败，请手动复制。");
+    }
+  };
 
   const openKeep = () => {
     setReason(""); setError(""); setSuccess(""); setModal("keep");
@@ -143,18 +157,26 @@ export default function ReporterDetailClient({ detail }: { detail: ReporterDetai
   const statusPill = <span className={`admin-user-status ${user.moderation_status || ""}`}>{userStatusLabels[user.moderation_status || ""] || user.moderation_status || "未知"}</span>;
 
   return (
-    <main className="admin-detail-shell">
+    <AdminDetailFrame activeView="reportwork" breadcrumb="管理后台 / 举报者风险 / 详情" adminInitial={adminInitial}>
+    <div className="admin-reporter-detail-page admin-detail-shell">
       <header className="admin-detail-top">
-        <Link href="/admin?view=reports" className="admin-back-link">← 返回举报中心</Link>
-        <span className="admin-detail-status">{statusPill}</span>
+        <Link href="/admin?view=reportwork" className="admin-btn admin-btn-light">← 返回作品举报</Link>
+        <span className="admin-detail-queue-label">举报者风险详情</span>
+        <button className="admin-btn admin-btn-light" type="button" disabled>下一个举报者 →</button>
       </header>
 
       <div className="admin-review-heading">
-        <div className="admin-detail-kicker">REPORTER RISK · {user.id.slice(0, 8).toUpperCase()}</div>
-        <h1>{user.nickname || "未命名用户"}</h1>
-        <div className="admin-detail-meta">
-          注册于 {fullDate(user.created_at)} · 举报权限：{isRestricted ? `受限${detail.report_permission.restricted_until ? `至 ${dateText(detail.report_permission.restricted_until)}` : ""}` : "正常"}
-          {user.moderated_at ? ` · 最近处置 ${fullDate(user.moderated_at)}` : ""}
+        <div className="admin-detail-title-line">
+          {statusPill}
+          <span className="admin-reporter-risk-pill">{riskLabels[stats.risk_level || "normal"] || "正常"}</span>
+          <h1>{user.nickname || "未命名用户"}</h1>
+        </div>
+        <div className="admin-detail-meta-line">
+          <p className="admin-detail-meta">
+            举报者风险 · 注册于 {fullDate(user.created_at)} · 举报权限：{isRestricted ? `受限${detail.report_permission.restricted_until ? `至 ${dateText(detail.report_permission.restricted_until)}` : ""}` : "正常"}
+            {user.moderated_at ? ` · 最近处置 ${fullDate(user.moderated_at)}` : ""}
+          </p>
+          <div className="admin-entity-ids"><button type="button" className={`admin-copy-id${copiedId ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyUserId()}>{copiedId ? "已复制用户 ID" : `用户 ${user.id}`}</button></div>
         </div>
       </div>
 
@@ -247,6 +269,7 @@ export default function ReporterDetailClient({ detail }: { detail: ReporterDetai
       </form></div> : null}
 
       {success ? <div className="admin-toast" role="status">{success}</div> : null}
-    </main>
+    </div>
+    </AdminDetailFrame>
   );
 }

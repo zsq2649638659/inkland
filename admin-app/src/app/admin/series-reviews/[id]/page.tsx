@@ -7,9 +7,19 @@ export default async function SeriesReviewPage({ params }: { params: Promise<{ i
   const { supabase, user } = await getAdminContext();
   if (!user) redirect("/admin/login");
   const db = createAdminServiceClient() || supabase;
-  const { data: series } = await db.from("series").select("id, user_id, name, description, tags, series_type, status, review_status, review_reason, review_submission_number, created_at").eq("id", id).eq("review_status", "pending").maybeSingle();
+  const { data: series } = await db.from("series").select("id, user_id, name, description, tags, series_type, status, review_status, review_reason, review_submission_number, created_at").eq("id", id).maybeSingle();
   if (!series) notFound();
-  const { data: reviewCase } = await db.from("series_moderation_review_cases").select("id, route_reason, screening_status, rules_version, created_at").eq("series_id", id).in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(1).maybeSingle();
-  const { data: findings } = reviewCase ? await db.from("series_moderation_findings").select("id, category, severity, quoted_text, details").eq("review_case_id", reviewCase.id).order("created_at", { ascending: true }) : { data: [] };
-  return <SeriesReviewClient series={series as never} reviewCase={reviewCase as never} findings={(findings || []) as never[]} />;
+  const { data: reviewHistory } = await db.from("series_moderation_review_cases")
+    .select("id, status, route_reason, screening_status, screening_sources, rules_version, created_at, decided_by, decided_at, submission_number")
+    .eq("series_id", id).order("created_at", { ascending: true });
+  const reviewCase = (reviewHistory || []).find((item) => ["pending", "reviewing"].includes(item.status))
+    || (reviewHistory || [])[reviewHistory?.length ? reviewHistory.length - 1 : 0]
+    || null;
+  if (!reviewCase) notFound();
+  const { data: findings } = reviewCase ? await db.from("series_moderation_findings").select("id, category, source, severity, quoted_text, details").eq("review_case_id", reviewCase.id).order("created_at", { ascending: true }) : { data: [] };
+  const [{ count: pendingPostCount }, { count: pendingSeriesCount }] = await Promise.all([
+    db.from("posts").select("id", { count: "exact", head: true }).eq("review_status", "pending"),
+    db.from("series_moderation_review_cases").select("id", { count: "exact", head: true }).in("status", ["pending", "reviewing"]),
+  ]);
+  return <SeriesReviewClient pendingCount={(pendingPostCount || 0) + (pendingSeriesCount || 0)} series={series as never} reviewCase={reviewCase as never} reviewHistory={(reviewHistory || []) as never[]} findings={(findings || []) as never[]} />;
 }

@@ -52,9 +52,65 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({ error: result?.message || "举报中心数据读取失败，请稍后重试。" }, { status: 500 });
   }
+
+  const cases = Array.isArray(result.cases) ? result.cases as Array<Record<string, unknown>> : [];
+  const caseIds = cases.map((item) => typeof item.id === "string" ? item.id : "").filter(Boolean);
+  const [contentReportsResult, commentReportsResult, snapshotsResult] = await Promise.all([
+    caseIds.length
+      ? supabase.from("content_reports").select("case_id, reporter_id, created_at, reporter:profiles!content_reports_reporter_id_fkey(nickname)").in("case_id", caseIds).order("created_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    caseIds.length
+      ? supabase.from("comment_reports").select("case_id, reporter_id, created_at, reporter:profiles!comment_reports_reporter_id_fkey(nickname)").in("case_id", caseIds).order("created_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    caseIds.length
+      ? supabase.from("moderation_report_snapshots").select("case_id, post_id, context_snapshot").in("case_id", caseIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  type ReportDetail = { case_id?: string | null; reporter_id?: string | null; created_at?: string | null; reporter?: { nickname?: string | null } | Array<{ nickname?: string | null }> | null };
+  const latestReportByCase = new Map<string, { reporterId: string | null; reporterNickname: string | null; reporterCount: number; latestTime: number }>();
+  const reportsByCase = new Map<string, Set<string>>();
+  for (const report of [...(contentReportsResult.data || []), ...(commentReportsResult.data || [])] as ReportDetail[]) {
+    if (!report.case_id) continue;
+    const current = latestReportByCase.get(report.case_id) || { reporterId: null, reporterNickname: null, reporterCount: 0, latestTime: 0 };
+    const reporterIds = reportsByCase.get(report.case_id) || new Set<string>();
+    if (report.reporter_id) reporterIds.add(report.reporter_id);
+    reportsByCase.set(report.case_id, reporterIds);
+    const nestedReporter = Array.isArray(report.reporter) ? report.reporter[0] : report.reporter;
+    const reportTime = report.created_at ? new Date(report.created_at).getTime() : 0;
+    if (!current.reporterId || reportTime >= current.latestTime) {
+      current.reporterId = report.reporter_id || null;
+      current.reporterNickname = nestedReporter?.nickname || null;
+      current.latestTime = reportTime;
+    }
+    current.reporterCount = reporterIds.size;
+    latestReportByCase.set(report.case_id, current);
+  }
+
+  const snapshotByCase = new Map<string, { postId: string | null; postTitle: string | null }>();
+  for (const snapshot of (snapshotsResult.data || []) as Array<{ case_id?: string | null; post_id?: string | null; context_snapshot?: Record<string, unknown> | null }>) {
+    if (!snapshot.case_id) continue;
+    const title = typeof snapshot.context_snapshot?.post_title === "string" ? snapshot.context_snapshot.post_title : null;
+    snapshotByCase.set(snapshot.case_id, { postId: snapshot.post_id || null, postTitle: title });
+  }
+
+  const enrichedCases = cases.map((item) => {
+    const caseId = typeof item.id === "string" ? item.id : "";
+    const reporter = latestReportByCase.get(caseId);
+    const snapshot = snapshotByCase.get(caseId);
+    return {
+      ...item,
+      ...(reporter ? {
+        reporter_count: reporter.reporterCount,
+        latest_reporter_id: reporter.reporterId,
+        latest_reporter_nickname: reporter.reporterNickname,
+      } : {}),
+      ...(snapshot ? { snapshot_post_id: snapshot.postId, snapshot_post_title: snapshot.postTitle } : {}),
+    };
+  });
   return NextResponse.json({
     success: true,
-    cases: result.cases || [],
+    cases: enrichedCases,
     reporters: result.reporters || [],
     targetUsers: result.target_users || [],
     counts: result.counts || {},
