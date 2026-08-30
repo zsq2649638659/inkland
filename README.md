@@ -16,7 +16,7 @@ npm run dev
 
 ## 数据库与存储
 
-部署前请按顺序检查项目中的 SQL 文件，至少执行 `feedbacks.sql` 和 `storage-policies.sql`，并在 Supabase 控制台核验所有 RLS 策略。完整清单见 [DEPLOYMENT-CHECKLIST.md](./DEPLOYMENT-CHECKLIST.md)。
+部署前请按顺序检查项目中的 SQL 文件，至少执行 `feedbacks.sql` 和 `storage-policies.sql`，并在 Supabase 控制台核验所有 RLS 策略。若启用用户反馈飞书同步，还要执行 [`feedback-feishu-sync-v1.sql`](./feedback-feishu-sync-v1.sql)，配置说明见 [`docs/飞书反馈同步配置.md`](./docs/飞书反馈同步配置.md)。完整清单见 [DEPLOYMENT-CHECKLIST.md](./DEPLOYMENT-CHECKLIST.md)。
 
 ## 生产部署
 
