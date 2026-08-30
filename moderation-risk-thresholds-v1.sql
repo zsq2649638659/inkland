@@ -123,10 +123,10 @@ BEGIN
   END IF;
   v_needle_len := char_length(v_needle);
   LOOP
-    v_found := position(v_needle IN v_hay FROM v_position);
+    v_found := position(v_needle IN substr(v_hay, v_position));
     EXIT WHEN v_found = 0;
     v_count := v_count + 1;
-    v_position := v_position + v_found + v_needle_len;
+    v_position := v_position + v_found - 1 + v_needle_len;
   END LOOP;
   RETURN v_count;
 END;
