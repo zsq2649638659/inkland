@@ -13,18 +13,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { supabase, user, account } = await getAdminContext();
   if (!user || !account) redirect("/admin/login");
   const [postsResult, reviewCasesResult, reviewHistoryCasesResult, seriesCasesResult, seriesHistoryCasesResult, commentCasesResult, commentHistoryCasesResult, reportCasesResult, feedbacksResult, rulesResult, rulesCountResult] = await Promise.all([
-    supabase.from("posts").select("id, title, content, post_type, status, review_status, review_reason, created_at, user_id, author:profiles!posts_user_id_fkey(nickname)").eq("review_status", "pending").order("created_at", { ascending: false }).limit(50),
-    supabase.from("moderation_review_cases").select("id, post_id, status, screening_status, priority, route_reason, submission_number").in("status", ["pending", "service_error"]).in("screening_status", ["completed", "failed"]).order("created_at", { ascending: false }).limit(100),
-    supabase.from("moderation_review_cases").select("id, post_id, status, screening_status, priority, route_reason, submission_number, decided_by, decided_at, created_at").not("status", "in", "(pending,reviewing,service_error)").order("created_at", { ascending: false }).limit(100),
-    supabase.from("series_moderation_review_cases").select("id, series_id, status, screening_status, priority, route_reason, created_at").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(100),
-    supabase.from("series_moderation_review_cases").select("id, series_id, status, screening_status, priority, route_reason, decided_by, decided_at, created_at").not("status", "in", "(pending,reviewing,service_error)").order("created_at", { ascending: false }).limit(100),
-    supabase.from("comment_moderation_review_cases").select("id, comment_id, post_id, author_id, parent_id, paragraph_index, status, priority, route_reason, screening_status, screening_sources, submission_number, decision_reason, decided_by, decided_at, created_at, comment_snapshot").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(100),
-    supabase.from("comment_moderation_review_cases").select("id, comment_id, post_id, author_id, parent_id, paragraph_index, status, priority, route_reason, screening_status, screening_sources, submission_number, decision_reason, decided_by, decided_at, created_at, comment_snapshot").not("status", "in", "(pending,reviewing)").order("created_at", { ascending: false }).limit(200),
-    supabase.from("moderation_report_cases").select("id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at").in("status", ["pending", "reviewing"]).order("last_reported_at", { ascending: false }).limit(50),
-    supabase.from("feedbacks").select("id, type, content, status, created_at, user_id").order("created_at", { ascending: false }).limit(200),
-    supabase.from("moderation_rules").select("id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at").order("created_at", { ascending: false }).limit(100),
+    supabase.from("posts").select("id, public_id, title, content, post_type, status, review_status, review_reason, created_at, user_id, author:profiles!posts_user_id_fkey(nickname, public_id)").eq("review_status", "pending").order("created_at", { ascending: false }).limit(50),
+    supabase.from("moderation_review_cases").select("id, public_id, post_id, status, screening_status, priority, route_reason, submission_number").in("status", ["pending", "service_error"]).in("screening_status", ["completed", "failed"]).order("created_at", { ascending: false }).limit(100),
+    supabase.from("moderation_review_cases").select("id, public_id, post_id, status, screening_status, priority, route_reason, submission_number, decided_by, decided_at, created_at").not("status", "in", "(pending,reviewing,service_error)").order("created_at", { ascending: false }).limit(100),
+    supabase.from("series_moderation_review_cases").select("id, public_id, series_id, status, screening_status, priority, route_reason, created_at").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(100),
+    supabase.from("series_moderation_review_cases").select("id, public_id, series_id, status, screening_status, priority, route_reason, decided_by, decided_at, created_at").not("status", "in", "(pending,reviewing,service_error)").order("created_at", { ascending: false }).limit(100),
+    supabase.from("comment_moderation_review_cases").select("id, public_id, comment_id, post_id, author_id, parent_id, paragraph_index, status, priority, route_reason, screening_status, screening_sources, submission_number, decision_reason, decided_by, decided_at, created_at, comment_snapshot").in("status", ["pending", "reviewing"]).order("created_at", { ascending: false }).limit(100),
+    supabase.from("comment_moderation_review_cases").select("id, public_id, comment_id, post_id, author_id, parent_id, paragraph_index, status, priority, route_reason, screening_status, screening_sources, submission_number, decision_reason, decided_by, decided_at, created_at, comment_snapshot").not("status", "in", "(pending,reviewing)").order("created_at", { ascending: false }).limit(200),
+    supabase.from("moderation_report_cases").select("id, public_id, target_type, target_id, target_user_id, status, priority, outcome, primary_reason_category, report_count, first_reported_at, last_reported_at, created_at").in("status", ["pending", "reviewing"]).order("last_reported_at", { ascending: false }).limit(50),
+    supabase.from("feedbacks").select("id, public_id, type, content, status, created_at, user_id").order("created_at", { ascending: false }).limit(200),
+    supabase.from("moderation_rules").select("id, public_id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at").order("created_at", { ascending: false }).limit(100),
     supabase.from("moderation_rules").select("id", { count: "exact", head: true }),
   ]);
+  const feedbackUserIds = [...new Set((feedbacksResult.data || []).map((item) => item.user_id).filter((value): value is string => Boolean(value)))];
+  const { data: feedbackUsers } = feedbackUserIds.length
+    ? await supabase.from("profiles").select("id, public_id").in("id", feedbackUserIds)
+    : { data: [] };
+  const feedbackUserMap = new Map((feedbackUsers || []).map((item) => [item.id, item.public_id]));
+  const feedbackRows = (feedbacksResult.data || []).map((item) => ({ ...item, user_public_id: feedbackUserMap.get(item.user_id) || null }));
   const reportCaseIds = (reportCasesResult.data || []).map((item) => item.id);
   const { data: reportSnapshots } = reportCaseIds.length
     ? await supabase.from("moderation_report_snapshots").select("case_id, object_snapshot, context_snapshot").in("case_id", reportCaseIds)
@@ -63,22 +69,30 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   });
   const seriesIds = (seriesCasesResult.data || []).map((item) => item.series_id);
   const { data: reviewSeries } = seriesIds.length
-    ? await supabase.from("series").select("id, name, description, user_id, created_at, review_status").in("id", seriesIds)
+    ? await supabase.from("series").select("id, public_id, name, description, user_id, created_at, review_status").in("id", seriesIds)
+    : { data: [] };
+  const seriesAuthorIds = [...new Set((reviewSeries || []).map((item) => item.user_id).filter((value): value is string => Boolean(value)))];
+  const { data: seriesAuthors } = seriesAuthorIds.length
+    ? await supabase.from("profiles").select("id, public_id").in("id", seriesAuthorIds)
     : { data: [] };
   const seriesMap = new Map((reviewSeries || []).map((item) => [item.id, item]));
-  const humanReviewSeries = (seriesCasesResult.data || []).map((item) => ({ ...item, series: seriesMap.get(item.series_id) || null }));
+  const seriesAuthorMap = new Map((seriesAuthors || []).map((item) => [item.id, item.public_id]));
+  const humanReviewSeries = (seriesCasesResult.data || []).map((item) => {
+    const series = seriesMap.get(item.series_id);
+    return { ...item, series: series ? { ...series, user_public_id: seriesAuthorMap.get(series.user_id) || null } : null };
+  });
   const commentCaseRows = [...(commentCasesResult.data || []), ...(commentHistoryCasesResult.data || [])];
   const commentIds = [...new Set(commentCaseRows.map((item) => item.comment_id).filter((value): value is string => Boolean(value)))];
   const commentPostIds = [...new Set(commentCaseRows.map((item) => item.post_id).filter((value): value is string => Boolean(value)))];
   const commentAuthorIds = [...new Set(commentCaseRows.map((item) => item.author_id).filter((value): value is string => Boolean(value)))];
   const [{ data: commentObjects }, { data: commentAuthors }, { data: commentPosts }] = await Promise.all([
-    commentIds.length ? supabase.from("comments").select("id, post_id, user_id, parent_id, paragraph_index, content, created_at").in("id", commentIds) : Promise.resolve({ data: [] }),
-    commentAuthorIds.length ? supabase.from("profiles").select("id, nickname").in("id", commentAuthorIds) : Promise.resolve({ data: [] }),
-    commentPostIds.length ? supabase.from("posts").select("id, title").in("id", commentPostIds) : Promise.resolve({ data: [] }),
+    commentIds.length ? supabase.from("comments").select("id, public_id, post_id, user_id, parent_id, paragraph_index, content, created_at").in("id", commentIds) : Promise.resolve({ data: [] }),
+    commentAuthorIds.length ? supabase.from("profiles").select("id, public_id, nickname").in("id", commentAuthorIds) : Promise.resolve({ data: [] }),
+    commentPostIds.length ? supabase.from("posts").select("id, public_id, title").in("id", commentPostIds) : Promise.resolve({ data: [] }),
   ]);
   const commentObjectMap = new Map((commentObjects || []).map((item) => [item.id, item]));
-  const commentAuthorMap = new Map((commentAuthors || []).map((item) => [item.id, item.nickname || "未知用户"]));
-  const commentPostMap = new Map((commentPosts || []).map((item) => [item.id, item.title || "未知作品"]));
+  const commentAuthorMap = new Map((commentAuthors || []).map((item) => [item.id, item]));
+  const commentPostMap = new Map((commentPosts || []).map((item) => [item.id, item]));
   const normalizeCommentCase = (item: (typeof commentCaseRows)[number]) => {
     const snapshot = (item.comment_snapshot || {}) as Record<string, unknown>;
     const comment = item.comment_id ? commentObjectMap.get(item.comment_id) : null;
@@ -93,8 +107,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       parent_id: item.parent_id ?? (typeof snapshot.parent_id === "string" ? snapshot.parent_id : comment?.parent_id || null),
       paragraph_index: item.paragraph_index ?? (typeof snapshot.paragraph_index === "number" ? snapshot.paragraph_index : comment?.paragraph_index ?? null),
       content: comment?.content || (typeof snapshot.content === "string" ? snapshot.content : "评论内容已删除"),
-      author_nickname: authorId ? commentAuthorMap.get(authorId) || "未知用户" : "未知用户",
-      post_title: postId ? commentPostMap.get(postId) || "未知作品" : "未知作品",
+      comment_public_id: comment?.public_id || (typeof snapshot.public_id === "string" ? snapshot.public_id : null),
+      author_nickname: authorId ? commentAuthorMap.get(authorId)?.nickname || "未知用户" : "未知用户",
+      author_public_id: authorId ? commentAuthorMap.get(authorId)?.public_id || null : null,
+      post_title: postId ? commentPostMap.get(postId)?.title || "未知作品" : "未知作品",
+      post_public_id: postId ? commentPostMap.get(postId)?.public_id || null : null,
       screening_sources: Array.isArray(item.screening_sources) ? item.screening_sources : [],
     };
   };
@@ -108,33 +125,42 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ])];
   const [{ data: historyPosts }, { data: historySeries }, { data: historyActors }] = await Promise.all([
     historyPostIds.length
-      ? supabase.from("posts").select("id, title, post_type, user_id, review_reason, author:profiles!posts_user_id_fkey(nickname)").in("id", historyPostIds)
+      ? supabase.from("posts").select("id, public_id, title, post_type, user_id, review_reason, author:profiles!posts_user_id_fkey(nickname, public_id)").in("id", historyPostIds)
       : Promise.resolve({ data: [] }),
     historySeriesIds.length
-      ? supabase.from("series").select("id, name, user_id").in("id", historySeriesIds)
+      ? supabase.from("series").select("id, public_id, name, user_id").in("id", historySeriesIds)
       : Promise.resolve({ data: [] }),
     historyActorIds.length
-      ? supabase.from("profiles").select("id, nickname").in("id", historyActorIds)
+      ? supabase.from("profiles").select("id, public_id, nickname").in("id", historyActorIds)
       : Promise.resolve({ data: [] }),
   ]);
+  const historySeriesAuthorIds = [...new Set((historySeries || []).map((item) => item.user_id).filter((value): value is string => Boolean(value)))];
+  const { data: historySeriesAuthors } = historySeriesAuthorIds.length
+    ? await supabase.from("profiles").select("id, public_id, nickname").in("id", historySeriesAuthorIds)
+    : { data: [] };
   const historyPostMap = new Map((historyPosts || []).map((item) => [item.id, item]));
   const historySeriesMap = new Map((historySeries || []).map((item) => [item.id, item]));
-  const historyActorMap = new Map((historyActors || []).map((item) => [item.id, item.nickname]));
+  const historyActorMap = new Map([
+    ...(historyActors || []).map((item) => [item.id, item] as const),
+    ...(historySeriesAuthors || []).map((item) => [item.id, item] as const),
+  ]);
   const reviewHistory = [
     ...(reviewHistoryCasesResult.data || []).flatMap((item) => {
       const post = historyPostMap.get(item.post_id);
       if (!post) return [];
-      const author = post.author as unknown as { nickname?: string } | Array<{ nickname?: string }> | null;
+      const author = post.author as unknown as { nickname?: string; public_id?: string | null } | Array<{ nickname?: string; public_id?: string | null }> | null;
       return [{
         ...item,
         item_type: "post" as const,
         entity_id: post.id,
+        entity_public_id: post.public_id,
         title: post.title || "无标题",
         post_type: post.post_type,
         user_id: post.user_id,
+        user_public_id: (Array.isArray(author) ? author[0]?.public_id : author?.public_id) || null,
         author_name: (Array.isArray(author) ? author[0]?.nickname : author?.nickname) || "未知作者",
         review_reason: post.review_reason,
-        handler_name: item.decided_by ? historyActorMap.get(item.decided_by) || `管理员 ${item.decided_by.slice(0, 8)}` : "未记录",
+        handler_name: item.decided_by ? historyActorMap.get(item.decided_by)?.nickname || `管理员 ${item.decided_by.slice(0, 8)}` : "未记录",
       }];
     }),
     ...(seriesHistoryCasesResult.data || []).flatMap((item) => {
@@ -144,12 +170,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         ...item,
         item_type: "series" as const,
         entity_id: series.id,
+        entity_public_id: series.public_id,
         title: series.name || "未命名连载",
         post_type: "serial",
         user_id: series.user_id,
-        author_name: historyActorMap.get(series.user_id) || `作者 ${series.user_id.slice(0, 8)}`,
+        user_public_id: historyActorMap.get(series.user_id)?.public_id || null,
+        author_name: historyActorMap.get(series.user_id)?.nickname || `作者 ${series.user_id.slice(0, 8)}`,
         review_reason: null,
-        handler_name: item.decided_by ? historyActorMap.get(item.decided_by) || `管理员 ${item.decided_by.slice(0, 8)}` : "未记录",
+        handler_name: item.decided_by ? historyActorMap.get(item.decided_by)?.nickname || `管理员 ${item.decided_by.slice(0, 8)}` : "未记录",
       }];
     }),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -164,7 +192,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     initialCommentHistory={initialCommentHistory as never[]}
     commentsReady={!commentCasesResult.error && !commentHistoryCasesResult.error}
     initialReports={reportCases as never[]}
-    initialFeedbacks={(feedbacksResult.data || []) as never[]}
+    initialFeedbacks={feedbackRows as never[]}
     initialRules={(rulesResult.data || []) as never[]}
     initialRuleTotal={rulesCountResult.count ?? (rulesResult.data || []).length}
     rulesReady={!rulesResult.error && !rulesCountResult.error}
