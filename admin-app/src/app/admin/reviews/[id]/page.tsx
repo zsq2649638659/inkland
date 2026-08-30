@@ -134,6 +134,7 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
       pendingCount={(pendingPostCount || 0) + (pendingSeriesCount || 0)}
       post={{ ...post, content: signedPostContent } as never}
       version={{ ...version, content: signed.content } as never}
+      previousVersion={(previousVersion || null) as never}
       reviewCase={reviewCase as never}
       findings={(findings || []) as never[]}
       historyCases={(historyCases || []) as never[]}

@@ -116,6 +116,7 @@ type HistoryVersion = {
   version_number?: number | null;
   submission_number?: number | null;
   title?: string | null;
+  content?: string | null;
   word_count?: number | null;
   submitted_at?: string | null;
   created_at?: string | null;
@@ -271,6 +272,19 @@ function ocrConfidence(finding: Finding) {
 
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false }) : "—";
+}
+
+function splitReviewParagraphs(content?: string | null) {
+  return (content || "")
+    .replace(/<!--\s*作者的话：[\s\S]*?-->/g, "")
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .split(/\n\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function normalizeReviewText(value?: string | null) {
+  return (value || "").replace(/\s+/g, " ").trim();
 }
 
 /* ==================== 高亮 ==================== */
@@ -448,10 +462,11 @@ function manualRangesIntersect(item: ManualFindingDraft, context: SelectionConte
 
 const makeClientId = () => `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-export default function ReviewDetailClient({ pendingCount, post, version, reviewCase, findings, historyCases, historyVersions, comparison, imageAccessError }: {
+export default function ReviewDetailClient({ pendingCount, post, version, previousVersion, reviewCase, findings, historyCases, historyVersions, comparison, imageAccessError }: {
   pendingCount: number;
   post: Post;
   version: Version;
+  previousVersion?: Version | null;
   reviewCase: ReviewCase;
   findings: Finding[];
   historyCases: HistoryCase[];
@@ -485,6 +500,16 @@ export default function ReviewDetailClient({ pendingCount, post, version, review
     () => noteStripped.replace(/!\[[^\]]*\]\(([^)]+)\)/g, "").split(/\n\n+/).map((part) => part.trim()).filter(Boolean),
     [noteStripped],
   );
+  const previousParagraphs = useMemo(() => splitReviewParagraphs(previousVersion?.content), [previousVersion?.content]);
+  const changedParagraphs = useMemo(() => {
+    if (!previousVersion || !comparison?.available || comparison.is_identical) return [];
+    const length = Math.max(previousParagraphs.length, paragraphs.length);
+    return Array.from({ length }, (_, index) => ({
+      index: index + 1,
+      previous: previousParagraphs[index] || "",
+      current: paragraphs[index] || "",
+    })).filter((item) => normalizeReviewText(item.previous) !== normalizeReviewText(item.current));
+  }, [comparison?.available, comparison?.is_identical, paragraphs, previousParagraphs, previousVersion]);
 
   const confirmedFindings = findings.filter((f) => confirmedIds.includes(f.id) || (f.status === "confirmed" && !dismissedIds.includes(f.id)));
   const titleSystemRanges = systemRangesInText(version.title || "无标题", confirmedFindings.filter((f) => f.field_name === "title"));
@@ -927,17 +952,8 @@ export default function ReviewDetailClient({ pendingCount, post, version, review
         </div>
       </header>
 
-      <div className="admin-review-layout">
-        <div className="admin-review-doc">
-          <section className="admin-detail-panel">
-            <div className="admin-panel-title-row">
-              <h2>送审原因</h2>
-            </div>
-            <div className="admin-evidence">
-              {reviewCase?.route_reason || "自动命中"}触发人工审核；审核来源：{screeningSources}；自动审核状态：{screeningStatusLabels[reviewCase?.screening_status || ""] || "—"}；规则/模型版本：{reviewCase?.rules_version || reviewCase?.model_version || "—"}。
-            </div>
-          </section>
-
+      <div className="admin-review-layout admin-work-review-layout">
+        <aside className="admin-review-findings" aria-label="机审标记与人工核对">
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row">
               <h2>机审标记 · 人工核对</h2>
@@ -1002,6 +1018,17 @@ export default function ReviewDetailClient({ pendingCount, post, version, review
             ) : (
               <div className="admin-manual-empty">还没有人工标记。框选正文文字试试，气泡会出现在选中文字上方。</div>
             ))}
+          </section>
+        </aside>
+
+        <div className="admin-review-doc">
+          <section className="admin-detail-panel">
+            <div className="admin-panel-title-row">
+              <h2>送审原因</h2>
+            </div>
+            <div className="admin-evidence">
+              {reviewCase?.route_reason || "自动命中"}触发人工审核；审核来源：{screeningSources}；自动审核状态：{screeningStatusLabels[reviewCase?.screening_status || ""] || "—"}；规则/模型版本：{reviewCase?.rules_version || reviewCase?.model_version || "—"}。
+            </div>
           </section>
 
           <section className="admin-detail-panel admin-snapshot">
@@ -1152,6 +1179,28 @@ export default function ReviewDetailClient({ pendingCount, post, version, review
                 <p>作者端再次原样提交会被拦截，需修改内容后才能重新提交审核。</p>
               ) : comparison.changed_fields?.length ? (
                 <p>修改涉及：{comparison.changed_fields.map((field) => comparisonFieldLabels[field] || field).join("、")}</p>
+              ) : null}
+              {!comparison.is_identical && changedParagraphs.length ? (
+                <div className="admin-version-diff" aria-label="正文段落版本对比">
+                  <div className="admin-version-diff-head">
+                    <span>段落</span>
+                    <span>上次打回版本</span>
+                    <span>本次提交版本</span>
+                  </div>
+                  {changedParagraphs.map((paragraph) => (
+                    <div className="admin-version-diff-row" key={paragraph.index}>
+                      <strong>第 {paragraph.index} 段</strong>
+                      <div className="admin-version-diff-old">
+                        {paragraph.previous ? <del>{paragraph.previous}</del> : <span>（本次新增）</span>}
+                      </div>
+                      <div className="admin-version-diff-new">
+                        {paragraph.current || "（本次删除）"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : !comparison.is_identical && comparison.changed_fields?.includes("content") ? (
+                <p className="admin-detail-empty">正文已变化，但上一版正文暂时无法读取。</p>
               ) : null}
             </section>
           ) : null}
