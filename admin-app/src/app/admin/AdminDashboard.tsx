@@ -5,12 +5,14 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin-browser";
 import { fetchWithTimeout } from "@/lib/adminFetch";
+import { displayPublicId } from "@/lib/publicIds";
 import ReportCenterClient from "./ReportCenterClient";
 import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
 
-type PostItem = { id: string; review_case_id: string; title: string; post_type: string | null; created_at: string; user_id: string; review_reason?: string | null; review_priority?: string | null; review_route_reason?: string | null; screening_status?: string | null; review_submission_number?: number | null; author?: { nickname?: string } | null };
+type PostItem = { id: string; public_id?: string | null; review_case_id: string; title: string; post_type: string | null; created_at: string; user_id: string; author_public_id?: string | null; review_reason?: string | null; review_priority?: string | null; review_route_reason?: string | null; screening_status?: string | null; review_submission_number?: number | null; author?: { nickname?: string; public_id?: string | null } | null };
 type ReportItem = {
   id: string;
+  public_id?: string | null;
   target_type: "post" | "comment" | "user";
   target_id: string;
   target_user_id?: string | null;
@@ -25,12 +27,13 @@ type ReportItem = {
   target_summary?: string | null;
   author_nickname?: string | null;
 };
-type FeedbackItem = { id: string; type: string; content: string; status: string; created_at: string; user_id: string };
-type SeriesReviewItem = { id: string; series_id: string; status: string; priority: string; route_reason: string; created_at: string; series?: { id: string; name: string; description: string | null; user_id: string } | null };
-type ReviewHistoryItem = { id: string; item_type: "post" | "series"; entity_id: string; title: string; post_type: string | null; user_id: string; author_name: string; status: string; screening_status?: string | null; priority?: string | null; route_reason?: string | null; submission_number?: number | null; decided_by?: string | null; decided_at?: string | null; created_at: string; review_reason?: string | null; handler_name: string };
-type CommentReviewItem = { id: string; comment_id: string | null; post_id: string | null; author_id: string | null; parent_id: string | null; paragraph_index: number | null; content: string; author_nickname: string; post_title: string; status: string; priority: string; route_reason: string | null; screening_status: string | null; screening_sources: string[]; submission_number?: number | null; decided_by?: string | null; decided_at?: string | null; created_at: string; decision_reason?: string | null };
+type FeedbackItem = { id: string; public_id?: string | null; type: string; content: string; status: string; created_at: string; user_id: string; user_public_id?: string | null };
+type SeriesReviewItem = { id: string; public_id?: string | null; series_id: string; status: string; priority: string; route_reason: string; created_at: string; series?: { id: string; public_id?: string | null; name: string; description: string | null; user_id: string; user_public_id?: string | null } | null };
+type ReviewHistoryItem = { id: string; public_id?: string | null; item_type: "post" | "series"; entity_id: string; entity_public_id?: string | null; title: string; post_type: string | null; user_id: string; user_public_id?: string | null; author_name: string; status: string; screening_status?: string | null; priority?: string | null; route_reason?: string | null; submission_number?: number | null; decided_by?: string | null; decided_at?: string | null; created_at: string; review_reason?: string | null; handler_name: string };
+type CommentReviewItem = { id: string; public_id?: string | null; comment_id: string | null; comment_public_id?: string | null; post_id: string | null; post_public_id?: string | null; author_id: string | null; author_public_id?: string | null; parent_id: string | null; paragraph_index: number | null; content: string; author_nickname: string; post_title: string; status: string; priority: string; route_reason: string | null; screening_status: string | null; screening_sources: string[]; submission_number?: number | null; decided_by?: string | null; decided_at?: string | null; created_at: string; decision_reason?: string | null };
 type UserSearchRow = {
   id: string;
+  public_id?: string | null;
   nickname: string | null;
   avatar_url: string | null;
   created_at: string;
@@ -47,6 +50,7 @@ type UserSearchRow = {
 };
 export type ModerationRule = {
   id: string;
+  public_id?: string | null;
   rule_type: "keyword" | "whitelist";
   pattern: string;
   category: string;
@@ -64,11 +68,11 @@ type RuleCounts = { all: number; low: number; medium: number; high: number; whit
 type RuleListPayload = { rules: ModerationRule[]; total: number; totalPages: number; page: number; pageSize: number; counts: RuleCounts };
 type RuleListOptions = { page?: number; pageSize?: number; risk?: RuleFilter; category?: string; q?: string };
 type GlobalSearchResults = {
-  posts: Array<{ id: string; title: string; post_type: string; status: string; review_status: string; author_nickname: string; href: string | null }>;
-  series: Array<{ id: string; name: string; status: string; review_status: string; href: string | null }>;
-  users: Array<{ id: string; nickname: string; moderation_status: string; href: string }>;
-  reports: Array<{ id: string; title: string; target_type: string; status: string | null; href: string }>;
-  feedbacks: Array<{ id: string; type: string; content: string; href: string }>;
+  posts: Array<{ id: string; public_id?: string | null; title: string; post_type: string; status: string; review_status: string; author_nickname: string; href: string | null }>;
+  series: Array<{ id: string; public_id?: string | null; name: string; status: string; review_status: string; href: string | null }>;
+  users: Array<{ id: string; public_id?: string | null; nickname: string; moderation_status: string; href: string }>;
+  reports: Array<{ id: string; public_id?: string | null; title: string; target_type: string; status: string | null; href: string }>;
+  feedbacks: Array<{ id: string; public_id?: string | null; type: string; content: string; href: string }>;
 };
 type BulkImportResult = {
   inserted: number;
@@ -827,7 +831,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   }, {});
   const feedbackRows = feedbackSource
     .filter((feedback) => feedbackTypeFilter === "all" || feedbackTypeLabel(feedback.type) === feedbackTypeFilter)
-    .filter((feedback) => `${feedbackTypeLabel(feedback.type)} ${feedback.content} ${feedback.user_id} ${feedback.id}`.toLowerCase().includes(query.trim().toLowerCase()))
+    .filter((feedback) => `${feedbackTypeLabel(feedback.type)} ${feedback.content} ${displayPublicId(feedback.user_public_id, feedback.user_id)} ${displayPublicId(feedback.public_id, feedback.id)}`.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => feedbackSort === "submissions"
       ? (feedbackUserCounts[b.user_id] || 0) - (feedbackUserCounts[a.user_id] || 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       : new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -844,9 +848,9 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
       return {
         key: post.id,
         title: post.title || "无标题",
-        id: post.id,
+        id: displayPublicId(post.public_id, post.id),
         author: post.author?.nickname || "未知作者",
-        authorId: post.user_id,
+        authorId: displayPublicId(post.author?.public_id, post.user_id),
         type: post.post_type === "serial" ? "章节" : post.post_type === "illustration" ? "图片" : "单篇",
         typeKey: post.post_type === "serial" ? "chapter" : post.post_type === "illustration" ? "image" : "single",
         risk: reviewRisk(post.review_priority, post.review_route_reason),
@@ -862,9 +866,9 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
       return {
         key: `series-${item.id}`,
         title: item.series?.name || "未命名连载",
-        id: item.series_id,
-        author: item.series?.user_id ? `作者 ${item.series.user_id.slice(0, 8)}` : "未知作者",
-        authorId: item.series?.user_id || "",
+        id: displayPublicId(item.series?.public_id, item.series_id),
+        author: item.series?.user_id ? `作者 ${displayPublicId(item.series.user_public_id, item.series.user_id)}` : "未知作者",
+        authorId: item.series?.user_id ? displayPublicId(item.series.user_public_id, item.series.user_id) : "",
         type: "连载信息",
         typeKey: "series",
         risk: reviewRisk(item.priority, item.route_reason),
@@ -887,7 +891,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   const historyRows = reviewHistory.filter((item) => {
     const typeKey = item.item_type === "series" ? "series" : item.post_type === "illustration" ? "image" : item.post_type === "serial" ? "chapter" : "single";
     const entry = reviewEntry(item.route_reason, item.review_reason);
-    const searchable = `${item.title} ${item.author_name} ${item.entity_id} ${item.user_id} ${entry.label} ${entry.source} ${reviewDecision(item.status)}`.toLowerCase();
+    const searchable = `${item.title} ${item.author_name} ${displayPublicId(item.entity_public_id, item.entity_id)} ${displayPublicId(item.user_public_id, item.user_id)} ${entry.label} ${entry.source} ${reviewDecision(item.status)}`.toLowerCase();
     return searchable.includes(query.trim().toLowerCase())
       && (reviewTypeFilter === "all" || typeKey === reviewTypeFilter)
       && (reviewRiskFilter === "all" || reviewRisk(item.priority, item.route_reason) === reviewRiskFilter)
@@ -913,8 +917,8 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
         const type = item.item_type === "series" ? "连载信息" : item.post_type === "serial" ? "章节" : item.post_type === "illustration" ? "图片" : "单篇";
         const href = item.item_type === "series" ? `/admin/series-reviews/${item.entity_id}` : `/admin/reviews/${item.id}`;
         return <Link className="admin-review-row admin-review-history-row" href={href} key={`${item.item_type}-${item.id}`} title="查看只读审核记录">
-          <span className="admin-review-work"><b>{item.title}</b><small>{item.entity_id}</small></span>
-          <span className="admin-review-author"><b>{item.author_name}</b><small>{item.user_id}</small></span>
+          <span className="admin-review-work"><b>{item.title}</b><small>{displayPublicId(item.entity_public_id, item.entity_id)}</small></span>
+          <span className="admin-review-author"><b>{item.author_name}</b><small>{displayPublicId(item.user_public_id, item.user_id)}</small></span>
           <span>{type}</span>
           <span><em className={`admin-review-result is-${item.status === "approved" ? "approved" : "rejected"}`}>{reviewDecision(item.status)}</em><small>{item.submission_number ? `第 ${item.submission_number} 次提交` : "已完成处理"}</small></span>
           <span>{entry.source}<small>{entry.label}</small></span>
@@ -944,7 +948,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     .filter((item) => commentMode === "history" || commentEntryFilter === "all" || commentEntryLabel(item) === commentEntryFilter)
     .filter((item) => commentMode === "pending" || commentResultFilter === "all" || commentStatusLabel(item.status) === commentResultFilter)
     .filter((item) => {
-      const searchable = `${item.content} ${item.post_title} ${item.author_nickname} ${item.comment_id || ""} ${item.post_id || ""} ${item.author_id || ""}`.toLowerCase();
+      const searchable = `${item.content} ${item.post_title} ${item.author_nickname} ${displayPublicId(item.comment_public_id, item.comment_id)} ${displayPublicId(item.post_public_id, item.post_id)} ${displayPublicId(item.author_public_id, item.author_id)}`.toLowerCase();
       return searchable.includes(query.trim().toLowerCase());
     })
     .sort((a, b) => commentSort === "risk"
@@ -969,16 +973,16 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
       <div className="admin-comment-table">
         {commentMode === "history" ? <div className="admin-comment-table-head admin-comment-history-head"><span>原评论</span><span>所属作品</span><span>发布者</span><span>处理结果</span><span>审核依据</span><span>处理人 · 时间</span></div> : <div className="admin-comment-table-head"><span>原评论</span><span>所属作品</span><span>发布者</span><span>类型</span><span>风险</span><span>入审方式</span><span>时间</span></div>}
         {commentMode === "history" ? commentRows.map((item) => <Link className="admin-comment-row admin-comment-history-row" href={`/admin/comments/${item.id}`} key={item.id} title="查看只读评论审核记录">
-          <span><b>{item.content}</b><small>{item.comment_id || "评论已删除"}</small></span>
-          <span><b>{item.post_title || "未知作品"}</b><small>{item.post_id || "—"}</small></span>
-          <span><b>{item.author_nickname || "未知用户"}</b><small>{item.author_id || "—"}</small></span>
+          <span><b>{item.content}</b><small>{item.comment_id ? displayPublicId(item.comment_public_id, item.comment_id) : "评论已删除"}</small></span>
+          <span><b>{item.post_title || "未知作品"}</b><small>{displayPublicId(item.post_public_id, item.post_id)}</small></span>
+          <span><b>{item.author_nickname || "未知用户"}</b><small>{displayPublicId(item.author_public_id, item.author_id)}</small></span>
           <span><em className={`admin-comment-result is-${commentResultClass(item.status)}`}>{commentStatusLabel(item.status)}</em><small>评论审核结果</small></span>
           <span>{item.decision_reason || item.route_reason || "未记录"}<small>{item.screening_sources.map(commentSourceLabel).join("、") || "未记录"}</small></span>
           <span>{item.decided_by ? `管理员 ${item.decided_by.slice(0, 8)}` : "系统"}<small>{fmtReviewTime(item.decided_at || item.created_at)}</small></span>
         </Link>) : commentRows.map((item) => <Link className="admin-comment-row" href={`/admin/comments/${item.id}`} key={item.id} title="进入评论审核详情">
-          <span><b>{item.content}</b><small>{item.comment_id || "评论已删除"}</small></span>
-          <span><b>{item.post_title || "未知作品"}</b><small>{item.post_id || "—"}</small></span>
-          <span><b>{item.author_nickname || "未知用户"}</b><small>{item.author_id || "—"}</small></span>
+          <span><b>{item.content}</b><small>{item.comment_id ? displayPublicId(item.comment_public_id, item.comment_id) : "评论已删除"}</small></span>
+          <span><b>{item.post_title || "未知作品"}</b><small>{displayPublicId(item.post_public_id, item.post_id)}</small></span>
+          <span><b>{item.author_nickname || "未知用户"}</b><small>{displayPublicId(item.author_public_id, item.author_id)}</small></span>
           <span>{commentTypeLabel(item)}</span>
           <span><em className={`admin-comment-risk is-${commentRiskLabel(item.priority)}`}>{commentRiskLabel(item.priority)}</em></span>
           <span>{commentEntryLabel(item)}<small>{item.screening_sources.map(commentSourceLabel).join("、") || "未记录"}</small></span>
@@ -1000,9 +1004,9 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     <div className="admin-feedback-table">
       <div className="admin-feedback-table-head"><span>反馈 · 编号</span><span>类型</span><span>提交人</span><span>提交次数</span><span>状态</span><span>时间</span></div>
       {visibleFeedbackRows.map((item) => <div className="admin-feedback-row" key={item.id} role="button" tabIndex={0} aria-label={`查看反馈：${item.content}`} onClick={() => router.push(`/admin/feedbacks/${item.id}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(`/admin/feedbacks/${item.id}`); } }}>
-        <span><strong>{item.content}</strong><small>{item.id}</small></span>
+        <span><strong>{item.content}</strong><small>{displayPublicId(item.public_id, item.id)}</small></span>
         <span>{feedbackTypeLabel(item.type)}</span>
-        <span><strong>用户 {item.user_id.slice(0, 8)}</strong><small>{item.user_id}</small></span>
+        <span><strong>用户 {displayPublicId(item.user_public_id, item.user_id)}</strong><small>{displayPublicId(item.user_public_id, item.user_id)}</small></span>
         <span><strong>累计 {feedbackUserCounts[item.user_id] || 1} 次</strong><small>含全部类型</small></span>
         <span><em className={`admin-feedback-status ${feedbackMode === "pending" ? "is-pending" : "is-resolved"}`}>{feedbackMode === "pending" ? "待处理" : "已处理"}</em></span>
         <span>{fmt(item.created_at)}{feedbackMode === "pending" ? <button className="admin-btn admin-feedback-action" type="button" disabled={busy === item.id} onClick={(event) => { event.stopPropagation(); void handleFeedback(item.id); }}>{busy === item.id ? "处理中…" : "标记已处理"}</button> : null}</span>
@@ -1045,7 +1049,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
           <div className="admin-rules-table-head"><span><input type="checkbox" checked={visibleRuleRows.length > 0 && visibleRuleRows.every((rule) => selectedRuleIds.has(rule.id))} onChange={toggleAllPageRules} aria-label="全选当前页" /></span><span>违禁词 / 关键词组</span><span>所属分类</span><span>风险等级</span><span>状态</span></div>
           {visibleRuleRows.map((rule) => <div className="admin-rules-table-row" key={rule.id}>
             <span><input className="admin-rule-checkbox" type="checkbox" checked={selectedRuleIds.has(rule.id)} onChange={() => toggleRuleSelection(rule.id)} aria-label={`勾选 ${rule.pattern}`} /></span>
-            <span className="admin-rule-word-cell"><b>{rule.pattern}</b><small>{rule.rule_type === "whitelist" ? "白名单" : `命中 ${rule.hit_count} 次 · ${formatRiskRule(rule.risk_level || "low", rule.min_hits ?? riskLabels[rule.risk_level || "low"].hits)}`}</small></span>
+            <span className="admin-rule-word-cell"><b>{rule.pattern}</b><small>{displayPublicId(rule.public_id, rule.id)} · {rule.rule_type === "whitelist" ? "白名单" : `命中 ${rule.hit_count} 次 · ${formatRiskRule(rule.risk_level || "low", rule.min_hits ?? riskLabels[rule.risk_level || "low"].hits)}`}</small></span>
             <select className="admin-rule-row-select" value={normalizeRuleCategory(rule.category)} onChange={(event) => void updateRuleInline(rule, { category: event.target.value })} disabled={busy === rule.id} aria-label={`修改${rule.pattern}的所属分类`}>{ruleCategoryOptions.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select>
             <select className="admin-rule-row-select" value={rule.risk_level || "low"} onChange={(event) => void updateRuleInline(rule, { riskLevel: event.target.value as ModerationRiskLevel })} disabled={rule.rule_type === "whitelist" || busy === rule.id} aria-label={`修改${rule.pattern}的风险等级`}><option value="high">高</option><option value="medium">中</option><option value="low">一般</option></select>
             <button className={`admin-rule-switch ${rule.enabled ? "is-on" : ""}`} type="button" role="switch" aria-checked={rule.enabled} aria-label={`${rule.enabled ? "停用" : "启用"}${rule.pattern}`} disabled={busy === rule.id} onClick={() => void updateRuleEnabled(rule)}><i aria-hidden="true" /></button>
@@ -1060,7 +1064,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
   const filteredUsers = userResults
     .filter((user) => {
       const query = userQuery.trim().toLowerCase();
-      return !query || `${user.nickname || ""} ${user.id}`.toLowerCase().includes(query);
+      return !query || `${user.nickname || ""} ${displayPublicId(user.public_id, user.id)}`.toLowerCase().includes(query);
     })
     .filter((user) => userMode === "all" || user.moderation_status !== "active")
     .filter((user) => userStatus === "all" || user.moderation_status === userStatus)
@@ -1091,7 +1095,7 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     {userError ? <div className="admin-alert admin-alert-error" role="alert">{userError}</div> : null}
     {userLoading && !userResults.length ? <div className="admin-users-empty"><strong>用户数据加载中…</strong></div> : !userSearched ? <div className="admin-users-empty"><strong>用户数据加载中…</strong><span>正在读取真实账号列表。</span></div> : visibleUsers.length === 0 ? <div className="admin-users-empty"><strong>当前筛选下暂无账号</strong><span>换个状态或搜索关键词试试。</span></div> : <div className="admin-users-table">
       <div className="admin-users-table-head"><span>用户</span><span>状态</span><span>有效违规</span><span>举报 收 / 发</span><span>最近活动</span><span>备注</span></div>
-      {visibleUsers.map((user) => <Link className="admin-users-table-row" href={`/admin/users/${user.id}`} key={user.id}><span className="admin-users-user-cell"><span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span><span><strong>{user.nickname || "未命名用户"}</strong><code className="admin-mono">{user.id}</code></span></span><span><span className={`admin-user-status ${user.moderation_status}`}>{userStatusLabels[user.moderation_status] || user.moderation_status || "未知"}</span></span><span>{user.active_violations} 次</span><span>收 {user.total_report_cases} / 发 {user.total_reports ?? 0}</span><span>{fmtUserListTime(user.activity_at || user.created_at)}</span><span className="admin-users-note">{user.moderation_note || "—"}</span></Link>)}
+      {visibleUsers.map((user) => <Link className="admin-users-table-row" href={`/admin/users/${user.id}`} key={user.id}><span className="admin-users-user-cell"><span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span><span><strong>{user.nickname || "未命名用户"}</strong><code className="admin-mono">{displayPublicId(user.public_id, user.id)}</code></span></span><span><span className={`admin-user-status ${user.moderation_status}`}>{userStatusLabels[user.moderation_status] || user.moderation_status || "未知"}</span></span><span>{user.active_violations} 次</span><span>收 {user.total_report_cases} / 发 {user.total_reports ?? 0}</span><span>{fmtUserListTime(user.activity_at || user.created_at)}</span><span className="admin-users-note">{user.moderation_note || "—"}</span></Link>)}
     </div>}
     {userSearched && filteredUsers.length ? <div className="admin-users-pagination"><span>共 {filteredUsers.length} 条 · 第 {userPage} / {userTotalPages} 页</span><div><button className="admin-pagination-btn" type="button" disabled={userPage <= 1} onClick={() => setUserPage((page) => Math.max(1, page - 1))}>上一页</button><button className="admin-pagination-btn" type="button" disabled={userPage >= userTotalPages} onClick={() => setUserPage((page) => Math.min(userTotalPages, page + 1))}>下一页</button></div></div> : null}
   </section>;
@@ -1114,11 +1118,11 @@ export default function AdminDashboard({ initialPosts, initialSeriesReviews, ini
     {bulkImportOpen && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && busy !== "bulk-import") setBulkImportOpen(false); }}><div className="admin-modal admin-bulk-import-modal" role="dialog" aria-modal="true" aria-labelledby="bulk-import-title"><div className="admin-modal-header"><div><h2 id="bulk-import-title">批量导入敏感词</h2><p className="admin-modal-desc">整批统一使用同一组分类、风险级别和最低命中次数。</p></div></div>{bulkResult ? <div className="admin-bulk-result"><div className="admin-bulk-result-head"><div className="is-inserted"><strong>{bulkResult.inserted}</strong><span>新增</span></div><div><strong>{bulkResult.skipped}</strong><span>跳过</span></div><div><strong>{bulkResult.invalidLines}</strong><span>无效</span></div></div>{bulkResult.invalidExamples.length > 0 ? <div className="admin-bulk-result-invalid"><strong>无效行示例</strong>{bulkResult.invalidExamples.map((value, index) => <span key={`${value}-${index}`}>{value}</span>)}</div> : null}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "bulk-import"} onClick={closeBulkImport}>完成</button><button className="admin-btn admin-btn-primary" type="button" disabled={busy === "bulk-import"} onClick={resetBulkImport}>再导一批</button></div></div> : <form onSubmit={(event) => { event.preventDefault(); void runBulkImport(); }}><label className="admin-field admin-bulk-source-field">敏感词文本<textarea value={bulkText} onChange={(event) => { setBulkText(event.target.value); setBulkError(""); }} placeholder="每行一个敏感词" rows={8} autoFocus /></label><div className="admin-bulk-file-row"><label className="admin-btn admin-btn-light admin-bulk-file-btn"><Icon name="upload" />选择文件<input type="file" accept=".txt,.csv,text/plain,text/csv" onChange={handleBulkFile} /></label>{bulkFileName ? <span className="admin-bulk-file-name">{bulkFileName}</span> : <span className="admin-bulk-file-hint">支持 .txt / .csv，每行一个</span>}</div><div className="admin-bulk-form-grid admin-bulk-form-grid-3"><label className="admin-field">问题分类<select value={bulkCategory} onChange={(event) => setBulkCategory(event.target.value)}>{ruleCategoryOptions.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select></label><label className="admin-field">风险级别<select value={bulkRiskLevel} onChange={(event) => handleBulkRiskChange(event.target.value as ModerationRiskLevel)}><option value="low">低风险 · 满 5 次</option><option value="medium">中风险 · 满 3 次</option><option value="high">高风险 · 命中 1 次</option></select></label><label className="admin-field">最低命中次数<input type="number" min={1} max={999} step={1} value={bulkMinHits} onChange={(event) => setBulkMinHits(event.target.value)} /></label></div><label className="admin-field admin-bulk-note-field">本批备注（可选）<input value={bulkDescription} onChange={(event) => setBulkDescription(event.target.value)} maxLength={500} /></label>{bulkPreview.values.length > 0 ? <div className="admin-bulk-preview"><div className="admin-bulk-preview-stats"><span>候选 <b>{bulkValidCount}</b> 条</span>{bulkPreview.duplicatedInBatch > 0 ? <span>重复已合并 <b>{bulkPreview.duplicatedInBatch}</b> 条</span> : null}{bulkInvalidCount > 0 ? <span>无效 <b>{bulkInvalidCount}</b> 条</span> : null}</div><div className="admin-bulk-preview-list">{bulkPreview.values.slice(0, 40).map((value, index) => <div className={`admin-bulk-preview-row ${value.length > 500 ? "is-invalid" : ""}`} key={`${value}-${index}`}><span>{value.length > 500 ? "超长" : index + 1}</span><strong>{value}</strong></div>)}{bulkPreview.values.length > 40 ? <div className="admin-bulk-preview-more">还有 {bulkPreview.values.length - 40} 条未显示</div> : null}</div></div> : null}{bulkError && <div className="admin-alert admin-alert-error" role="alert">{bulkError}</div>}<div className="admin-modal-actions"><button className="admin-btn admin-btn-light" type="button" disabled={busy === "bulk-import"} onClick={closeBulkImport}>取消</button><button className="admin-btn admin-btn-primary" type="submit" disabled={busy === "bulk-import" || bulkPreview.values.length === 0}>{busy === "bulk-import" ? "导入中…" : "确认导入"}</button></div></form>}</div></div>}
     {globalSearchOpen ? <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !globalLoading) setGlobalSearchOpen(false); }}><div className="admin-modal admin-global-search-modal" role="dialog" aria-modal="true" aria-labelledby="global-search-title"><div className="admin-modal-header"><div><h2 id="global-search-title">全局搜索</h2><p className="admin-modal-desc">搜索作品、连载、用户、举报案件与用户反馈。</p></div></div><form className="admin-global-search-form" onSubmit={runGlobalSearch}><input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} placeholder="输入关键词" aria-label="全局搜索关键词" autoFocus /><button className="admin-btn admin-btn-primary" type="submit" disabled={globalLoading}>{globalLoading ? "搜索中…" : "搜索"}</button></form>{globalError ? <div className="admin-alert admin-alert-error" role="alert">{globalError}</div> : null}{globalResults ? <div className="admin-global-search-results">{(() => {
         const groups = [
-          { key: "posts", label: "作品", rows: globalResults.posts.map((item) => ({ key: item.id, title: item.title, meta: `${item.post_type || "作品"} · ${item.review_status === "pending" ? "待审核" : item.status || "已发布"}${item.author_nickname ? ` · ${item.author_nickname}` : ""}`, href: item.href })) },
-          { key: "series", label: "连载", rows: globalResults.series.map((item) => ({ key: item.id, title: item.name, meta: `${item.review_status === "pending" ? "待审核" : item.status || ""}`, href: item.href })) },
-          { key: "users", label: "用户", rows: globalResults.users.map((item) => ({ key: item.id, title: item.nickname, meta: `${userStatusLabels[item.moderation_status] || item.moderation_status}`, href: item.href })) },
-          { key: "reports", label: "举报案件", rows: globalResults.reports.map((item) => ({ key: item.id, title: item.title, meta: `${labels[item.target_type] || "对象"} · ${statusLabelsForSearch(item.status)}`, href: item.href })) },
-          { key: "feedbacks", label: "用户反馈", rows: globalResults.feedbacks.map((item) => ({ key: item.id, title: item.type, meta: item.content, href: item.href })) },
+          { key: "posts", label: "作品", rows: globalResults.posts.map((item) => ({ key: item.id, title: item.title, meta: `${displayPublicId(item.public_id, item.id)} · ${item.post_type || "作品"} · ${item.review_status === "pending" ? "待审核" : item.status || "已发布"}${item.author_nickname ? ` · ${item.author_nickname}` : ""}`, href: item.href })) },
+          { key: "series", label: "连载", rows: globalResults.series.map((item) => ({ key: item.id, title: item.name, meta: `${displayPublicId(item.public_id, item.id)} · ${item.review_status === "pending" ? "待审核" : item.status || ""}`, href: item.href })) },
+          { key: "users", label: "用户", rows: globalResults.users.map((item) => ({ key: item.id, title: item.nickname, meta: `${displayPublicId(item.public_id, item.id)} · ${userStatusLabels[item.moderation_status] || item.moderation_status}`, href: item.href })) },
+          { key: "reports", label: "举报案件", rows: globalResults.reports.map((item) => ({ key: item.id, title: item.title, meta: `${displayPublicId(item.public_id, item.id)} · ${labels[item.target_type] || "对象"} · ${statusLabelsForSearch(item.status)}`, href: item.href })) },
+          { key: "feedbacks", label: "用户反馈", rows: globalResults.feedbacks.map((item) => ({ key: item.id, title: item.type, meta: `${displayPublicId(item.public_id, item.id)} · ${item.content}`, href: item.href })) },
         ].filter((group) => group.rows.length > 0);
         const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
         if (total === 0) return <div className="admin-empty"><strong>没有找到匹配结果</strong></div>;

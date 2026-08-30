@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
+import { displayPublicId } from "@/lib/publicIds";
 
 const issueTypes = [...MODERATION_REASON_OPTIONS];
 const categoryLabels: Record<string, string> = { adult: "色情、淫秽与低俗", porn: "色情、淫秽与低俗" };
 
 type SeriesProps = {
-  series: { id: string; user_id: string; name: string; description: string | null; tags: string[]; series_type: string; created_at: string; review_reason: string | null; review_submission_number?: number | null };
-  reviewCase: { id?: string; status?: string | null; route_reason?: string | null; rules_version?: string | null; screening_status?: string | null; screening_sources?: string[] | null; created_at?: string | null; decided_by?: string | null; decided_at?: string | null; submission_number?: number | null } | null;
+  series: { id: string; public_id?: string | null; user_id: string; author_public_id?: string | null; name: string; description: string | null; tags: string[]; series_type: string; created_at: string; review_reason: string | null; review_submission_number?: number | null };
+  reviewCase: { id?: string; public_id?: string | null; status?: string | null; route_reason?: string | null; rules_version?: string | null; screening_status?: string | null; screening_sources?: string[] | null; created_at?: string | null; decided_by?: string | null; decided_at?: string | null; submission_number?: number | null } | null;
   reviewHistory: Array<{ id: string; status: string; route_reason?: string | null; screening_status?: string | null; screening_sources?: string[] | null; rules_version?: string | null; created_at: string; decided_by?: string | null; decided_at?: string | null; submission_number?: number | null }>;
   findings: Array<{ id: string; category: string; source?: string | null; severity?: string | null; quoted_text: string | null; details: string | null }>;
 };
@@ -188,11 +189,11 @@ export default function SeriesReviewClient({ pendingCount, series, reviewCase, r
             连载信息 · 第 {currentSubmissionNumber} 次入审 · {new Date(reviewCase?.created_at || series.created_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })} · 入审方式：{reviewCase?.route_reason || "自动命中"}
           </p>
           <div className="admin-entity-ids">
-            <button type="button" className={`admin-copy-id${copiedKey === "series" ? " is-copied" : ""}`} title="点击复制连载 ID" onClick={() => void copyId("series", series.id)}>
-              {copiedKey === "series" ? "已复制连载 ID" : `连载 ${series.id}`}
+            <button type="button" className={`admin-copy-id${copiedKey === "series" ? " is-copied" : ""}`} title="点击复制连载 ID" onClick={() => void copyId("series", displayPublicId(series.public_id, series.id))}>
+              {copiedKey === "series" ? "已复制连载 ID" : `连载 ${displayPublicId(series.public_id, series.id)}`}
             </button>
-            <button type="button" className={`admin-copy-id${copiedKey === "user" ? " is-copied" : ""}`} title="点击复制作者 ID" onClick={() => void copyId("user", series.user_id)}>
-              {copiedKey === "user" ? "已复制作者 ID" : `作者 ${series.user_id}`}
+            <button type="button" className={`admin-copy-id${copiedKey === "user" ? " is-copied" : ""}`} title="点击复制作者 ID" onClick={() => void copyId("user", displayPublicId(series.author_public_id, series.user_id))}>
+              {copiedKey === "user" ? "已复制作者 ID" : `作者 ${displayPublicId(series.author_public_id, series.user_id)}`}
             </button>
           </div>
         </div>
@@ -243,7 +244,7 @@ export default function SeriesReviewClient({ pendingCount, series, reviewCase, r
             <dl>
               <div><dt>审核服务</dt><dd>{(reviewCase?.screening_sources || []).map(screeningSourceLabel).join("、") || "未记录"}</dd></div>
               <div><dt>规则版本</dt><dd>{reviewCase?.rules_version || "—"}</dd></div>
-              <div><dt>冻结对象</dt><dd>{series.id}</dd></div>
+              <div><dt>冻结对象</dt><dd>{displayPublicId(series.public_id, series.id)}</dd></div>
               <div><dt>入审方式</dt><dd>{reviewCase?.route_reason || "自动命中"}</dd></div>
               <div><dt>提交编号</dt><dd>{currentSubmissionNumber}</dd></div>
               <div><dt>记录状态</dt><dd>{reviewStatusLabel(reviewCase?.status || "")}</dd></div>

@@ -5,7 +5,7 @@ const categories = new Set<string>(MODERATION_REASON_OPTIONS);
 const riskLevels = new Set(["low", "medium", "high"]);
 const riskFilters = new Set(["all", "low", "medium", "high", "whitelist"]);
 const riskDefaultMinHits: Record<string, number> = { low: 5, medium: 3, high: 1 };
-const RULE_SELECT = "id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at";
+const RULE_SELECT = "id, public_id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at";
 const MAX_BULK_IDS = 2000;
 
 function normalizeIds(value: unknown): string[] | null {
@@ -136,7 +136,7 @@ export async function POST(request: Request) {
   const { data, error } = await context.supabase
     .from("moderation_rules")
     .insert({ rule_type: ruleType, pattern, category, risk_level: normalizedRiskLevel, min_hits: normalizedMinHits, description: description || null, created_by: adminId, updated_by: adminId })
-    .select("id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at")
+    .select("id, public_id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at")
     .single();
 
   if (error) {
@@ -188,7 +188,7 @@ export async function PATCH(request: Request) {
       .from("moderation_rules")
       .update(updates)
       .in("id", ids)
-      .select("id, rule_type, pattern, risk_level, min_hits, enabled");
+    .select("id, public_id, rule_type, pattern, risk_level, min_hits, enabled");
     if (hasRisk || hasMinHits) query = query.eq("rule_type", "keyword");
     const { data, error } = await query;
     if (error) {
@@ -247,7 +247,7 @@ export async function PATCH(request: Request) {
     .from("moderation_rules")
     .update(updates)
     .eq("id", body.id)
-    .select("id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at")
+    .select("id, public_id, rule_type, pattern, category, severity, risk_level, min_hits, description, enabled, hit_count, updated_at")
     .maybeSingle();
   if (error) {
     if (isMissingRiskColumns(error)) return Response.json({ error: "风险分级功能尚未启用，请先执行 moderation-risk-thresholds-v1.sql。" }, { status: 503 });

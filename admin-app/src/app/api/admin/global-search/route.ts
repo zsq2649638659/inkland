@@ -5,6 +5,7 @@ type AdminContext = Awaited<ReturnType<typeof getAdminContext>>;
 
 type SearchUserRow = {
   id: string;
+  public_id?: string | null;
   nickname: string | null;
   moderation_status: string;
 };
@@ -35,20 +36,20 @@ export async function GET(request: Request) {
   const [postsResult, seriesResult, userResult, feedbacksResult, snapshotMatches] = await Promise.all([
     supabase
       .from("posts")
-      .select("id, title, post_type, status, review_status, user_id, author:profiles!posts_user_id_fkey(nickname)")
+      .select("id, public_id, title, post_type, status, review_status, user_id, author:profiles!posts_user_id_fkey(nickname, public_id)")
       .ilike("title", pattern)
       .order("created_at", { ascending: false })
       .limit(8),
     supabase
       .from("series")
-      .select("id, name, status, review_status")
+      .select("id, public_id, name, status, review_status")
       .ilike("name", pattern)
       .order("created_at", { ascending: false })
       .limit(5),
     supabase.rpc("admin_user_search", { p_query: q, p_limit: 8 }),
     supabase
       .from("feedbacks")
-      .select("id, type, content")
+      .select("id, public_id, type, content")
       .ilike("content", pattern)
       .order("created_at", { ascending: false })
       .limit(5),
@@ -56,9 +57,10 @@ export async function GET(request: Request) {
   ]);
 
   const posts = (postsResult.data || []).map((item) => {
-    const author = item.author as { nickname?: string | null } | null;
+    const author = item.author as { nickname?: string | null; public_id?: string | null } | null;
     return {
       id: item.id as string,
+      public_id: item.public_id as string | null,
       title: String(item.title || "无标题"),
       post_type: (item.post_type as string | null) || "",
       status: (item.status as string | null) || "",
@@ -70,6 +72,7 @@ export async function GET(request: Request) {
 
   const series = (seriesResult.data || []).map((item) => ({
     id: item.id as string,
+    public_id: item.public_id as string | null,
     name: String(item.name || "未命名连载"),
     status: (item.status as string | null) || "",
     review_status: (item.review_status as string | null) || "",
@@ -77,8 +80,14 @@ export async function GET(request: Request) {
   }));
 
   const userPayload = userResult.data as { ok?: boolean; users?: SearchUserRow[] } | null;
+  const userIds = userPayload?.ok ? (userPayload.users || []).map((item) => item.id) : [];
+  const { data: userProfiles } = userIds.length
+    ? await supabase.from("profiles").select("id, public_id").in("id", userIds)
+    : { data: [] };
+  const userPublicIdMap = new Map((userProfiles || []).map((item) => [item.id, item.public_id]));
   const users = userPayload?.ok ? (userPayload.users || []).map((item) => ({
     id: item.id,
+    public_id: item.public_id || userPublicIdMap.get(item.id) || null,
     nickname: item.nickname || "未命名用户",
     moderation_status: item.moderation_status,
     href: `/admin/users/${item.id}`,
@@ -86,6 +95,7 @@ export async function GET(request: Request) {
 
   const feedbacks = (feedbacksResult.data || []).map((item) => ({
     id: item.id as string,
+    public_id: item.public_id as string | null,
     type: String(item.type || "反馈"),
     content: String(item.content || ""),
     href: "/admin?view=feedbacks",
@@ -96,7 +106,7 @@ export async function GET(request: Request) {
   if (caseIds.length) {
     const { data: cases } = await supabase
       .from("moderation_report_cases")
-      .select("id, target_type, status")
+      .select("id, public_id, target_type, status")
       .in("id", caseIds)
       .limit(20);
     const caseMap = new Map((cases || []).map((item) => [item.id, item]));
@@ -106,6 +116,7 @@ export async function GET(request: Request) {
         const row = caseMap.get(item.case_id)!;
         return {
           id: item.case_id,
+          public_id: row.public_id as string | null,
           title: snapshotTitle(item),
           target_type: String(item.target_type || "object"),
           status: (row.status as string | null) || "",

@@ -3,6 +3,7 @@
 ## 需要在 Supabase 控制台完成
 
 - 执行 `feedbacks.sql`，创建反馈表和 RLS 策略。
+- 执行 [`编号体系-v1.sql`](./编号体系-v1.sql)，为新用户、作品、评论、举报、审核、反馈和规则记录启用业务编号；不回填或修改现有 UUID。
 - 执行 `storage-policies.sql`，配置 `post-images` bucket、文件大小和对象权限。
 - 执行 `private-images.sql`，配置 `private-post-images` bucket 和登录可见作品规则。
 - 在 Authentication → URL Configuration 中设置正式 Site URL 和 Redirect URLs。

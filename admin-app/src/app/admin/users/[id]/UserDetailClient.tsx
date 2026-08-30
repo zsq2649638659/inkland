@@ -5,12 +5,14 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { fetchWithTimeout } from "@/lib/adminFetch";
 import { MODERATION_REASON_OPTIONS, normalizeModerationReason } from "@/lib/moderationReasons";
+import { displayPublicId } from "@/lib/publicIds";
 import AdminDetailFrame from "../../AdminDetailFrame";
 
 type UserDetailPayload = {
   ok: boolean;
   user: {
     id: string;
+    public_id?: string | null;
     nickname?: string | null;
     avatar_url?: string | null;
     bio?: string | null;
@@ -29,6 +31,7 @@ type UserDetailPayload = {
   };
   recent_posts: Array<{
     id: string;
+    public_id?: string | null;
     title?: string | null;
     post_type?: string | null;
     status?: string | null;
@@ -39,13 +42,16 @@ type UserDetailPayload = {
   }>;
   recent_comments: Array<{
     id: string;
+    public_id?: string | null;
     post_id?: string | null;
+    post_public_id?: string | null;
     parent_id?: string | null;
     content?: string | null;
     created_at?: string | null;
   }>;
   violations: Array<{
     id: string;
+    public_id?: string | null;
     source_type?: string | null;
     content_type?: string | null;
     category?: string | null;
@@ -58,6 +64,7 @@ type UserDetailPayload = {
   }>;
   restrictions: Array<{
     id: string;
+    public_id?: string | null;
     restriction_type?: string | null;
     status?: string | null;
     reason?: string | null;
@@ -80,6 +87,7 @@ type UserDetailPayload = {
       id: string;
       target_type?: string | null;
       target_id?: string | null;
+      target_public_id?: string | null;
       reason_category?: string | null;
       details?: string | null;
       status?: string | null;
@@ -241,7 +249,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
   const copyUserId = async () => {
     try {
       if (!navigator.clipboard) throw new Error("clipboard unavailable");
-      await navigator.clipboard.writeText(user.id);
+      await navigator.clipboard.writeText(displayPublicId(user.public_id, user.id));
       setCopiedId(true);
       setSuccess("已复制用户 ID");
       window.setTimeout(() => setCopiedId(false), 1500);
@@ -454,7 +462,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
           </div>
           <div className="admin-detail-meta-line">
             <p className="admin-detail-meta">用户账号 · 注册于 {fullDate(user.created_at)} · 当前属于{statusLabels[user.moderation_status || ""] || user.moderation_status || "未知"}账号 · 最近处置 {user.moderated_at ? fullDate(user.moderated_at) : "未记录"}</p>
-            <div className="admin-entity-ids"><button type="button" className={`admin-copy-id${copiedId ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyUserId()}>{copiedId ? "已复制用户 ID" : `用户 ${user.id}`}</button></div>
+            <div className="admin-entity-ids"><button type="button" className={`admin-copy-id${copiedId ? " is-copied" : ""}`} title="点击复制用户 ID" onClick={() => void copyUserId()}>{copiedId ? "已复制用户 ID" : `用户 ${displayPublicId(user.public_id, user.id)}`}</button></div>
           </div>
         </div>
 
@@ -464,7 +472,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
             <h2>账号事实</h2>
             <div className="admin-user-profile">
               {user.avatar_url ? <img src={user.avatar_url} alt="用户头像" className="admin-user-avatar" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="admin-user-avatar admin-user-avatar-empty">{(user.nickname || "用").slice(0, 1)}</span>}
-              <div><strong>{user.nickname || "未命名用户"}</strong><span>用户 ID</span><code className="admin-mono">{user.id}</code></div>
+              <div><strong>{user.nickname || "未命名用户"}</strong><span>用户 ID</span><code className="admin-mono">{displayPublicId(user.public_id, user.id)}</code></div>
             </div>
             {user.bio ? <p className="admin-user-bio">{user.bio}</p> : <p>该用户没有填写个人简介。</p>}
             {user.moderation_note ? <div className="admin-moderation-note"><strong>最近处置说明</strong><span>{user.moderation_note}</span></div> : null}
@@ -528,7 +536,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
               {detail.reporter_stats.recent_reports.map((report) => <div className="admin-recent-report-item" key={report.id}>
                 <strong>{targetShortLabels[report.target_type || ""] || "内容"}举报 · {reportStatusLabels[report.status || ""] || report.status || "未知"}</strong>
                 <span>{normalizeModerationReason(report.reason_category) || "未填写原因"}{report.details ? ` · ${report.details}` : ""}</span>
-                <small>{fullDate(report.created_at)} · ID {report.target_id}</small>
+                <small>{fullDate(report.created_at)} · 对象 ID {displayPublicId(report.target_public_id, report.target_id)}</small>
               </div>)}
             </div> : null}
           </section>
@@ -539,6 +547,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
               <strong>{item.content_type || "账号"} · {normalizeModerationReason(item.category) || "未分类"}</strong>
               <div className="admin-risk-tags"><span>{severityLabels[item.severity || ""] || item.severity}</span><span>{item.status === "active" ? "有效" : "已撤销"}</span></div>
               {item.summary ? <small>{item.summary}</small> : null}
+              <small className="admin-mono">违规记录 ID {displayPublicId(item.public_id, item.id)}</small>
               <small>确认于 {fullDate(item.confirmed_at)}{item.revoked_at ? ` · 撤销于 ${fullDate(item.revoked_at)}` : ""}</small>
             </div>)}</div> : <p className="admin-detail-empty">该用户没有确认违规记录。</p>}
           </section>
@@ -558,7 +567,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
             {detail.recent_comments.length ? <div className="admin-risk-list">{detail.recent_comments.map((comment) => <div className="admin-risk-item" key={comment.id}>
               <strong>评论于 {fullDate(comment.created_at)}</strong>
               <small>{comment.content || "评论内容已删除"}</small>
-              <small className="admin-mono">评论 ID {comment.id} · 作品 ID {comment.post_id || "—"}</small>
+              <small className="admin-mono">评论 ID {displayPublicId(comment.public_id, comment.id)} · 作品 ID {displayPublicId(comment.post_public_id, comment.post_id)}</small>
             </div>)}</div> : <p className="admin-detail-empty">该用户没有评论记录。</p>}
           </section>
 
@@ -568,6 +577,7 @@ export default function UserDetailClient({ detail, profileRevisions, adminInitia
               <strong>{restrictionLabels[item.restriction_type || ""] || item.restriction_type || "限制"} · {item.status === "active" ? "生效中" : "已解除"}</strong>
               <div className="admin-risk-tags"><span>{dateText(item.starts_at)} 起</span>{item.ends_at ? <span>至 {dateText(item.ends_at)}</span> : <span>永久</span>}{item.lifted_at ? <span>解除于 {dateText(item.lifted_at)}</span> : null}</div>
               {item.reason ? <small>原因：{item.reason}</small> : null}
+              <small className="admin-mono">限制记录 ID {displayPublicId(item.public_id, item.id)}</small>
             </div>)}</div> : <p className="admin-detail-empty">该用户没有限制记录。</p>}
           </section>
         </article>
