@@ -52,7 +52,6 @@ export default function AdminLoginPage() {
       <label className="admin-login-field"><span>密码</span><span className="admin-login-password"><input type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-pressed={showPassword} onClick={() => setShowPassword((open) => !open)}>{showPassword ? "隐藏" : "显示"}</button></span></label>
       {error && <div className="admin-alert admin-alert-error" role="alert">{error}</div>}
       <button className="admin-btn admin-btn-primary admin-login-submit" type="submit" disabled={loading}>{loading ? "登录中…" : "登录"}</button>
-      <div className="admin-login-note">设计稿为脱敏演示数据，不连接真实账号；交互用于走查与评审。</div>
     </form>
   </main>;
 }

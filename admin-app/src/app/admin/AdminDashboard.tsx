@@ -161,16 +161,18 @@ function normalizeRuleCategory(category: string) {
 }
 const formatRiskRule = (risk: ModerationRiskLevel, hits: number) =>
   risk === "high" ? `高风险 · 命中 ${hits} 次进审核` : `${riskLabels[risk].shortLabel} · 满 ${hits} 次进审核`;
-const fmt = (value: string) => new Date(value).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+const ADMIN_TIME_ZONE = "Asia/Shanghai";
+const adminDateKey = (value: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: ADMIN_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
+const fmt = (value: string) => new Date(value).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric", timeZone: ADMIN_TIME_ZONE });
 const fmtReviewTime = (value: string) => {
   const date = new Date(value);
   const now = new Date();
-  const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+  const sameDay = adminDateKey(date) === adminDateKey(now);
   return sameDay
-    ? `今天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}`
-    : date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }).replace("/", "-");
+    ? `今天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: ADMIN_TIME_ZONE })}`
+    : date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit", timeZone: ADMIN_TIME_ZONE }).replace("/", "-");
 };
-const fmtUserListTime = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }) : "—";
+const fmtUserListTime = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: ADMIN_TIME_ZONE }) : "—";
 const reviewRisk = (priority?: string | null, routeReason?: string | null) => {
   if (priority === "urgent" || priority === "high") return "高";
   if (priority === "low") return "低";

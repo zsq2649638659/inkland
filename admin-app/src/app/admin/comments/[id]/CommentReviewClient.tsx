@@ -19,7 +19,7 @@ const statusLabels: Record<string, string> = { approved: "已放行", reminded: 
 const commentStatusLabel = (status?: string | null) => statusLabels[status || ""] || "已处理";
 const typeLabel = (parentId: string | null, paragraphIndex: number | null) => parentId ? "回复" : paragraphIndex !== null ? "段评" : "评论";
 const sourceLabel = (sources: string[] | null, screeningStatus: string | null) => screeningStatus === "failed" ? "服务异常" : (sources || []).map((item) => sourceLabels[item] || item).join("、") || "未记录";
-const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "—";
+const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false }) : "—";
 
 export default function CommentReviewClient({ adminName, adminEmail, pendingCount, pendingCommentCount, queuePosition, queueTotal, previousCaseId, nextCaseId, reviewCase, comment, author, post, parentComment, findings, history }: {
   adminName: string; adminEmail: string; pendingCount: number; pendingCommentCount: number; queuePosition: number | null; queueTotal: number; previousCaseId: string | null; nextCaseId: string | null; reviewCase: ReviewCase;

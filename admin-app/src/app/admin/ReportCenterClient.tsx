@@ -50,6 +50,7 @@ type ReportCenterPayload = {
 type Props = { initialKind: ReportPageKind };
 
 const PAGE_SIZE = 20;
+const ADMIN_TIME_ZONE = "Asia/Shanghai";
 const defaultFilters = (): ReportFilterState => ({ reason: "all", priority: "all", outcome: "all", sort: "latest" });
 const priorityLabels: Record<string, string> = { normal: "一般", high: "中", urgent: "高" };
 const priorityRank: Record<string, number> = { normal: 1, high: 2, urgent: 3 };
@@ -82,13 +83,19 @@ function relativeTime(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);
   const now = new Date();
-  const start = (item: Date) => new Date(item.getFullYear(), item.getMonth(), item.getDate()).getTime();
+  const start = (item: Date) => {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: ADMIN_TIME_ZONE, year: "numeric", month: "numeric", day: "numeric" }).formatToParts(item);
+    const year = Number(parts.find((part) => part.type === "year")?.value);
+    const month = Number(parts.find((part) => part.type === "month")?.value);
+    const day = Number(parts.find((part) => part.type === "day")?.value);
+    return Date.UTC(year, month - 1, day);
+  };
   const days = Math.round((start(now) - start(date)) / 86_400_000);
-  const time = date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const time = date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: ADMIN_TIME_ZONE });
   if (days === 0) return `今天 ${time}`;
   if (days === 1) return `昨天 ${time}`;
   if (days === 2) return `前天 ${time}`;
-  return `${date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })} ${time}`;
+  return `${date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric", timeZone: ADMIN_TIME_ZONE })} ${time}`;
 }
 
 function CopyId({ value, copied, onCopy }: { value?: string | null; copied: string | null; onCopy: (value: string) => void }) {
