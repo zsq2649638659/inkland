@@ -178,6 +178,7 @@ export default function LoginPage() {
           message: "该邮箱已被注册，请直接登录或使用其他邮箱",
         });
         setLoading(false);
+        setAuthActionInProgress(false);
         return;
       }
 
@@ -188,7 +189,6 @@ export default function LoginPage() {
           nickname: nickname.trim(),
         });
         // 与登录保持一致，等 AuthProvider 完成 user 更新后再导航。
-        setAuthActionInProgress(false);
       } else {
         // 需要邮箱确认
         setStatus({
@@ -197,9 +197,9 @@ export default function LoginPage() {
         });
         setMode("login");
         setPassword("");
-        setAuthActionInProgress(false);
       }
     }
+    setAuthActionInProgress(false);
     setLoading(false);
   };
 
