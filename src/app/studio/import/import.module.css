@@ -26,12 +26,14 @@
 .dropZone.dragging { border-color: #76584a; background: #f4eeeb; }
 .dropZone > i { font-size: 34px; color: #8d7265; }
 .dropZone p { margin: 3px 0; color: #716762; }
-.primaryButton, .dangerButton, .textButton, .bulkBar button { min-height: 44px; border: 1px solid var(--color-primary); border-radius: var(--radius-sm); background: var(--color-primary); color: #fff; padding: 9px 16px; cursor: pointer; text-decoration: none; transition: filter var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast); }
+.primaryButton, .dangerButton, .textButton, .bulkBar button, .secondaryButton { min-height: 44px; border: 1px solid var(--color-primary); border-radius: var(--radius-sm); background: var(--color-primary); color: #fff; padding: 9px 16px; cursor: pointer; text-decoration: none; transition: filter var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast); }
 .primaryButton:hover:not(:disabled) { filter: brightness(.94); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 .primaryButton:focus-visible, .textButton:focus-visible, .sourceTabs button:focus-visible, .urlField input:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent); outline-offset: 2px; }
 .primaryButton:disabled, .dangerButton:disabled, .bulkBar button:disabled { opacity: .45; cursor: not-allowed; }
 .dangerButton { border-color: #a54848; background: #fff; color: #a54848; }
 .textButton { border-color: transparent; background: transparent; color: #8b433f; }
+.secondaryButton { min-height: 36px; padding: 7px 11px; border-color: #a98576; background: #fff; color: #704d40; font-size: 13px; }
+.secondaryButton:hover:not(:disabled) { background: #f8f2ef; }
 .errorNotice, .successNotice { padding: 12px 14px; margin-bottom: 14px; border: 1px solid; }
 .errorNotice { background: #fff3f2; border-color: #e5b6b2; color: #8d342e; }
 .successNotice { background: #f1f7f1; border-color: #b9d2bb; color: #35633a; }
@@ -90,6 +92,16 @@
 .previewBody textarea, .draftBody textarea { width: 100%; min-height: 150px; box-sizing: border-box; border: 1px solid #d7cfca; padding: 12px; resize: vertical; line-height: 1.65; }
 .fileMeta { margin: 7px 0 10px; color: #847a75; font-size: 13px; }
 .warning { color: #8a5d22; font-size: 13px; }
+.duplicateNotice { display: grid; gap: 12px; margin: 10px 0 12px; padding: 12px 13px; border: 1px solid #e2c18f; background: #fff8ec; color: #6d4b1b; }
+.duplicateNotice > div:first-child { display: grid; gap: 4px; }
+.duplicateNotice strong { font-size: 13px; }
+.duplicateNotice p { margin: 0; font-size: 13px; line-height: 1.55; }
+.duplicateActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.duplicateActions .textButton { min-height: 36px; padding: 7px 10px; }
+.duplicateexact { border-color: #d6c1a0; background: #faf6ed; }
+.duplicateupdate { border-color: #b7c9df; background: #f3f7fc; color: #34516f; }
+.duplicatebatch { border-color: #d8b1a5; background: #fff4f1; color: #7b3f35; }
+.duplicatesimilar { border-color: #e2c18f; background: #fff8ec; }
 .bulkTagBar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; align-items: center; margin-bottom: 14px; padding: 12px; border: 1px solid #d8cfca; background: #f4f0ed; }
 .bulkTagBar span { font-weight: 700; }
 .bulkTagBar input { min-width: 0; padding: 9px 10px; border: 1px solid #cfc5bf; background: #fff; }
@@ -102,6 +114,7 @@
 .publishSummary li { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid #ddd5d0; }
 .publishSummary strong, .publishSummary span { overflow-wrap: anywhere; }
 .publishSummary span { color: #76584a; font-size: 13px; text-align: left; }
+.duplicateSummary { color: #7b551f !important; font-size: 13px; }
 .publishPanel { display: grid; gap: 14px; margin-top: 20px; padding: 0; border: 0; background: transparent; }
 .publishPanel h2, .publishPanel p { margin: 0; }
 .publishPanel p { margin-top: 4px; color: #756b66; }

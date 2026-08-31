@@ -9,6 +9,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
 import { cleanImportHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
+import { clearImportBatch, loadImportBatch, saveImportBatch, type ImportBatchSnapshot } from "@/lib/importBatchStore";
+import { findImportDuplicate, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
 import { addTags, MAX_TAGS_PER_WORK, splitTags } from "@/lib/tagRules";
 import styles from "./import.module.css";
 
@@ -37,6 +39,8 @@ interface ParsedWork {
   chapterNumber?: number;
   chapterTitle?: string;
   detectedEncoding?: string;
+  duplicateMatch?: ImportDuplicateMatch;
+  duplicateAction?: ImportDuplicateAction;
 }
 
 interface PublishResult {
@@ -579,6 +583,7 @@ export default function ImportWorkspace() {
     export: null,
   });
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [batchId, setBatchId] = useState("");
   const [parsedWorks, setParsedWorks] = useState<ParsedWork[]>([]);
   const [textPlans, setTextPlans] = useState<TextImportPlan[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -597,6 +602,8 @@ export default function ImportWorkspace() {
     notion: { configured: false, connected: false },
     feishu: { configured: false, connected: false },
   });
+  const batchHydratedRef = useRef(false);
+  const persistTimerRef = useRef<number | null>(null);
 
   const refreshProviderStatus = useCallback(async () => {
     try {
@@ -638,6 +645,172 @@ export default function ImportWorkspace() {
     }
   }, [refreshProviderStatus]);
 
+  useEffect(() => {
+    if (!user || batchHydratedRef.current) return;
+    batchHydratedRef.current = true;
+    void loadImportBatch(user.id).then((snapshot) => {
+      if (!snapshot || !Array.isArray(snapshot.parsedWorks) || snapshot.parsedWorks.length === 0) return;
+      const restoredResults: PublishResult[] = Array.isArray(snapshot.publishResults)
+        ? snapshot.publishResults.map<PublishResult>((result) => {
+          const item = result as PublishResult;
+          return item.status === "publishing" ? { ...item, status: "failed", message: "页面在处理过程中中断，可点击“重试失败内容”。" } : item;
+        })
+        : [];
+      setBatchId(snapshot.batchId);
+      setParsedWorks(snapshot.parsedWorks as ParsedWork[]);
+      setTextPlans((snapshot.textPlans || []) as TextImportPlan[]);
+      setBulkTags(snapshot.bulkTags || []);
+      setPublishMode(snapshot.publishMode || "publish");
+      setPublishResults(restoredResults);
+      setPublishProgress(snapshot.publishProgress || 0);
+      setPublishComplete(Boolean(snapshot.publishComplete));
+      const restoredStep = Number(snapshot.currentStep);
+      setCurrentStep(restoredStep >= 1 && restoredStep <= 5 ? restoredStep as 1 | 2 | 3 | 4 | 5 : 1);
+      setNotice("已恢复上次未完成的导入批次；重复内容仍需在确认页处理。");
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !batchHydratedRef.current || !batchId || parsedWorks.length === 0) return;
+    if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = window.setTimeout(() => {
+      const snapshot: ImportBatchSnapshot = {
+        batchId,
+        parsedWorks,
+        textPlans,
+        bulkTags,
+        publishMode,
+        currentStep,
+        publishResults,
+        publishProgress,
+        publishComplete,
+        savedAt: new Date().toISOString(),
+      };
+      void saveImportBatch(user.id, snapshot);
+    }, 300);
+    return () => {
+      if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    };
+  }, [batchId, bulkTags, currentStep, parsedWorks, publishComplete, publishMode, publishProgress, publishResults, textPlans, user]);
+
+  const loadExistingPosts = async (): Promise<ExistingImportPost[]> => {
+    if (!user) throw new Error("请先登录");
+    const pageSize = 500;
+    const rows: ExistingImportPost[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("id, title, content, post_type, series_name, chapter_number, status")
+        .eq("user_id", user.id)
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = ((data || []) as Array<Omit<ExistingImportPost, "source">>).map((post) => ({
+        ...post,
+        source: "database" as const,
+      }));
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
+  };
+
+  const toExistingImportPost = (work: ParsedWork): ExistingImportPost => ({
+    id: work.id,
+    title: work.title,
+    content: work.content,
+    post_type: work.groupMode === "serial" ? "serial" : "novel",
+    series_name: work.groupName || null,
+    chapter_number: work.groupMode === "serial" ? (work.chapterNumber || null) : null,
+    status: "draft",
+    source: "batch",
+  });
+
+  const sameDuplicateMatch = (left?: ImportDuplicateMatch | null, right?: ImportDuplicateMatch | null) => (
+    Boolean(left && right && left.kind === right.kind && left.existingPostId === right.existingPostId)
+  );
+
+  const annotateImportWorks = (works: ParsedWork[], existingPosts: ExistingImportPost[]) => {
+    const candidates = [...existingPosts];
+    return works.map((work) => {
+      const duplicateMatch = findImportDuplicate(work, candidates);
+      const previousAction = sameDuplicateMatch(work.duplicateMatch, duplicateMatch) ? work.duplicateAction : undefined;
+      const duplicateAction = duplicateMatch
+        ? previousAction || (duplicateMatch.kind === "exact" ? "skip" : "review")
+        : undefined;
+      const annotated = { ...work, duplicateMatch: duplicateMatch || undefined, duplicateAction };
+      candidates.push(toExistingImportPost(annotated));
+      return annotated;
+    });
+  };
+
+  const addParsedWorks = async (nextWorks: ParsedWork[], nextTextPlans: TextImportPlan[]) => {
+    const existingPosts = await loadExistingPosts();
+    const annotatedWorks = annotateImportWorks(nextWorks, [
+      ...existingPosts,
+      ...parsedWorks.map(toExistingImportPost),
+    ]);
+    const nextBatchId = batchId || crypto.randomUUID();
+    setBatchId(nextBatchId);
+    setParsedWorks((works) => [...works, ...annotatedWorks]);
+    setTextPlans((plans) => {
+      const existingPlanIds = new Set(plans.map((plan) => plan.id));
+      return [...plans, ...nextTextPlans.filter((plan) => !existingPlanIds.has(plan.id))];
+    });
+    setPublishResults([]);
+    setPublishProgress(0);
+    setPublishComplete(false);
+    const exactSkipped = annotatedWorks.filter((work) => work.duplicateMatch?.kind === "exact").length;
+    const decisionsNeeded = annotatedWorks.filter((work) => work.duplicateMatch && work.duplicateAction === "review").length;
+    if (decisionsNeeded > 0) {
+      setNotice(`已加入 ${annotatedWorks.length} 篇内容，其中 ${decisionsNeeded} 篇疑似重复，请在确认页选择处理方式${exactSkipped > 0 ? `；${exactSkipped} 篇完全重复内容已默认跳过` : ""}。`);
+    } else if (exactSkipped > 0) {
+      setNotice(`已加入 ${annotatedWorks.length} 篇内容；${exactSkipped} 篇完全重复内容已默认跳过，可在预览中改为保留。`);
+    } else {
+      setNotice(`本次新增 ${annotatedWorks.length} 篇内容；你可以继续使用其他方式导入，完成后再进入下一步。`);
+    }
+  };
+
+  const refreshDuplicateAnalysis = async () => {
+    const existingPosts = await loadExistingPosts();
+    const annotatedWorks = annotateImportWorks(parsedWorks, existingPosts);
+    setParsedWorks(annotatedWorks);
+    return annotatedWorks;
+  };
+
+  const setDuplicateAction = (workId: string, action: ImportDuplicateAction) => {
+    setParsedWorks((works) => works.map((work) => work.id === workId
+      ? { ...work, duplicateAction: action, selected: action !== "skip" && action !== "review" }
+      : work));
+    setError("");
+  };
+
+  const setParsedSelection = (workId: string, selected: boolean) => {
+    setParsedWorks((works) => works.map((work) => {
+      if (work.id !== workId) return work;
+      if (!work.duplicateMatch) return { ...work, selected };
+      return {
+        ...work,
+        selected,
+        duplicateAction: selected
+          ? (work.duplicateAction === "skip" ? "review" : work.duplicateAction)
+          : "skip",
+      };
+    }));
+  };
+
+  const setAllParsedSelection = (selected: boolean) => {
+    setParsedWorks((works) => works.map((work) => {
+      if (!work.duplicateMatch) return { ...work, selected };
+      return {
+        ...work,
+        selected,
+        duplicateAction: selected
+          ? (work.duplicateAction === "skip" ? "review" : work.duplicateAction)
+          : "skip",
+      };
+    }));
+  };
+
   const handleFiles = async (fileList: FileList | File[]) => {
     const files = Array.from(fileList);
     setError("");
@@ -663,21 +836,12 @@ export default function ImportWorkspace() {
       }
       catch (parseError) { failures.push(getErrorMessage(parseError, `${file.name} 解析失败`)); }
     }
-    const existingHashes = new Set(parsedWorks.map((work) => work.sourceHash));
-    const uniqueWorks = nextWorks.filter((work) => {
-      if (existingHashes.has(work.sourceHash)) return false;
-      existingHashes.add(work.sourceHash);
-      return true;
-    });
-    const includedPlanIds = new Set(uniqueWorks.map((work) => work.sourcePlanId).filter(Boolean));
-    setParsedWorks((works) => [...works, ...uniqueWorks]);
-    setTextPlans((plans) => [...plans, ...nextTextPlans.filter((plan) => includedPlanIds.has(plan.id))]);
+    try {
+      await addParsedWorks(nextWorks, nextTextPlans);
+    } catch (databaseError) {
+      setError(`暂时无法检查已有作品，内容未加入导入队列：${getErrorMessage(databaseError, "请稍后重试")}`);
+    }
     if (failures.length > 0) setError(failures.join("；"));
-    setPublishResults([]);
-    setPublishProgress(0);
-    setPublishComplete(false);
-    if (uniqueWorks.length > 0) setNotice(`本次新增 ${uniqueWorks.length} 篇内容；你可以继续使用其他方式导入，完成后再进入下一步。`);
-    else if (nextWorks.length > 0) setNotice("这些内容已经在当前导入批次中，未重复添加。");
     setBusy(false);
   };
 
@@ -693,10 +857,16 @@ export default function ImportWorkspace() {
       const mode = changes.mode || (chapters.length >= 2 ? current.mode : "single");
       const nextPlan: TextImportPlan = { ...current, ...changes, encoding, content, chapters, mode };
       const works = await buildTextWorks(nextPlan);
+      const remainingWorks = parsedWorks.filter((work) => work.sourcePlanId !== planId);
+      const existingPosts = await loadExistingPosts();
+      const annotatedWorks = annotateImportWorks(works, [
+        ...existingPosts,
+        ...remainingWorks.map(toExistingImportPost),
+      ]);
       setTextPlans((plans) => plans.map((plan) => plan.id === planId ? nextPlan : plan));
       setParsedWorks((items) => [
         ...items.filter((work) => work.sourcePlanId !== planId),
-        ...works,
+        ...annotatedWorks,
       ]);
       setNotice(changes.encoding
         ? `已按 ${encoding.toUpperCase()} 重新读取“${current.fileName}”，识别到 ${chapters.length} 个章节。`
@@ -785,14 +955,7 @@ export default function ImportWorkspace() {
         groupTags: [],
       };
       const works = await buildTextWorks(plan);
-      setTextPlans((plans) => [...plans, plan]);
-      setParsedWorks((items) => [...items, ...works]);
-      setPublishResults([]);
-      setPublishProgress(0);
-      setPublishComplete(false);
-      setNotice(chapters.length >= 2
-        ? "文档已加入当前导入批次；章节检测和拆分方式将在第二步确认。"
-        : "文档已加入当前导入批次；你可以继续选择其他导入方式，完成后再进入下一步。");
+      await addParsedWorks(works, [plan]);
     } catch (readError) {
       setError(getErrorMessage(readError, "在线文档读取失败"));
     } finally {
@@ -902,6 +1065,8 @@ export default function ImportWorkspace() {
   };
 
   const resetImport = () => {
+    if (user) void clearImportBatch(user.id);
+    setBatchId("");
     setCurrentStep(1);
     setParsedWorks([]);
     setTextPlans([]);
@@ -917,6 +1082,13 @@ export default function ImportWorkspace() {
   };
 
   const removeImportedSource = (sourceBatchId: string | undefined, workId: string) => {
+    const remainingWorks = sourceBatchId
+      ? parsedWorks.filter((work) => work.sourceBatchId !== sourceBatchId)
+      : parsedWorks.filter((work) => work.id !== workId);
+    if (remainingWorks.length === 0) {
+      if (user) void clearImportBatch(user.id);
+      setBatchId("");
+    }
     if (sourceBatchId) {
       setParsedWorks((works) => works.filter((work) => work.sourceBatchId !== sourceBatchId));
       setTextPlans((plans) => plans.filter((plan) => plan.id !== sourceBatchId));
@@ -932,13 +1104,26 @@ export default function ImportWorkspace() {
     setCurrentStep(2);
   };
 
-  const continueFromConfirm = () => {
-    const selected = parsedWorks.filter((work) => work.selected);
-    if (selected.length === 0) { setError("请至少选择一篇作品"); return; }
-    if (selected.some((work) => !work.title.trim() || !work.content.trim())) { setError("标题和正文不能为空"); return; }
+  const continueFromConfirm = async () => {
+    if (busy) return;
+    setBusy(true);
     setError("");
     setNotice("");
-    setCurrentStep(3);
+    try {
+      const annotatedWorks = await refreshDuplicateAnalysis();
+      const selected = annotatedWorks.filter((work) => work.selected);
+      if (selected.length === 0) { setError("请至少选择一篇作品"); return; }
+      if (selected.some((work) => !work.title.trim() || !work.content.trim())) { setError("标题和正文不能为空"); return; }
+      if (selected.some((work) => work.duplicateMatch && (!work.duplicateAction || work.duplicateAction === "review" || work.duplicateAction === "skip"))) {
+        setError("请先为选中的重复内容选择处理方式");
+        return;
+      }
+      setCurrentStep(3);
+    } catch (databaseError) {
+      setError(`暂时无法再次检查已有作品：${getErrorMessage(databaseError, "请稍后重试")}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const continueFromTags = () => {
@@ -950,10 +1135,11 @@ export default function ImportWorkspace() {
     setCurrentStep(4);
   };
 
-  const publishSelectedWorks = async () => {
-    if (busy || publishComplete) return;
+  const publishSelectedWorks = async ({ retryFailedOnly = false }: { retryFailedOnly?: boolean } = {}) => {
+    if (busy || (!retryFailedOnly && publishComplete)) return;
     if (!user) { setError("请先登录"); return; }
-    const items = parsedWorks.filter((work) => work.selected);
+    const failedWorkIds = new Set(publishResults.filter((result) => result.status === "failed").map((result) => result.workId));
+    const items = parsedWorks.filter((work) => work.selected && (!retryFailedOnly || failedWorkIds.has(work.id)));
     if (items.length === 0) { setError("请至少选择一篇作品"); return; }
     if (items.some((work) => !work.title.trim() || !work.content.trim())) { setError("标题和正文不能为空"); return; }
     const validationError = validateEditingInformation(items);
@@ -978,7 +1164,13 @@ export default function ImportWorkspace() {
     setNotice("");
     setPublishComplete(false);
     setPublishProgress(0);
-    setPublishResults(items.map((work) => ({ workId: work.id, title: work.title, status: "waiting", message: "等待处理" })));
+    if (retryFailedOnly) {
+      setPublishResults((results) => results.map((result) => failedWorkIds.has(result.workId)
+        ? { ...result, status: "waiting", message: "等待重试" }
+        : result));
+    } else {
+      setPublishResults(items.map((work) => ({ workId: work.id, title: work.title, status: "waiting", message: "等待处理" })));
+    }
     setCurrentStep(5);
 
     let successCount = 0;
@@ -992,6 +1184,7 @@ export default function ImportWorkspace() {
           ensuredGroups.add(groupKey);
         }
         const isSerial = work.groupMode === "serial";
+        const shouldUpdate = work.duplicateAction === "update" && work.duplicateMatch?.kind === "update";
         const postData: Record<string, unknown> = {
           user_id: user.id,
           title: work.title.trim(),
@@ -1008,7 +1201,9 @@ export default function ImportWorkspace() {
           postData.chapter_number = work.chapterNumber || 1;
           postData.chapter_title = work.chapterTitle || work.title.trim();
         }
-        const { data: post, error: postError } = await supabase.from("posts").insert(postData).select("id, review_status, status").single();
+        const { data: post, error: postError } = shouldUpdate
+          ? await supabase.from("posts").update(postData).eq("id", work.duplicateMatch!.existingPostId).eq("user_id", user.id).select("id, review_status, status").single()
+          : await supabase.from("posts").insert(postData).select("id, review_status, status").single();
         if (postError || !post?.id) throw postError || new Error("作品创建失败");
         try {
           if (!isSerial) await saveTagsForPost(post.id as string, bulkTags);
@@ -1018,7 +1213,9 @@ export default function ImportWorkspace() {
           throw tagError;
         }
         successCount += 1;
-        const successMessage = publishMode === "draft"
+        const successMessage = shouldUpdate
+          ? "已更新已有章节"
+          : publishMode === "draft"
           ? "已保存到草稿箱"
           : publishMode === "schedule"
             ? `已提交审核，计划 ${new Date(scheduledAt!).toLocaleString("zh-CN")} 发布`
@@ -1036,8 +1233,8 @@ export default function ImportWorkspace() {
     window.dispatchEvent(new Event("inkland:stats-changed"));
     setPublishComplete(true);
     setNotice(successCount === items.length
-      ? `${items.length} 篇内容全部处理完成。`
-      : `处理完成：成功 ${successCount} 篇，失败 ${items.length - successCount} 篇。`);
+      ? `${retryFailedOnly ? "失败内容已" : ""}${items.length} 篇内容全部处理完成。`
+      : `${retryFailedOnly ? "重试完成" : "处理完成"}：成功 ${successCount} 篇，失败 ${items.length - successCount} 篇。`);
     setBusy(false);
   };
 
@@ -1048,6 +1245,8 @@ export default function ImportWorkspace() {
 
   const selectedParsedCount = parsedWorks.filter((work) => work.selected).length;
   const selectedWithTagsCount = parsedWorks.filter((work) => work.selected && (work.groupMode === "serial" ? (work.groupTags?.length || 0) > 0 : bulkTags.length > 0)).length;
+  const duplicateSkippedCount = parsedWorks.filter((work) => work.duplicateMatch && (!work.selected || work.duplicateAction === "skip")).length;
+  const duplicateUpdateCount = parsedWorks.filter((work) => work.selected && work.duplicateAction === "update").length;
   const publishDoneCount = publishResults.filter((result) => result.status === "success" || result.status === "failed").length;
   const publishSuccessCount = publishResults.filter((result) => result.status === "success").length;
   const publishFailedCount = publishResults.filter((result) => result.status === "failed").length;
@@ -1169,9 +1368,9 @@ export default function ImportWorkspace() {
                     <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>{plan.canChangeEncoding ? `当前编码：${plan.encoding.toUpperCase()}；` : `来源：${plan.sourceType.toUpperCase()}；`}{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div>{plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}</div>
                     {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>导入类型</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
                   </section>)}</div>}
-                <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setParsedWorks((current) => current.map((work) => ({ ...work, selected: event.target.checked })))} /> 全选</label></div>
+                <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setAllParsedSelection(event.target.checked)} /> 全选</label></div>
                 <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
-                  <div className={styles.previewList}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy) { setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: !item.selected } : item)); } }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, selected: event.target.checked } : item))} /></div><label className={styles.contentField}><span>正文</span><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value) } : item))} /></label></div></article>)}</div>
+                <div className={styles.previewList}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div><div className={styles.fileMeta}>{work.sourceName} · {work.wordCount.toLocaleString()} 字</div>{work.warning && <p className={styles.warning}>{work.warning}</p>}{work.duplicateMatch && <div className={`${styles.duplicateNotice} ${styles[`duplicate${work.duplicateMatch.kind}`]}`} role="status"><div><strong>{work.duplicateMatch.kind === "exact" ? "完全重复" : work.duplicateMatch.kind === "update" ? "检测到已有章节" : work.duplicateMatch.kind === "batch" ? "本批次章节号冲突" : "疑似重复"}</strong><p>{work.duplicateMatch.message}</p></div><div className={styles.duplicateActions}><button type="button" className={styles.textButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "skip"); }}>跳过</button>{work.duplicateMatch.kind === "update" ? <><button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "update"); }}>更新已有版本</button><button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "keep"); }}>作为新章节</button></> : <button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "keep"); }}>{work.duplicateMatch.kind === "exact" ? "仍保留为新作品" : work.duplicateMatch.kind === "batch" ? "保留为独立内容" : "保留为新作品"}</button>}</div></div>}<label className={styles.contentField}><span>正文</span><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /></label></div></article>)}</div>
                 </div>
                 <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>下一步</button></div>
               </div>}
@@ -1191,7 +1390,7 @@ export default function ImportWorkspace() {
               </div>}
 
               {currentStep === 4 && <div className={styles.previewSection}>
-                <div className={styles.sectionHeader}><div><h2>确认发布</h2><p>本批次共 {selectedParsedCount} 篇内容，请选择最终处理方式。</p></div></div>
+                <div className={styles.sectionHeader}><div><h2>确认发布</h2><p>本批次共 {selectedParsedCount} 篇内容，请选择最终处理方式。</p>{duplicateSkippedCount > 0 && <p className={styles.duplicateSummary}>将跳过 {duplicateSkippedCount} 篇重复内容{duplicateUpdateCount > 0 ? `；更新 ${duplicateUpdateCount} 个已有章节` : ""}。</p>}</div></div>
                 <ul className={styles.publishSummary}>{parsedWorks.filter((work) => work.selected).map((work) => <li key={work.id}><strong>{work.title}</strong><span>{work.groupMode === "serial" ? `${work.groupName} · ${(work.groupTags || []).map((tag) => `#${tag}`).join(" ")}` : bulkTags.map((tag) => `#${tag}`).join(" ")}</span></li>)}</ul>
                 <section className={styles.publishPanel} aria-label="确认发布">
                   <fieldset className={`${styles.publishModes} collection-options`}>
@@ -1237,7 +1436,7 @@ export default function ImportWorkspace() {
                       <p className={styles.workMsg}>{result.message}</p>
                     </li>)}
                   </ul>
-                  {publishComplete && <div className={styles.resultActions}><button type="button" onClick={resetImport}>继续导入</button><Link href="/studio" className={styles.primaryButton}>查看创作中心</Link></div>}
+                  {publishComplete && <div className={styles.resultActions}>{publishFailedCount > 0 && <button type="button" className={styles.secondaryButton} onClick={() => void publishSelectedWorks({ retryFailedOnly: true })}>重试失败内容</button>}<button type="button" className={styles.secondaryButton} onClick={resetImport}>继续导入</button><Link href="/studio" className={styles.primaryButton}>查看创作中心</Link></div>}
                 </section>
               </div>}
           </section>
