@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
+import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -15,15 +16,19 @@ export default function MobileNav() {
 
   useEffect(() => {
     if (!user) return;
+    const cached = readClientCache<number>(`notification-count:${user.id}`, 30_000, true);
+    if (cached !== undefined) setNotificationCount(cached);
     const fetchCount = () => {
-      supabase
+      void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
+        const { count } = await supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("read", false)
-        .then(({ count }: { count: number | null }) => setNotificationCount(count || 0));
+        return count || 0;
+      }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
-    fetchCount();
+    if (cached === undefined) fetchCount();
     const timer = window.setInterval(fetchCount, 30_000);
     return () => window.clearInterval(timer);
   }, [user, supabase]);

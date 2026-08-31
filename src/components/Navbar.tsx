@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
 import DefaultAvatar from "@/components/DefaultAvatar";
-import { getOrCreateClientCache } from "@/lib/client-cache";
+import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 interface Suggestion {
   name: string;
@@ -41,18 +41,21 @@ export default function Navbar() {
       setNotificationCount(0);
       return;
     }
-    const fetchNotificationCount = () => {
-      void supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false)
-        .then(({ count }: { count: number | null }) => setNotificationCount(count || 0));
+    const fetchNotificationCount = (force = false) => {
+      if (force) invalidateClientCache(`notification-count:${user.id}`);
+      void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
+        const { count } = await supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("read", false);
+        return count || 0;
+      }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
     fetchNotificationCount();
     const channel = supabase
       .channel(`navbar-notifications:${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchNotificationCount)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => fetchNotificationCount(true))
       .subscribe();
     const timer = window.setInterval(fetchNotificationCount, 30_000);
     return () => {
@@ -132,7 +135,7 @@ export default function Navbar() {
           }),
         };
       },
-      { ttlMs: 10_000 },
+      { ttlMs: 10_000, persist: true },
     );
     setTagSuggestions(result.tags);
     setUserSuggestions(result.users);
