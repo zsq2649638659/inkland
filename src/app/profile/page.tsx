@@ -319,7 +319,7 @@ export default function ProfilePage() {
       const { data: likes } = await supabase.from("likes").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
       if (likes && likes.length > 0) {
         const postIds = likes.map((l: Record<string, unknown>) => l.post_id as string);
-        const interactionTimes = new Map(likes.map((l: Record<string, unknown>) => [l.post_id as string, l.created_at as string]));
+        const interactionTimes = new Map<string, string>(likes.map((l: Record<string, unknown>) => [l.post_id as string, l.created_at as string]));
         const { data: rawPosts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
         posts = ((rawPosts as unknown as Post[]) || []).map((p) => ({
           ...p,
@@ -364,7 +364,7 @@ export default function ProfilePage() {
       const { data: bms } = await supabase.from("bookmarks").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
       if (bms && bms.length > 0) {
         const postIds = bms.map((b: Record<string, unknown>) => b.post_id as string);
-        const interactionTimes = new Map(bms.map((b: Record<string, unknown>) => [b.post_id as string, b.created_at as string]));
+        const interactionTimes = new Map<string, string>(bms.map((b: Record<string, unknown>) => [b.post_id as string, b.created_at as string]));
         const { data: rawPosts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
         posts = ((rawPosts as unknown as Post[]) || []).map((p) => ({
           ...p,
