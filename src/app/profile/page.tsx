@@ -478,7 +478,7 @@ export default function ProfilePage() {
         .order("created_at", { ascending: false })
         .limit(50),
     ]);
-    const myFollowingSet = new Set((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
+    const myFollowingSet = new Set<string>((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
     setFollowingIds(myFollowingSet);
     if (fData) {
       const users = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
