@@ -7,6 +7,7 @@ import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
 import PostTagCard from "@/components/PostTagCard";
 import type { Post } from "@/lib/types";
+import { slimContent } from "@/lib/feed";
 
 type TagTab = "latest" | "hottest";
 type TimeFilter = "all" | "day" | "week" | "month";
@@ -115,7 +116,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
             const tagNames = pt ? pt.map((t) => t.tags.name) : [];
             return {
               id: p.id as string, title: (p.title as string) || "无标题",
-              content: p.content as string, cover_url: p.cover_url as string | null,
+              content: slimContent((p.content as string) || ""), cover_url: p.cover_url as string | null,
               post_type: p.post_type as Post["post_type"],
               series_name: p.series_name as string | null,
               chapter_number: p.chapter_number as number | null,
@@ -212,7 +213,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           for (const row of (latestResult.data || []) as Array<Record<string, unknown>>) {
             latestDetails.set(row.id as string, {
               title: (row.title as string) || "",
-              content: (row.content as string) || "",
+              content: slimContent((row.content as string) || ""),
             });
           }
           const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();

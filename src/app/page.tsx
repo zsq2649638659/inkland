@@ -12,6 +12,7 @@ import { SkeletonFeed, SkeletonHome } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import { loadFeed, type FeedResult } from "@/lib/feed";
 import type { Post } from "@/lib/types";
+import { readClientCache, writeClientCache } from "@/lib/client-cache";
 
 type TabType = "following" | "myTags" | "hot24";
 
@@ -25,9 +26,32 @@ interface TagItem {
 interface FeedCacheEntry {
   posts: Post[];
   serialCards: SerialPostCardData[];
+  followedTags?: FeedResult["followedTags"];
   at: number;
 }
 const feedCache = new Map<string, FeedCacheEntry>();
+const FEED_CACHE_TTL = 30_000;
+
+function readFeedCache(key: string): FeedCacheEntry | undefined {
+  const memory = feedCache.get(key);
+  if (memory && Date.now() - memory.at < FEED_CACHE_TTL) return memory;
+  if (memory) feedCache.delete(key);
+
+  const stored = readClientCache<FeedCacheEntry>(`feed:${key}`, FEED_CACHE_TTL, true);
+  if (!stored) return undefined;
+  feedCache.set(key, stored);
+  return stored;
+}
+
+function writeFeedCache(key: string, result: FeedResult) {
+  const entry: FeedCacheEntry = {
+    posts: result.posts,
+    serialCards: result.serialCards,
+    at: Date.now(),
+  };
+  feedCache.set(key, entry);
+  writeClientCache(`feed:${key}`, entry, true);
+}
 
 export default function HomePage() {
   const supabase = useMemo(() => createClient(), []);
@@ -43,6 +67,14 @@ export default function HomePage() {
   const [requestTimedOut, setRequestTimedOut] = useState(false);
   const latestPostTimeRef = useRef<string>("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const updateLatestPostTime = (result: Pick<FeedCacheEntry, "posts" | "serialCards">) => {
+    const times: string[] = [];
+    if (result.posts.length > 0 && result.posts[0].created_at) times.push(result.posts[0].created_at);
+    if (result.serialCards.length > 0 && result.serialCards[0].createdAt) times.push(result.serialCards[0].createdAt);
+    times.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    if (times.length > 0) latestPostTimeRef.current = times[0];
+  };
 
   const checkNewPosts = useCallback(async () => {
     if (!latestPostTimeRef.current) return;
@@ -135,11 +167,12 @@ export default function HomePage() {
   const loadPosts = async (opts?: { force?: boolean }) => {
     // 命中缓存：立即秒开（不闪骨架屏），后台照常静默刷新
     const cacheKey = user ? `${user.id}:${tab}` : `anon:${tab}`;
-    const hit = !opts?.force ? feedCache.get(cacheKey) : undefined;
+    const hit = !opts?.force ? readFeedCache(cacheKey) : undefined;
 
     if (hit) {
       setPosts(hit.posts);
       setSerialCards(hit.serialCards);
+      updateLatestPostTime(hit);
       setError("");
       setLoading(false);
     } else {
@@ -175,13 +208,8 @@ export default function HomePage() {
     }
     setHasNewPosts(false);
     setLoading(false);
-    feedCache.set(cacheKey, { posts: res.posts, serialCards: res.serialCards, at: Date.now() });
-
-    const times: string[] = [];
-    if (res.posts.length > 0 && res.posts[0].created_at) times.push(res.posts[0].created_at);
-    if (res.serialCards.length > 0 && res.serialCards[0].createdAt) times.push(res.serialCards[0].createdAt);
-    times.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-    if (times.length > 0) latestPostTimeRef.current = times[0];
+    writeFeedCache(cacheKey, res);
+    updateLatestPostTime(res);
   };
 
   const loadFollowedTags = async () => {
@@ -193,6 +221,13 @@ export default function HomePage() {
       setLoading(false);
       return;
     }
+    const cacheKey = `${user.id}:myTags`;
+    const hit = readFeedCache(cacheKey);
+    if (hit) {
+      setFollowedTags(hit.followedTags || []);
+      setError("");
+      setLoading(false);
+    }
     const res = (await fetchFeed()) ?? (await loadFeed(supabase, { tab: "myTags", userId: user.id }));
     if (res.error) {
       setError(res.error);
@@ -202,6 +237,7 @@ export default function HomePage() {
     }
     setFollowedTags(res.followedTags);
     setLoading(false);
+    writeFeedCache(cacheKey, res);
   };
 
   const loadMore = () => {

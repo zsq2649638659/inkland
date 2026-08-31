@@ -14,6 +14,7 @@ import { SkeletonProfile, SkeletonWorksGrid, SkeletonUserCardList } from "@/comp
 import EmptyState from "@/components/EmptyState";
 import { slimContent } from "@/lib/feed";
 import type { Post } from "@/lib/types";
+import { getOrCreateClientCache } from "@/lib/client-cache";
 
 type FilterType = "all" | "single" | "image" | "series";
 type TabType = "works" | "likes" | "bookmarks" | "following" | "followers";
@@ -198,16 +199,17 @@ export default function ProfilePage() {
   // 列表数据优先走服务端聚合路由（机房内拉取并瘦身，客户端只下载轻量数据）；
   // 本地 dev 或路由异常时返回 null，调用方回落客户端直连。
   const fetchProfilePosts = async (apiTab: "works" | "likes" | "bookmarks"): Promise<Post[] | null> => {
-    try {
-      const apiResp = await fetch(`/api/profile-posts?tab=${apiTab}`, { credentials: "same-origin" });
-      if (apiResp.ok) {
+    return getOrCreateClientCache<Post[]>(
+      `profile-posts:${user?.id || "anonymous"}:${apiTab}`,
+      async () => {
+        const apiResp = await fetch(`/api/profile-posts?tab=${apiTab}`, { credentials: "same-origin" });
+        if (!apiResp.ok) throw new Error(`profile posts request failed: ${apiResp.status}`);
         const json = await apiResp.json();
-        if (json && Array.isArray(json.data)) return json.data as Post[];
-      }
-    } catch {
-      // 回落直连
-    }
-    return null;
+        if (!json || !Array.isArray(json.data)) throw new Error("profile posts response invalid");
+        return json.data as Post[];
+      },
+      { ttlMs: 30_000, persist: true },
+    ).catch(() => null);
   };
 
   const loadPosts = async () => {

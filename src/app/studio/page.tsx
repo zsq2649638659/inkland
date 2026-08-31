@@ -10,6 +10,7 @@ import { slimContent } from "@/lib/feed";
 import { SkeletonStudio } from "@/components/Skeleton";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { assertCanPublish } from "@/lib/userRestrictions";
+import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 type FilterType = "all" | "novel" | "illustration" | "serial";
 type StatusFilter = "all" | "published" | "draft" | "rejected";
@@ -46,6 +47,11 @@ interface SeriesWorkItem {
   updated_at: string | null;
   chapter_count: number;
   tags: string[];
+}
+
+interface StudioWorksResponse {
+  data: Record<string, unknown>[];
+  stats: Array<Record<string, unknown>>;
 }
 
 export default function StudioPage() {
@@ -85,14 +91,22 @@ export default function StudioPage() {
     let data: Record<string, unknown>[] | null = null;
     let statsRows: Array<Record<string, unknown>> | null = null;
     try {
-      const apiResp = await fetch("/api/studio-works", { credentials: "same-origin" });
-      if (apiResp.ok) {
-        const json = await apiResp.json();
-        if (json && Array.isArray(json.data)) {
-          data = json.data as Record<string, unknown>[];
-          statsRows = json.stats as Array<Record<string, unknown>>;
-        }
-      }
+      const cached = await getOrCreateClientCache<StudioWorksResponse>(
+        `studio-works:${user.id}`,
+        async () => {
+          const apiResp = await fetch("/api/studio-works", { credentials: "same-origin" });
+          if (!apiResp.ok) throw new Error(`studio works request failed: ${apiResp.status}`);
+          const json = await apiResp.json();
+          if (!json || !Array.isArray(json.data)) throw new Error("studio works response invalid");
+          return {
+            data: json.data as Record<string, unknown>[],
+            stats: Array.isArray(json.stats) ? json.stats as Array<Record<string, unknown>> : [],
+          };
+        },
+        { ttlMs: 30_000, persist: true },
+      );
+      data = cached.data;
+      statsRows = cached.stats;
     } catch {
       // 回落直连
     }
@@ -186,18 +200,28 @@ export default function StudioPage() {
     // 系列元数据与「我的全部连载章节行」互不依赖，并行取回（原实现串行两轮）。
     // 章节行只取 series_name 用于计数，不拉正文；按 user_id 圈定比按 series_name
     // 更精确，避免同名系列的其他作者章节被误计入。
-    const [{ data }, { data: chapterRows }] = await Promise.all([
-      supabase
-        .from("series")
-        .select("id, name, description, tags, series_type, created_at, updated_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("posts")
-        .select("series_name")
-        .eq("user_id", user.id)
-        .eq("post_type", "serial"),
-    ]);
+    const { data, chapterRows } = await getOrCreateClientCache<{
+      data: unknown[] | null;
+      chapterRows: unknown[] | null;
+    }>(
+      `studio-series:${user.id}`,
+      async () => {
+        const [{ data }, { data: chapterRows }] = await Promise.all([
+          supabase
+            .from("series")
+            .select("id, name, description, tags, series_type, created_at, updated_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("posts")
+            .select("series_name")
+            .eq("user_id", user.id)
+            .eq("post_type", "serial"),
+        ]);
+        return { data, chapterRows };
+      },
+      { ttlMs: 30_000, persist: true },
+    );
 
     if (data) {
       const seen = new Set<string>();
@@ -235,6 +259,8 @@ export default function StudioPage() {
       if (error) { await dialog.alert({ title:"删除失败", message:error.message, variant:"danger" }); return; }
     }
     setWorks((prev) => prev.filter((w) => w.id !== work.id));
+    invalidateClientCache(`studio-works:${user?.id || ""}`);
+    invalidateClientCache(`studio-series:${user?.id || ""}`);
     window.dispatchEvent(new Event("inkland:stats-changed"));
   };
 
@@ -447,6 +473,7 @@ export default function StudioPage() {
     setWorks((prev) => prev.map((w) => selectedIds.has(w.id) ? { ...w, status: "published" } : w));
     setBatchMode(false);
     setSelectedIds(new Set());
+    invalidateClientCache(`studio-works:${user.id}`);
     window.dispatchEvent(new Event("inkland:stats-changed"));
   };
 
@@ -473,6 +500,8 @@ export default function StudioPage() {
     setWorks((prev) => prev.filter((w) => !selectedIds.has(w.id)));
     setBatchMode(false);
     setSelectedIds(new Set());
+    invalidateClientCache(`studio-works:${user.id}`);
+    invalidateClientCache(`studio-series:${user.id}`);
     window.dispatchEvent(new Event("inkland:stats-changed"));
   };
 

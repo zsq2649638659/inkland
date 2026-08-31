@@ -17,6 +17,7 @@ import DefaultAvatar from "@/components/DefaultAvatar";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import { assertCanInteract } from "@/lib/userRestrictions";
 import { assembleSeriesInfo } from "@/lib/seriesInfo";
+import { slimContent } from "@/lib/feed";
 
 interface FollowUser {
   id: string;
@@ -229,7 +230,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           return {
             id: p.id as string,
             title: (p.title as string) || "无标题",
-            content: (p.content as string) || "",
+            content: slimContent((p.content as string) || ""),
             cover_url: p.cover_url as string | null,
             word_count: p.word_count as number,
             created_at: p.created_at as string,

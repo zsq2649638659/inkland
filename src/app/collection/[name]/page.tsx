@@ -6,6 +6,7 @@ import PostTagCard from "@/components/PostTagCard";
 import { SkeletonCollectionDetail } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { slimContent } from "@/lib/feed";
 
 type CollectionInfo = {
   name: string;
@@ -72,6 +73,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
           const joinedTags = post.post_tags as Array<{ tags: { name: string } | null }> | undefined;
           return {
             ...post,
+            content: slimContent((post.content as string) || ""),
             tags: joinedTags?.map((item) => item.tags?.name).filter(Boolean) || [],
           } as unknown as Post;
         })

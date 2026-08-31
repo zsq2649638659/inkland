@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { SkeletonSearchResults } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { slimContent } from "@/lib/feed";
 
 type SearchFilter = "tags" | "users" | "works" | "posts";
 
@@ -89,8 +90,12 @@ function SearchContent() {
     // 先展示主结果；标签篇数在后台补齐，不再让一条统计查询阻塞整页。
     const tagRows = (tagRes.data || []) as Array<{ id: string; name: string }>;
     const visibleUsers = ((userRes.data || []) as UserResult[]).filter((item) => !blockedIds.has(item.id));
-    const visibleTitlePosts = ((titleRes.data || []) as unknown as Post[]).filter((post) => !blockedIds.has(post.user_id || ""));
-    const visibleContentPosts = ((contentRes.data || []) as unknown as Post[]).filter((post) => !blockedIds.has(post.user_id || ""));
+    const visibleTitlePosts = ((titleRes.data || []) as unknown as Post[])
+      .filter((post) => !blockedIds.has(post.user_id || ""))
+      .map((post) => ({ ...post, content: slimContent(post.content || "") }));
+    const visibleContentPosts = ((contentRes.data || []) as unknown as Post[])
+      .filter((post) => !blockedIds.has(post.user_id || ""))
+      .map((post) => ({ ...post, content: slimContent(post.content || "") }));
     const initialTags = tagRows.map((tag) => ({ name: tag.name, post_count: 0 }));
     setTags(initialTags);
     setUsers(visibleUsers);
