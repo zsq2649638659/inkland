@@ -121,7 +121,7 @@ export default function StudioPage() {
               .from("post_stats")
               .select("id, like_count, comment_count, bookmark_count")
               .in("id", ids)
-              .then((r) => ({ data: r.data as unknown }))
+              .then((r: { data: unknown }) => ({ data: r.data }))
           )
         : null;
     }
