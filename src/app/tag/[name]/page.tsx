@@ -280,7 +280,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
       setViewCount(totalInteractions);
 
       if (totalCount !== (tag as Record<string, unknown>).post_count) {
-        supabase.from("tags").update({ post_count: totalCount }).eq("id", tagId).then(({ error }) => {
+        supabase.from("tags").update({ post_count: totalCount }).eq("id", tagId).then(({ error }: { error: { message?: string } | null }) => {
           if (error) console.error("更新标签篇数失败:", error);
         });
       }
