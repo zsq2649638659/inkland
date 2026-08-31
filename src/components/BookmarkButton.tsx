@@ -36,7 +36,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
       .eq("post_id", postId)
       .eq("user_id", user.id)
       .single()
-      .then(({ data }) => setBookmarked(!!data));
+      .then(({ data }: { data: { id: string } | null }) => setBookmarked(!!data));
   }, [user, postId, initialActive]);
 
   const toggle = async () => {
