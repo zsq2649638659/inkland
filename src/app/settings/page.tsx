@@ -46,6 +46,42 @@ export default function SettingsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!user || activeTab !== "blocked") return;
+    let active = true;
+    setBlockedLoading(true);
+    void (async () => {
+      const { data: blocked } = await supabase
+        .from("blocked_users")
+        .select("id, blocked_user_id, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      const blockedRows = (blocked || []) as BlockedUserRow[];
+      const ids = blockedRows.map((row) => row.blocked_user_id);
+      const { data: profiles } = ids.length
+        ? await supabase.from("profiles").select("id, nickname, bio").in("id", ids)
+        : { data: [] };
+      if (!active) return;
+      const profileRows = (profiles || []) as BlockedProfileRow[];
+      const profileMap = new Map(profileRows.map((item) => [item.id, item]));
+      setBlockedUsers(blockedRows.map((row) => {
+        const blockedProfile = profileMap.get(row.blocked_user_id);
+        const name = blockedProfile?.nickname || "已注销用户";
+        return {
+          id: row.id,
+          blockedUserId: row.blocked_user_id,
+          name,
+          bio: `屏蔽于 ${new Date(row.created_at).toLocaleDateString("zh-CN")}`,
+          color: "linear-gradient(135deg, #E8E4E0, #B8B0A8)",
+          textColor: "#5C554E",
+          initial: name.slice(0, 1),
+        };
+      }));
+      setBlockedLoading(false);
+    })();
+    return () => { active = false; };
+  }, [activeTab, supabase, user]);
+
   const tabs: { key: SettingsTab; label: string }[] = [
     { key: "password", label: "修改密码" },
     { key: "blocked", label: "屏蔽管理" },
@@ -105,42 +141,6 @@ export default function SettingsPage() {
     setFeedbackSubmitting(false);
     setTimeout(() => setFeedbackSuccess(""), 3000);
   };
-
-  useEffect(() => {
-    if (!user || activeTab !== "blocked") return;
-    let active = true;
-    setBlockedLoading(true);
-    void (async () => {
-      const { data: blocked } = await supabase
-        .from("blocked_users")
-        .select("id, blocked_user_id, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      const blockedRows = (blocked || []) as BlockedUserRow[];
-      const ids = blockedRows.map((row) => row.blocked_user_id);
-      const { data: profiles } = ids.length
-        ? await supabase.from("profiles").select("id, nickname, bio").in("id", ids)
-        : { data: [] };
-      if (!active) return;
-      const profileRows = (profiles || []) as BlockedProfileRow[];
-      const profileMap = new Map(profileRows.map((item) => [item.id, item]));
-      setBlockedUsers(blockedRows.map((row) => {
-        const blockedProfile = profileMap.get(row.blocked_user_id);
-        const name = blockedProfile?.nickname || "已注销用户";
-        return {
-          id: row.id,
-          blockedUserId: row.blocked_user_id,
-          name,
-          bio: `屏蔽于 ${new Date(row.created_at).toLocaleDateString("zh-CN")}`,
-          color: "linear-gradient(135deg, #E8E4E0, #B8B0A8)",
-          textColor: "#5C554E",
-          initial: name.slice(0, 1),
-        };
-      }));
-      setBlockedLoading(false);
-    })();
-    return () => { active = false; };
-  }, [activeTab, supabase, user]);
 
   const unblockUser = async (blocked: { id: string }) => {
     const { error } = await supabase.from("blocked_users").delete().eq("id", blocked.id);
