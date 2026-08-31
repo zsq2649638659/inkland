@@ -31,7 +31,7 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
       .eq("post_id", postId)
       .eq("user_id", user.id)
       .single()
-      .then(({ data }) => setLiked(!!data));
+      .then(({ data }: { data: { id: string } | null }) => setLiked(!!data));
   }, [user, postId]);
 
   const toggle = async () => {

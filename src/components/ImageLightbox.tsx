@@ -85,7 +85,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
 
   useEffect(() => {
     if (!user || !authorId || user.id === authorId) return;
-    supabase.from("follows").select("id").eq("follower_id", user.id).eq("following_id", authorId).maybeSingle().then(({ data }) => setFollowing(!!data));
+    supabase.from("follows").select("id").eq("follower_id", user.id).eq("following_id", authorId).maybeSingle().then(({ data }: { data: { id: string } | null }) => setFollowing(!!data));
   }, [user, authorId]);
 
   const toggleFollow = async () => {

@@ -11,6 +11,9 @@ type SettingsTab = "password" | "blocked" | "notifications" | "about" | "contact
 
 const siteContactEmail = "inkland@163.com";
 
+type BlockedUserRow = { id: string; blocked_user_id: string; created_at: string };
+type BlockedProfileRow = { id: string; nickname: string | null; bio: string | null };
+
 export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -113,20 +116,22 @@ export default function SettingsPage() {
         .select("id, blocked_user_id, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      const ids = (blocked || []).map((row) => row.blocked_user_id as string);
+      const blockedRows = (blocked || []) as BlockedUserRow[];
+      const ids = blockedRows.map((row) => row.blocked_user_id);
       const { data: profiles } = ids.length
         ? await supabase.from("profiles").select("id, nickname, bio").in("id", ids)
         : { data: [] };
       if (!active) return;
-      const profileMap = new Map((profiles || []).map((item) => [item.id, item]));
-      setBlockedUsers((blocked || []).map((row) => {
-        const blockedProfile = profileMap.get(row.blocked_user_id as string);
+      const profileRows = (profiles || []) as BlockedProfileRow[];
+      const profileMap = new Map(profileRows.map((item) => [item.id, item]));
+      setBlockedUsers(blockedRows.map((row) => {
+        const blockedProfile = profileMap.get(row.blocked_user_id);
         const name = blockedProfile?.nickname || "已注销用户";
         return {
-          id: row.id as string,
-          blockedUserId: row.blocked_user_id as string,
+          id: row.id,
+          blockedUserId: row.blocked_user_id,
           name,
-          bio: `屏蔽于 ${new Date(row.created_at as string).toLocaleDateString("zh-CN")}`,
+          bio: `屏蔽于 ${new Date(row.created_at).toLocaleDateString("zh-CN")}`,
           color: "linear-gradient(135deg, #E8E4E0, #B8B0A8)",
           textColor: "#5C554E",
           initial: name.slice(0, 1),

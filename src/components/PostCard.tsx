@@ -158,7 +158,7 @@ export default function PostCard({ post }: PostCardProps) {
       .eq("follower_id", user.id)
       .eq("following_id", post.user_id)
       .single()
-      .then(({ data }) => setFollowing(!!data));
+      .then(({ data }: { data: { id: string } | null }) => setFollowing(!!data));
   }, [user, post.user_id]);
 
   const toggleFollow = async () => {
