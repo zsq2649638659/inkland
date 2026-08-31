@@ -110,25 +110,19 @@
 .groupInfoCard > label > span { padding-top: 9px; font-weight: 700; }
 .groupInfoCard input, .groupInfoCard textarea { width: 100%; box-sizing: border-box; border: 1px solid #cfc5bf; background: #fff; padding: 9px 10px; font: inherit; }
 .groupInfoCard textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
-.metadataCandidate { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 13px; padding: 16px; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: 12px; background: color-mix(in srgb, var(--color-primary) 5%, var(--color-card)); color: var(--color-text); box-shadow: 0 5px 16px rgba(79, 54, 43, .06); }
-.metadataCandidateIcon { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border)); border-radius: 10px; background: var(--color-primary-light); color: var(--color-primary); }
-.metadataCandidateContent { display: grid; min-width: 0; gap: 8px; }
+.metadataCandidate { display: grid; gap: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-left: 3px solid var(--color-primary); border-radius: 10px; background: color-mix(in srgb, var(--color-primary) 4%, var(--color-card)); color: var(--color-text); }
 .metadataCandidateHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.metadataCandidateHeading > div { display: grid; gap: 2px; }
-.metadataCandidateKicker { color: var(--color-primary); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
-.metadataCandidateHeading h3 { margin: 0; color: var(--color-text); font-size: 16px; line-height: 1.35; }
+.metadataCandidateHeading h3 { margin: 0; color: var(--color-text); font-size: 15px; line-height: 1.35; }
 .metadataCandidateSource, .metadataHint { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
-.metadataCandidateText { padding: 12px 13px; border: 1px solid color-mix(in srgb, var(--color-primary) 14%, var(--color-border)); border-radius: 9px; background: var(--color-card); }
-.metadataCandidateText p { margin: 0; white-space: pre-wrap; color: var(--color-text); font-size: 14px; line-height: 1.7; }
-.metadataCandidateActions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.metadataCandidateHint { min-width: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
+.metadataCandidateText { padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border)); border-radius: 8px; background: var(--color-card); }
+.metadataCandidateText p { margin: 0; white-space: pre-wrap; color: var(--color-text); font-size: 14px; line-height: 1.65; }
+.metadataCandidateActions { display: flex; justify-content: flex-end; }
 .metadataCandidateStatus { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid #b9d2bb; border-radius: 999px; color: #35633a; background: #f1f7f1; font-size: 12px; font-weight: 700; }
-.metadataCandidateButton { display: inline-flex; min-height: 40px; flex: none; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--color-primary); border-radius: 9px; background: var(--color-primary); color: #fff; padding: 8px 13px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; transition: filter var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast); }
+.metadataCandidateButton { display: inline-flex; min-height: 40px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--color-primary); border-radius: 8px; background: var(--color-primary); color: #fff; padding: 8px 13px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; transition: filter var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast); }
 .metadataCandidateButton:hover:not(:disabled) { filter: brightness(.94); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 .metadataCandidateButton:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent); outline-offset: 2px; }
 .metadataCandidateButton:disabled { border-color: #d7cfca; background: #e9e3df; color: #756b66; cursor: not-allowed; }
 .metadataCandidateAccepted { border-color: #b9d2bb; background: color-mix(in srgb, #f1f7f1 70%, var(--color-card)); }
-.metadataCandidateAccepted .metadataCandidateIcon { border-color: #b9d2bb; color: #35633a; background: #f1f7f1; }
 .metadataCandidateAccepted .metadataCandidateText { border-color: #c9ddcb; }
 .metadataHint { margin: 0; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
@@ -1424,7 +1418,6 @@
   background: #213326;
 }
 
-:global([data-theme="dark"]) .metadataCandidateAccepted .metadataCandidateIcon,
 :global([data-theme="dark"]) .metadataCandidateStatus {
   border-color: #416448;
   color: #a9d6ad;
@@ -1436,8 +1429,7 @@
 }
 
 @media (max-width: 520px) {
-  .metadataCandidate { grid-template-columns: 1fr; gap: 11px; padding: 14px; }
-  .metadataCandidateIcon { width: 34px; height: 34px; }
+  .metadataCandidate { gap: 9px; padding: 13px; }
   .metadataCandidateActions { align-items: stretch; flex-direction: column; }
   .metadataCandidateButton { width: 100%; }
 }
