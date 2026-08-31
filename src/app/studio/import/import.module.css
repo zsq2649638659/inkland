@@ -110,6 +110,12 @@
 .groupInfoCard > label > span { padding-top: 9px; font-weight: 700; }
 .groupInfoCard input, .groupInfoCard textarea { width: 100%; box-sizing: border-box; border: 1px solid #cfc5bf; background: #fff; padding: 9px 10px; font: inherit; }
 .groupInfoCard textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
+.metadataCandidate { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid #d8c8bb; background: #fffaf5; color: #5e4a3f; }
+.metadataCandidateHeading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.metadataCandidateHeading span, .metadataHint { color: #806f66; font-size: 13px; line-height: 1.55; }
+.metadataCandidate p { margin: 0; white-space: pre-wrap; line-height: 1.65; }
+.metadataCandidate .secondaryButton { justify-self: start; }
+.metadataHint { margin: 0; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
 .publishSummary li { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid #ddd5d0; }
 .publishSummary strong, .publishSummary span { overflow-wrap: anywhere; }

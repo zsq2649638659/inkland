@@ -8,9 +8,10 @@ import mammoth from "mammoth";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
-import { cleanImportHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
+import { cleanImportHeading, extractImportPreamble, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
 import { clearImportBatch, loadImportBatch, saveImportBatch, type ImportBatchSnapshot } from "@/lib/importBatchStore";
 import { findImportDuplicate, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
+import { extractTextImportMetadata, normalizeImportedTitle } from "@/lib/importMetadata";
 import { addTags, MAX_TAGS_PER_WORK, splitTags } from "@/lib/tagRules";
 import styles from "./import.module.css";
 
@@ -36,6 +37,8 @@ interface ParsedWork {
   groupName?: string;
   groupDescription?: string;
   groupTags?: string[];
+  descriptionCandidate?: string;
+  descriptionCandidateSource?: string;
   chapterNumber?: number;
   chapterTitle?: string;
   detectedEncoding?: string;
@@ -72,6 +75,9 @@ interface TextImportPlan {
   groupName: string;
   groupDescription: string;
   groupTags: string[];
+  descriptionCandidate: string;
+  descriptionCandidateSource?: string;
+  descriptionCandidateAccepted?: boolean;
 }
 
 interface ParsedFileResult {
@@ -102,7 +108,7 @@ function getExtension(fileName: string) {
 }
 
 function titleFromFileName(fileName: string) {
-  return fileName.replace(/\.[^.]+$/, "").trim() || "未命名作品";
+  return normalizeImportedTitle(fileName.replace(/\.[^.]+$/, ""));
 }
 
 function countWords(content: string) {
@@ -111,6 +117,15 @@ function countWords(content: string) {
 
 function normalizeContent(content: string) {
   return content.replace(/\r\n?/g, "\n").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function removeImportedPreamble(content: string, preamble: string) {
+  const normalizedContent = normalizeContent(content);
+  const normalizedPreamble = normalizeContent(preamble);
+  const prefix = `${normalizedPreamble}\n\n`;
+  return normalizedPreamble && normalizedContent.startsWith(prefix)
+    ? normalizeContent(normalizedContent.slice(prefix.length))
+    : normalizedContent;
 }
 
 const TEXT_ENCODINGS = ["utf-8", "gb18030", "big5", "utf-16le", "utf-16be"] as const;
@@ -369,11 +384,13 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
     detectedEncoding: plan.canChangeEncoding ? plan.encoding : undefined,
     groupDescription: plan.groupDescription,
     groupTags: plan.groupTags,
+    descriptionCandidate: plan.descriptionCandidate,
+    descriptionCandidateSource: plan.descriptionCandidateSource,
   };
   if (plan.mode === "single" || plan.chapters.length < 2) {
     return [await makeParsedWork({
       ...common,
-      title: titleFromFileName(plan.fileName),
+      title: normalizeImportedTitle(plan.groupName, titleFromFileName(plan.fileName)),
       content: plan.content,
       sourceName: plan.fileName,
       groupMode: "single",
@@ -386,7 +403,9 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
   return Promise.all(plan.chapters.map((chapter, index) => makeParsedWork({
     ...common,
     title: chapter.title,
-    content: chapter.content,
+    content: index === 0 && plan.descriptionCandidateAccepted
+      ? removeImportedPreamble(chapter.content, extractImportPreamble(plan.content))
+      : chapter.content,
     sourceName: `${plan.fileName} · ${chapter.title}`,
     groupMode: plan.mode,
     groupName: plan.groupName.trim() || titleFromFileName(plan.fileName),
@@ -401,6 +420,7 @@ async function parseTextFile(file: File): Promise<ParsedFileResult> {
   const detectedEncoding = detectTextEncoding(bytes);
   const content = normalizeContent(decodeText(bytes, detectedEncoding));
   const chapters = splitImportChapters(content);
+  const metadata = extractTextImportMetadata(content, titleFromFileName(file.name));
   const plan: TextImportPlan = {
     id: crypto.randomUUID(),
     fileName: file.name,
@@ -412,9 +432,11 @@ async function parseTextFile(file: File): Promise<ParsedFileResult> {
     content,
     chapters,
     mode: chapters.length >= 2 ? "serial" : "single",
-    groupName: titleFromFileName(file.name),
+    groupName: metadata.title,
     groupDescription: "",
     groupTags: [],
+    descriptionCandidate: metadata.descriptionCandidate,
+    descriptionCandidateSource: metadata.descriptionSource,
   };
   return { works: await buildTextWorks(plan), textPlan: plan };
 }
@@ -424,7 +446,7 @@ async function parseFile(file: File): Promise<ParsedFileResult> {
   let content = "";
   let warning: string | undefined;
 
-  if (extension === "txt" || extension === "text") return parseTextFile(file);
+  if (["txt", "text", "md", "markdown"].includes(extension)) return parseTextFile(file);
   if (extension === "epub") return { works: await parseEpub(file) };
   if (extension === "docx") {
     const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
@@ -855,7 +877,16 @@ export default function ImportWorkspace() {
       const content = changes.encoding && current.bytes ? normalizeContent(decodeText(current.bytes, encoding)) : current.content;
       const chapters = changes.encoding ? splitImportChapters(content) : current.chapters;
       const mode = changes.mode || (chapters.length >= 2 ? current.mode : "single");
-      const nextPlan: TextImportPlan = { ...current, ...changes, encoding, content, chapters, mode };
+      const metadata = changes.encoding ? extractTextImportMetadata(content, current.groupName || titleFromFileName(current.fileName)) : undefined;
+      const nextPlan: TextImportPlan = {
+        ...current,
+        ...changes,
+        encoding,
+        content,
+        chapters,
+        mode,
+        ...(metadata ? { descriptionCandidate: metadata.descriptionCandidate, descriptionCandidateSource: metadata.descriptionSource, descriptionCandidateAccepted: false } : {}),
+      };
       const works = await buildTextWorks(nextPlan);
       const remainingWorks = parsedWorks.filter((work) => work.sourcePlanId !== planId);
       const existingPosts = await loadExistingPosts();
@@ -939,6 +970,7 @@ export default function ImportWorkspace() {
         return;
       }
       const chapters = splitImportChapters(content);
+      const metadata = extractTextImportMetadata(content, normalizedTitle);
       const plan: TextImportPlan = {
         id: crypto.randomUUID(),
         fileName: normalizedTitle,
@@ -950,9 +982,11 @@ export default function ImportWorkspace() {
         content,
         chapters,
         mode: chapters.length >= 2 ? "serial" : "single",
-        groupName: normalizedTitle,
+        groupName: metadata.title,
         groupDescription: "",
         groupTags: [],
+        descriptionCandidate: metadata.descriptionCandidate,
+        descriptionCandidateSource: metadata.descriptionSource,
       };
       const works = await buildTextWorks(plan);
       await addParsedWorks(works, [plan]);
@@ -1033,6 +1067,31 @@ export default function ImportWorkspace() {
       ...(changes.groupDescription !== undefined ? { groupDescription: changes.groupDescription } : {}),
       ...(changes.groupTags !== undefined ? { groupTags: changes.groupTags } : {}),
     } : work));
+  };
+
+  const adoptDescriptionCandidate = (planId: string) => {
+    const plan = textPlans.find((item) => item.id === planId);
+    if (!plan?.descriptionCandidate) return;
+    const preamble = extractImportPreamble(plan.content);
+    setTextPlans((plans) => plans.map((item) => item.id === planId ? {
+      ...item,
+      groupDescription: item.descriptionCandidate,
+      descriptionCandidateAccepted: true,
+    } : item));
+    setParsedWorks((works) => {
+      const firstChapterIndex = works.findIndex((work) => work.sourcePlanId === planId);
+      if (firstChapterIndex < 0) return works;
+      const firstChapter = works[firstChapterIndex];
+      const content = removeImportedPreamble(firstChapter.content, preamble);
+      return works.map((work, index) => {
+        if (work.sourcePlanId !== planId) return work;
+        if (index === firstChapterIndex) return content === work.content
+          ? { ...work, groupDescription: plan.descriptionCandidate }
+          : { ...work, content, wordCount: countWords(content), groupDescription: plan.descriptionCandidate };
+        return { ...work, groupDescription: plan.descriptionCandidate };
+      });
+    });
+    setNotice("已采用简介候选；候选来源的开头导语也已从首章正文中移除。你仍可以继续修改简介和正文。");
   };
 
   const validateEditingInformation = (items: ParsedWork[]) => {
@@ -1376,9 +1435,18 @@ export default function ImportWorkspace() {
               </div>}
 
               {currentStep === 3 && <div className={styles.stepPage}>
-                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；单篇标签会应用到本次选中的每篇单篇。</p></div></div>
+                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；单篇标签会应用到本次选中的每篇单篇。导入器只提供简介候选，必须由你确认后才会写入连载或合集简介。</p></div></div>
                 <div className={styles.stepScrollArea}>
-                  {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}><label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label><label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>{plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}</section>)}
+                  {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}>
+                    <label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label>
+                    {plan.descriptionCandidate ? <div className={styles.metadataCandidate}>
+                      <div className={styles.metadataCandidateHeading}><strong>检测到简介候选</strong><span>来源：{plan.descriptionCandidateSource || "文档开头导语"}；不会自动写入</span></div>
+                      <p>{plan.descriptionCandidate}</p>
+                      <button type="button" className={styles.secondaryButton} disabled={busy || plan.descriptionCandidateAccepted} onClick={() => adoptDescriptionCandidate(plan.id)}>{plan.descriptionCandidateAccepted ? "已采用候选简介" : "采用候选简介"}</button>
+                    </div> : <p className={styles.metadataHint}>未识别到简介候选；正文不会自动作为简介，请手动填写。</p>}
+                    <label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="请确认或填写简介，最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>
+                    {plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}
+                  </section>)}
                   {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <>
                     <div className={styles.bulkTagBar}>
                       <span>批量添加单篇标签</span>
