@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
 import { SkeletonNotification } from "@/components/Skeleton";
+import { getNotificationLink, type NotificationMetadata } from "@/lib/notificationLinks";
 
 type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark" | "reply";
 
@@ -21,15 +22,11 @@ interface NotificationItem {
   read: boolean;
   created_at: string;
   template_key?: string | null;
-  metadata?: {
-    action_url?: string;
-    action_label?: string;
-    issue_type?: string;
-    affected_image_indexes?: number[];
-    reason?: string;
-    submission_number?: number;
-    issues?: ReviewIssueMeta[];
-  } | null;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+  link_url?: string | null;
+  report_post_id?: string | null;
+  metadata?: NotificationMetadata & { issues?: ReviewIssueMeta[] } | null;
   // joined fields
   actor_nickname?: string | null;
   actor_avatar_url?: string | null;
@@ -146,12 +143,43 @@ export default function NotificationsPage() {
       post?: { title: string | null } | null;
     }>;
 
+    const reportCommentIds = Array.from(new Set(
+      raw
+        .filter((notification) =>
+          notification.type === "system" &&
+          (notification.template_key?.startsWith("report_") || (notification.content || "").includes("举报")) &&
+          (notification.related_entity_type === "comment" || notification.metadata?.target_type === "comment")
+        )
+        .map((notification) =>
+          notification.related_entity_type === "comment"
+            ? notification.related_entity_id
+            : notification.metadata?.target_id
+        )
+        .filter((id): id is string => Boolean(id))
+    ));
+    const reportPostByComment = new Map<string, string>();
+    if (reportCommentIds.length > 0) {
+      const { data: comments } = await supabase
+        .from("comments")
+        .select("id, post_id")
+        .in("id", reportCommentIds);
+      for (const comment of (comments || []) as Array<{ id: string; post_id: string | null }>) {
+        if (comment.post_id) reportPostByComment.set(comment.id, comment.post_id);
+      }
+    }
+
     const enriched = raw.map((n) => {
+      const reportCommentId = n.related_entity_type === "comment"
+        ? n.related_entity_id
+        : n.metadata?.target_type === "comment"
+          ? n.metadata.target_id
+          : null;
       return {
         ...n,
         actor_nickname: n.actor?.nickname || null,
         actor_avatar_url: n.actor?.avatar_url || null,
         post_title: n.post ? (n.post.title || "未知作品") : null,
+        report_post_id: reportCommentId ? reportPostByComment.get(reportCommentId) || null : null,
       };
     });
 
@@ -191,26 +219,8 @@ export default function NotificationsPage() {
       // 等待数据库完成已读更新，再跳转，避免返回“全部”时状态仍是未读
       await markAsRead(n.id);
     }
-    // Navigate based on type
-    if (n.post_id && (n.type === "comment" || n.type === "like" || n.type === "bookmark" || n.type === "reply")) {
-      const commentAnchor = n.type === "comment" || n.type === "reply" ? "#comments" : "";
-      router.push(`/read/${n.post_id}${commentAnchor}`);
-    } else if (n.type === "follow" && n.actor_id) {
-      router.push(`/user/${n.actor_id}`);
-    } else if (n.type === "system" && n.metadata?.action_url?.startsWith("/")) {
-      router.push(n.metadata.action_url);
-    } else if (n.type === "system" && n.post_id && n.content.includes("未通过本次审核")) {
-      router.push(`/create?editPost=${n.post_id}`);
-    }
-  };
-
-  const getSystemActionUrl = (notification: NotificationItem): string | null => {
-    if (notification.type !== "system") return null;
-    if (notification.metadata?.action_url?.startsWith("/")) return notification.metadata.action_url;
-    if (notification.post_id && (notification.template_key === "post_review_rejected" || notification.content.includes("未通过本次审核"))) {
-      return `/create?editPost=${notification.post_id}`;
-    }
-    return null;
+    const href = getNotificationLink(n);
+    if (href) router.push(href);
   };
 
   const reviewIssueLabel = (issue: ReviewIssueMeta): string => {
@@ -345,8 +355,8 @@ export default function NotificationsPage() {
     const guideline = content.match(/《([^》]+)》/);
     const match = activity || guideline;
     if (!match) return content;
-    const editUrl = getSystemActionUrl(notification);
-    const href = editUrl || (activity ? `/search?q=${encodeURIComponent(match[1])}` : "/settings");
+    const href = getNotificationLink(notification) || (activity ? `/search?q=${encodeURIComponent(match[1])}` : null);
+    if (!href) return content;
     const start = match.index || 0;
     const label = match[0];
     return <>{content.slice(0, start)}<Link href={href} onClick={async (event) => {
