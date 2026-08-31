@@ -76,10 +76,11 @@ export default function LoginPage() {
 
     let error: { message: string } | null = null;
     try {
-      ({ error } = await withTimeout(supabase.auth.signInWithPassword({
+      const result = await withTimeout<Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>>(supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
-      })));
+      }));
+      ({ error } = result);
     } catch (requestError) {
       setStatus({ type: "error", message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT" ? "连接服务器超时，请检查网络或稍后重试" : "登录请求失败，请稍后重试" });
       setLoading(false);
@@ -130,13 +131,14 @@ export default function LoginPage() {
     let data: Awaited<ReturnType<typeof supabase.auth.signUp>>["data"];
     let error: Awaited<ReturnType<typeof supabase.auth.signUp>>["error"];
     try {
-      ({ data, error } = await withTimeout(supabase.auth.signUp({
+      const result = await withTimeout<Awaited<ReturnType<typeof supabase.auth.signUp>>>(supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
           data: { username: nickname.trim() },
         },
-      })));
+      }));
+      ({ data, error } = result);
     } catch (requestError) {
       setStatus({ type: "error", message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT" ? "连接服务器超时，请检查网络或稍后重试" : "注册请求失败，请稍后重试" });
       setLoading(false);
