@@ -325,7 +325,7 @@ export default function ProfilePage() {
       .from("follows")
       .select("following_id")
       .eq("follower_id", user.id);
-    const myFollowingSet = new Set((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
+    const myFollowingSet = new Set<string>((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
     setFollowingIds(myFollowingSet);
 
     const { data: fData } = await supabase
