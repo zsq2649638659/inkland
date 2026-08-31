@@ -78,7 +78,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
         .select("id, content, created_at, user_id, parent_id, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
         .eq("post_id", post.id).order("created_at", { ascending: false }).limit(50);
       if (!active) return;
-      const baseComments = (data || []).map((row: Record<string, unknown>) => {
+      const baseComments: Comment[] = (data || []).map((row: Record<string, unknown>) => {
         const author = row.author as { nickname?: string; avatar_url?: string | null } | null;
         return { id: row.id as string, post_id: post.id, user_id: row.user_id as string, parent_id: (row.parent_id as string | null) || null, paragraph_index: null, content: row.content as string, created_at: row.created_at as string, author: { nickname: author?.nickname || "匿名用户", avatar_url: author?.avatar_url || null } };
       });
