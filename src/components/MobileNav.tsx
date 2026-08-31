@@ -21,7 +21,7 @@ export default function MobileNav() {
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("read", false)
-        .then(({ count }) => setNotificationCount(count || 0));
+        .then(({ count }: { count: number | null }) => setNotificationCount(count || 0));
     };
     fetchCount();
     const timer = window.setInterval(fetchCount, 30_000);

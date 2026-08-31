@@ -148,7 +148,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       .eq("follower_id", user.id)
       .eq("following_id", data.authorId)
       .single()
-      .then(({ data: followData }) => setFollowing(!!followData));
+      .then(({ data: followData }: { data: { id: string } | null }) => setFollowing(!!followData));
   }, [user, data.authorId]);
 
   const toggleFollow = async () => {

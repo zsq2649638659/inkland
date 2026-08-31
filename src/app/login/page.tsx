@@ -20,7 +20,7 @@ function withTimeout<T>(promise: Promise<T>, milliseconds = 15000) {
     new Promise<never>((_, reject) => {
       window.setTimeout(() => reject(new Error("REQUEST_TIMEOUT")), milliseconds);
     }),
-  ]);
+  ]) as Promise<T>;
 }
 
 export default function LoginPage() {
