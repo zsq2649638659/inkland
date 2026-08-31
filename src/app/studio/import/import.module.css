@@ -100,6 +100,7 @@
 .duplicateActions .textButton { min-height: 36px; padding: 7px 10px; }
 .duplicateexact { border-color: #d6c1a0; background: #faf6ed; }
 .duplicateupdate { border-color: #b7c9df; background: #f3f7fc; color: #34516f; }
+.duplicatebatch { border-color: #d8b1a5; background: #fff4f1; color: #7b3f35; }
 .duplicatesimilar { border-color: #e2c18f; background: #fff8ec; }
 .bulkTagBar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; align-items: center; margin-bottom: 14px; padding: 12px; border: 1px solid #d8cfca; background: #f4f0ed; }
 .bulkTagBar span { font-weight: 700; }

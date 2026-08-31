@@ -1,5 +1,6 @@
-export type ImportDuplicateKind = "exact" | "similar" | "update";
+export type ImportDuplicateKind = "exact" | "similar" | "update" | "batch";
 export type ImportDuplicateAction = "review" | "skip" | "keep" | "update";
+export type ImportPostSource = "database" | "batch";
 
 export interface ExistingImportPost {
   id: string;
@@ -9,6 +10,7 @@ export interface ExistingImportPost {
   series_name: string | null;
   chapter_number: number | null;
   status: string | null;
+  source: ImportPostSource;
 }
 
 export interface ImportDuplicateMatch {
@@ -77,7 +79,9 @@ export function findImportDuplicate(
       existingPostId: exact.id,
       existingTitle: exact.title || "未命名作品",
       similarity: 1,
-      message: `与已有作品《${exact.title || "未命名作品"}》正文完全相同，建议跳过。`,
+      message: exact.source === "batch"
+        ? `与当前导入批次中的《${exact.title || "未命名作品"}》正文完全相同，建议跳过。`
+        : `与已有作品《${exact.title || "未命名作品"}》正文完全相同，建议跳过。`,
     };
   }
 
@@ -88,12 +92,15 @@ export function findImportDuplicate(
       && post.chapter_number === work.chapterNumber
     ));
     if (sameChapter) {
+      const isBatchConflict = sameChapter.source === "batch";
       return {
-        kind: "update",
+        kind: isBatchConflict ? "batch" : "update",
         existingPostId: sameChapter.id,
         existingTitle: sameChapter.title || `第${work.chapterNumber}章`,
         similarity: textSimilarity(content, comparableImportText(sameChapter.content)),
-        message: `检测到《${work.groupName}》第 ${work.chapterNumber} 章已有版本，正文不同，可更新已有版本或作为新章节。`,
+        message: isBatchConflict
+          ? `当前导入批次中已经有《${work.groupName}》第 ${work.chapterNumber} 章，不能更新尚未写入数据库的临时内容。请选择跳过，或保留为独立导入内容。`
+          : `检测到《${work.groupName}》第 ${work.chapterNumber} 章已有版本，正文不同，可更新已有版本或作为新章节。`,
       };
     }
   }
@@ -112,6 +119,8 @@ export function findImportDuplicate(
     existingPostId: bestMatch.post.id,
     existingTitle: bestMatch.post.title || "未命名作品",
     similarity: bestMatch.similarity,
-    message: `与已有作品《${bestMatch.post.title || "未命名作品"}》正文相似度约 ${formatSimilarity(bestMatch.similarity)}，请确认是否仍要导入。`,
+    message: bestMatch.post.source === "batch"
+      ? `与当前导入批次中的《${bestMatch.post.title || "未命名作品"}》正文相似度约 ${formatSimilarity(bestMatch.similarity)}，请确认是否仍要导入。`
+      : `与已有作品《${bestMatch.post.title || "未命名作品"}》正文相似度约 ${formatSimilarity(bestMatch.similarity)}，请确认是否仍要导入。`,
   };
 }
