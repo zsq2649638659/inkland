@@ -110,7 +110,7 @@
 .groupInfoCard > label > span { padding-top: 9px; font-weight: 700; }
 .groupInfoCard input, .groupInfoCard textarea { width: 100%; box-sizing: border-box; border: 1px solid #cfc5bf; background: #fff; padding: 9px 10px; font: inherit; }
 .groupInfoCard textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
-.metadataCandidate { display: grid; gap: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-left: 3px solid var(--color-primary); border-radius: 10px; background: color-mix(in srgb, var(--color-primary) 4%, var(--color-card)); color: var(--color-text); }
+.metadataCandidate { display: grid; gap: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: 10px; background: color-mix(in srgb, var(--color-primary) 4%, var(--color-card)); color: var(--color-text); }
 .metadataCandidateHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .metadataCandidateHeading h3 { margin: 0; color: var(--color-text); font-size: 15px; line-height: 1.35; }
 .metadataHint { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
@@ -122,10 +122,6 @@
 .metadataCandidateButton:hover:not(:disabled) { filter: brightness(.94); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 .metadataCandidateButton:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent); outline-offset: 2px; }
 .metadataCandidateButton:disabled { border-color: #d7cfca; background: #e9e3df; color: #756b66; cursor: not-allowed; }
-.metadataCandidateEditButton { min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: var(--color-primary); padding: 8px 4px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; }
-.metadataCandidateEditButton:hover:not(:disabled) { background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
-.metadataCandidateEditButton:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent); outline-offset: 2px; }
-.metadataCandidateEditButton:disabled { color: var(--color-text-muted); cursor: not-allowed; }
 .metadataCandidateAccepted { border-color: #b9d2bb; background: color-mix(in srgb, #f1f7f1 70%, var(--color-card)); }
 .metadataHint { margin: 0; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
