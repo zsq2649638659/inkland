@@ -72,16 +72,12 @@
 .stepScrollArea { height: auto; max-height: none; overflow: visible; overflow-x: visible; overflow-y: visible; overscroll-behavior: auto; padding: 2px 10px 14px 2px; }
 .stepScrollArea .textPlanList { margin-top: 0; margin-bottom: 14px; }
 .textPlanCard { border: 0; border-radius: 0; background: transparent; padding: 0; }
-.textPlanHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
-.textPlanHeading p { margin: 4px 0 0; color: #756b66; font-size: 13px; }
-.textPlanHeading label { display: grid; gap: 5px; color: #514641; font-size: 13px; }
 .groupNameField input { border: 1px solid #cfc5bf; background: #fff; padding: 8px 10px; }
 .splitOptions { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 14px 0 0; border: 0; padding: 0; }
 .splitOptions legend { width: 100%; margin-bottom: 7px; font-weight: 700; }
 .splitOptions label { display: flex; align-items: center; gap: 6px; }
 .groupNameField { display: grid; grid-template-columns: 90px minmax(0, 1fr); align-items: center; gap: 10px; margin-top: 13px; }
 .groupNameField span { font-weight: 700; }
-.noChaptersHint { margin: 13px 0 0; color: #76551e; font-size: 13px; line-height: 1.6; }
 .previewSection { margin-top: 26px; }
 .sectionHeader { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 14px; }
 .sectionHeader h2 { margin: 0 0 4px; }
@@ -90,18 +86,6 @@
 .previewBody, .draftBody { min-width: 0; }
 .titleInput { width: 100%; box-sizing: border-box; border: 1px solid #cfc5bf; padding: 10px 12px; font: inherit; font-weight: 700; color: #302724; }
 .previewBody textarea, .draftBody textarea { width: 100%; min-height: 150px; box-sizing: border-box; border: 1px solid #d7cfca; padding: 12px; resize: vertical; line-height: 1.65; }
-.fileMeta { margin: 7px 0 10px; color: #847a75; font-size: 13px; }
-.warning { color: #8a5d22; font-size: 13px; }
-.duplicateNotice { display: grid; gap: 12px; margin: 10px 0 12px; padding: 12px 13px; border: 1px solid #e2c18f; background: #fff8ec; color: #6d4b1b; }
-.duplicateNotice > div:first-child { display: grid; gap: 4px; }
-.duplicateNotice strong { font-size: 13px; }
-.duplicateNotice p { margin: 0; font-size: 13px; line-height: 1.55; }
-.duplicateActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.duplicateActions .textButton { min-height: 36px; padding: 7px 10px; }
-.duplicateexact { border-color: #d6c1a0; background: #faf6ed; }
-.duplicateupdate { border-color: #b7c9df; background: #f3f7fc; color: #34516f; }
-.duplicatebatch { border-color: #d8b1a5; background: #fff4f1; color: #7b3f35; }
-.duplicatesimilar { border-color: #e2c18f; background: #fff8ec; }
 .bulkTagBar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; align-items: center; margin-bottom: 14px; padding: 12px; border: 1px solid #d8cfca; background: #f4f0ed; }
 .bulkTagBar span { font-weight: 700; }
 .bulkTagBar input { min-width: 0; padding: 9px 10px; border: 1px solid #cfc5bf; background: #fff; }
@@ -110,19 +94,21 @@
 .groupInfoCard > label > span { padding-top: 9px; font-weight: 700; }
 .groupInfoCard input, .groupInfoCard textarea { width: 100%; box-sizing: border-box; border: 1px solid #cfc5bf; background: #fff; padding: 9px 10px; font: inherit; }
 .groupInfoCard textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
-.metadataCandidate { display: grid; gap: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: 10px; background: color-mix(in srgb, var(--color-primary) 4%, var(--color-card)); color: var(--color-text); }
-.metadataCandidateHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.metadataCandidateHeading h3 { margin: 0; color: var(--color-text); font-size: 15px; line-height: 1.35; }
+.metadataCandidate { padding: 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: 10px; background: color-mix(in srgb, var(--color-primary) 4%, var(--color-card)); color: var(--color-text); }
+.metadataCandidateBody { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; }
+.metadataCandidateCopy { display: grid; min-width: 0; gap: 8px; }
+.metadataCandidateCopy h3 { margin: 0; color: var(--color-text); font-size: 15px; line-height: 1.35; }
 .metadataHint { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
 .metadataCandidateText { padding: 0; }
 .metadataCandidateText p { margin: 0; white-space: pre-wrap; color: var(--color-text); font-size: 14px; line-height: 1.65; }
-.metadataCandidateActions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 8px; }
+.metadataCandidateActions { display: flex; flex: none; align-self: center; align-items: center; justify-content: flex-end; gap: 8px; }
 .metadataCandidateStatus { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid #b9d2bb; border-radius: 999px; color: #35633a; background: #f1f7f1; font-size: 12px; font-weight: 700; }
 .metadataCandidateButton { display: inline-flex; min-height: 40px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--color-primary); border-radius: 8px; background: var(--color-primary); color: #fff; padding: 8px 13px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; transition: filter var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast); }
 .metadataCandidateButton:hover:not(:disabled) { filter: brightness(.94); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 .metadataCandidateButton:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent); outline-offset: 2px; }
 .metadataCandidateButton:disabled { border-color: #d7cfca; background: #e9e3df; color: #756b66; cursor: not-allowed; }
 .metadataCandidateAccepted { border-color: #b9d2bb; background: color-mix(in srgb, #f1f7f1 70%, var(--color-card)); }
+:global(.importNoticeActions) { flex-wrap: wrap; }
 .metadataHint { margin: 0; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
 .publishSummary li { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid #ddd5d0; }
@@ -434,8 +420,6 @@
   .schedulePickerFields { flex-direction: column; }
   .schedulePickerField, .schedulePickerField:first-child, .schedulePickerField:last-child { width: 100%; max-width: none; min-width: 0; flex: auto; }
   .scheduleTimePopover { right: auto; left: 0; }
-  .textPlanHeading { display: grid; justify-content: stretch; }
-  .textPlanHeading strong { display: block; margin-right: -0.5em; }
   .splitOptions { display: grid; }
   .groupNameField { grid-template-columns: 1fr; }
   .stickyActions { bottom: 72px; }
@@ -686,6 +670,13 @@
 }
 
 .previewToolbar > strong { font-size: 15px; }
+
+.previewDescription {
+  margin: -2px 0 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
 
 .sourceTabs {
   gap: 8px;
@@ -1051,9 +1042,6 @@
 .draftCard,
 .groupInfoCard { padding: 14px; }
 
-.textPlanHeading p,
-.fileMeta { color: var(--color-text-muted); }
-
 .splitOptions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1198,6 +1186,35 @@
   line-height: 1.7;
   letter-spacing: -.02em;
 }
+
+.contentFieldControl { display: grid; gap: 4px; }
+
+.wordCount {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.previewNoticeTrigger {
+  justify-self: start;
+  min-height: 32px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.previewNoticeTrigger:hover { color: var(--color-primary-hover); }
+.previewNoticeTrigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
+  outline-offset: 2px;
+}
+.previewNoticeTrigger:disabled { color: var(--color-text-muted); cursor: not-allowed; }
 
 .contentField > span {
   font-size: var(--font-size-sm);
@@ -1424,7 +1441,9 @@
 }
 
 @media (max-width: 520px) {
-  .metadataCandidate { gap: 9px; padding: 13px; }
+  .metadataCandidate { padding: 13px; }
+  .metadataCandidateBody { grid-template-columns: 1fr; gap: 10px; }
+  .metadataCandidateActions { justify-content: flex-end; }
 }
 
 @keyframes importCalendarIn {

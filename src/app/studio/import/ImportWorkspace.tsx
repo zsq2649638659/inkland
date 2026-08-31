@@ -103,6 +103,19 @@ function getErrorMessage(error: unknown, fallback: string) {
     : fallback;
 }
 
+function getDuplicateNoticeTitle(kind: ImportDuplicateMatch["kind"]) {
+  if (kind === "exact") return "完全重复";
+  if (kind === "update") return "检测到已有章节";
+  if (kind === "batch") return "本批次章节冲突";
+  return "疑似重复";
+}
+
+function getDuplicateKeepLabel(kind: ImportDuplicateMatch["kind"]) {
+  if (kind === "exact") return "仍保留为新作品";
+  if (kind === "batch") return "保留为独立内容";
+  return "保留为新作品";
+}
+
 function getExtension(fileName: string) {
   return fileName.toLowerCase().split(".").pop() || "";
 }
@@ -411,7 +424,6 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
     groupName: plan.groupName.trim() || titleFromFileName(plan.fileName),
     chapterNumber: plan.mode === "serial" ? (chapter.number || index + 1) : undefined,
     chapterTitle: plan.mode === "serial" ? chapter.title : undefined,
-    warning: `已从同一份${sourceLabel}中拆出第 ${index + 1}/${plan.chapters.length} 部分，并保留“${plan.groupName.trim() || titleFromFileName(plan.fileName)}”分组关系。`,
   })));
 }
 
@@ -612,6 +624,7 @@ export default function ImportWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeModalWorkId, setNoticeModalWorkId] = useState<string | null>(null);
   const [bulkTags, setBulkTags] = useState<string[]>([]);
   const [copyrightConfirmed, setCopyrightConfirmed] = useState(false);
   const [publishMode, setPublishMode] = useState<"publish" | "draft" | "schedule">("publish");
@@ -678,8 +691,11 @@ export default function ImportWorkspace() {
           return item.status === "publishing" ? { ...item, status: "failed", message: "页面在处理过程中中断，可点击“重试失败内容”。" } : item;
         })
         : [];
+      const restoredWorks = (snapshot.parsedWorks as ParsedWork[]).map((work) => (
+        work.warning?.startsWith("已从同一份") ? { ...work, warning: undefined } : work
+      ));
       setBatchId(snapshot.batchId);
-      setParsedWorks(snapshot.parsedWorks as ParsedWork[]);
+      setParsedWorks(restoredWorks);
       setTextPlans((snapshot.textPlans || []) as TextImportPlan[]);
       setBulkTags(snapshot.bulkTags || []);
       setPublishMode(snapshot.publishMode || "publish");
@@ -714,6 +730,15 @@ export default function ImportWorkspace() {
       if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
     };
   }, [batchId, bulkTags, currentStep, parsedWorks, publishComplete, publishMode, publishProgress, publishResults, textPlans, user]);
+
+  useEffect(() => {
+    if (!noticeModalWorkId) return;
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setNoticeModalWorkId(null);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [noticeModalWorkId]);
 
   const loadExistingPosts = async (): Promise<ExistingImportPost[]> => {
     if (!user) throw new Error("请先登录");
@@ -804,6 +829,17 @@ export default function ImportWorkspace() {
       ? { ...work, duplicateAction: action, selected: action !== "skip" && action !== "review" }
       : work));
     setError("");
+  };
+
+  const openImportNotice = (workId: string) => {
+    setError("");
+    setNoticeModalWorkId(workId);
+  };
+
+  const resolveImportNotice = (action: ImportDuplicateAction) => {
+    if (!noticeModalWorkId) return;
+    setDuplicateAction(noticeModalWorkId, action);
+    setNoticeModalWorkId(null);
   };
 
   const setParsedSelection = (workId: string, selected: boolean) => {
@@ -1311,6 +1347,12 @@ export default function ImportWorkspace() {
   const publishFailedCount = publishResults.filter((result) => result.status === "failed").length;
   const publishingItem = publishResults.find((result) => result.status === "publishing");
   const activeGroupedPlans = textPlans.filter((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
+  const noticeModalWork = parsedWorks.find((work) => work.id === noticeModalWorkId);
+  const splitSummary = textPlans
+    .filter((plan) => plan.chapters.length >= 2 && plan.mode !== "single")
+    .map((plan) => `已按章节拆分，并保留“${plan.groupName.trim() || titleFromFileName(plan.fileName)}”分组关系。`)
+    .filter((summary, index, summaries) => summaries.indexOf(summary) === index)
+    .join(" ");
   const importQueueEntries = Array.from(parsedWorks.reduce((groups, work) => {
     const key = work.sourceBatchId || work.id;
     const current = groups.get(key);
@@ -1424,12 +1466,13 @@ export default function ImportWorkspace() {
 
               {currentStep === 2 && <div className={styles.stepPage}>
                 {textPlans.length > 0 && <div className={styles.textPlanList}>{textPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
-                    <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>{plan.canChangeEncoding ? `当前编码：${plan.encoding.toUpperCase()}；` : `来源：${plan.sourceType.toUpperCase()}；`}{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div>{plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}</div>
-                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>导入类型</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
+                    {plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}
+                    {plan.chapters.length >= 2 && <fieldset className={styles.splitOptions}><legend>导入方式</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />长篇连载</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />合集单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持整篇</label></fieldset>}
                   </section>)}</div>}
                 <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setAllParsedSelection(event.target.checked)} /> 全选</label></div>
+                {splitSummary && <p className={styles.previewDescription}>{splitSummary}</p>}
                 <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
-                <div className={styles.previewList}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div><div className={styles.fileMeta}>{work.sourceName} · {work.wordCount.toLocaleString()} 字</div>{work.warning && <p className={styles.warning}>{work.warning}</p>}{work.duplicateMatch && <div className={`${styles.duplicateNotice} ${styles[`duplicate${work.duplicateMatch.kind}`]}`} role="status"><div><strong>{work.duplicateMatch.kind === "exact" ? "完全重复" : work.duplicateMatch.kind === "update" ? "检测到已有章节" : work.duplicateMatch.kind === "batch" ? "本批次章节号冲突" : "疑似重复"}</strong><p>{work.duplicateMatch.message}</p></div><div className={styles.duplicateActions}><button type="button" className={styles.textButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "skip"); }}>跳过</button>{work.duplicateMatch.kind === "update" ? <><button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "update"); }}>更新已有版本</button><button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "keep"); }}>作为新章节</button></> : <button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "keep"); }}>{work.duplicateMatch.kind === "exact" ? "仍保留为新作品" : work.duplicateMatch.kind === "batch" ? "保留为独立内容" : "保留为新作品"}</button>}</div></div>}<label className={styles.contentField}><span>正文</span><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /></label></div></article>)}</div>
+                <div className={styles.previewList}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div>{(work.warning || work.duplicateMatch) && <button type="button" className={styles.previewNoticeTrigger} onClick={(event) => { event.stopPropagation(); openImportNotice(work.id); }}>{work.duplicateMatch ? "查看重复提示" : "查看导入提示"}</button>}<label className={styles.contentField}><span>正文</span><div className={styles.contentFieldControl}><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /><span className={styles.wordCount}>{work.wordCount.toLocaleString()} 字</span></div></label></div></article>)}</div>
                 </div>
                 <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>下一步</button></div>
               </div>}
@@ -1440,15 +1483,17 @@ export default function ImportWorkspace() {
                   {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}>
                     <label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label>
                     {plan.descriptionCandidate ? <div className={`${styles.metadataCandidate}${plan.descriptionCandidateAccepted ? ` ${styles.metadataCandidateAccepted}` : ""}`} role="region" aria-labelledby={`metadata-candidate-${plan.id}`}>
-                      <div className={styles.metadataCandidateHeading}>
-                        <h3 id={`metadata-candidate-${plan.id}`}>已识别出的{plan.mode === "serial" ? "连载" : "合集"}简介</h3>
+                      <div className={styles.metadataCandidateBody}>
+                        <div className={styles.metadataCandidateCopy}>
+                          <h3 id={`metadata-candidate-${plan.id}`}>已识别出的{plan.mode === "serial" ? "连载" : "合集"}简介</h3>
+                          <div className={styles.metadataCandidateText}><p>{plan.descriptionCandidate}</p></div>
+                        </div>
                         <div className={styles.metadataCandidateActions}>
                           {plan.descriptionCandidateAccepted
                             ? <span className={styles.metadataCandidateStatus}><svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3.5 8.4 2.7 2.7 6.3-6.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>已采用</span>
                             : <button type="button" className={styles.metadataCandidateButton} disabled={busy} onClick={() => adoptDescriptionCandidate(plan.id)}>采用</button>}
                         </div>
                       </div>
-                      <div className={styles.metadataCandidateText}><p>{plan.descriptionCandidate}</p></div>
                     </div> : <p className={styles.metadataHint}>未识别到简介候选；正文不会自动作为简介，请手动填写。</p>}
                     <label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="请确认或填写简介，最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>
                     {plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}
@@ -1514,6 +1559,32 @@ export default function ImportWorkspace() {
                 </section>
               </div>}
           </section>
+          {noticeModalWork && typeof document !== "undefined" && createPortal(
+            <div className="modal-overlay active" onClick={() => setNoticeModalWorkId(null)}>
+              <div className="modal" role="dialog" aria-modal="true" aria-labelledby={`import-notice-title-${noticeModalWork.id}`} onClick={(event) => event.stopPropagation()}>
+                <div className="modal-title" id={`import-notice-title-${noticeModalWork.id}`}>{noticeModalWork.duplicateMatch ? getDuplicateNoticeTitle(noticeModalWork.duplicateMatch.kind) : "导入提示"}</div>
+                <div className="modal-body">
+                  {noticeModalWork.warning && <p>{noticeModalWork.warning}</p>}
+                  {noticeModalWork.duplicateMatch && <p>{noticeModalWork.duplicateMatch.message}</p>}
+                </div>
+                <div className="modal-actions importNoticeActions">
+                  {noticeModalWork.duplicateMatch
+                    ? <>
+                      <button type="button" className="btn-modal btn-modal-cancel" onClick={() => setNoticeModalWorkId(null)}>取消</button>
+                      {noticeModalWork.duplicateMatch.kind === "update" && <button type="button" className="btn-modal btn-modal-primary" onClick={() => resolveImportNotice("update")}>更新已有版本</button>}
+                      {noticeModalWork.duplicateMatch.kind === "update"
+                        ? <button type="button" className="btn-modal btn-modal-primary" onClick={() => resolveImportNotice("keep")}>作为新章节</button>
+                        : <>
+                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => resolveImportNotice("skip")}>跳过</button>
+                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => resolveImportNotice("keep")}>{getDuplicateKeepLabel(noticeModalWork.duplicateMatch.kind)}</button>
+                        </>}
+                    </>
+                    : <button type="button" className="btn-modal btn-modal-primary" onClick={() => setNoticeModalWorkId(null)}>知道了</button>}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
         </main>
     </div>
   );
