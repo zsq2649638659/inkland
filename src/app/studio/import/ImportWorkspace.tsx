@@ -1441,16 +1441,17 @@ export default function ImportWorkspace() {
                     <label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label>
                     {plan.descriptionCandidate ? <div className={`${styles.metadataCandidate}${plan.descriptionCandidateAccepted ? ` ${styles.metadataCandidateAccepted}` : ""}`} role="region" aria-labelledby={`metadata-candidate-${plan.id}`}>
                       <div className={styles.metadataCandidateHeading}>
-                        <h3 id={`metadata-candidate-${plan.id}`}>简介候选</h3>
-                        {plan.descriptionCandidateAccepted && <span className={styles.metadataCandidateStatus}><svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3.5 8.4 2.7 2.7 6.3-6.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>已确认</span>}
+                        <h3 id={`metadata-candidate-${plan.id}`}>已识别出的{plan.mode === "serial" ? "连载" : "合集"}简介</h3>
+                        <div className={styles.metadataCandidateActions}>
+                          {plan.descriptionCandidateAccepted
+                            ? <span className={styles.metadataCandidateStatus}><svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3.5 8.4 2.7 2.7 6.3-6.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>已采用</span>
+                            : <button type="button" className={styles.metadataCandidateButton} disabled={busy} onClick={() => adoptDescriptionCandidate(plan.id)}>采用</button>}
+                          <button type="button" className={styles.metadataCandidateEditButton} disabled={busy} aria-label={`编辑已识别出的${plan.mode === "serial" ? "连载" : "合集"}简介`} aria-controls={`metadata-description-${plan.id}`} onClick={() => document.getElementById(`metadata-description-${plan.id}`)?.focus()}>编辑</button>
+                        </div>
                       </div>
-                      <p className={styles.metadataCandidateSource}>{plan.descriptionCandidateAccepted ? "已采用 · 仍可编辑" : `来自${plan.descriptionCandidateSource || "文档开头导语"} · 确认后使用`}</p>
                       <div className={styles.metadataCandidateText}><p>{plan.descriptionCandidate}</p></div>
-                      <div className={styles.metadataCandidateActions}>
-                        <button type="button" className={styles.metadataCandidateButton} disabled={busy || plan.descriptionCandidateAccepted} onClick={() => adoptDescriptionCandidate(plan.id)}>{plan.descriptionCandidateAccepted ? "已采用" : "采用候选简介"}</button>
-                      </div>
                     </div> : <p className={styles.metadataHint}>未识别到简介候选；正文不会自动作为简介，请手动填写。</p>}
-                    <label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="请确认或填写简介，最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>
+                    <label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea id={`metadata-description-${plan.id}`} value={plan.groupDescription || ""} maxLength={500} placeholder="请确认或填写简介，最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>
                     {plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}
                   </section>)}
                   {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <>
