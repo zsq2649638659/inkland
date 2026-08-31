@@ -81,8 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // “无 session” 结果不会覆盖随后已经建立的登录状态。
     let authStateVersion = 0;
 
-    const hydrateSession = async (session: Session | null) => {
-      const version = authStateVersion;
+    const hydrateSession = async (session: Session | null, version: number) => {
       if (!active || version !== authStateVersion) return;
       const u = session?.user || null;
       // 如果同一个人（相同 user ID），不更新 user 对象引用，避免触发下游 useEffect
@@ -117,8 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (event: AuthChangeEvent, session: Session | null) => {
         // INITIAL_SESSION 也作为有效的初始化结果处理；不能只依赖 getSession，
         // 否则首次登录时两个异步结果可能互相覆盖。
-        authStateVersion += 1;
-        void hydrateSession(session);
+        const version = ++authStateVersion;
+        void hydrateSession(session, version);
       }
     );
 
@@ -126,8 +125,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 则丢弃这个可能已经过时的 getSession 结果。
     supabase.auth.getSession().then((result: { data: { session: Session | null } }) => {
       if (!active || authStateVersion !== 0) return;
-      authStateVersion += 1;
-      void hydrateSession(result.data.session);
+      const version = ++authStateVersion;
+      void hydrateSession(result.data.session, version);
     }).catch(() => {
       if (!active || authStateVersion !== 0) return;
       authStateVersion += 1;
