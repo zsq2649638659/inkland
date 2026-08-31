@@ -32,8 +32,6 @@ export interface SerialPostCardData {
   likeCount: number;
   commentCount: number;
   bookmarkCount: number;
-  likedByMe?: boolean;
-  bookmarkedByMe?: boolean;
   createdAt: string;
   likedByMe?: boolean;
   bookmarkedByMe?: boolean;
