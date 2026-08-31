@@ -47,7 +47,7 @@ export default function Navbar() {
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("read", false)
-        .then(({ count }) => setNotificationCount(count || 0));
+        .then(({ count }: { count: number | null }) => setNotificationCount(count || 0));
     };
     fetchNotificationCount();
     const channel = supabase
