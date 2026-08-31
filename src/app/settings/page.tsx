@@ -19,7 +19,7 @@ type BlockedProfileRow = { id: string; nickname: string | null; bio: string | nu
 export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
@@ -89,6 +89,22 @@ export default function SettingsPage() {
     { key: "about", label: "关于我们" },
     { key: "contact", label: "联系我们" },
   ];
+
+  if (authLoading) {
+    return (
+      <div id="page-settings" className="min-h-screen bg-paper pb-20 lg:pb-0">
+        <div className="main-container">
+          <HomeSidebar />
+          <div className="content-area">
+            <div className="feed-empty-state" role="status" aria-busy="true">
+              <span className="auth-spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
+              <p className="feed-empty-desc">正在确认登录状态…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 未登录状态
   if (!user) {

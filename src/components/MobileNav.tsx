@@ -10,7 +10,7 @@ import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
 export default function MobileNav() {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const [notificationCount, setNotificationCount] = useState(0);
 
@@ -38,7 +38,7 @@ export default function MobileNav() {
     { href: "/discover", label: "发现", icon: "fa-compass" },
     { href: "/create", label: "发布", icon: "fa-circle-plus" },
     { href: "/notifications", label: "通知", icon: "fa-bell", style: "far", badge: notificationCount },
-    { href: user ? "/profile" : "/login", label: user ? "我的" : "登录", icon: "fa-user", style: "far" },
+    { href: user || authLoading ? "/profile" : "/login", label: user || authLoading ? "我的" : "登录", icon: "fa-user", style: "far" },
   ];
 
   return (

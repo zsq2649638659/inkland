@@ -9,6 +9,7 @@ import type { Comment } from "@/lib/types";
 interface InlineCommentPanelProps {
   postId: string;
   user: { id?: string; email?: string | null } | null;
+  authLoading?: boolean;
   displayName: string;
   avatarUrl?: string | null;
   comments: Comment[];
@@ -40,7 +41,7 @@ function splitReplyContent(content: string) {
 }
 
 export default function InlineCommentPanel({
-  postId, user, displayName, avatarUrl, comments, commentCount, commentText, loadingComments, submitting,
+  postId, user, authLoading = false, displayName, avatarUrl, comments, commentCount, commentText, loadingComments, submitting,
   onCommentTextChange, onSubmit, onReply, onClose, onDelete, onReport, onBlock,
 }: InlineCommentPanelProps) {
   const supabase = createClient();
@@ -63,7 +64,11 @@ export default function InlineCommentPanel({
 
   return (
     <div className="inline-comment-panel comments-section" aria-label={`评论区，共${commentCount}条评论`}>
-      {user ? (
+      {authLoading ? (
+        <div className="inline-comment-login" role="status" aria-busy="true">
+          <p><i className="fa-regular fa-message" /> 正在确认登录状态…</p>
+        </div>
+      ) : user ? (
         <div className="comment-input-area">
           <div className="comment-input-main">
             <textarea

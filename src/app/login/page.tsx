@@ -23,6 +23,24 @@ function withTimeout<T>(promise: PromiseLike<T>, milliseconds = 15000): Promise<
   ]) as Promise<T>;
 }
 
+async function waitForServerSession(attempts = 20): Promise<boolean> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch("/api/auth/session", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (response.ok) return true;
+    } catch {
+      // The next attempt covers a transient network failure during login.
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+    }
+  }
+  return false;
+}
+
 export default function LoginPage() {
   const supabase = createClient();
   const router = useRouter();
@@ -36,6 +54,13 @@ export default function LoginPage() {
   const [status, setStatus] = useState<StatusMsg>({ type: null, message: "" });
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [authTimeout, setAuthTimeout] = useState(false);
+  const [authActionInProgress, setAuthActionInProgress] = useState(false);
+  const [serverSessionReady, setServerSessionReady] = useState(false);
+
+  const getNextPath = () => {
+    const next = new URLSearchParams(window.location.search).get("next");
+    return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  };
 
   // 本地超时保护：如果 authLoading 超过 3 秒，强制显示表单
   useEffect(() => {
@@ -45,21 +70,26 @@ export default function LoginPage() {
 
   // 已登录用户自动跳转（保留 next 参数）
   useEffect(() => {
-    if (!authLoading && user) {
-      router.push(getNextPath());
+    if (!authLoading && user && !authActionInProgress && serverSessionReady) {
+      router.replace(getNextPath());
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, authActionInProgress, serverSessionReady, router]);
+
+  // 处理从其他页面进入登录页时已有客户端 session、但服务器 Cookie 尚未确认的窗口。
+  useEffect(() => {
+    if (authLoading || !user || authActionInProgress || serverSessionReady) return;
+    let active = true;
+    void waitForServerSession().then((ready) => {
+      if (active) setServerSessionReady(ready);
+    });
+    return () => { active = false; };
+  }, [user, authLoading, authActionInProgress, serverSessionReady]);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("mode") === "register") setMode("register");
   }, []);
 
   const clearStatus = () => setStatus({ type: null, message: "" });
-
-  const getNextPath = () => {
-    const next = new URLSearchParams(window.location.search).get("next");
-    return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-  };
 
   const handleLogin = async () => {
     if (!email.trim()) {
@@ -72,6 +102,8 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setAuthActionInProgress(true);
+    setServerSessionReady(false);
     clearStatus();
 
     let error: { message: string } | null = null;
@@ -84,6 +116,7 @@ export default function LoginPage() {
     } catch (requestError) {
       setStatus({ type: "error", message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT" ? "连接服务器超时，请检查网络或稍后重试" : "登录请求失败，请稍后重试" });
       setLoading(false);
+      setAuthActionInProgress(false);
       return;
     }
 
@@ -100,11 +133,22 @@ export default function LoginPage() {
                 : "登录失败，请稍后重试",
       });
       setLoading(false);
+      setAuthActionInProgress(false);
       return;
     }
 
-    router.push(getNextPath());
-    router.refresh();
+    // 不在这里抢先导航：等待 AuthProvider 收到 SIGNED_IN 并更新 user 后，
+    // 上面的 effect 再跳转，避免首次登录时被保护路由当成未登录。
+    const serverReady = await withTimeout(waitForServerSession(), 5000).catch(() => false);
+    if (!serverReady) {
+      setStatus({ type: "error", message: "登录已完成，但页面同步较慢，请稍后重试" });
+      setLoading(false);
+      setAuthActionInProgress(false);
+      return;
+    }
+    setServerSessionReady(true);
+    setLoading(false);
+    setAuthActionInProgress(false);
   };
 
   const handleRegister = async () => {
@@ -126,6 +170,7 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setAuthActionInProgress(true);
     clearStatus();
 
     let data: Awaited<ReturnType<typeof supabase.auth.signUp>>["data"];
@@ -142,6 +187,7 @@ export default function LoginPage() {
     } catch (requestError) {
       setStatus({ type: "error", message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT" ? "连接服务器超时，请检查网络或稍后重试" : "注册请求失败，请稍后重试" });
       setLoading(false);
+      setAuthActionInProgress(false);
       return;
     }
 
@@ -158,6 +204,7 @@ export default function LoginPage() {
                 : "注册失败，请稍后重试",
       });
       setLoading(false);
+      setAuthActionInProgress(false);
       return;
     }
 
@@ -169,6 +216,7 @@ export default function LoginPage() {
           message: "该邮箱已被注册，请直接登录或使用其他邮箱",
         });
         setLoading(false);
+        setAuthActionInProgress(false);
         return;
       }
 
@@ -178,8 +226,7 @@ export default function LoginPage() {
           id: data.user.id,
           nickname: nickname.trim(),
         });
-        router.push(getNextPath());
-        router.refresh();
+        // 与登录保持一致，等 AuthProvider 完成 user 更新后再导航。
       } else {
         // 需要邮箱确认
         setStatus({
@@ -190,6 +237,7 @@ export default function LoginPage() {
         setPassword("");
       }
     }
+    setAuthActionInProgress(false);
     setLoading(false);
   };
 

@@ -25,7 +25,7 @@ interface SuggestionResult {
 }
 
 export default function Navbar() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { open, openDrawer } = useMobileDrawer();
@@ -280,7 +280,7 @@ export default function Navbar() {
 
         {/* V2: navbar-right — only create button + mobile menu (avatar is in sidebar) */}
         <div className="navbar-right">
-          <Link href={user ? "/create" : "/login"} className="btn-create no-underline">
+          <Link href={user || authLoading ? "/create" : "/login"} className="btn-create no-underline">
             <i className="fa-solid fa-pen-to-square" /> 创作
           </Link>
 

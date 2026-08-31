@@ -29,7 +29,7 @@ function SearchContent() {
   const initialQuery = searchParams.get("q") || "";
   const initialType = (searchParams.get("type") || "tags") as SearchFilter;
   const supabase = createClient();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [inputValue, setInputValue] = useState(initialQuery);
   const [activeFilter, setActiveFilter] = useState<SearchFilter>(initialType);
@@ -128,10 +128,6 @@ function SearchContent() {
   // URL 参数同步（初始加载）
   useEffect(() => {
     setInputValue(initialQuery);
-    if (initialQuery && user) {
-      const rid = ++requestIdRef.current;
-      doSearch(initialQuery, rid);
-    }
   }, [initialQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 输入防抖自动搜索（300ms）
@@ -161,7 +157,7 @@ function SearchContent() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [inputValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inputValue, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInputChange = (value: string) => {
     setInputValue(value);
@@ -194,6 +190,10 @@ function SearchContent() {
       default: return { label: "单篇", icon: "fa-file-lines", kind: "single" };
     }
   };
+
+  if (authLoading) {
+    return <SkeletonSearchResults variant={activeFilter} />;
+  }
 
   // 未登录状态
   if (!user) {

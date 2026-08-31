@@ -65,7 +65,7 @@ function getTimeAgo(dateStr: string): string {
 
 export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const supabase = createClient();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [following, setFollowing] = useState(false);
@@ -103,7 +103,10 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
 
   const plainExcerpt = useMemo(() => stripMarkdown(data.content), [data.content]);
 
-  const goToLogin = () => router.push("/login");
+  const goToLogin = () => {
+    if (authLoading) return;
+    router.push("/login");
+  };
 
   const reportTarget = (targetType: "post" | "comment", targetId: string) => {
     if (!user) { goToLogin(); return; }
@@ -367,6 +370,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
         <InlineCommentPanel
           postId={data.chapterId}
           user={user}
+          authLoading={authLoading}
           displayName={profile?.nickname || user?.email?.split("@")[0] || "我"}
           avatarUrl={profile?.avatar_url}
           comments={comments}

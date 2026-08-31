@@ -26,7 +26,7 @@ interface ReaderClientProps {
 export default function ReaderClient({ post }: ReaderClientProps) {
   const supabase = createClient();
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const dialog = useAppDialog();
   const [darkMode, setDarkMode] = useState(false);
   const [fontSize, setFontSize] = useState(18);
@@ -384,6 +384,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
   const avatarChar = profile?.nickname?.[0] || user?.email?.[0] || "?";
 
   const goToLogin = () => {
+    if (authLoading) return;
     router.push("/login");
   };
 
@@ -696,7 +697,14 @@ export default function ReaderClient({ post }: ReaderClientProps) {
           {/* 评论区 */}
           <div id="comments" className="comments-section" onMouseOver={handleCommentMouseOver} onMouseOut={handleCommentMouseOut}>
 
-            {user ? (
+            {authLoading ? (
+              <div style={{ marginBottom: 32, padding: 24, textAlign: 'center', borderRadius: 12, background: 'var(--color-bg-secondary, #E8E4E0)' }} role="status" aria-busy="true">
+                <p style={{ fontSize: 14, color: 'var(--color-text-muted, #6B6B6B)' }}>
+                  <i className="fa-regular fa-message" style={{ marginRight: 6 }} />
+                  正在确认登录状态…
+                </p>
+              </div>
+            ) : user ? (
               <div className="comment-input-area">
                 <div className="comment-input-avatar">
                   {profile?.avatar_url ? (

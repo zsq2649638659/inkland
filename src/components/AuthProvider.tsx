@@ -77,7 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    const hydrateSession = async (session: Session | null) => {
+    // getSession() 与 onAuthStateChange() 可能交错返回。用版本号保证较早的
+    // “无 session” 结果不会覆盖随后已经建立的登录状态。
+    let authStateVersion = 0;
+
+    const hydrateSession = async (session: Session | null, version: number) => {
+      if (!active || version !== authStateVersion) return;
       const u = session?.user || null;
       // 如果同一个人（相同 user ID），不更新 user 对象引用，避免触发下游 useEffect
       if (u && userIdRef.current === u.id) {
@@ -102,47 +107,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (active) setLoading(false);
 
       const nextProfile = await fetchProfile(u.id);
-      if (!active) return;
+      if (!active || version !== authStateVersion) return;
       setProfile(nextProfile);
       saveCachedProfile(u.id, nextProfile);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
-        // 初始化时 event 为 INITIAL_SESSION，跳过（由 getSession 处理）
-        if (event === "INITIAL_SESSION") return;
-        if (session) {
-          void hydrateSession(session);
-        } else {
-          // SIGNED_OUT
-          if (active) {
-            // 必须同步清空 userIdRef：否则再次登录同一账号时，
-            // hydrateSession 会因「用户 id 相同」命中提前 return，跳过 setUser，
-            // 页面就一直停在未登录态，直到手动刷新才恢复。
-            userIdRef.current = null;
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-          }
-        }
+        // INITIAL_SESSION 也作为有效的初始化结果处理；不能只依赖 getSession，
+        // 否则首次登录时两个异步结果可能互相覆盖。
+        const version = ++authStateVersion;
+        void hydrateSession(session, version);
       }
     );
 
-    // 只用 getSession 做初始化，避免双重调用
+    // 作为 INITIAL_SESSION 的兼容兜底；若期间已经收到任何 auth 事件，
+    // 则丢弃这个可能已经过时的 getSession 结果。
     supabase.auth.getSession().then((result: { data: { session: Session | null } }) => {
-      void hydrateSession(result.data.session);
+      if (!active || authStateVersion !== 0) return;
+      const version = ++authStateVersion;
+      void hydrateSession(result.data.session, version);
+    }).catch(() => {
+      if (!active || authStateVersion !== 0) return;
+      authStateVersion += 1;
+      userIdRef.current = null;
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
     });
-
-    // 超时保护：3 秒后无论如何结束 loading
-    const timeoutId = window.setTimeout(() => {
-      if (active) {
-        setLoading(false);
-      }
-    }, 3000);
 
     return () => {
       active = false;
-      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, [fetchProfile, supabase]);
