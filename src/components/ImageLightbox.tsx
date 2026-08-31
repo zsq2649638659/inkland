@@ -36,7 +36,7 @@ function timeAgo(value?: string) {
 export default function ImageLightbox({ post, images, initialIndex = 0, onClose }: ImageLightboxProps) {
   const supabase = createClient();
   const siteDialog = useSiteDialog();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [index, setIndex] = useState(Math.min(initialIndex, Math.max(0, images.length - 1)));
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -117,6 +117,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
   }, [user, authorId]);
 
   const toggleFollow = async () => {
+    if (authLoading) return;
     if (!user) { window.location.href = "/login"; return; }
     if (!following) {
       const blocked = await assertCanInteract();
@@ -234,7 +235,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
         </div>
         <h2>{title}</h2><p className="image-lightbox-description">{description || "暂无说明"}</p>
         <div className="image-lightbox-actions card-actions"><LikeButton postId={post.id} initialCount={post.like_count || 0} /><button type="button" className="card-action"><i className="fa-regular fa-comment" /><span>{commentCount}</span></button><BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} /><button type="button" className="card-action" onClick={share}><i className="fa-solid fa-arrow-up-from-bracket" /><span>分享</span></button></div>
-        <InlineCommentPanel postId={post.id} user={user} displayName={profile?.nickname || user?.email?.split("@")[0] || "我"} avatarUrl={profile?.avatar_url} comments={comments} commentCount={commentCount} commentText={commentText} loadingComments={loadingComments} submitting={submitting} onCommentTextChange={setCommentText} onSubmit={submitComment} onReply={submitReply} onDelete={deleteComment} onClose={onClose} onReport={(commentId, commentUserId) => { void commentUserId; setModeration({ mode: "report", targetId: commentId, targetType: "comment" }); }} onBlock={(userId) => setModeration({ mode: "block", targetId: userId, targetType: "user" })} />
+        <InlineCommentPanel postId={post.id} user={user} authLoading={authLoading} displayName={profile?.nickname || user?.email?.split("@")[0] || "我"} avatarUrl={profile?.avatar_url} comments={comments} commentCount={commentCount} commentText={commentText} loadingComments={loadingComments} submitting={submitting} onCommentTextChange={setCommentText} onSubmit={submitComment} onReply={submitReply} onDelete={deleteComment} onClose={onClose} onReport={(commentId, commentUserId) => { void commentUserId; setModeration({ mode: "report", targetId: commentId, targetType: "comment" }); }} onBlock={(userId) => setModeration({ mode: "block", targetId: userId, targetType: "user" })} />
       </aside>
       <ModerationReasonModal open={!!moderation && moderation.mode === "report"} mode="report" onClose={() => setModeration(null)} onSubmit={submitModeration} />
       <ModerationReasonModal open={!!moderation && moderation.mode === "block"} mode="block" onClose={() => setModeration(null)} onSubmit={submitModeration} />

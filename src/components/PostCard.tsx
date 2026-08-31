@@ -48,7 +48,7 @@ function isPlaceholderTitle(title?: string) {
 
 export default function PostCard({ post }: PostCardProps) {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
 
   const [showComment, setShowComment] = useState(false);
@@ -120,6 +120,7 @@ export default function PostCard({ post }: PostCardProps) {
   }, [post.content, post.cover_url, supabase, user]);
 
   const goToLogin = () => {
+    if (authLoading) return;
     router.push("/login");
   };
 
@@ -372,7 +373,7 @@ export default function PostCard({ post }: PostCardProps) {
 
         <div className="card-header-actions">
           {user?.id !== post.user_id && (
-            <button className="card-follow-btn" onClick={toggleFollow} disabled={followLoading}>
+            <button className="card-follow-btn" onClick={toggleFollow} disabled={authLoading || followLoading}>
               {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
             </button>
           )}
@@ -488,6 +489,7 @@ export default function PostCard({ post }: PostCardProps) {
         <InlineCommentPanel
           postId={post.id}
           user={user}
+          authLoading={authLoading}
           displayName={profile?.nickname || user?.email?.split("@")[0] || "我"}
           avatarUrl={profile?.avatar_url}
           comments={comments}

@@ -13,7 +13,7 @@ import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
 export default function MobileDrawer() {
   const { open, closeDrawer } = useMobileDrawer();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -165,7 +165,17 @@ export default function MobileDrawer() {
         {/* Body */}
         <div className="mobile-drawer-body" style={{ flex: 1, padding: "12px 0" }}>
           {/* User section — 与参考设计保持一致的 sidebar-user 垂直居中布局 */}
-          {user ? (
+          {authLoading ? (
+            <div className="sidebar-user" aria-busy="true">
+              <div className="sidebar-user-avatar">
+                <i className="fa-solid fa-user text-white/60" />
+              </div>
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">正在确认登录状态…</div>
+                <div className="sidebar-user-bio">请稍候</div>
+              </div>
+            </div>
+          ) : user ? (
             <div className="sidebar-user">
               <div className="sidebar-user-avatar">
                 {profile?.avatar_url ? (

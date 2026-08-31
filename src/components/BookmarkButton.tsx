@@ -22,7 +22,7 @@ interface BookmarkButtonProps {
 export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly, plain, className, initialActive }: BookmarkButtonProps) {
   const supabase = createClient();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const dialog = useAppDialog();
   const [bookmarked, setBookmarked] = useState(initialActive ?? false);
   const [count, setCount] = useState(initialCount);
@@ -40,6 +40,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
   }, [user, postId, initialActive]);
 
   const toggle = async () => {
+    if (authLoading) return;
     if (!user) {
       if (onLogin) onLogin();
       else router.push("/login");
@@ -84,14 +85,14 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
   if (iconOnly) {
     if (plain) {
       return (
-        <button className={`stat-item ${className || ""}`} title="收藏" onClick={toggle} disabled={loading}>
+        <button className={`stat-item ${className || ""}`} title="收藏" onClick={toggle} disabled={loading || authLoading}>
           <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
           <span>{count}</span>
         </button>
       );
     }
     return (
-      <button className="rs-btn" title="收藏" onClick={toggle} disabled={loading}>
+      <button className="rs-btn" title="收藏" onClick={toggle} disabled={loading || authLoading}>
         <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "#F26B5B" } : undefined} />
       </button>
     );
@@ -101,7 +102,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
     <button
       className={`card-action ${bookmarked ? "liked" : ""}`}
       onClick={toggle}
-      disabled={loading}
+      disabled={loading || authLoading}
     >
       <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} />
       <span>{count}</span>

@@ -22,7 +22,7 @@ interface LikeButtonProps {
 export default function LikeButton({ postId, initialCount, onLogin, iconOnly, plain, className, initialActive }: LikeButtonProps) {
   const supabase = createClient();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const dialog = useAppDialog();
   const [liked, setLiked] = useState(initialActive ?? false);
   const [count, setCount] = useState(initialCount);
@@ -40,6 +40,7 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
   }, [user, postId, initialActive]);
 
   const toggle = async () => {
+    if (authLoading) return;
     if (!user) {
       if (onLogin) onLogin();
       else router.push("/login");
@@ -84,14 +85,14 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
   if (iconOnly) {
     if (plain) {
       return (
-        <button className={`stat-item ${className || ""}`} title="点赞" onClick={toggle} disabled={loading}>
+        <button className={`stat-item ${className || ""}`} title="点赞" onClick={toggle} disabled={loading || authLoading}>
           <i className={`${liked ? "fa-solid" : "fa-regular"} fa-heart`} style={liked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
           <span>{count}</span>
         </button>
       );
     }
     return (
-      <button className="rs-btn flex items-center gap-1" title="点赞" onClick={toggle} disabled={loading}>
+      <button className="rs-btn flex items-center gap-1" title="点赞" onClick={toggle} disabled={loading || authLoading}>
         <i className={`${liked ? "fa-solid" : "fa-regular"} fa-heart`} style={liked ? { color: "#e74c3c" } : undefined} />
         <span className="text-xs text-muted">{count}</span>
       </button>
@@ -102,7 +103,7 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
     <button
       className={`card-action ${liked ? "liked" : ""}`}
       onClick={toggle}
-      disabled={loading}
+      disabled={loading || authLoading}
     >
       <i className={`${liked ? "fa-solid" : "fa-regular"} fa-heart`} />
       <span>{count}</span>
