@@ -16,6 +16,7 @@ import { useAppDialog } from "@/components/AppDialogProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import { assertCanInteract } from "@/lib/userRestrictions";
+import { assembleSeriesInfo } from "@/lib/seriesInfo";
 
 interface FollowUser {
   id: string;
@@ -43,43 +44,6 @@ interface SeriesInfo {
   comment_count: number;
   bookmark_count: number;
 }
-
-// 移除 Markdown 语法，提取纯文本
-const stripMarkdown = (text: string): string => {
-  return text
-    .replace(/!\[.*?\]\(.*?\)/g, "")
-    .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
-    .replace(/[#*_~`>]/g, "")
-    .replace(/\n{2,}/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-};
-
-// 查询系列下所有章节的点赞/评论/收藏总数
-const loadSeriesStats = async (supabase: ReturnType<typeof createClient>, seriesName: string) => {
-  const { data: chapters } = await supabase
-    .from("posts")
-    .select("id")
-    .eq("series_name", seriesName)
-    .eq("post_type", "serial")
-    .eq("status", "published");
-
-  if (!chapters || chapters.length === 0) return { like_count: 0, comment_count: 0, bookmark_count: 0 };
-
-  const chapterIds = chapters.map((c: Record<string, unknown>) => c.id as string);
-
-  const [likeRes, commentRes, bookmarkRes] = await Promise.all([
-    supabase.from("likes").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-    supabase.from("comments").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-    supabase.from("bookmarks").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-  ]);
-
-  return {
-    like_count: likeRes.count || 0,
-    comment_count: commentRes.count || 0,
-    bookmark_count: bookmarkRes.count || 0,
-  };
-};
 
 export default function UserPage({ params }: { params: Promise<{ id: string }> }) {
   const [reportOpen, setReportOpen] = useState(false);
@@ -171,66 +135,56 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const loadStats = useCallback(async (userId: string) => {
-    // Post count
-    const { count: pCount } = await supabase
-      .from("posts")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "published");
-    setPostCount(pCount || 0);
+    // 个人资料统计互不依赖；帖子 ID 同时用于帖子总数和互动汇总，避免重复查一遍 posts。
+    const [postIdsResult, followingResult, followerResult] = await Promise.all([
+      supabase.from("posts").select("id").eq("user_id", userId).eq("status", "published"),
+      supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
+      supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", userId),
+    ]);
+    const postIds = (postIdsResult.data || []) as Array<{ id: string }>;
+    setPostCount(postIds.length);
+    setFollowingCount(followingResult.count || 0);
+    setFollowerCount(followerResult.count || 0);
 
-    // Like & bookmark counts from post_stats
-    const { data: postIds } = await supabase
-      .from("posts")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "published");
-    if (postIds && postIds.length > 0) {
-      const ids = postIds.map((p) => p.id);
+    if (postIds.length > 0) {
       const { data: stats } = await supabase
         .from("post_stats")
         .select("like_count, bookmark_count")
-        .in("id", ids);
-      if (stats) {
-        let totalLikes = 0;
-        let totalBookmarks = 0;
-        for (const s of stats as Array<{ like_count: number; bookmark_count: number }>) {
-          totalLikes += s.like_count || 0;
-          totalBookmarks += s.bookmark_count || 0;
-        }
-        setLikeCount(totalLikes);
-        setBookmarkCount(totalBookmarks);
+        .in("id", postIds.map((post) => post.id));
+      let totalLikes = 0;
+      let totalBookmarks = 0;
+      for (const s of (stats || []) as Array<{ like_count: number; bookmark_count: number }>) {
+        totalLikes += s.like_count || 0;
+        totalBookmarks += s.bookmark_count || 0;
       }
+      setLikeCount(totalLikes);
+      setBookmarkCount(totalBookmarks);
+    } else {
+      setLikeCount(0);
+      setBookmarkCount(0);
     }
-
-    // Following count
-    const { count: fgCount } = await supabase
-      .from("follows")
-      .select("id", { count: "exact", head: true })
-      .eq("follower_id", userId);
-    setFollowingCount(fgCount || 0);
-
-    // Follower count
-    const { count: frCount } = await supabase
-      .from("follows")
-      .select("id", { count: "exact", head: true })
-      .eq("following_id", userId);
-    setFollowerCount(frCount || 0);
   }, [supabase]);
 
   useEffect(() => {
     const load = async () => {
-      const { data: prof } = await supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id).single();
-      if (prof) setProfile(prof as { nickname: string; avatar_url: string | null; bio: string | null });
-
-      // Load stats
-      await loadStats(id);
-
-      const { data: rawData } = await supabase
+      const profilePromise = supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id).single();
+      const postsPromise = supabase
         .from("posts")
         .select("id, title, content, word_count, post_type, created_at, series_name, chapter_number, cover_url, user_id, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)")
         .eq("user_id", id).eq("status", "published")
         .order("created_at", { ascending: false }).limit(50);
+      const seriesPromise = supabase
+        .from("series")
+        .select("id, name, cover_url, description, series_type, tags, status, created_at")
+        .eq("user_id", id)
+        .order("created_at", { ascending: false });
+      void loadStats(id);
+      const [{ data: prof }, { data: rawData }, { data: allSeriesData }] = await Promise.all([
+        profilePromise,
+        postsPromise,
+        seriesPromise,
+      ]);
+      if (prof) setProfile(prof as { nickname: string; avatar_url: string | null; bio: string | null });
 
       if (rawData) {
         const rawArr = rawData as unknown as Record<string, unknown>[];
@@ -292,16 +246,11 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         });
 
         setPosts(formatted);
+        // 帖子和个人资料先出屏，系列摘要在后台批量补齐，不阻塞用户查看普通作品。
+        setLoading(false);
 
         // 处理连载：从 series 表加载元数据
         const seriesNames = [...new Set(serialMetaPosts.map((p) => p.series_name as string).filter(Boolean))];
-
-        // 直接查询该用户的所有 series 记录（包括没有帖子的空系列）
-        const { data: allSeriesData } = await supabase
-          .from("series")
-          .select("id, name, cover_url, description, series_type, tags, status, created_at")
-          .eq("user_id", id)
-          .order("created_at", { ascending: false });
 
         let matchedSeries: Record<string, unknown>[] = [];
         if (allSeriesData) {
@@ -323,29 +272,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             return true;
           });
 
-          const seriesWithChapters = await Promise.all(deduped.map(async (s) => {
-            const { data: chapters, count } = await supabase
-              .from("posts")
-              .select("id, title, content, chapter_number, created_at", { count: "exact" })
-              .eq("series_name", s.name)
-              .eq("post_type", "serial")
-              .eq("status", "published")
-              .order("chapter_number", { ascending: false })
-              .limit(1);
-
-            const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
-            const stats = await loadSeriesStats(supabase, s.name);
-            return {
-              ...s,
-              ...stats,
-              latestChapterId: latest ? latest.id as string : null,
-              latestChapterNumber: latest ? latest.chapter_number as number : null,
-              latestChapterTitle: latest ? latest.title as string : null,
-              latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
-              latestChapterCreatedAt: latest ? latest.created_at as string : null,
-              totalChapters: count || 0,
-            };
-          }));
+          const seriesWithChapters = await assembleSeriesInfo(supabase, deduped);
 
           setSeriesList(seriesWithChapters);
         }

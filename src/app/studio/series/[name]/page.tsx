@@ -59,13 +59,31 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     if (!user) return;
     setLoading(true);
 
-    // 从 series 表获取
-    const { data: seriesData } = await supabase
+    // 系列、章节和创作者资料彼此独立，合并成一波请求。
+    const seriesPromise = supabase
       .from("series")
       .select("*")
       .eq("name", decodedName)
       .eq("user_id", user.id)
       .single();
+    const chaptersPromise = supabase
+      .from("posts")
+      .select("id, title, chapter_number, chapter_title, word_count, status, review_status, review_reason, created_at, updated_at")
+      .eq("series_name", decodedName)
+      .eq("post_type", "serial")
+      .eq("user_id", user.id)
+      .gt("chapter_number", 0)
+      .order("chapter_number", { ascending: true });
+    const profilePromise = supabase
+      .from("profiles")
+      .select("nickname, avatar_url")
+      .eq("id", user.id)
+      .single();
+    const [{ data: seriesData }, { data: chData }, { data: profileData }] = await Promise.all([
+      seriesPromise,
+      chaptersPromise,
+      profilePromise,
+    ]);
 
     if (seriesData) {
       const s = seriesData as unknown as Record<string, unknown>;
@@ -84,16 +102,6 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
       setEditTags((s.tags as string[]) || []);
     }
 
-    // 获取所有章节
-    const { data: chData } = await supabase
-      .from("posts")
-      .select("id, title, chapter_number, chapter_title, word_count, status, review_status, review_reason, created_at, updated_at")
-      .eq("series_name", decodedName)
-      .eq("post_type", "serial")
-      .eq("user_id", user.id)
-      .gt("chapter_number", 0)
-      .order("chapter_number", { ascending: true });
-
     if (chData) {
       setChapters(chData.map((c: Record<string, unknown>) => ({
         id: c.id as string,
@@ -109,12 +117,6 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
       })));
     }
 
-    // 获取创作者信息
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("nickname, avatar_url")
-      .eq("id", user.id)
-      .single();
     if (profileData) {
       setProfile(profileData as { nickname: string; avatar_url: string | null });
     }

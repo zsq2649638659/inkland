@@ -2,17 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/browser";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
 export default function MobileDrawer() {
   const { open, closeDrawer } = useMobileDrawer();
   const { user, profile } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
@@ -23,23 +26,22 @@ export default function MobileDrawer() {
 
   useEffect(() => {
     if (!user) return;
+    const cached = readClientCache<number>(`notification-count:${user.id}`, 30_000, true);
+    if (cached !== undefined) setNotificationCount(cached);
     const fetchCount = () => {
-      supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false)
-        .then(({ count }) => setNotificationCount(count || 0));
+      void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
+        const { count } = await supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("read", false);
+        return count || 0;
+      }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
-    fetchCount();
-    const channel = supabase
-      .channel(`mobile-drawer-notifications:${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchCount)
-      .subscribe();
+    if (cached === undefined) fetchCount();
     const timer = window.setInterval(fetchCount, 30_000);
     return () => {
       window.clearInterval(timer);
-      void supabase.removeChannel(channel);
     };
   }, [user, supabase]);
 
@@ -84,7 +86,7 @@ export default function MobileDrawer() {
 
   const handleNav = (href: string) => {
     closeDrawer();
-    window.location.href = href;
+    router.push(href);
   };
 
   const drawerContent = open ? (
@@ -308,7 +310,7 @@ export default function MobileDrawer() {
                 onClick={async () => {
                   setShowLogout(false);
                   closeDrawer();
-                  window.location.href = "/login";
+                  router.push("/login");
                 }}
               >确认退出</button>
             </div>

@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { getOrCreateClientCache } from "@/lib/client-cache";
 
 interface Suggestion {
   name: string;
@@ -15,9 +17,17 @@ interface Suggestion {
   id?: string;
 }
 
+interface SuggestionResult {
+  tags: Suggestion[];
+  users: Suggestion[];
+  posts: Suggestion[];
+  content: Suggestion[];
+}
+
 export default function Navbar() {
   const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const { open, openDrawer } = useMobileDrawer();
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -97,22 +107,37 @@ export default function Navbar() {
       return;
     }
     setSearching(true);
-    const { data: blockedRows } = user
-      ? await supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id)
-      : { data: [] };
-    const blockedIds = new Set((blockedRows || []).map((row) => row.blocked_user_id as string));
-    const { data: tags } = await supabase.from("tags").select("name, post_count").ilike("name", `%${q}%`).order("post_count", { ascending: false }).limit(5);
-    setTagSuggestions((tags || []).map((t: Record<string, unknown>) => ({ name: t.name as string, type: "tag" as const, subtitle: `${t.post_count} 篇` })));
-    const { data: users } = await supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(5);
-    setUserSuggestions((users || []).filter((u: Record<string, unknown>) => !blockedIds.has(u.id as string)).map((u: Record<string, unknown>) => ({ name: (u.nickname as string) || "匿名用户", type: "user" as const, id: u.id as string, subtitle: (u.avatar_url as string) || "" })));
-    const { data: titlePosts } = await supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5);
-    setPostSuggestions((titlePosts || []).filter((p: Record<string, unknown>) => !blockedIds.has(p.user_id as string)).map((p: Record<string, unknown>) => ({ name: (p.title as string) || "无标题", type: "post" as const, id: p.id as string })));
-    const { data: contentPosts } = await supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5);
-    setContentSuggestions((contentPosts || []).filter((p: Record<string, unknown>) => !blockedIds.has(p.user_id as string)).map((p: Record<string, unknown>) => {
-      const rawContent = (p.content as string) || "";
-      const excerpt = rawContent.replace(/!\[.*?\]\(.*?\)/g, "").replace(/\[([^\]]*)\]\(.*?\)/g, "$1").replace(/[*_~`#>|-]/g, "").replace(/\n+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
-      return { name: `${(p.title as string) || "无标题"}`, type: "content" as const, id: p.id as string, subtitle: excerpt ? `...${excerpt}...` : "" };
-    }));
+    const result = await getOrCreateClientCache<SuggestionResult>(
+      `search-suggestions:${user?.id || "anon"}:${q.toLowerCase()}`,
+      async () => {
+        const [blockedRes, tagsRes, usersRes, titleRes, contentRes] = await Promise.all([
+          user ? supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id) : Promise.resolve({ data: [] as unknown[] }),
+          supabase.from("tags").select("name, post_count").ilike("name", `%${q}%`).order("post_count", { ascending: false }).limit(5),
+          supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(5),
+          supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5),
+          supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5),
+        ]);
+        const blockedIds = new Set((blockedRes.data || []).map((row: Record<string, unknown>) => row.blocked_user_id as string));
+        const users = (usersRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.id as string));
+        const posts = (titleRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.user_id as string));
+        const content = (contentRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.user_id as string));
+        return {
+          tags: (tagsRes.data || []).map((t: Record<string, unknown>) => ({ name: t.name as string, type: "tag" as const, subtitle: `${t.post_count} 篇` })),
+          users: users.map((item: Record<string, unknown>) => ({ name: (item.nickname as string) || "匿名用户", type: "user" as const, id: item.id as string, subtitle: (item.avatar_url as string) || "" })),
+          posts: posts.map((item: Record<string, unknown>) => ({ name: (item.title as string) || "无标题", type: "post" as const, id: item.id as string })),
+          content: content.map((item: Record<string, unknown>) => {
+            const rawContent = (item.content as string) || "";
+            const excerpt = rawContent.replace(/!\[.*?\]\(.*?\)/g, "").replace(/\[([^\]]*)\]\(.*?\)/g, "$1").replace(/[*_~`#>|-]/g, "").replace(/\n+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+            return { name: (item.title as string) || "无标题", type: "content" as const, id: item.id as string, subtitle: excerpt ? `...${excerpt}...` : "" };
+          }),
+        };
+      },
+      { ttlMs: 10_000 },
+    );
+    setTagSuggestions(result.tags);
+    setUserSuggestions(result.users);
+    setPostSuggestions(result.posts);
+    setContentSuggestions(result.content);
     setSearching(false);
   }, [supabase, user]);
 
@@ -124,14 +149,14 @@ export default function Navbar() {
 
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchQuery.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
   const selectSuggestion = (s: Suggestion) => {
-    if (s.type === "tag") window.location.href = `/tag/${encodeURIComponent(s.name)}`;
-    else if (s.type === "user") window.location.href = `/user/${s.id}`;
-    else if (s.type === "post" || s.type === "content") window.location.href = `/read/${s.id}`;
+    if (s.type === "tag") router.push(`/tag/${encodeURIComponent(s.name)}`);
+    else if (s.type === "user") router.push(`/user/${s.id}`);
+    else if (s.type === "post" || s.type === "content") router.push(`/read/${s.id}`);
   };
 
   const hasAnyResults = tagSuggestions.length > 0 || userSuggestions.length > 0 || postSuggestions.length > 0 || contentSuggestions.length > 0;

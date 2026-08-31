@@ -14,8 +14,13 @@ const API_CACHE_TTL = 30_000;
 // 命中时直接回传已瘦身的 JSON 字符串，跳过「拉 3.4MB 全文 + 瘦身」全程。
 const feedApiCache = new Map<string, { body: string; at: number }>();
 
-const jsonResp = (body: string) =>
-  new NextResponse(body, { headers: { "content-type": "application/json; charset=utf-8" } });
+const jsonResp = (body: string, publicCache = false) =>
+  new NextResponse(body, {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "Cache-Control": publicCache ? "public, s-maxage=30, stale-while-revalidate=60" : "private, no-store",
+    },
+  });
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -39,13 +44,13 @@ export async function GET(request: Request) {
     const cacheKey = `${userId ?? "anon"}:${tab}`;
     const hit = feedApiCache.get(cacheKey);
     if (hit && Date.now() - hit.at < API_CACHE_TTL) {
-      return jsonResp(hit.body);
+      return jsonResp(hit.body, url.searchParams.get("u") === "anon" && tab === "hot24");
     }
 
     const result = await loadFeed(supabase, { tab, userId });
     const body = JSON.stringify(result);
     feedApiCache.set(cacheKey, { body, at: Date.now() });
-    return jsonResp(body);
+    return jsonResp(body, url.searchParams.get("u") === "anon" && tab === "hot24");
   } catch (e) {
     console.error("feed api failed:", e);
     return NextResponse.json({ error: "feed unavailable" }, { status: 500 });

@@ -503,7 +503,7 @@ export default function ProfilePage() {
     else if (tab === "bookmarks") loadBookmarks();
     else if (tab === "following") loadFollowing();
     else if (tab === "followers") loadFollowers();
-  }, [user, tab, filter]);
+  }, [user, tab]);
 
   const filterPills: { key: FilterType; label: string }[] = [
     { key: "all", label: "全部" },

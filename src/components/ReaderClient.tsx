@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
@@ -24,6 +25,7 @@ interface ReaderClientProps {
 
 export default function ReaderClient({ post }: ReaderClientProps) {
   const supabase = createClient();
+  const router = useRouter();
   const { user, profile } = useAuth();
   const dialog = useAppDialog();
   const [darkMode, setDarkMode] = useState(false);
@@ -382,7 +384,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
   const avatarChar = profile?.nickname?.[0] || user?.email?.[0] || "?";
 
   const goToLogin = () => {
-    window.location.href = "/login";
+    router.push("/login");
   };
 
   const handleReport = (commentId: string, commentUserId: string) => {

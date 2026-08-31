@@ -66,11 +66,11 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
 
       const tagId = (tag as Record<string, unknown>).id as string;
 
-      // 1. 查询 post_tags 关联的帖子
-      const { data: ptData } = await supabase
-        .from("post_tags")
-        .select("post_id")
-        .eq("tag_id", tagId);
+      // 帖子关联和 series.tags 关联互不依赖，合并成同一波请求。
+      const [{ data: ptData }, { data: seriesByTag }] = await Promise.all([
+        supabase.from("post_tags").select("post_id").eq("tag_id", tagId),
+        supabase.from("series").select("name").contains("tags", [decodedName]),
+      ]);
 
       let allPosts: Post[] = [];
       let standalonePostsList: Post[] = [];
@@ -78,11 +78,16 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
 
       if (ptData && ptData.length > 0) {
         const postIds = ptData.map((p: Record<string, unknown>) => p.post_id as string);
-        const { data: postsData } = await supabase
+        const postsPromise = supabase
           .from("posts")
           .select("id, title, content, word_count, post_type, chapter_number, series_name, created_at, cover_url, user_id, author:profiles!posts_user_id_fkey(nickname, avatar_url), post_tags(tags(name))")
           .in("id", postIds)
           .eq("status", "published");
+        const statsPromise = supabase
+          .from("post_stats")
+          .select("id, like_count, comment_count, bookmark_count")
+          .in("id", postIds);
+        const [{ data: postsData }, { data: stats }] = await Promise.all([postsPromise, statsPromise]);
 
         if (postsData) {
           for (const p of postsData as Array<Record<string, unknown>>) {
@@ -93,11 +98,6 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           }
 
           let statsMap: Record<string, { like_count: number; comment_count: number; bookmark_count: number }> = {};
-          const ids = postsData.map((p: Record<string, unknown>) => p.id as string);
-          const { data: stats } = await supabase
-            .from("post_stats")
-            .select("id, like_count, comment_count, bookmark_count")
-            .in("id", ids);
           if (stats) {
             for (const s of stats as Array<Record<string, unknown>>) {
               statsMap[s.id as string] = {
@@ -132,19 +132,9 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
             return !(raw?.post_type === "serial" && raw?.series_name);
           });
 
-          standalonePostsList.sort((a, b) =>
-            tagTab === "hottest"
-              ? ((b.like_count || 0) + (b.comment_count || 0)) - ((a.like_count || 0) + (a.comment_count || 0))
-              : new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime()
-          );
+          standalonePostsList.sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime());
         }
       }
-
-      // 2. 查询 series 表中 tags 字段包含该标签的系列
-      const { data: seriesByTag } = await supabase
-        .from("series")
-        .select("name")
-        .contains("tags", [decodedName]);
 
       const allSeriesNames = new Set(chapterSeriesNames);
       if (seriesByTag) {
@@ -165,77 +155,101 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           const rawSeries = seriesData as unknown as SeriesEntry[];
 
           const userIds = [...new Set(rawSeries.map((s) => s.user_id))];
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("id, nickname, avatar_url")
-            .in("id", userIds);
+          const chapterRowsPromise = supabase
+            .from("posts")
+            .select("id, series_name, chapter_number, created_at")
+            .in("series_name", [...allSeriesNames])
+            .eq("post_type", "serial")
+            .eq("status", "published");
+          const profilesPromise = userIds.length > 0
+            ? supabase.from("profiles").select("id, nickname, avatar_url").in("id", userIds)
+            : Promise.resolve({ data: null });
+          const [{ data: profiles }, { data: chapterRows }] = await Promise.all([profilesPromise, chapterRowsPromise]);
           const profileMap: Record<string, { nickname: string; avatar_url: string | null }> = {};
-          if (profiles) {
-            for (const p of profiles as Array<Record<string, unknown>>) {
-              profileMap[p.id as string] = {
-                nickname: p.nickname as string,
-                avatar_url: p.avatar_url as string | null,
-              };
-            }
+          for (const p of (profiles || []) as Array<Record<string, unknown>>) {
+            profileMap[p.id as string] = {
+              nickname: p.nickname as string,
+              avatar_url: p.avatar_url as string | null,
+            };
           }
 
-          matchedSeries = await Promise.all(rawSeries.map(async (s) => {
-            const { data: chapters, count } = await supabase
-              .from("posts")
-              .select("id, title, content, chapter_number, created_at", { count: "exact" })
-              .eq("series_name", s.name)
-              .eq("post_type", "serial")
-              .eq("status", "published")
-              .order("chapter_number", { ascending: false })
-              .limit(1);
+          const chapters = (chapterRows || []) as Array<{
+            id: string;
+            series_name: string | null;
+            chapter_number: number | null;
+            created_at: string | null;
+          }>;
+          const chaptersBySeries = new Map<string, typeof chapters>();
+          for (const chapter of chapters) {
+            if (!chapter.series_name) continue;
+            const current = chaptersBySeries.get(chapter.series_name) || [];
+            current.push(chapter);
+            chaptersBySeries.set(chapter.series_name, current);
+          }
+          const latestBySeries = new Map<string, (typeof chapters)[number]>();
+          for (const [seriesName, rows] of chaptersBySeries) {
+            const latest = rows.reduce((best, row) => {
+              if (!best) return row;
+              const bestNumber = best.chapter_number ?? -1;
+              const rowNumber = row.chapter_number ?? -1;
+              if (rowNumber !== bestNumber) return rowNumber > bestNumber ? row : best;
+              return new Date(row.created_at || "").getTime() > new Date(best.created_at || "").getTime() ? row : best;
+            }, null as (typeof chapters)[number] | null);
+            if (latest) latestBySeries.set(seriesName, latest);
+          }
 
-            const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
+          const chapterIds = chapters.map((chapter) => chapter.id);
+          const latestIds = [...latestBySeries.values()].map((chapter) => chapter.id);
+          const [latestResult, statsResult] = await Promise.all([
+            latestIds.length > 0
+              ? supabase.from("posts").select("id, title, content").in("id", latestIds)
+              : Promise.resolve({ data: null }),
+            chapterIds.length > 0
+              ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", chapterIds)
+              : Promise.resolve({ data: null }),
+          ]);
+          const latestDetails = new Map<string, { title: string; content: string }>();
+          for (const row of (latestResult.data || []) as Array<Record<string, unknown>>) {
+            latestDetails.set(row.id as string, {
+              title: (row.title as string) || "",
+              content: (row.content as string) || "",
+            });
+          }
+          const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();
+          for (const row of (statsResult.data || []) as Array<Record<string, unknown>>) {
+            statsMap.set(row.id as string, {
+              like_count: (row.like_count as number) || 0,
+              comment_count: (row.comment_count as number) || 0,
+              bookmark_count: (row.bookmark_count as number) || 0,
+            });
+          }
 
-            // 统计系列所有章节的互动数据
-            let seriesStats = { like_count: 0, comment_count: 0, bookmark_count: 0 };
-            if (count && count > 0) {
-              const { data: chapterIds } = await supabase
-                .from("posts")
-                .select("id")
-                .eq("series_name", s.name)
-                .eq("post_type", "serial")
-                .eq("status", "published");
-              if (chapterIds && chapterIds.length > 0) {
-                const cids = chapterIds.map((c: Record<string, unknown>) => c.id as string);
-                const { data: chStats } = await supabase
-                  .from("post_stats")
-                  .select("like_count, comment_count, bookmark_count")
-                  .in("id", cids);
-                if (chStats) {
-                  for (const cs of chStats as Array<Record<string, unknown>>) {
-                    seriesStats.like_count += (cs.like_count as number) || 0;
-                    seriesStats.comment_count += (cs.comment_count as number) || 0;
-                    seriesStats.bookmark_count += (cs.bookmark_count as number) || 0;
-                  }
-                }
-              }
-            }
-
+          matchedSeries = rawSeries.map((s) => {
+            const rows = chaptersBySeries.get(s.name) || [];
+            const latest = latestBySeries.get(s.name);
+            const detail = latest ? latestDetails.get(latest.id) : undefined;
+            const totals = rows.reduce((sum, row) => {
+              const stats = statsMap.get(row.id);
+              return {
+                like_count: sum.like_count + (stats?.like_count || 0),
+                comment_count: sum.comment_count + (stats?.comment_count || 0),
+                bookmark_count: sum.bookmark_count + (stats?.bookmark_count || 0),
+              };
+            }, { like_count: 0, comment_count: 0, bookmark_count: 0 });
             return {
               ...s,
               author: profileMap[s.user_id] || { nickname: "匿名用户", avatar_url: null },
-              totalChapters: count || 0,
-              latestChapterId: latest ? latest.id as string : null,
-              latestChapterNumber: latest ? latest.chapter_number as number : null,
-              latestChapterTitle: latest ? latest.title as string : null,
-              latestChapterContent: latest ? latest.content as string : null,
-              latestChapterCreatedAt: latest ? latest.created_at as string : null,
-              like_count: seriesStats.like_count,
-              comment_count: seriesStats.comment_count,
-              bookmark_count: seriesStats.bookmark_count,
+              totalChapters: rows.length,
+              latestChapterId: latest?.id || null,
+              latestChapterNumber: latest?.chapter_number ?? null,
+              latestChapterTitle: detail?.title || null,
+              latestChapterContent: detail?.content || null,
+              latestChapterCreatedAt: latest?.created_at || null,
+              ...totals,
             };
-          }));
+          });
 
-          matchedSeries.sort((a, b) =>
-            tagTab === "hottest"
-              ? (b.like_count + b.comment_count * 2 + b.bookmark_count * 3) - (a.like_count + a.comment_count * 2 + a.bookmark_count * 3)
-              : new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime()
-          );
+          matchedSeries.sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime());
         }
       }
 
@@ -271,16 +285,27 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
         });
       }
 
-      if (user) {
-        const { data: tf } = await supabase
-          .from("tag_follows").select("id").eq("user_id", user.id).eq("tag_id", tagId).single();
-        setIsFollowingTag(!!tf);
-      }
-
       setLoading(false);
     };
     load();
-  }, [decodedName, supabase, user, tagTab]);
+  }, [decodedName, supabase]);
+
+  // 登录状态只影响关注按钮，不应让整张标签页重新查询帖子和系列。
+  useEffect(() => {
+    if (!user || !tagInfo?.id) {
+      setIsFollowingTag(false);
+      return;
+    }
+    let active = true;
+    void supabase
+      .from("tag_follows")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("tag_id", tagInfo.id)
+      .maybeSingle()
+      .then((result: { data: unknown }) => { if (active) setIsFollowingTag(!!result.data); });
+    return () => { active = false; };
+  }, [supabase, user?.id, tagInfo?.id]);
 
   const handleTagFollow = async () => {
     if (!user || !tagInfo) return;

@@ -38,36 +38,34 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
 
   useEffect(() => {
     const load = async () => {
-      const { data: series } = await supabase
-        .from("series")
-        .select("name, description, created_at, updated_at, user_id")
-        .eq("name", decodedName)
-        .maybeSingle();
-
-      const { data: postData } = await supabase
-        .from("posts")
-        .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, user_id, post_tags(tags(name))")
-        .eq("series_name", decodedName)
-        .neq("post_type", "serial")
-        .eq("status", "published")
-        .order("created_at", { ascending: false });
+      const [{ data: series }, { data: postData }] = await Promise.all([
+        supabase
+          .from("series")
+          .select("name, description, created_at, updated_at, user_id")
+          .eq("name", decodedName)
+          .maybeSingle(),
+        supabase
+          .from("posts")
+          .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, user_id, post_tags(tags(name))")
+          .eq("series_name", decodedName)
+          .neq("post_type", "serial")
+          .eq("status", "published")
+          .order("created_at", { ascending: false }),
+      ]);
 
       const rawPosts = (postData || []) as unknown as Array<Record<string, unknown>>;
       const authorId = (series?.user_id as string | null) || (rawPosts[0]?.user_id as string | null) || null;
-      let nickname = "匿名用户";
-      let avatarUrl: string | null = null;
-      if (authorId) {
-        const { data: author } = await supabase.from("profiles").select("nickname, avatar_url").eq("id", authorId).maybeSingle();
-        nickname = (author?.nickname as string) || nickname;
-        avatarUrl = (author?.avatar_url as string | null) || null;
-      }
-
       const postIds = rawPosts.map((post) => post.id as string).filter(Boolean);
-      let bookmarkCount = 0;
-      if (postIds.length > 0) {
-        const { count } = await supabase.from("bookmarks").select("id", { count: "exact", head: true }).in("post_id", postIds);
-        bookmarkCount = count || 0;
-      }
+      const authorPromise = authorId
+        ? supabase.from("profiles").select("nickname, avatar_url").eq("id", authorId).maybeSingle()
+        : Promise.resolve({ data: null });
+      const bookmarkPromise = postIds.length > 0
+        ? supabase.from("bookmarks").select("id", { count: "exact", head: true }).in("post_id", postIds)
+        : Promise.resolve({ count: 0 });
+      const [{ data: author }, { count }] = await Promise.all([authorPromise, bookmarkPromise]);
+      const nickname = (author?.nickname as string) || "匿名用户";
+      const avatarUrl = (author?.avatar_url as string | null) || null;
+      const bookmarkCount = count || 0;
 
       const formatted = rawPosts
         .map((post) => {

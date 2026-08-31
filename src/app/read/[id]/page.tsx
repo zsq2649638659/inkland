@@ -36,7 +36,7 @@ export default async function ReadPage({
   // Fetch post data using Supabase server client
   const { data: posts, error: postError } = await supabase
     .from("posts")
-    .select("id,title,content,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility")
+    .select("id,title,content,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url,bio),post_tags(tags!inner(name))")
     .eq("id", id)
     .eq("status", "published")
     .limit(1);
@@ -50,30 +50,16 @@ export default async function ReadPage({
   }
 
   const p = posts[0] as Record<string, unknown>;
-  const resolvedContent = await resolvePrivateImages(supabase, (p.content as string) || "");
-  const resolvedCover = p.cover_url ? await resolvePrivateImages(supabase, p.cover_url as string) : null;
+  const [resolvedContent, resolvedCover] = await Promise.all([
+    resolvePrivateImages(supabase, (p.content as string) || ""),
+    p.cover_url ? resolvePrivateImages(supabase, p.cover_url as string) : Promise.resolve(null),
+  ]);
   const postType = p.post_type as string;
   const isImagePost = postType === "illustration" || postType === "comic" || postType === "cosplay" || postType === "art";
 
-  // Fetch author
-  const { data: authors } = await supabase
-    .from("profiles")
-    .select("nickname,avatar_url,bio")
-    .eq("id", p.user_id)
-    .limit(1);
-
-  const author = authors && authors.length > 0
-    ? authors[0] as { nickname: string; avatar_url: string | null; bio: string | null }
-    : null;
-
-  // Fetch tags
-  const { data: postTags } = await supabase
-    .from("post_tags")
-    .select("tags!inner(name)")
-    .eq("post_id", id);
-
-  const tags = Array.isArray(postTags)
-    ? (postTags as unknown as Array<{ tags: { name: string } }>).map((pt) => pt.tags?.name).filter(Boolean)
+  const author = p.author as { nickname: string; avatar_url: string | null; bio: string | null } | null;
+  const tags = Array.isArray(p.post_tags)
+    ? (p.post_tags as unknown as Array<{ tags: { name: string } }>).map((pt) => pt.tags?.name).filter(Boolean)
     : [];
 
   // Fetch images for image posts

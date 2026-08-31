@@ -65,14 +65,16 @@ export default function HomePage() {
         }
       }
       query = query.in("user_id", followingIds);
-      const bookmarkedPostIds = [...new Set((bookmarks || []).map((bookmark) => bookmark.post_id as string).filter(Boolean))];
+      const bookmarkRows = (bookmarks || []) as Array<{ post_id?: string | null }>;
+      const bookmarkedPostIds = [...new Set(bookmarkRows.map((bookmark) => bookmark.post_id).filter((id): id is string => Boolean(id)))];
       if (bookmarkedPostIds.length > 0) {
         const { data: bookmarkedPosts } = await supabase
           .from("posts")
           .select("series_name, post_type, chapter_number")
           .in("id", bookmarkedPostIds)
           .eq("status", "published");
-        bookmarkedSeriesNames = [...new Set((bookmarkedPosts || [])
+        const bookmarkedPostRows = (bookmarkedPosts || []) as Array<{ post_type?: string; chapter_number?: number | null; series_name?: string | null }>;
+        bookmarkedSeriesNames = [...new Set(bookmarkedPostRows
           .filter((post) => post.post_type === "serial" && post.chapter_number && post.series_name)
           .map((post) => post.series_name as string))];
       }

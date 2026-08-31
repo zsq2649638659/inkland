@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
@@ -48,6 +49,7 @@ interface ReviewIssueMeta {
 
 export default function NotificationsPage() {
   const supabase = createClient();
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +93,7 @@ export default function NotificationsPage() {
     };
   }, [user, filterType]);
 
-  const loadUnreadByType = async () => {
+  async function loadUnreadByType() {
     if (!user) return;
     const { data, error } = await supabase
       .from("notifications")
@@ -108,7 +110,7 @@ export default function NotificationsPage() {
     setUnreadCount(data.length);
   };
 
-  const loadNotifications = async () => {
+  async function loadNotifications() {
     if (!user) return;
     setLoading(true);
 
@@ -192,13 +194,13 @@ export default function NotificationsPage() {
     // Navigate based on type
     if (n.post_id && (n.type === "comment" || n.type === "like" || n.type === "bookmark" || n.type === "reply")) {
       const commentAnchor = n.type === "comment" || n.type === "reply" ? "#comments" : "";
-      window.location.assign(`/read/${n.post_id}${commentAnchor}`);
+      router.push(`/read/${n.post_id}${commentAnchor}`);
     } else if (n.type === "follow" && n.actor_id) {
-      window.location.assign(`/user/${n.actor_id}`);
+      router.push(`/user/${n.actor_id}`);
     } else if (n.type === "system" && n.metadata?.action_url?.startsWith("/")) {
-      window.location.assign(n.metadata.action_url);
+      router.push(n.metadata.action_url);
     } else if (n.type === "system" && n.post_id && n.content.includes("未通过本次审核")) {
-      window.location.assign(`/create?editPost=${n.post_id}`);
+      router.push(`/create?editPost=${n.post_id}`);
     }
   };
 
