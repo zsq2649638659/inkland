@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
@@ -27,6 +28,7 @@ interface NotificationItem {
 
 export default function NotificationsPage() {
   const supabase = createClient();
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +58,7 @@ export default function NotificationsPage() {
     return () => window.clearInterval(timer);
   }, [user]);
 
-  const loadUnreadByType = async () => {
+  async function loadUnreadByType() {
     if (!user) return;
     const { data, error } = await supabase
       .from("notifications")
@@ -73,13 +75,14 @@ export default function NotificationsPage() {
     setUnreadCount(data.length);
   };
 
-  const loadNotifications = async () => {
+  async function loadNotifications() {
     if (!user) return;
     setLoading(true);
 
+    // actor 资料和作品标题通过 PostgREST 关联一次取回，避免通知列表再串行请求用户和作品。
     let q = supabase
       .from("notifications")
-      .select("*")
+      .select("*, actor:profiles!notifications_actor_id_fkey(nickname, avatar_url), post:posts(title)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -102,49 +105,17 @@ export default function NotificationsPage() {
       return;
     }
 
-    const raw = data as unknown as NotificationItem[];
-
-    // Fetch actor profiles
-    const actorIds = [...new Set(raw.filter((n) => n.actor_id).map((n) => n.actor_id!))];
-    const actorMap = new Map<string, { nickname: string; avatar_url: string | null }>();
-    if (actorIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, nickname, avatar_url")
-        .in("id", actorIds);
-      if (profiles) {
-        for (const p of profiles as unknown as Record<string, unknown>[]) {
-          actorMap.set(p.id as string, {
-            nickname: (p.nickname as string) || "用户",
-            avatar_url: (p.avatar_url as string) || null,
-          });
-        }
-      }
-    }
-
-    // Fetch post titles
-    const postIds = [...new Set(raw.filter((n) => n.post_id).map((n) => n.post_id!))];
-    const postMap = new Map<string, string>();
-    if (postIds.length > 0) {
-      const { data: posts } = await supabase
-        .from("posts")
-        .select("id, title")
-        .in("id", postIds);
-      if (posts) {
-        for (const p of posts as unknown as Record<string, unknown>[]) {
-          postMap.set(p.id as string, (p.title as string) || "未知作品");
-        }
-      }
-    }
+    const raw = data as unknown as Array<NotificationItem & {
+      actor?: { nickname: string | null; avatar_url: string | null } | null;
+      post?: { title: string | null } | null;
+    }>;
 
     const enriched = raw.map((n) => {
-      const actor = n.actor_id ? actorMap.get(n.actor_id) : null;
-      const postTitle = n.post_id ? postMap.get(n.post_id) : null;
       return {
         ...n,
-        actor_nickname: actor?.nickname || null,
-        actor_avatar_url: actor?.avatar_url || null,
-        post_title: postTitle || null,
+        actor_nickname: n.actor?.nickname || null,
+        actor_avatar_url: n.actor?.avatar_url || null,
+        post_title: n.post ? (n.post.title || "未知作品") : null,
       };
     });
 
@@ -187,9 +158,9 @@ export default function NotificationsPage() {
     // Navigate based on type
     if (n.post_id && (n.type === "comment" || n.type === "like" || n.type === "bookmark" || n.type === "reply")) {
       const commentAnchor = n.type === "comment" || n.type === "reply" ? "#comments" : "";
-      window.location.href = `/read/${n.post_id}${commentAnchor}`;
+      router.push(`/read/${n.post_id}${commentAnchor}`);
     } else if (n.type === "follow" && n.actor_id) {
-      window.location.href = `/user/${n.actor_id}`;
+      router.push(`/user/${n.actor_id}`);
     }
   };
 

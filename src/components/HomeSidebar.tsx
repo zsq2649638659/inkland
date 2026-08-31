@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
+import { getOrCreateClientCache, invalidateClientCache, readClientCache } from "@/lib/client-cache";
 
 type SidebarStats = {
   following: number | null;
@@ -70,25 +71,27 @@ export default function HomeSidebar() {
     const cachedStats = getCachedStats(user.id);
     setUserStats(cachedStats);
     const loadStats = async () => {
-      const [{ count: followingCount }, { count: followersCount }, { data: publishedPosts }, { data: series }] = await Promise.all([
-        supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
-        supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
-        supabase.from("posts").select("id, review_status").eq("user_id", user.id).eq("status", "published").neq("post_type", "serial"),
-        supabase.from("series").select("name").eq("user_id", user.id),
-      ]);
+      const nextStats = await getOrCreateClientCache(`sidebar-stats:${user.id}`, async () => {
+        const [{ count: followingCount }, { count: followersCount }, { data: publishedPosts }, { data: series }] = await Promise.all([
+          supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
+          supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
+          supabase.from("posts").select("id, review_status").eq("user_id", user.id).eq("status", "published").neq("post_type", "serial").neq("review_status", "rejected"),
+          supabase.from("series").select("name").eq("user_id", user.id),
+        ]);
 
-      const publishedWorkCount = (publishedPosts || []).filter((post) => post.review_status !== "rejected").length;
-      const seriesCount = new Set((series || []).map((item) => item.name).filter(Boolean)).size;
-      const nextStats = {
-        following: followingCount || 0,
-        followers: followersCount || 0,
-        works: publishedWorkCount + seriesCount,
-      };
+        const seriesCount = new Set(((series || []) as Array<{ name?: string | null }>).map((item) => item.name).filter(Boolean)).size;
+        return {
+          following: followingCount || 0,
+          followers: followersCount || 0,
+          works: (publishedPosts || []).length + seriesCount,
+        };
+      }, { ttlMs: 30_000, persist: true });
       setUserStats(nextStats);
       saveCachedStats(user.id, nextStats);
     };
     loadStats();
     const handleStatsChanged = () => {
+      invalidateClientCache(`sidebar-stats:${user.id}`);
       loadStats();
     };
     window.addEventListener("inkland:stats-changed", handleStatsChanged);
@@ -109,25 +112,31 @@ export default function HomeSidebar() {
     } catch { /* ignore unavailable local storage */ }
 
     if (!lastSeen || pathname === "/") return;
-    supabase
-      .from("posts")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "published")
-      .gt("created_at", lastSeen)
-      .then(({ count }) => setNewWorksCount(count || 0));
+    void getOrCreateClientCache(`new-works:${user.id}:${lastSeen}`, async () => {
+      const { count } = await supabase
+        .from("posts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "published")
+        .gt("created_at", lastSeen);
+      return count || 0;
+    }, { ttlMs: 30_000, persist: true }).then((count) => setNewWorksCount(count));
   }, [user, pathname, supabase]);
 
   useEffect(() => {
     if (!user) return;
+    const cached = readClientCache<number>(`notification-count:${user.id}`, 30_000, true);
+    if (cached !== undefined) setNotificationCount(cached);
     const fetchNotificationCount = () => {
-      supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false)
-        .then(({ count }) => setNotificationCount(count || 0));
+      void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
+        const { count } = await supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("read", false);
+        return count || 0;
+      }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
-    fetchNotificationCount();
+    if (cached === undefined) fetchNotificationCount();
     const timer = window.setInterval(fetchNotificationCount, 30_000);
     return () => window.clearInterval(timer);
   }, [user, supabase]);

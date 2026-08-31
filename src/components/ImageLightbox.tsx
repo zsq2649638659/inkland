@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
@@ -31,6 +32,7 @@ function timeAgo(value?: string) {
 
 export default function ImageLightbox({ post, images, initialIndex = 0, onClose }: ImageLightboxProps) {
   const supabase = createClient();
+  const router = useRouter();
   const { user, profile } = useAuth();
   const [index, setIndex] = useState(Math.min(initialIndex, Math.max(0, images.length - 1)));
   const [comments, setComments] = useState<Comment[]>([]);
@@ -87,7 +89,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
   }, [user, authorId]);
 
   const toggleFollow = async () => {
-    if (!user) { window.location.href = "/login"; return; }
+    if (!user) { router.push("/login"); return; }
     const query = supabase.from("follows");
     const result = following ? await query.delete().eq("follower_id", user.id).eq("following_id", authorId) : await query.insert({ follower_id: user.id, following_id: authorId });
     if (!result.error) setFollowing(!following);

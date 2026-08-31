@@ -38,6 +38,8 @@ export interface Post {
   time_ago?: string;
   excerpt?: string;
   images?: string[];
+  liked_by_me?: boolean;
+  bookmarked_by_me?: boolean;
 }
 
 export interface Tag {

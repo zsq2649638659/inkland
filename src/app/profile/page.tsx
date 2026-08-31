@@ -12,6 +12,7 @@ import { SkeletonProfile, SkeletonProfileSection } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Post } from "@/lib/types";
+import { assembleSeriesInfo } from "@/lib/seriesInfo";
 
 type FilterType = "all" | "single" | "image" | "series";
 type TabType = "works" | "likes" | "bookmarks" | "following" | "followers";
@@ -37,17 +38,6 @@ interface SeriesInfo {
   interaction_at?: string;
 }
 
-// 移除 Markdown 语法，提取纯文本
-const stripMarkdown = (text: string): string => {
-  return text
-    .replace(/!\[.*?\]\(.*?\)/g, "")
-    .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
-    .replace(/[#*_~`>]/g, "")
-    .replace(/\n{2,}/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-};
-
 interface FollowUser {
   id: string;
   nickname: string;
@@ -61,32 +51,6 @@ const hasImages = (post: Post): boolean => {
   if (cp.cover_url && !(cp.cover_url as string).startsWith("private://")) return true;
   const content = (cp.content as string) || "";
   return /!\[.*?\]\((?!private:\/\/).*?\)/g.test(content);
-};
-
-// 查询系列下所有章节的点赞/评论/收藏总数
-const loadSeriesStats = async (supabase: ReturnType<typeof createClient>, seriesName: string) => {
-  const { data: chapters } = await supabase
-    .from("posts")
-    .select("id")
-    .eq("series_name", seriesName)
-    .eq("post_type", "serial")
-    .eq("status", "published");
-
-  if (!chapters || chapters.length === 0) return { like_count: 0, comment_count: 0, bookmark_count: 0 };
-
-  const chapterIds = chapters.map((c: Record<string, unknown>) => c.id as string);
-
-  const [likeRes, commentRes, bookmarkRes] = await Promise.all([
-    supabase.from("likes").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-    supabase.from("comments").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-    supabase.from("bookmarks").select("id", { count: "exact", head: true }).in("post_id", chapterIds),
-  ]);
-
-  return {
-    like_count: likeRes.count || 0,
-    comment_count: commentRes.count || 0,
-    bookmark_count: bookmarkRes.count || 0,
-  };
 };
 
 export default function ProfilePage() {
@@ -155,7 +119,31 @@ export default function ProfilePage() {
     const { data, error: err } = await q;
     if (err) { setError(`加载失败: ${err.message}`); setLoading(false); return; }
 
-    const raw = (data as unknown as Post[]).sort((a, b) => {
+    const privatePrefix = "private://private-post-images/";
+    const resolvePrivateUrl = async (url?: string | null) => {
+      if (!url?.startsWith(privatePrefix)) return url || null;
+      const { data: signed } = await supabase.storage.from("private-post-images").createSignedUrl(url.slice(privatePrefix.length), 3600);
+      return signed?.signedUrl || url;
+    };
+    const rawPosts = data as unknown as Post[];
+    // 私有图片签名是增强信息；先让作品列表可见，再在后台替换为 signed URL。
+    setAllPosts(rawPosts);
+    setDisplayPosts(rawPosts.filter((post) => {
+      const postType = post.post_type;
+      return postType !== "serial" || post.chapter_number === null || post.chapter_number === undefined;
+    }));
+    setLoading(false);
+    const resolvedPosts = await Promise.all(rawPosts.map(async (post) => {
+      let content = post.content || "";
+      const privateUrls = [...new Set([...content.matchAll(/private:\/\/private-post-images\/([^\s)]+)/g)].map((match) => match[0]))];
+      const replacements = await Promise.all(privateUrls.map(async (url) => ({ url, signedUrl: await resolvePrivateUrl(url) })));
+      for (const replacement of replacements) {
+        if (replacement.signedUrl) content = content.split(replacement.url).join(replacement.signedUrl);
+      }
+      return { ...post, content, cover_url: await resolvePrivateUrl(post.cover_url) };
+    }));
+
+    const raw = resolvedPosts.sort((a, b) => {
       const da = new Date(a.published_at || a.created_at || "").getTime();
       const db = new Date(b.published_at || b.created_at || "").getTime();
       return db - da;
@@ -204,29 +192,7 @@ export default function ProfilePage() {
       return true;
     });
 
-    const seriesWithChapters = await Promise.all(deduped.map(async (s) => {
-      const { data: chapters, count } = await supabase
-        .from("posts")
-        .select("id, title, content, chapter_number, created_at", { count: "exact" })
-        .eq("series_name", s.name)
-        .eq("post_type", "serial")
-        .eq("status", "published")
-        .order("chapter_number", { ascending: false })
-        .limit(1);
-
-      const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
-      const stats = await loadSeriesStats(supabase, s.name);
-      return {
-        ...s,
-        ...stats,
-        latestChapterId: latest ? latest.id as string : null,
-        latestChapterNumber: latest ? latest.chapter_number as number : null,
-        latestChapterTitle: latest ? latest.title as string : null,
-        latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
-        latestChapterCreatedAt: latest ? latest.created_at as string : null,
-        totalChapters: count || 0,
-      };
-    }));
+    const seriesWithChapters = await assembleSeriesInfo(supabase, deduped);
 
     return seriesWithChapters;
   };
@@ -318,29 +284,7 @@ export default function ProfilePage() {
         return true;
       });
 
-      const seriesWithChapters = await Promise.all(deduped.map(async (s) => {
-        const { data: chapters, count } = await supabase
-          .from("posts")
-          .select("id, title, content, chapter_number, created_at", { count: "exact" })
-          .eq("series_name", s.name)
-          .eq("post_type", "serial")
-          .eq("status", "published")
-          .order("chapter_number", { ascending: false })
-          .limit(1);
-
-        const latest = chapters && chapters.length > 0 ? chapters[0] as Record<string, unknown> : null;
-        const stats = await loadSeriesStats(supabase, s.name);
-        return {
-          ...s,
-          ...stats,
-          latestChapterId: latest ? latest.id as string : null,
-          latestChapterNumber: latest ? latest.chapter_number as number : null,
-          latestChapterTitle: latest ? latest.title as string : null,
-          latestChapterContent: latest ? stripMarkdown((latest.content as string) || "") || null : null,
-          latestChapterCreatedAt: latest ? latest.created_at as string : null,
-          totalChapters: count || 0,
-        };
-      }));
+      const seriesWithChapters = await assembleSeriesInfo(supabase, deduped);
 
       setSeriesList(seriesWithChapters);
     }
@@ -418,7 +362,7 @@ export default function ProfilePage() {
     else if (tab === "bookmarks") loadBookmarks();
     else if (tab === "following") loadFollowing();
     else if (tab === "followers") loadFollowers();
-  }, [user, tab, filter]);
+  }, [user, tab]);
 
   const displayName = profile?.nickname || user?.email?.split("@")[0] || "用户";
   const avatarChar = profile?.nickname?.[0] || user?.email?.[0] || "?";

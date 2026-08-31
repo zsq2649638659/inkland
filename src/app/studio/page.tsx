@@ -84,11 +84,35 @@ export default function StudioPage() {
     });
 
     const ids = filtered.map((p) => p.id as string);
-    const { data: stats } = await supabase
-      .from("post_stats")
-      .select("id, like_count, comment_count, bookmark_count")
-      .in("id", ids);
+    const statsPromise = ids.length > 0
+      ? supabase
+          .from("post_stats")
+          .select("id, like_count, comment_count, bookmark_count")
+          .in("id", ids)
+      : Promise.resolve({ data: null });
+    const imageTypes = new Set(["illustration", "comic", "cosplay"]);
+    const privateMarker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
+    const imageResolvePromise = Promise.all(
+      filtered
+        .filter((p) => imageTypes.has(p.post_type as string) && typeof p.content === "string" && p.content.includes("private://"))
+        .map(async (p) => {
+          const content = p.content as string;
+          const paths = [...content.matchAll(privateMarker)].map((m) => m[1]);
+          const results = await Promise.all(
+            paths.map(async (path) => {
+              const { data } = await supabase.storage.from("private-post-images").createSignedUrl(path, 3600);
+              return { marker: `private://private-post-images/${path}`, signedUrl: data?.signedUrl || null };
+            })
+          );
+          let resolved = content;
+          for (const { marker, signedUrl } of results) {
+            if (signedUrl) resolved = resolved.split(marker).join(signedUrl);
+          }
+          return [p.id as string, [...resolved.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1])] as const;
+        })
+    );
     const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();
+    const { data: stats } = await statsPromise;
     if (stats) for (const s of stats as Array<Record<string, unknown>>) {
       statsMap.set(s.id as string, {
         like_count: s.like_count as number,
@@ -105,30 +129,9 @@ export default function StudioPage() {
     setWorks(workList);
     setLoading(false);
 
-    // 解析私有图片的 signed URL
-    const imageTypes = new Set(["illustration", "comic", "cosplay"]);
-    const privateMarker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
-    const urlMap: Record<string, string[]> = {};
-    const resolveTasks = workList
-      .filter((w) => imageTypes.has(w.post_type) && w.content?.includes("private://"))
-      .map(async (w) => {
-        const content = w.content || "";
-        const paths = [...content.matchAll(privateMarker)].map((m) => m[1]);
-        const results = await Promise.all(
-          paths.map(async (path) => {
-            const { data } = await supabase.storage.from("private-post-images").createSignedUrl(path, 3600);
-            return { marker: `private://private-post-images/${path}`, signedUrl: data?.signedUrl || null };
-          })
-        );
-        let resolved = content;
-        for (const { marker, signedUrl } of results) {
-          if (signedUrl) resolved = resolved.split(marker).join(signedUrl);
-        }
-        urlMap[w.id] = [...resolved.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1]);
-      });
-    if (resolveTasks.length > 0) {
-      await Promise.all(resolveTasks);
-      setResolvedImageUrls((prev) => ({ ...prev, ...urlMap }));
+    const resolvedImages = await imageResolvePromise;
+    if (resolvedImages.length > 0) {
+      setResolvedImageUrls((prev) => ({ ...prev, ...Object.fromEntries(resolvedImages) }));
     }
   };
 

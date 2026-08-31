@@ -44,128 +44,98 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
+    let active = true;
     const load = async () => {
-      // 先尝试从 series 表获取元数据
-      const { data: seriesData } = await supabase
-        .from("series")
-        .select("id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at")
-        .eq("name", decodedName)
-        .single();
+      // 系列元数据和章节互不依赖，先并行发出，避免跨区域请求瀑布。
+      const [{ data: seriesData }, { data: chData }] = await Promise.all([
+        supabase
+          .from("series")
+          .select("id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at")
+          .eq("name", decodedName)
+          .maybeSingle(),
+        supabase
+          .from("posts")
+          .select("id, title, chapter_number, chapter_title, word_count, created_at, user_id, status")
+          .eq("series_name", decodedName)
+          .eq("post_type", "serial")
+          .eq("status", "published")
+          .gt("chapter_number", 0)
+          .order("chapter_number", { ascending: true }),
+      ]);
 
-      // 获取所有章节
-      const { data: chData } = await supabase
-        .from("posts")
-        .select("id, title, chapter_number, chapter_title, word_count, created_at, user_id, status")
-        .eq("series_name", decodedName)
-        .eq("post_type", "serial")
-        .eq("status", "published")
-        .gt("chapter_number", 0)
-        .order("chapter_number", { ascending: true });
+      if (!active) return;
+      const chapters = (chData || []) as unknown as Array<Record<string, unknown>>;
+      const seriesRow = seriesData as unknown as Record<string, unknown> | null;
+      const firstChapter = chapters[0] || null;
+      const authorId = (seriesRow?.user_id as string | undefined) || (firstChapter?.user_id as string | undefined);
 
-      if (seriesData) {
-        const s = seriesData as unknown as Record<string, unknown>;
-        const authorId = s.user_id as string;
-
-        // 获取作者信息
-        const { data: author } = await supabase
+      if (authorId) {
+        const authorPromise = supabase
           .from("profiles")
           .select("nickname, avatar_url")
           .eq("id", authorId)
-          .single();
+          .maybeSingle();
+        const tagsPromise = !seriesRow && chapters.length > 0
+          ? supabase.from("post_tags").select("tags(name)").in("post_id", chapters.map((chapter) => chapter.id as string))
+          : Promise.resolve({ data: [] as unknown[] });
+        const [{ data: author }, { data: tags }] = await Promise.all([authorPromise, tagsPromise]);
+        if (!active) return;
 
-        const totalWords = (chData || []).reduce((sum: number, c: Record<string, unknown>) => sum + ((c.word_count as number) || 0), 0);
-
+        const tagNames: string[] = seriesRow
+          ? ((seriesRow.tags as string[]) || [])
+          : [...new Set<string>((tags || []).flatMap((item: Record<string, unknown>) => {
+            const tag = item.tags as { name: string } | null;
+            return tag?.name ? [tag.name] : [];
+          }))];
+        const totalWords = chapters.reduce((sum, chapter) => sum + ((chapter.word_count as number) || 0), 0);
         setSeriesInfo({
           user_id: authorId,
           title: decodedName,
-          cover_url: (s.cover_url as string) || null,
-          description: (s.description as string) || "",
+          cover_url: (seriesRow?.cover_url as string) || (firstChapter?.cover_url as string) || null,
+          description: (seriesRow?.description as string) || "",
           word_count: totalWords,
-          created_at: s.created_at as string,
-          updated_at: s.updated_at as string,
-          author: { nickname: (author as { nickname: string } | null)?.nickname || "匿名用户", avatar_url: (author as { avatar_url: string | null } | null)?.avatar_url || null },
-          tags: (s.tags as string[]) || [],
-          status: (s.status as string) || "ongoing",
-          series_type: (s.series_type as string) || "fanfic",
-        });
-
-        setIsOwner(user?.id === authorId);
-
-        if (user && authorId !== user.id) {
-          const { data: follow } = await supabase
-            .from("follows")
-            .select("id")
-            .eq("follower_id", user.id)
-            .eq("following_id", authorId)
-            .single();
-          setIsFollowing(!!follow);
-        }
-      } else if (chData && chData.length > 0) {
-        // 降级：从章节数据中提取信息
-        const firstChapter = chData[0] as unknown as Record<string, unknown>;
-        const chAuthorId = firstChapter.user_id as string;
-
-        const { data: author } = await supabase
-          .from("profiles")
-          .select("nickname, avatar_url")
-          .eq("id", chAuthorId)
-          .single();
-
-        const postIds = chData.map((c: Record<string, unknown>) => c.id as string);
-        const { data: tags } = await supabase
-          .from("post_tags")
-          .select("tags(name)")
-          .in("post_id", postIds);
-        const tagNames = [...new Set((tags || []).flatMap((t: Record<string, unknown>) => {
-          const tag = t.tags as { name: string } | null;
-          return tag?.name ? [tag.name] : [];
-        }))];
-
-        const totalWords = chData.reduce((sum: number, c: Record<string, unknown>) => sum + ((c.word_count as number) || 0), 0);
-
-        setSeriesInfo({
-          user_id: chAuthorId,
-          title: decodedName,
-          cover_url: (firstChapter as Record<string, unknown>).cover_url as string | null,
-          description: "",
-          word_count: totalWords,
-          created_at: firstChapter.created_at as string,
-          updated_at: firstChapter.created_at as string,
+          created_at: (seriesRow?.created_at as string) || (firstChapter?.created_at as string) || "",
+          updated_at: (seriesRow?.updated_at as string) || (firstChapter?.created_at as string) || "",
           author: { nickname: (author as { nickname: string } | null)?.nickname || "匿名用户", avatar_url: (author as { avatar_url: string | null } | null)?.avatar_url || null },
           tags: tagNames,
-          status: "ongoing",
-          series_type: "fanfic",
+          status: (seriesRow?.status as string) || "ongoing",
+          series_type: (seriesRow?.series_type as string) || "fanfic",
         });
-
-        setIsOwner(user?.id === chAuthorId);
-
-        if (user && chAuthorId !== user.id) {
-          const { data: follow } = await supabase
-            .from("follows")
-            .select("id")
-            .eq("follower_id", user.id)
-            .eq("following_id", chAuthorId)
-            .single();
-          setIsFollowing(!!follow);
-        }
+        setIsOwner(user?.id === authorId);
       }
 
-      if (chData) {
-        const chapterList = chData.map((c: Record<string, unknown>) => ({
-          id: c.id as string,
-          title: (c.title as string) || "无标题",
-          chapter_number: c.chapter_number as number,
-          chapter_title: (c.chapter_title as string) || "",
-          word_count: (c.word_count as number) || 0,
-          created_at: c.created_at as string,
-        }));
-        setChapters(chapterList);
-      }
-
+      setChapters(chapters.map((chapter) => ({
+        id: chapter.id as string,
+        title: (chapter.title as string) || "无标题",
+        chapter_number: chapter.chapter_number as number,
+        chapter_title: (chapter.chapter_title as string) || "",
+        word_count: (chapter.word_count as number) || 0,
+        created_at: chapter.created_at as string,
+      })));
       setLoading(false);
     };
-    load();
-  }, [decodedName, supabase, user]);
+    void load();
+    return () => { active = false; };
+  }, [decodedName, supabase]);
+
+  // 关注状态依赖登录用户，但不应让整页内容重复请求。
+  useEffect(() => {
+    if (!user || !seriesInfo) {
+      setIsFollowing(false);
+      return;
+    }
+    setIsOwner(user.id === seriesInfo.user_id);
+    if (user.id === seriesInfo.user_id) return;
+    let active = true;
+    void supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", user.id)
+      .eq("following_id", seriesInfo.user_id)
+      .maybeSingle()
+      .then((result: { data: unknown }) => { if (active) setIsFollowing(!!result.data); });
+    return () => { active = false; };
+  }, [seriesInfo, supabase, user?.id]);
 
   const handleFollow = async () => {
     if (!user || !seriesInfo) return;

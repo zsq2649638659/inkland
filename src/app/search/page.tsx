@@ -69,14 +69,10 @@ function SearchContent() {
 
     const postSelect = "id, title, content, word_count, post_type, created_at, cover_url, user_id, series_name, chapter_number, author:profiles!posts_user_id_fkey(nickname, avatar_url)";
 
-    const { data: blockedRows } = await supabase
-      .from("blocked_users")
-      .select("blocked_user_id")
-      .eq("user_id", user.id);
-    const blockedIds = new Set((blockedRows || []).map((row) => row.blocked_user_id as string));
-
-    // 第一波并行：标签 + 用户 + 作品(标题) + 正文(内容)
-    const [tagRes, userRes, titleRes, contentRes] = await Promise.all([
+    // 第一波并行：屏蔽关系 + 标签 + 用户 + 作品标题 + 正文。
+    // 屏蔽关系不应再单独占用一轮跨区往返。
+    const [blockedRes, tagRes, userRes, titleRes, contentRes] = await Promise.all([
+      supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id),
       supabase.from("tags").select("id, name").ilike("name", `%${q}%`).limit(20),
       supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(20),
       // 作品：只搜标题
@@ -87,39 +83,40 @@ function SearchContent() {
 
     if (rid !== requestIdRef.current) return;
 
-    // 处理标签 + 实时计数作品数
-    const tagRows = (tagRes.data || []) as Array<{ id: string; name: string }>;
-    let tagResults: TagResult[] = [];
+    const blockedIds = new Set(((blockedRes.data || []) as Array<{ blocked_user_id?: string | null }>).map((row) => row.blocked_user_id as string));
 
-    if (tagRows.length > 0) {
-      const tagIds = tagRows.map((t) => t.id);
-      const { data: ptCounts } = await supabase
+    // 先展示主结果；标签篇数在后台补齐，不再让一条统计查询阻塞整页。
+    const tagRows = (tagRes.data || []) as Array<{ id: string; name: string }>;
+    const visibleUsers = ((userRes.data || []) as UserResult[]).filter((item) => !blockedIds.has(item.id));
+    const visibleTitlePosts = ((titleRes.data || []) as unknown as Post[]).filter((post) => !blockedIds.has(post.user_id || ""));
+    const visibleContentPosts = ((contentRes.data || []) as unknown as Post[]).filter((post) => !blockedIds.has(post.user_id || ""));
+    const initialTags = tagRows.map((tag) => ({ name: tag.name, post_count: 0 }));
+    setTags(initialTags);
+    setUsers(visibleUsers);
+    setTitlePosts(visibleTitlePosts);
+    setContentPosts(visibleContentPosts);
+    setLoading(false);
+
+    if (tagRows.length === 0) return;
+
+    const tagIds = tagRows.map((t) => t.id);
+    const { data: ptCounts } = await supabase
         .from("post_tags")
         .select("tag_id, post_id")
         .in("tag_id", tagIds);
 
-      if (rid !== requestIdRef.current) return;
-
-      const countMap = new Map<string, number>();
-      if (ptCounts) {
-        for (const row of ptCounts as Array<{ tag_id: string; post_id: string }>) {
-          countMap.set(row.tag_id, (countMap.get(row.tag_id) || 0) + 1);
-        }
-      }
-
-      tagResults = tagRows
-        .map((t) => ({ name: t.name, post_count: countMap.get(t.id) || 0 }))
-        .sort((a, b) => b.post_count - a.post_count);
-    }
-
     if (rid !== requestIdRef.current) return;
 
-    setTags(tagResults);
-    setUsers(((userRes.data || []) as UserResult[]).filter((item) => !blockedIds.has(item.id)));
-    // 作品只取标题匹配，正文只取内容匹配
-    setTitlePosts(((titleRes.data || []) as unknown as Post[]).filter((post) => !blockedIds.has(post.user_id || "")));
-    setContentPosts(((contentRes.data || []) as unknown as Post[]).filter((post) => !blockedIds.has(post.user_id || "")));
-    setLoading(false);
+    const countMap = new Map<string, number>();
+    if (ptCounts) {
+      for (const row of ptCounts as Array<{ tag_id: string; post_id: string }>) {
+        countMap.set(row.tag_id, (countMap.get(row.tag_id) || 0) + 1);
+      }
+    }
+
+    setTags(tagRows
+      .map((tag) => ({ name: tag.name, post_count: countMap.get(tag.id) || 0 }))
+      .sort((a, b) => b.post_count - a.post_count));
   }, [supabase, user]);
 
   // URL 参数同步（初始加载）
