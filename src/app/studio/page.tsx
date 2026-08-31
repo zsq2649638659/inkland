@@ -466,6 +466,7 @@ export default function StudioPage() {
 
   const batchPublish = async () => {
     if (selectedIds.size === 0) return;
+    if (!user) return;
     const blocked = await assertCanPublish();
     if (blocked) { await dialog.alert({ title:"批量发布失败", message:blocked, variant:"danger" }); return; }
     const { error } = await supabase.from("posts").update({ status: "published", published_at: new Date().toISOString() }).in("id", Array.from(selectedIds));
