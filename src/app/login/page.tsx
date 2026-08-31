@@ -14,9 +14,9 @@ interface StatusMsg {
   message: string;
 }
 
-function withTimeout<T>(promise: Promise<T>, milliseconds = 15000) {
+function withTimeout<T>(promise: PromiseLike<T>, milliseconds = 15000): Promise<T> {
   return Promise.race([
-    promise,
+    Promise.resolve(promise),
     new Promise<never>((_, reject) => {
       window.setTimeout(() => reject(new Error("REQUEST_TIMEOUT")), milliseconds);
     }),
