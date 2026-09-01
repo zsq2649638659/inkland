@@ -96,8 +96,7 @@
 .groupInfoCard textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
 .importNoticeWorkTitle { margin-top: 0 !important; color: var(--color-text) !important; font-weight: 700; }
 :global(.importNoticeActions) { flex-wrap: nowrap; gap: 6px; }
-:global(.importNoticeActions .btn-modal) { min-width: 0; padding: 10px 12px; font-size: 13px; white-space: nowrap; }
-:global(.metadataCandidateModalActions .btn-modal) { padding-left: 16px; padding-right: 16px; }
+:global(.importNoticeActions .btn-modal) { min-width: 0; min-height: 44px; padding: 11px 24px; font-size: 13px; white-space: nowrap; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
 .publishSummary li { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid #ddd5d0; }
 .publishSummary strong, .publishSummary span { overflow-wrap: anywhere; }
@@ -833,11 +832,12 @@
 .bulkBar button,
 .stepActions > button:not(.primaryButton),
 .finalActions > button:not(.primaryButton),
-.resultActions button {
+.resultActions button,
+.secondaryButton {
   min-height: 44px;
   border: 0;
   border-radius: var(--radius-full);
-  padding: 10px 18px;
+  padding: 10px 24px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -943,7 +943,7 @@
 
 .importQueue li button {
   min-height: 44px;
-  padding: 10px 18px;
+  padding: 10px 24px;
   border: 0;
   border-radius: var(--radius-full);
   background: var(--color-bg-secondary);
@@ -1092,8 +1092,24 @@
   gap: 8px;
 }
 
+.previewListSingle { grid-template-columns: minmax(0, 1fr); }
+.previewListDouble { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
 @media (max-width: 760px) {
-  .previewList { grid-template-columns: repeat(auto-fit, minmax(30%, 1fr)); }
+  .previewList { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .previewListSingle { grid-template-columns: minmax(0, 1fr); }
+  .previewListDouble { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  :global(.importNoticeActions) { width: 100%; gap: 8px; }
+  :global(.importNoticeActions .btn-modal) {
+    flex: 1 1 0;
+    box-sizing: border-box;
+    padding: 11px 6px;
+    font-size: 12px;
+    line-height: 1.3;
+    text-align: center;
+    white-space: normal;
+  }
 }
 
 .previewCard {
