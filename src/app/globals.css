@@ -10041,7 +10041,7 @@ p {
 .account-settings-experience-tooltip ul { display:grid;gap:5px;margin:8px 0 0;padding:0;list-style:none; }
 .account-settings-experience-tooltip li { display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--color-text-muted);font-size:11px;line-height:1.5; }
 .account-settings-experience-tooltip li b { color:var(--color-primary);font-weight:700;white-space:nowrap; }
-.account-settings-coin-tooltip { top:calc(100% + 9px);right:0;width:260px;padding:13px 14px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-card);box-shadow:0 10px 24px rgba(26,26,26,.12); }
+.account-settings-coin-tooltip { top:calc(100% + 9px);left:0;width:260px;padding:13px 14px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-card);box-shadow:0 10px 24px rgba(26,26,26,.12); }
 .account-settings-coin-tooltip::before { right:18px; }
 .account-settings-coin-tooltip > div { display:grid;gap:2px;margin-top:8px;color:var(--color-text-muted);font-size:11px;line-height:1.5; }
 .account-settings-coin-tooltip > div b { color:var(--color-text);font-weight:700; }
