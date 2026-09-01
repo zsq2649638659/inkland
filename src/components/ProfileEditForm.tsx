@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { compressImage } from "@/lib/image";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import AccountDatePicker from "@/components/AccountDatePicker";
+import SettingsStatus from "@/components/SettingsStatus";
 import { assertCanProfileEdit } from "@/lib/userRestrictions";
 import { readAccountPreferences, saveAccountPreferences } from "@/lib/accountPreferences";
 
@@ -338,12 +339,7 @@ export default function ProfileEditForm() {
               {/* Actions */}
               <div className="form-actions">
                 {success && (
-                  <div className="success-toast" role="status">
-                    <span className="success-toast-icon" aria-hidden="true">
-                      <i className="fa-solid fa-circle-check"></i>
-                    </span>
-                    <span className="success-toast-text">保存成功</span>
-                  </div>
+                  <SettingsStatus kind="success" message="保存成功" />
                 )}
                 <div className="form-action-buttons">
                   <button type="button" className="btn-cancel" onClick={handleCancel}>

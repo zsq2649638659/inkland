@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import SettingsStatus from "@/components/SettingsStatus";
 import { createClient } from "@/lib/supabase/browser";
 import {
   defaultAccountPreferences,
@@ -91,6 +92,7 @@ export default function AccountSettingsPanel() {
   const [copyrightLicense, setCopyrightLicense] = useState<CopyrightLicense>(defaultAccountPreferences.copyright_license);
   const [savingCopyright, setSavingCopyright] = useState(false);
   const [copyrightMessage, setCopyrightMessage] = useState("");
+  const [copyrightMessageKind, setCopyrightMessageKind] = useState<"success" | "error" | "">("");
   const [copyrightOpen, setCopyrightOpen] = useState(false);
   const [coinInfoOpen, setCoinInfoOpen] = useState(false);
   const [activity, setActivity] = useState<AccountActivity | null>(null);
@@ -178,6 +180,7 @@ export default function AccountSettingsPanel() {
     if (savingCopyright) return;
     setSavingCopyright(true);
     setCopyrightMessage("");
+    setCopyrightMessageKind("");
     const { error } = await saveAccountPreferences(supabase, {
       gender: accountPreferences.gender,
       birth_date: accountPreferences.birth_date,
@@ -185,10 +188,12 @@ export default function AccountSettingsPanel() {
     });
     setSavingCopyright(false);
     if (error) {
+      setCopyrightMessageKind("error");
       setCopyrightMessage("版权设置保存失败，请稍后再试。");
       return;
     }
     setAccountPreferences((current) => ({ ...current, copyright_license: copyrightLicense }));
+    setCopyrightMessageKind("success");
     setCopyrightMessage("版权设置已保存。");
   }
 
@@ -322,7 +327,9 @@ export default function AccountSettingsPanel() {
           <button className="settings-btn-save" disabled={savingCopyright} onClick={() => void saveCopyright()} type="button">
             {savingCopyright ? "保存中…" : "保存版权设置"}
           </button>
-          {copyrightMessage && <p className="account-settings-message" role="status">{copyrightMessage}</p>}
+          {copyrightMessage && (
+            <SettingsStatus kind={copyrightMessageKind === "error" ? "error" : "success"} message={copyrightMessage} />
+          )}
         </div>
       </section>
 

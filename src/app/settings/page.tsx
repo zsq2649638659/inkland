@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import AccountSettingsPanel from "@/components/AccountSettingsPanel";
+import SettingsStatus from "@/components/SettingsStatus";
 
 type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordMessageKind, setPasswordMessageKind] = useState<"success" | "error" | "">("");
   const [passwordSaving, setPasswordSaving] = useState(false);
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
@@ -187,18 +189,22 @@ export default function SettingsPage() {
 
   const handlePasswordChange = async () => {
     setPasswordMessage("");
+    setPasswordMessageKind("");
     if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
+      setPasswordMessageKind("error");
       setPasswordMessage("请确认当前密码、新密码和确认密码填写正确；新密码至少 8 位。");
       return;
     }
     setPasswordSaving(true);
     const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email || "", password: currentPassword });
     if (verifyError) {
+      setPasswordMessageKind("error");
       setPasswordMessage("当前密码不正确，请检查后重试。");
       setPasswordSaving(false);
       return;
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPasswordMessageKind(error ? "error" : "success");
     setPasswordMessage(error ? "密码修改失败，请稍后重试。" : "密码已修改。请使用新密码登录。");
     if (!error) {
       setCurrentPassword("");
@@ -276,10 +282,14 @@ export default function SettingsPage() {
               <input id="settings-confirm-password" name="settings-confirm-password" type="password" className="settings-form-input" placeholder="请再次输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
 
-            {passwordMessage && <p className="text-sm text-muted mb-4" role="status">{passwordMessage}</p>}
-            <button type="submit" className="settings-btn-save" disabled={passwordSaving}>
-              <i className="fa-solid fa-check" aria-hidden="true"></i> {passwordSaving ? "保存中…" : "保存修改"}
-            </button>
+            <div className="settings-form-actions">
+              {passwordMessage && (
+                <SettingsStatus kind={passwordMessageKind === "error" ? "error" : "success"} message={passwordMessage} />
+              )}
+              <button type="submit" className="settings-btn-save" disabled={passwordSaving}>
+                <i className="fa-solid fa-check" aria-hidden="true"></i> {passwordSaving ? "保存中…" : "保存修改"}
+              </button>
+            </div>
           </form>
 
           {/* ---- Panel: 屏蔽管理 (user card grid, 2 columns) ---- */}
@@ -479,21 +489,19 @@ export default function SettingsPage() {
               ></textarea>
             </div>
 
-            {/* Success message */}
-            {feedbackSuccess && (
-              <div className="settings-feedback-notice settings-feedback-success" role="status">
-                <span className="success-toast-icon">
-                  <i className="fa-solid fa-circle-check"></i>
-                </span>
-                <span className="success-toast-text">{feedbackSuccess}</span>
-              </div>
-            )}
+            <div className="settings-form-actions">
+              {feedbackSuccess && (
+                <SettingsStatus kind="success" message={feedbackSuccess} />
+              )}
 
-            {feedbackError && <div className="settings-feedback-notice settings-feedback-error" role="alert"><i className="fa-solid fa-circle-exclamation" /> {feedbackError}</div>}
+              {feedbackError && (
+                <SettingsStatus kind="error" message={feedbackError} />
+              )}
 
-            <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
-              <i className={`fa-solid ${feedbackSubmitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} aria-hidden="true"></i> {feedbackSubmitting ? "提交中…" : "提交反馈"}
-            </button>
+              <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
+                <i className={`fa-solid ${feedbackSubmitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} aria-hidden="true"></i> {feedbackSubmitting ? "提交中…" : "提交反馈"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
