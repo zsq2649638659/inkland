@@ -167,7 +167,7 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
           );
         })}
       </div>
-      
+
       {step === 2 && !visualOnly && (
         <p className={styles.loadingNote}>热门原作会随平台内容更新。</p>
       )}
