@@ -962,7 +962,7 @@ export default function ImportWorkspace() {
     const current = textPlans.find((plan) => plan.id === planId);
     if (!current) return;
     const equivalentPlanIds = new Set(textPlans
-      .filter((plan) => getTextPlanIdentity(plan) === getTextPlanIdentity(current))
+      .filter((plan) => changes.encoding !== undefined ? plan.canChangeEncoding : plan.chapters.length >= 2)
       .map((plan) => plan.id));
     setBusy(true);
     setError("");
@@ -1162,11 +1162,14 @@ export default function ImportWorkspace() {
   const updateGroupInformation = (planId: string, changes: Partial<Pick<TextImportPlan, "groupName" | "groupDescription" | "groupTags">>) => {
     const current = textPlans.find((plan) => plan.id === planId);
     if (!current) return;
-    const equivalentPlanIds = new Set(textPlans
+    const activeGroupedPlanIds = new Set(textPlans
+      .filter((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id))
+      .map((plan) => plan.id));
+    const targetPlanIds = activeGroupedPlanIds.has(planId) ? activeGroupedPlanIds : new Set(textPlans
       .filter((plan) => getTextPlanIdentity(plan) === getTextPlanIdentity(current))
       .map((plan) => plan.id));
-    setTextPlans((plans) => plans.map((plan) => equivalentPlanIds.has(plan.id) ? { ...plan, ...changes } : plan));
-    setParsedWorks((works) => works.map((work) => equivalentPlanIds.has(work.sourcePlanId || "") ? {
+    setTextPlans((plans) => plans.map((plan) => targetPlanIds.has(plan.id) ? { ...plan, ...changes } : plan));
+    setParsedWorks((works) => works.map((work) => targetPlanIds.has(work.sourcePlanId || "") ? {
       ...work,
       ...(changes.groupName !== undefined ? { groupName: changes.groupName } : {}),
       ...(changes.groupDescription !== undefined ? { groupDescription: changes.groupDescription } : {}),
@@ -1177,11 +1180,14 @@ export default function ImportWorkspace() {
   const adoptDescriptionCandidate = (planId: string) => {
     const plan = textPlans.find((item) => item.id === planId);
     if (!plan?.descriptionCandidate) return;
-    const equivalentPlanIds = new Set(textPlans
+    const groupedPlanIds = new Set(textPlans
+      .filter((item) => item.mode === plan.mode && item.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === item.id))
+      .map((item) => item.id));
+    const targetPlanIds = groupedPlanIds.size > 0 ? groupedPlanIds : new Set(textPlans
       .filter((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan))
       .map((item) => item.id));
     const preamble = extractImportPreamble(plan.content);
-    setTextPlans((plans) => plans.map((item) => equivalentPlanIds.has(item.id) ? {
+    setTextPlans((plans) => plans.map((item) => targetPlanIds.has(item.id) ? {
       ...item,
       groupDescription: plan.descriptionCandidate,
       descriptionCandidateAccepted: true,
@@ -1189,12 +1195,12 @@ export default function ImportWorkspace() {
     setParsedWorks((works) => {
       const firstChapterIndexes = new Map<string, number>();
       works.forEach((work, index) => {
-        if (work.sourcePlanId && equivalentPlanIds.has(work.sourcePlanId) && !firstChapterIndexes.has(work.sourcePlanId)) {
+        if (work.sourcePlanId && targetPlanIds.has(work.sourcePlanId) && !firstChapterIndexes.has(work.sourcePlanId)) {
           firstChapterIndexes.set(work.sourcePlanId, index);
         }
       });
       return works.map((work, index) => {
-        if (!work.sourcePlanId || !equivalentPlanIds.has(work.sourcePlanId)) return work;
+        if (!work.sourcePlanId || !targetPlanIds.has(work.sourcePlanId)) return work;
         if (index === firstChapterIndexes.get(work.sourcePlanId)) {
           const content = removeImportedPreamble(work.content, preamble);
           return content === work.content
@@ -1432,10 +1438,10 @@ export default function ImportWorkspace() {
   const publishSuccessCount = publishResults.filter((result) => result.status === "success").length;
   const publishFailedCount = publishResults.filter((result) => result.status === "failed").length;
   const publishingItem = publishResults.find((result) => result.status === "publishing");
-  const uniqueTextPlans = getUniqueTextPlans(textPlans);
-  const activeGroupedPlans = uniqueTextPlans.filter((plan) => plan.mode !== "single"
-    && textPlans.some((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan)
-      && parsedWorks.some((work) => work.selected && work.sourcePlanId === item.id)));
+  const encodingPlan = textPlans.find((plan) => plan.canChangeEncoding);
+  const splitPlan = textPlans.find((plan) => plan.chapters.length >= 2);
+  const activeGroupedPlan = textPlans.find((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
+  const activeGroupedPlans = activeGroupedPlan ? [activeGroupedPlan] : [];
   const noticeModalWork = parsedWorks.find((work) => work.id === noticeModalWorkId);
   const metadataCandidateModalPlan = textPlans.find((plan) => plan.id === metadataCandidateModalPlanId);
   const splitSummary = textPlans
@@ -1555,10 +1561,14 @@ export default function ImportWorkspace() {
               </>}
 
               {currentStep === 2 && <div className={styles.stepPage}>
-                {uniqueTextPlans.length > 0 && <div className={styles.textPlanList}>{uniqueTextPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
-                    {plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}
-                    {plan.chapters.length >= 2 && <fieldset className={styles.splitOptions}><legend>导入方式</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />长篇连载</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />合集单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持整篇</label></fieldset>}
-                  </section>)}</div>}
+                {(encodingPlan || splitPlan) && <div className={styles.textPlanList}>
+                  {encodingPlan && <section className={styles.textPlanCard}>
+                    <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={encodingPlan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(encodingPlan.id, { encoding })} /></div>
+                  </section>}
+                  {splitPlan && <section className={styles.textPlanCard}>
+                    <fieldset className={styles.splitOptions}><legend>导入方式</legend><label><input type="radio" name="import-mode" checked={splitPlan.mode === "serial"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "serial" })} />长篇连载</label><label><input type="radio" name="import-mode" checked={splitPlan.mode === "collection"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "collection" })} />合集单篇</label><label><input type="radio" name="import-mode" checked={splitPlan.mode === "single"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "single" })} />保持整篇</label></fieldset>
+                  </section>}
+                </div>}
                 <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setAllParsedSelection(event.target.checked)} /> 全选</label></div>
                 {splitSummary && <p className={styles.previewDescription}>{splitSummary}</p>}
                 <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
