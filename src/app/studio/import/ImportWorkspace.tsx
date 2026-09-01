@@ -1250,10 +1250,7 @@ export default function ImportWorkspace() {
   const updateGroupInformation = (planId: string, changes: Partial<Pick<TextImportPlan, "groupName" | "groupDescription" | "groupTags">>) => {
     const current = textPlans.find((plan) => plan.id === planId);
     if (!current) return;
-    const activeGroupedPlanIds = new Set(textPlans
-      .filter((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id))
-      .map((plan) => plan.id));
-    const targetPlanIds = activeGroupedPlanIds.has(planId) ? activeGroupedPlanIds : new Set(textPlans
+    const targetPlanIds = new Set(textPlans
       .filter((plan) => getTextPlanIdentity(plan) === getTextPlanIdentity(current))
       .map((plan) => plan.id));
     setTextPlans((plans) => plans.map((plan) => targetPlanIds.has(plan.id) ? { ...plan, ...changes } : plan));
@@ -1268,10 +1265,7 @@ export default function ImportWorkspace() {
   const adoptDescriptionCandidate = (planId: string) => {
     const plan = textPlans.find((item) => item.id === planId);
     if (!plan?.descriptionCandidate) return;
-    const groupedPlanIds = new Set(textPlans
-      .filter((item) => item.mode === plan.mode && item.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === item.id))
-      .map((item) => item.id));
-    const targetPlanIds = groupedPlanIds.size > 0 ? groupedPlanIds : new Set(textPlans
+    const targetPlanIds = new Set(textPlans
       .filter((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan))
       .map((item) => item.id));
     const preamble = extractImportPreamble(plan.content);
@@ -1528,7 +1522,11 @@ export default function ImportWorkspace() {
   const publishingItem = publishResults.find((result) => result.status === "publishing");
   const encodingPlan = textPlans.find((plan) => plan.canChangeEncoding);
   const splitPlan = textPlans.find((plan) => plan.chapters.length >= 2);
-  const activeGroupedPlan = textPlans.find((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
+  const activeGroupedPlan = textPlans.find((plan) => plan.mode !== "single"
+    && Boolean(plan.descriptionCandidate)
+    && !plan.descriptionCandidateAccepted
+    && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id))
+    || textPlans.find((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
   const activeGroupedPlans = activeGroupedPlan ? [activeGroupedPlan] : [];
   const noticeModalWork = parsedWorks.find((work) => work.id === noticeModalWorkId);
   const metadataCandidateModalPlan = textPlans.find((plan) => plan.id === metadataCandidateModalPlanId);
