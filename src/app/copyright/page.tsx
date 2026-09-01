@@ -48,9 +48,7 @@ export default function CopyrightPage() {
         <h2>四、发现未经允许的转载</h2>
         <p>如果你发现自己的作品被未经允许转载、改编或用于商业宣传，请通过 <a href={`mailto:${contactEmail}`}>{contactEmail}</a> 联系我们，并提供账号、作品链接、具体侵权位置、权利或授权证明以及你的处理诉求。平台会在材料足以核验时进行初步处理。</p>
 
-        <p className="mt-8 text-sm text-muted">本说明是 Inkland 的产品使用说明，不构成针对具体作品的法律意见。正式运营前，版权规则和投诉流程应根据实际运营主体、作品类型和适用法律进一步审核。</p>
       </article>
     </main>
   );
 }
-

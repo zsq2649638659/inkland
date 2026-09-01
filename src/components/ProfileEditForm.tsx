@@ -273,26 +273,28 @@ export default function ProfileEditForm() {
               </div>
 
               {/* Personal details */}
-              <div className="field-group">
-                <span className="field-label">性别</span>
-                <div className="profile-choice-group" role="group" aria-label="选择性别">
-                  {genderOptions.map((option) => (
-                    <button
-                      type="button"
-                      key={option.value}
-                      className={`profile-choice-button${gender === option.value ? " selected" : ""}`}
-                      aria-pressed={gender === option.value}
-                      onClick={() => setGender(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+              <div className="profile-personal-fields">
+                <div className="field-group">
+                  <span className="field-label">性别</span>
+                  <div className="profile-choice-group" role="group" aria-label="选择性别">
+                    {genderOptions.map((option) => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        className={`profile-choice-button${gender === option.value ? " selected" : ""}`}
+                        aria-pressed={gender === option.value}
+                        onClick={() => setGender(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="field-group">
-                <span className="field-label">出生日期</span>
-                <AccountDatePicker value={birthDate} onChange={setBirthDate} />
+                <div className="field-group">
+                  <span className="field-label">出生日期</span>
+                  <AccountDatePicker value={birthDate} onChange={setBirthDate} />
+                </div>
               </div>
 
               {/* Email */}

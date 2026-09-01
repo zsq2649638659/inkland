@@ -61,7 +61,14 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
 
   function changeMonth(offset: number) {
     const next = new Date(calendarYear, calendarMonthIndex + offset, 1);
-    setCalendarMonth(toMonthValue(next));
+    const nextMonth = toMonthValue(next);
+    setCalendarMonth(nextMonth < MIN_DATE.slice(0, 7) ? MIN_DATE.slice(0, 7) : nextMonth > todayValue.slice(0, 7) ? todayValue.slice(0, 7) : nextMonth);
+  }
+
+  function changeYear(offset: number) {
+    const next = new Date(calendarYear + offset, calendarMonthIndex, 1);
+    const nextMonth = toMonthValue(next);
+    setCalendarMonth(nextMonth < MIN_DATE.slice(0, 7) ? MIN_DATE.slice(0, 7) : nextMonth > todayValue.slice(0, 7) ? todayValue.slice(0, 7) : nextMonth);
   }
 
   return (
@@ -82,6 +89,14 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
           <div className="account-calendar-header">
             <button
               type="button"
+              aria-label="上一年"
+              disabled={calendarMonth <= MIN_DATE.slice(0, 7)}
+              onClick={() => changeYear(-1)}
+            >
+              <i className="fa-solid fa-angles-left" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
               aria-label="上个月"
               disabled={calendarMonth <= MIN_DATE.slice(0, 7)}
               onClick={() => changeMonth(-1)}
@@ -96,6 +111,14 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
               onClick={() => changeMonth(1)}
             >
               <i className="fa-solid fa-chevron-right" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="下一年"
+              disabled={calendarMonth >= todayValue.slice(0, 7)}
+              onClick={() => changeYear(1)}
+            >
+              <i className="fa-solid fa-angles-right" aria-hidden="true" />
             </button>
           </div>
           <div className="account-calendar-weekdays" aria-hidden="true">
@@ -131,4 +154,3 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
     </div>
   );
 }
-

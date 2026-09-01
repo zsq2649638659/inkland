@@ -49,7 +49,9 @@ export default function AccountSettingsPanel() {
   const [savingCopyright, setSavingCopyright] = useState(false);
   const [copyrightMessage, setCopyrightMessage] = useState("");
   const [copyrightOpen, setCopyrightOpen] = useState(false);
+  const [coinInfoOpen, setCoinInfoOpen] = useState(false);
   const copyrightSelectRef = useRef<HTMLDivElement>(null);
+  const coinInfoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -72,12 +74,20 @@ export default function AccountSettingsPanel() {
       if (!copyrightSelectRef.current?.contains(event.target as Node)) setCopyrightOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCopyrightOpen(false);
+      if (event.key === "Escape") {
+        setCopyrightOpen(false);
+        setCoinInfoOpen(false);
+      }
+    };
+    const closeCoinInfo = (event: MouseEvent) => {
+      if (!coinInfoRef.current?.contains(event.target as Node)) setCoinInfoOpen(false);
     };
     document.addEventListener("mousedown", closeCopyrightSelect);
+    document.addEventListener("mousedown", closeCoinInfo);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       document.removeEventListener("mousedown", closeCopyrightSelect);
+      document.removeEventListener("mousedown", closeCoinInfo);
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, []);
@@ -112,112 +122,97 @@ export default function AccountSettingsPanel() {
       <div className="account-settings-heading">
         <div>
           <h2 id="account-settings-title" className="settings-panel-title">账号设置</h2>
-          <p className="settings-panel-desc">查看账号信息，管理资料展示和版权偏好。</p>
         </div>
-        <Link className="settings-btn-secondary" href="/settings?tab=profile">编辑资料</Link>
       </div>
 
       <section className="account-settings-section" aria-labelledby="account-basic-title">
         <h3 id="account-basic-title" className="account-settings-section-title">基本信息</h3>
-        <div className="account-settings-profile">
-          <div className="account-settings-avatar">
-            {avatarUrl ? <Image src={avatarUrl} alt="当前头像" fill sizes="72px" unoptimized /> : <DefaultAvatar name={displayName} />}
-          </div>
-          <div className="account-settings-profile-copy">
-            <div className="account-settings-profile-name">{displayName}</div>
-            <div className="account-settings-profile-level">Lv.{level.number} · Inkland 用户</div>
-          </div>
-        </div>
-        <div className="account-settings-status-grid">
-          <section className="account-settings-status-card" aria-labelledby="account-level-title">
-            <div className="account-settings-status-heading">
-              <div>
-                <h4 id="account-level-title">当前等级</h4>
-                <p>等级会记录你在 Inkland 的创作与互动积累</p>
-              </div>
-              <strong>Lv.{level.number}</strong>
+        <div className="account-settings-profile-row">
+          <div className="account-settings-profile">
+            <div className="account-settings-avatar">
+              {avatarUrl ? <Image src={avatarUrl} alt="当前头像" fill sizes="72px" unoptimized /> : <DefaultAvatar name={displayName} />}
             </div>
-            <div className="account-settings-progress-meta">
-              <span>当前经验值 {level.current} / {level.next}</span>
-              <span>还需 {level.next - level.current} 升级</span>
-            </div>
-            <div className="account-settings-progress" role="progressbar" aria-label={`等级经验值 ${level.current} / ${level.next}`} aria-valuemin={0} aria-valuemax={level.next} aria-valuenow={level.current}>
-              <span style={{ width: `${levelProgress}%` }} />
-            </div>
-            <p className="account-settings-status-note">等级福利暂未开放，后续会围绕创作、互动和社区活动逐步开放。</p>
-            <div className="account-settings-rule-heading">经验值获取方式（规划）</div>
-            <div className="account-settings-rule-grid">
-              {experienceRules.map(([label, value]) => (
-                <div className="account-settings-rule-item" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
+            <div className="account-settings-profile-copy">
+              <div className="account-settings-profile-name">{displayName}</div>
+              <div className="account-settings-level-line">
+                <div
+                  className="account-settings-level-progress"
+                  role="progressbar"
+                  tabIndex={0}
+                  aria-label={`等级 LV.${level.number}，经验值 ${level.current} / ${level.next}`}
+                  aria-valuemin={0}
+                  aria-valuemax={level.next}
+                  aria-valuenow={level.current}
+                >
+                  <span style={{ width: `${levelProgress}%` }} />
+                  <strong>LV.{level.number}</strong>
+                  <div className="account-settings-tooltip account-settings-experience-tooltip" role="tooltip">
+                    <strong>经验值获取方式</strong>
+                    <ul>
+                      {experienceRules.map(([label, value]) => <li key={label}><span>{label}</span><b>{value}</b></li>)}
+                    </ul>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </section>
-          <section className="account-settings-status-card" aria-labelledby="account-coin-title">
-            <div className="account-settings-status-heading">
-              <div>
-                <h4 id="account-coin-title">Inkland 币</h4>
-                <p>用于表达支持的站内虚拟道具</p>
-              </div>
-              <strong className="account-settings-coin-balance">{coinBalance}</strong>
-            </div>
-            <div className="account-settings-coin-unit">枚</div>
-            <div className="account-settings-coin-columns">
-              <div>
-                <div className="account-settings-rule-heading">获取方式</div>
-                <ul className="account-settings-bullet-list">
-                  {coinWays.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              </div>
-              <div>
-                <div className="account-settings-rule-heading">可以做什么</div>
-                <ul className="account-settings-bullet-list">
-                  {coinUses.map((item) => <li key={item}>{item}</li>)}
-                </ul>
+                <span className="account-settings-experience-value">{level.current}/{level.next}</span>
               </div>
             </div>
-            <p className="account-settings-status-note">系统正在建设中，当前暂不可领取、转赠、出售或兑换现金。</p>
-          </section>
+          </div>
+          <div className="account-settings-profile-actions">
+            <div className="account-settings-coin" ref={coinInfoRef}>
+              <button
+                type="button"
+                className="account-settings-coin-trigger"
+                aria-label={`墨滴 ${coinBalance}，查看获取方式和用途`}
+                aria-expanded={coinInfoOpen}
+                onClick={() => setCoinInfoOpen((current) => !current)}
+              >
+                <span className="account-settings-coin-logo" aria-hidden="true"><i className="fa-solid fa-droplet" /></span>
+                <strong>{coinBalance}</strong>
+                <span>墨滴</span>
+              </button>
+              <div className={`account-settings-tooltip account-settings-coin-tooltip${coinInfoOpen ? " open" : ""}`} role="tooltip">
+                <strong>墨滴</strong>
+                <div><b>获取方式</b><span>{coinWays.join("、")}</span></div>
+                <div><b>可以做什么</b><span>{coinUses.join("，")}</span></div>
+                <small>不可转赠、出售或兑换现金</small>
+              </div>
+            </div>
+            <Link className="settings-btn-secondary" href="/settings?tab=profile">编辑资料</Link>
+          </div>
         </div>
-        <dl className="account-settings-list">
-          <div className="account-settings-row">
-            <dt>昵称</dt>
-            <dd>{displayName}</dd>
-          </div>
-          <div className="account-settings-row">
-            <dt>用户 ID</dt>
-            <dd className="account-settings-id">{user.id}</dd>
-          </div>
-          <div className="account-settings-row account-settings-row-stacked">
-            <dt>账号简介</dt>
-            <dd>{profile?.bio || "未设置"}</dd>
-          </div>
-          <div className="account-settings-row">
-            <dt>性别</dt>
-            <dd>{genderLabels[accountPreferences.gender]}</dd>
-          </div>
-          <div className="account-settings-row">
-            <dt>出生日期</dt>
-            <dd>{formatBirthDate(accountPreferences.birth_date)}</dd>
-          </div>
-          <div className="account-settings-row">
-            <dt>绑定邮箱</dt>
-            <dd>{user.email || "未绑定"}</dd>
-          </div>
-        </dl>
+        <div className="account-settings-profile-fields">
+          <dl className="account-settings-list">
+            <div className="account-settings-row">
+              <dt>用户 ID</dt>
+              <dd className="account-settings-id">{user.id}</dd>
+            </div>
+            <div className="account-settings-row account-settings-row-stacked">
+              <dt>账号简介</dt>
+              <dd>{profile?.bio || "未设置"}</dd>
+            </div>
+            <div className="account-settings-row">
+              <dt>性别</dt>
+              <dd>{genderLabels[accountPreferences.gender]}</dd>
+            </div>
+            <div className="account-settings-row">
+              <dt>出生日期</dt>
+              <dd>{formatBirthDate(accountPreferences.birth_date)}</dd>
+            </div>
+            <div className="account-settings-row">
+              <dt>绑定邮箱</dt>
+              <dd>{user.email || "未绑定"}</dd>
+            </div>
+          </dl>
+        </div>
       </section>
 
       <section className="account-settings-section" aria-labelledby="account-copyright-title">
         <div className="account-settings-section-heading">
           <div>
             <h3 id="account-copyright-title" className="account-settings-section-title">版权设置</h3>
-            <p className="account-settings-section-desc">用更直白的方式记录你对站外转载和改编的默认态度。</p>
           </div>
           <Link className="account-settings-help-link" href="/copyright">查看版权说明</Link>
         </div>
-        <label className="settings-form-label" htmlFor="account-copyright-license">默认版权偏好</label>
         <div className={`account-copyright-select${copyrightOpen ? " open" : ""}`} ref={copyrightSelectRef}>
           <button
             type="button"
@@ -250,9 +245,6 @@ export default function AccountSettingsPanel() {
             </div>
           )}
         </div>
-        <p className="account-settings-copyright-hint">
-          {selectedCopyright.description} 此设置不会自动改变已发布作品。
-        </p>
         {copyrightMessage && <p className="account-settings-message" role="status">{copyrightMessage}</p>}
         <button className="settings-btn-save" disabled={savingCopyright} onClick={() => void saveCopyright()} type="button">
           {savingCopyright ? "保存中…" : "保存版权设置"}
