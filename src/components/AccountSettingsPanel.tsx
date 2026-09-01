@@ -230,7 +230,7 @@ export default function AccountSettingsPanel() {
                   </div>
                 </div>
                 <div
-                  className="account-settings-level-progress"
+                  className={`account-settings-level-progress${levelProgress > 0 ? " has-progress" : ""}`}
                   role="progressbar"
                   tabIndex={0}
                   aria-label={`等级 LV.${experience.number}，经验值 ${experience.current} / ${experience.next}`}
