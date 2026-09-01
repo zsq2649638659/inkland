@@ -330,7 +330,6 @@ export default function AccountSettingsPanel() {
         <div className="account-settings-section-heading">
           <div>
             <h3 id="account-interest-title" className="account-settings-section-title">兴趣领域</h3>
-            <p className="account-settings-section-desc">根据你的选择展示兴趣发现内容，不会替换首页关注流。</p>
           </div>
           <Link className="account-settings-help-link" href="/onboarding/interests?mode=settings">修改兴趣</Link>
         </div>

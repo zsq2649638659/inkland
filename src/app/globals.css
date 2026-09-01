@@ -10022,7 +10022,7 @@ p {
 .account-settings-level-line { display:flex;align-items:center;gap:18px;margin-top:6px; }
 .account-settings-level-progress { position:relative;display:flex;min-width:0;height:28px;flex:1;align-items:center;overflow:visible;border-radius:var(--radius-full);background:var(--color-bg-secondary);cursor:help; }
 .account-settings-level-progress > span { position:absolute;inset:0 auto 0 0;min-width:0;border-radius:inherit;background:var(--color-primary);transition:width .25s ease; }
-.account-settings-level-progress.has-progress > span { min-width:8px; }
+.account-settings-level-progress.has-progress > span { min-width:28px; }
 .account-settings-level-progress > strong { position:relative;z-index:1;padding:0 10px;color:#fff;font-size:15px;font-weight:700;line-height:28px;letter-spacing:.01em;text-shadow:0 1px 2px rgba(26,26,26,.16); }
 .account-settings-experience-value { flex-shrink:0;color:var(--color-text-muted);font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap; }
 .account-settings-coin { position:relative; }
@@ -10246,11 +10246,6 @@ p {
   .account-settings-row { grid-template-columns:1fr;gap:3px;padding:12px 0; }
   .account-settings-id { word-break:break-all; }
   .account-copyright-select { width:100%; }
-}
-
-@media (max-width: 600px) {
-  .account-settings-section-heading { flex-direction:column;gap:8px; }
-  .account-settings-help-link { align-self:flex-start; }
 }
 
 /* ===== Series Page (Catalog & Manage) ===== */
