@@ -122,6 +122,7 @@ export default function AccountSettingsPanel() {
       <div className="account-settings-heading">
         <div>
           <h2 id="account-settings-title" className="settings-panel-title">账号设置</h2>
+          <p className="settings-panel-desc">管理账号资料、版权偏好和兴趣领域。</p>
         </div>
       </div>
 
@@ -135,6 +136,24 @@ export default function AccountSettingsPanel() {
             <div className="account-settings-profile-copy">
               <div className="account-settings-profile-name">{displayName}</div>
               <div className="account-settings-level-line">
+                <div className="account-settings-coin" ref={coinInfoRef}>
+                  <button
+                    type="button"
+                    className="account-settings-coin-trigger"
+                    aria-label={`当前余额 ${coinBalance}，查看获取方式和用途`}
+                    aria-expanded={coinInfoOpen}
+                    onClick={() => setCoinInfoOpen((current) => !current)}
+                  >
+                    <span className="account-settings-coin-logo" aria-hidden="true"><i className="fa-solid fa-droplet" /></span>
+                    <strong>{coinBalance}</strong>
+                  </button>
+                  <div className={`account-settings-tooltip account-settings-coin-tooltip${coinInfoOpen ? " open" : ""}`} role="tooltip">
+                    <strong>墨滴</strong>
+                    <div><b>获取方式</b><span>{coinWays.join("、")}</span></div>
+                    <div><b>可以做什么</b><span>{coinUses.join("，")}</span></div>
+                    <small>不可转赠、出售或兑换现金</small>
+                  </div>
+                </div>
                 <div
                   className="account-settings-level-progress"
                   role="progressbar"
@@ -158,25 +177,6 @@ export default function AccountSettingsPanel() {
             </div>
           </div>
           <div className="account-settings-profile-actions">
-            <div className="account-settings-coin" ref={coinInfoRef}>
-              <button
-                type="button"
-                className="account-settings-coin-trigger"
-                aria-label={`墨滴 ${coinBalance}，查看获取方式和用途`}
-                aria-expanded={coinInfoOpen}
-                onClick={() => setCoinInfoOpen((current) => !current)}
-              >
-                <span className="account-settings-coin-logo" aria-hidden="true"><i className="fa-solid fa-droplet" /></span>
-                <strong>{coinBalance}</strong>
-                <span>墨滴</span>
-              </button>
-              <div className={`account-settings-tooltip account-settings-coin-tooltip${coinInfoOpen ? " open" : ""}`} role="tooltip">
-                <strong>墨滴</strong>
-                <div><b>获取方式</b><span>{coinWays.join("、")}</span></div>
-                <div><b>可以做什么</b><span>{coinUses.join("，")}</span></div>
-                <small>不可转赠、出售或兑换现金</small>
-              </div>
-            </div>
             <Link className="settings-btn-secondary" href="/settings?tab=profile">编辑资料</Link>
           </div>
         </div>
@@ -245,10 +245,12 @@ export default function AccountSettingsPanel() {
             </div>
           )}
         </div>
-        {copyrightMessage && <p className="account-settings-message" role="status">{copyrightMessage}</p>}
-        <button className="settings-btn-save" disabled={savingCopyright} onClick={() => void saveCopyright()} type="button">
-          {savingCopyright ? "保存中…" : "保存版权设置"}
-        </button>
+        <div className="account-settings-copyright-actions">
+          {copyrightMessage && <p className="account-settings-message" role="status">{copyrightMessage}</p>}
+          <button className="settings-btn-save" disabled={savingCopyright} onClick={() => void saveCopyright()} type="button">
+            {savingCopyright ? "保存中…" : "保存版权设置"}
+          </button>
+        </div>
       </section>
 
       <section className="account-settings-section" aria-labelledby="account-interest-title">
