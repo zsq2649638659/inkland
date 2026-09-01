@@ -53,9 +53,11 @@ function parseSort(value: string | null): SortFilter {
   return value === "hot" || value === "bookmarks" ? value : "latest";
 }
 
-function parseWordValue(value: string | null): string {
-  return value && /^\d+$/.test(value) ? value : "";
-}
+const SORT_OPTIONS: Array<{ value: SortFilter; label: string }> = [
+  { value: "latest", label: "按更新时间" },
+  { value: "hot", label: "按热度" },
+  { value: "bookmarks", label: "按收藏量" },
+];
 
 function getPostVisual(postType?: string) {
   switch (postType) {
@@ -102,8 +104,7 @@ function SearchContent() {
   const [workType, setWorkType] = useState<WorkTypeFilter>(parseWorkType(searchParams.get("workType")));
   const [seriesStatus, setSeriesStatus] = useState<SeriesStatusFilter>(parseSeriesStatus(searchParams.get("seriesStatus")));
   const [sortBy, setSortBy] = useState<SortFilter>(parseSort(searchParams.get("sort")));
-  const [minWords, setMinWords] = useState(parseWordValue(searchParams.get("minWords")));
-  const [maxWords, setMaxWords] = useState(parseWordValue(searchParams.get("maxWords")));
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   // 作品（标题匹配）和正文（内容匹配）分开存储，不再混入标签关联作品
   const [titlePosts, setTitlePosts] = useState<SearchPost[]>([]);
   const [contentPosts, setContentPosts] = useState<Post[]>([]);
@@ -115,6 +116,7 @@ function SearchContent() {
   // 防抖 + 请求序列号，避免竞态
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
+  const sortMenuRef = useRef<HTMLDivElement | null>(null);
 
   const filters: { key: SearchFilter; label: string }[] = [
     { key: "tags", label: "标签" },
@@ -133,8 +135,6 @@ function SearchContent() {
       ["workType", workType],
       ["seriesStatus", seriesStatus],
       ["sort", sortBy],
-      ["minWords", minWords],
-      ["maxWords", maxWords],
     ];
 
     ["q", "type", "workType", "seriesStatus", "sort", "minWords", "maxWords"].forEach((key) => url.searchParams.delete(key));
@@ -163,8 +163,6 @@ function SearchContent() {
     const q = query.trim();
     const includeTestData = includeTestDataForProfile(profile);
     const applyWorkRefine = activeFilter === "works";
-    const minWordCount = minWords ? Number(minWords) : null;
-    const maxWordCount = maxWords ? Number(maxWords) : null;
     const postSelect = "id, title, content, word_count, post_type, created_at, updated_at, cover_url, user_id, series_name, chapter_number, author:profiles!posts_user_id_fkey(nickname, avatar_url)";
 
     let allowedSeriesNames: string[] | null = null;
@@ -199,8 +197,6 @@ function SearchContent() {
           if (!allowedSeriesNames || allowedSeriesNames.length === 0) return null;
           queryBuilder = queryBuilder.in("series_name", allowedSeriesNames);
         }
-        if (minWordCount !== null) queryBuilder = queryBuilder.gte("word_count", minWordCount);
-        if (maxWordCount !== null) queryBuilder = queryBuilder.lte("word_count", maxWordCount);
       }
 
       return queryBuilder
@@ -292,7 +288,27 @@ function SearchContent() {
       .filter((tag) => (countMap.get(tag.id) || 0) > 0)
       .map((tag) => ({ name: tag.name, post_count: countMap.get(tag.id) || 0 }))
       .sort((a, b) => b.post_count - a.post_count));
-  }, [activeFilter, maxWords, minWords, profile, seriesStatus, sortBy, supabase, user, workType]);
+  }, [activeFilter, profile, seriesStatus, sortBy, supabase, user, workType]);
+
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
+        setSortMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSortMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [sortMenuOpen]);
 
   // 输入和筛选条件共用防抖自动搜索（300ms）
   useEffect(() => {
@@ -347,14 +363,6 @@ function SearchContent() {
   const handleWorkTypeChange = (nextType: WorkTypeFilter) => {
     setWorkType(nextType);
     if (nextType === "single" || nextType === "image") setSeriesStatus("all");
-  };
-
-  const resetRefine = () => {
-    setWorkType("all");
-    setSeriesStatus("all");
-    setSortBy("latest");
-    setMinWords("");
-    setMaxWords("");
   };
 
   if (authLoading) {
@@ -429,16 +437,6 @@ function SearchContent() {
   const hasUserResults = userCount > 0;
   const hasWorkResults = workCount > 0;
   const hasPostResults = postCount > 0;
-  const minWordCount = minWords ? Number(minWords) : null;
-  const maxWordCount = maxWords ? Number(maxWords) : null;
-  const rangeInvalid = minWordCount !== null && maxWordCount !== null && minWordCount > maxWordCount;
-  const refineCount = [
-    workType !== "all",
-    seriesStatus !== "all",
-    sortBy !== "latest",
-    minWords !== "",
-    maxWords !== "",
-  ].filter(Boolean).length;
 
   const currentHasResults = (() => {
     switch (activeFilter) {
@@ -494,17 +492,7 @@ function SearchContent() {
         </div>
 
         {activeFilter === "works" && (
-          <section className="search-refine-panel" aria-labelledby="search-refine-title">
-            <div className="search-refine-heading">
-              <div>
-                <h2 id="search-refine-title" className="search-refine-title">筛选作品</h2>
-                <p className="search-refine-subtitle">按需要缩小结果</p>
-              </div>
-              <button type="button" className="search-refine-reset" onClick={resetRefine} disabled={refineCount === 0}>
-                重置{refineCount > 0 ? `（${refineCount}）` : ""}
-              </button>
-            </div>
-
+          <section className="search-refine-panel" aria-label="作品筛选条件">
             <div className="search-refine-grid">
               <fieldset className="search-refine-group">
                 <legend>作品类型</legend>
@@ -549,45 +537,40 @@ function SearchContent() {
               </fieldset>
 
               <div className="search-refine-control">
-                <label htmlFor="search-sort">排序方式</label>
-                <div className="search-refine-select-wrap">
-                  <select id="search-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortFilter)}>
-                    <option value="latest">按更新时间</option>
-                    <option value="hot">按热度</option>
-                    <option value="bookmarks">按收藏量</option>
-                  </select>
-                  <i className="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                <span className="search-refine-label">排序方式</span>
+                <div className={`search-refine-sort${sortMenuOpen ? " open" : ""}`} ref={sortMenuRef}>
+                  <button
+                    type="button"
+                    className="search-refine-sort-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={sortMenuOpen}
+                    aria-controls="search-sort-menu"
+                    onClick={() => setSortMenuOpen((open) => !open)}
+                  >
+                    <span>{SORT_OPTIONS.find((option) => option.value === sortBy)?.label}</span>
+                    <i className="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                  </button>
+                  {sortMenuOpen && (
+                    <div id="search-sort-menu" className="search-refine-sort-menu" role="listbox" aria-label="排序方式">
+                      {SORT_OPTIONS.map((option) => (
+                        <button
+                          type="button"
+                          key={option.value}
+                          className="search-refine-sort-option"
+                          role="option"
+                          aria-selected={sortBy === option.value}
+                          onClick={() => {
+                            setSortBy(option.value);
+                            setSortMenuOpen(false);
+                          }}
+                        >
+                          <span>{option.label}</span>
+                          {sortBy === option.value && <i className="fa-solid fa-check" aria-hidden="true"></i>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              <div className="search-refine-control">
-                <span className="search-refine-label">字数范围</span>
-                <div className="search-refine-range">
-                  <label>
-                    <span className="sr-only">最少字数</span>
-                    <input
-                      type="number"
-                      min="0"
-                      inputMode="numeric"
-                      placeholder="最少"
-                      value={minWords}
-                      onChange={(e) => setMinWords(e.target.value.replace(/\D/g, ""))}
-                    />
-                  </label>
-                  <span className="search-refine-range-separator">至</span>
-                  <label>
-                    <span className="sr-only">最多字数</span>
-                    <input
-                      type="number"
-                      min="0"
-                      inputMode="numeric"
-                      placeholder="最多"
-                      value={maxWords}
-                      onChange={(e) => setMaxWords(e.target.value.replace(/\D/g, ""))}
-                    />
-                  </label>
-                </div>
-                {rangeInvalid && <p className="search-refine-error" role="alert">最少字数不能大于最多字数</p>}
               </div>
             </div>
           </section>
@@ -615,10 +598,7 @@ function SearchContent() {
         {!loading && hasSearched && !currentHasResults && (
           <div className="no-results visible">
             <i className="fa-solid fa-magnifying-glass"></i>
-            <p>{activeFilter === "works" && refineCount > 0 ? "没有符合当前筛选条件的作品" : "没有找到相关结果"}</p>
-            {activeFilter === "works" && refineCount > 0 && (
-              <button type="button" className="search-empty-action" onClick={resetRefine}>重置筛选</button>
-            )}
+            <p>{activeFilter === "works" && (workType !== "all" || seriesStatus !== "all" || sortBy !== "latest") ? "没有符合当前筛选条件的作品" : "没有找到相关结果"}</p>
           </div>
         )}
 
@@ -660,11 +640,6 @@ function SearchContent() {
 
             {activeFilter === "works" && hasWorkResults && (
               <div className="result-section" data-section="works">
-                <div className="search-result-summary">
-                  <span>显示 {workCount} 个作品</span>
-                  <span>·</span>
-                  <span>{sortBy === "latest" ? "按更新时间" : sortBy === "hot" ? "按热度" : "按收藏量"}</span>
-                </div>
                 <div className="work-list">
                   {titlePosts.map((post) => {
                     const raw = post as unknown as Record<string, unknown>;
