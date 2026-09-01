@@ -4,7 +4,7 @@ export interface ImportChapter {
   number?: number;
 }
 
-const CHAPTER_HEADING = /^(?:第[零〇一二三四五六七八九十百千万两\d]+[章节卷回部篇集]|chapter\s+[零〇一二三四五六七八九十百千万两\d]+|序章|楔子|引子|前言|后记|终章|尾声|番外(?:[零〇一二三四五六七八九十百千万两\d]+)?)(?:[：:\s　\-—·].*)?$/i;
+const CHAPTER_HEADING = /^(?:第\s*[零〇一二三四五六七八九十百千万两\d]+\s*[章节卷回部篇集]|chapter\s+[零〇一二三四五六七八九十百千万两\d]+|序章|楔子|引子|前言|后记|终章|尾声|番外(?:[零〇一二三四五六七八九十百千万两\d]+)?)(?:[：:\s　\-—·].*)?$/i;
 
 function normalizeChapterContent(content: string) {
   return content.replace(/\r\n?/g, "\n").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\n{3,}/g, "\n\n").trim();
@@ -43,7 +43,7 @@ function chineseNumberValue(value: string) {
 }
 
 function chapterNumberFromTitle(title: string) {
-  const matched = title.match(/^第([零〇一二三四五六七八九十百千万两\d]+)[章节卷回部篇集]/i)
+  const matched = title.match(/^第\s*([零〇一二三四五六七八九十百千万两\d]+)\s*[章节卷回部篇集]/i)
     || title.match(/^chapter\s+([零〇一二三四五六七八九十百千万两\d]+)/i);
   return matched ? chineseNumberValue(matched[1]) : undefined;
 }

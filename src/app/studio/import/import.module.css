@@ -102,6 +102,7 @@
 .publishSummary strong, .publishSummary span { overflow-wrap: anywhere; }
 .publishSummary span { color: #76584a; font-size: 13px; text-align: left; }
 .duplicateSummary { color: #7b551f !important; font-size: 13px; }
+.importResultSummary { margin-top: 4px !important; color: var(--color-text-muted) !important; font-size: 13px; line-height: 1.55; }
 .publishPanel { display: grid; gap: 14px; margin-top: 20px; padding: 0; border: 0; background: transparent; }
 .publishPanel h2, .publishPanel p { margin: 0; }
 .publishPanel p { margin-top: 4px; color: #756b66; }
