@@ -24,7 +24,7 @@ async function loadHotWorks(supabase: SupabaseClient): Promise<string[]> {
   const { data } = await supabase
     .from("tags")
     .select("name, post_count")
-    .in("type", ["fandom", "genre"])
+    .eq("type", "fandom")
     .order("post_count", { ascending: false })
     .limit(24);
   const names = (data || [])
