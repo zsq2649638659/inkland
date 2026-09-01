@@ -42,6 +42,7 @@ export default function DiscoverPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
   const preferences = useMemo(() => readInterestPreferences(user), [user]);
+  const domains = useMemo(() => preferences?.domains.map((item) => item.trim().toLowerCase()).filter(Boolean) || [], [preferences]);
   const terms = useMemo(() => preferences?.original_works.map((item) => item.trim().toLowerCase()).filter(Boolean) || [], [preferences]);
   const [posts, setPosts] = useState<DiscoveryPost[] | null>(null);
 
@@ -51,7 +52,7 @@ export default function DiscoverPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (terms.length === 0) return;
+    if (terms.length === 0 && domains.length === 0) return;
 
     let active = true;
     void (async () => {
@@ -69,12 +70,19 @@ export default function DiscoverPage() {
       const matched = ((data || []) as DiscoveryPost[]).filter((post) => {
         const tagNames = (post.post_tags || []).map((item) => item.tags?.name || "").join(" ");
         const haystack = `${post.title || ""} ${post.series_name || ""} ${tagNames}`.toLowerCase();
-        return terms.some((term) => haystack.includes(term));
+        const matchesWork = terms.some((term) => haystack.includes(term));
+        const matchesDomain = domains.some((domain) => {
+          if (domain === "绘画") return post.post_type === "image";
+          if (domain === "连载") return post.post_type === "serial";
+          if (domain === "文字") return post.post_type !== "image";
+          return haystack.includes(domain);
+        });
+        return matchesWork || matchesDomain;
       });
       setPosts(matched.slice(0, 24));
     })();
     return () => { active = false; };
-  }, [profile, supabase, terms, user]);
+  }, [domains, profile, supabase, terms, user]);
 
   if (authLoading || !user) {
     return <div id="page-discover" className="min-h-screen bg-paper"><div className="feed-empty-state" role="status">正在加载兴趣发现…</div></div>;
@@ -103,10 +111,10 @@ export default function DiscoverPage() {
             </section>
           )}
 
-          {terms.length > 0 && posts === null ? (
+          {(terms.length > 0 || domains.length > 0) && posts === null ? (
             <div className="feed-empty-state" role="status">正在匹配内容…</div>
-          ) : !preferences || preferences.original_works.length === 0 ? (
-            <EmptyState icon="fa-compass" title="还没有选择具体兴趣" description="选择感兴趣的领域和原作后，这里会展示对应内容。" actionLabel="设置兴趣" actionHref="/onboarding/interests?next=%2Fdiscover" />
+          ) : !preferences || (preferences.domains.length === 0 && preferences.original_works.length === 0 && preferences.dimensions.length === 0) ? (
+            <EmptyState icon="fa-compass" title="还没有选择兴趣" description="选择感兴趣的内容后，这里会展示对应发现。" actionLabel="设置兴趣" actionHref="/onboarding/interests?next=%2Fdiscover" />
           ) : posts?.length === 0 ? (
             <EmptyState icon="fa-compass" title="暂时没有匹配内容" description="可以修改兴趣选择，或稍后再来看看。" actionLabel="修改兴趣" actionHref="/onboarding/interests?next=%2Fdiscover" />
           ) : (
