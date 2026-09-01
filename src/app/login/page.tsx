@@ -56,10 +56,17 @@ export default function LoginPage() {
   const [authTimeout, setAuthTimeout] = useState(false);
   const [authActionInProgress, setAuthActionInProgress] = useState(false);
   const [serverSessionReady, setServerSessionReady] = useState(false);
+  const [postAuthPath, setPostAuthPath] = useState<string | null>(null);
 
   const getNextPath = () => {
+    if (postAuthPath) return postAuthPath;
     const next = new URLSearchParams(window.location.search).get("next");
     return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  };
+
+  const getInterestOnboardingPath = () => {
+    const next = getNextPath();
+    return `/onboarding/interests?next=${encodeURIComponent(next)}`;
   };
 
   // 本地超时保护：如果 authLoading 超过 3 秒，强制显示表单
@@ -73,7 +80,7 @@ export default function LoginPage() {
     if (!authLoading && user && !authActionInProgress && serverSessionReady) {
       router.replace(getNextPath());
     }
-  }, [user, authLoading, authActionInProgress, serverSessionReady, router]);
+  }, [user, authLoading, authActionInProgress, serverSessionReady, postAuthPath, router]);
 
   // 处理从其他页面进入登录页时已有客户端 session、但服务器 Cookie 尚未确认的窗口。
   useEffect(() => {
@@ -107,12 +114,14 @@ export default function LoginPage() {
     clearStatus();
 
     let error: { message: string } | null = null;
+    let signedInUserId: string | null = null;
     try {
       const result = await withTimeout<Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>>(supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       }));
       ({ error } = result);
+      signedInUserId = result.data.user?.id || null;
     } catch (requestError) {
       setStatus({ type: "error", message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT" ? "连接服务器超时，请检查网络或稍后重试" : "登录请求失败，请稍后重试" });
       setLoading(false);
@@ -145,6 +154,15 @@ export default function LoginPage() {
       setLoading(false);
       setAuthActionInProgress(false);
       return;
+    }
+    try {
+      const pending = JSON.parse(window.localStorage.getItem("inkland:pending-interest-onboarding") || "null") as { userId?: string; next?: string } | null;
+      if (pending?.userId && pending.userId === signedInUserId) {
+        setPostAuthPath(`/onboarding/interests?next=${encodeURIComponent(pending.next || "/")}`);
+        window.localStorage.removeItem("inkland:pending-interest-onboarding");
+      }
+    } catch {
+      // 登录不应因本地存储不可用而失败。
     }
     setServerSessionReady(true);
     setLoading(false);
@@ -226,9 +244,15 @@ export default function LoginPage() {
           id: data.user.id,
           nickname: nickname.trim(),
         });
+        setPostAuthPath(getInterestOnboardingPath());
         // 与登录保持一致，等 AuthProvider 完成 user 更新后再导航。
       } else {
         // 需要邮箱确认
+        try {
+          window.localStorage.setItem("inkland:pending-interest-onboarding", JSON.stringify({ userId: data.user.id, next: getNextPath() }));
+        } catch {
+          // 邮箱确认流程不应因本地存储不可用而失败。
+        }
         setStatus({
           type: "success",
           message: "注册成功！我们已向你的邮箱发送了一封验证邮件，请点击邮件中的链接完成验证后再登录。",

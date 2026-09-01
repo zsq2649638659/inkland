@@ -2,14 +2,27 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ProfileEditForm from "@/components/ProfileEditForm";
+import AccountSettingsPanel from "@/components/AccountSettingsPanel";
+import SettingsStatus from "@/components/SettingsStatus";
 
-type SettingsTab = "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+
+function parseSettingsTab(value: string | null): SettingsTab | null {
+  return value === "account" || value === "profile" || value === "password" || value === "blocked" || value === "notifications" || value === "about" || value === "contact"
+    ? value
+    : null;
+}
+
+function initialSettingsTab(): SettingsTab {
+  if (typeof window === "undefined") return "account";
+  return parseSettingsTab(new URLSearchParams(window.location.search).get("tab")) || "account";
+}
 
 const siteContactEmail = "inkland@163.com";
 
@@ -19,8 +32,9 @@ type BlockedProfileRow = { id: string; nickname: string | null; bio: string | nu
 export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialSettingsTab);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
@@ -34,9 +48,16 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordMessageKind, setPasswordMessageKind] = useState<"success" | "error" | "">("");
   const [passwordSaving, setPasswordSaving] = useState(false);
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
+
+  useEffect(() => {
+    const requested = parseSettingsTab(searchParams.get("tab"));
+    if (!requested) return;
+    void Promise.resolve().then(() => setActiveTab(requested));
+  }, [searchParams]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -51,7 +72,9 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!user || activeTab !== "blocked") return;
     let active = true;
-    setBlockedLoading(true);
+    void Promise.resolve().then(() => {
+      if (active) setBlockedLoading(true);
+    });
     void (async () => {
       const { data: blocked } = await supabase
         .from("blocked_users")
@@ -82,6 +105,7 @@ export default function SettingsPage() {
   }, [activeTab, supabase, user]);
 
   const tabs: { key: SettingsTab; label: string }[] = [
+    { key: "account", label: "账号设置" },
     { key: "profile", label: "编辑资料" },
     { key: "password", label: "修改密码" },
     { key: "blocked", label: "屏蔽管理" },
@@ -165,18 +189,22 @@ export default function SettingsPage() {
 
   const handlePasswordChange = async () => {
     setPasswordMessage("");
+    setPasswordMessageKind("");
     if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
+      setPasswordMessageKind("error");
       setPasswordMessage("请确认当前密码、新密码和确认密码填写正确；新密码至少 8 位。");
       return;
     }
     setPasswordSaving(true);
     const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email || "", password: currentPassword });
     if (verifyError) {
+      setPasswordMessageKind("error");
       setPasswordMessage("当前密码不正确，请检查后重试。");
       setPasswordSaving(false);
       return;
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPasswordMessageKind(error ? "error" : "success");
     setPasswordMessage(error ? "密码修改失败，请稍后重试。" : "密码已修改。请使用新密码登录。");
     if (!error) {
       setCurrentPassword("");
@@ -214,6 +242,11 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* ---- Panel: 账号设置 ---- */}
+          <div style={{ display: activeTab === "account" ? "block" : "none" }}>
+            <AccountSettingsPanel />
+          </div>
+
           {/* ---- Panel: 编辑资料 ---- */}
           <section className="settings-panel" style={{ display: activeTab === "profile" ? "block" : "none" }}>
             <h2 className="settings-panel-title">编辑资料</h2>
@@ -249,10 +282,14 @@ export default function SettingsPage() {
               <input id="settings-confirm-password" name="settings-confirm-password" type="password" className="settings-form-input" placeholder="请再次输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
 
-            {passwordMessage && <p className="text-sm text-muted mb-4" role="status">{passwordMessage}</p>}
-            <button type="submit" className="settings-btn-save" disabled={passwordSaving}>
-              <i className="fa-solid fa-check" aria-hidden="true"></i> {passwordSaving ? "保存中…" : "保存修改"}
-            </button>
+            <div className="settings-form-actions">
+              {passwordMessage && (
+                <SettingsStatus kind={passwordMessageKind === "error" ? "error" : "success"} message={passwordMessage} />
+              )}
+              <button type="submit" className="settings-btn-save" disabled={passwordSaving}>
+                <i className="fa-solid fa-check" aria-hidden="true"></i> {passwordSaving ? "保存中…" : "保存修改"}
+              </button>
+            </div>
           </form>
 
           {/* ---- Panel: 屏蔽管理 (user card grid, 2 columns) ---- */}
@@ -452,21 +489,18 @@ export default function SettingsPage() {
               ></textarea>
             </div>
 
-            {/* Success message */}
-            {feedbackSuccess && (
-              <div className="settings-feedback-notice settings-feedback-success" role="status">
-                <span className="success-toast-icon">
-                  <i className="fa-solid fa-circle-check"></i>
-                </span>
-                <span className="success-toast-text">{feedbackSuccess}</span>
-              </div>
-            )}
+            <div className="settings-form-actions settings-feedback-actions">
+              <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
+                <i className={`fa-solid ${feedbackSubmitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} aria-hidden="true"></i> {feedbackSubmitting ? "提交中…" : "提交反馈"}
+              </button>
+              {feedbackSuccess && (
+                <SettingsStatus kind="success" message={feedbackSuccess} />
+              )}
 
-            {feedbackError && <div className="settings-feedback-notice settings-feedback-error" role="alert"><i className="fa-solid fa-circle-exclamation" /> {feedbackError}</div>}
-
-            <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
-              <i className={`fa-solid ${feedbackSubmitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} aria-hidden="true"></i> {feedbackSubmitting ? "提交中…" : "提交反馈"}
-            </button>
+              {feedbackError && (
+                <SettingsStatus kind="error" message={feedbackError} />
+              )}
+            </div>
           </div>
         </div>
       </div>
