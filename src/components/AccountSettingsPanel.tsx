@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
@@ -14,45 +14,25 @@ import {
   type AccountPreferences,
   type CopyrightLicense,
 } from "@/lib/accountPreferences";
+import { copyrightPolicyMap, copyrightPolicyOptions } from "@/lib/copyrightPolicy";
 import { readInterestPreferences } from "@/lib/interestPreferences";
 
-const copyrightOptions: Array<{ value: CopyrightLicense; label: string; description: string }> = [
-  {
-    value: "all-rights-reserved",
-    label: "保留所有权利",
-    description: "默认不授予站外转载、改编或商用许可。",
-  },
-  {
-    value: "cc-by-nc-nd",
-    label: "CC BY-NC-ND 4.0",
-    description: "允许署名、非商业转载，但不得修改作品。",
-  },
-  {
-    value: "cc-by-nc-sa",
-    label: "CC BY-NC-SA 4.0",
-    description: "允许署名、非商业改编，并以相同方式共享。",
-  },
-  {
-    value: "cc-by-nc",
-    label: "CC BY-NC 4.0",
-    description: "允许署名、非商业使用和改编。",
-  },
-  {
-    value: "cc-by-nd",
-    label: "CC BY-ND 4.0",
-    description: "允许署名和商业使用，但不得修改作品。",
-  },
-  {
-    value: "cc-by-sa",
-    label: "CC BY-SA 4.0",
-    description: "允许署名、商业改编，并以相同方式共享。",
-  },
-  {
-    value: "cc-by",
-    label: "CC BY 4.0",
-    description: "只要署名，即可进行再传播、改编和商用。",
-  },
-];
+const level = {
+  current: 0,
+  next: 100,
+  number: 1,
+};
+
+const experienceRules = [
+  ["每日登录", "+5 经验"],
+  ["阅读作品", "+5 经验 / 日"],
+  ["收藏或关注作品", "+5 经验 / 日"],
+  ["发布通过审核的作品", "+20 经验 / 日"],
+] as const;
+
+const coinBalance = 0;
+const coinWays = ["完成每日任务（每日有上限）", "参与 Inkland 社区活动"];
+const coinUses = ["给喜欢的作品表达支持", "参与平台后续开放的社区活动"];
 
 function formatBirthDate(value: string | null) {
   if (!value) return "未设置";
@@ -68,6 +48,8 @@ export default function AccountSettingsPanel() {
   const [copyrightLicense, setCopyrightLicense] = useState<CopyrightLicense>(defaultAccountPreferences.copyright_license);
   const [savingCopyright, setSavingCopyright] = useState(false);
   const [copyrightMessage, setCopyrightMessage] = useState("");
+  const [copyrightOpen, setCopyrightOpen] = useState(false);
+  const copyrightSelectRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -85,10 +67,27 @@ export default function AccountSettingsPanel() {
     return () => { active = false; };
   }, [supabase, user]);
 
+  useEffect(() => {
+    const closeCopyrightSelect = (event: MouseEvent) => {
+      if (!copyrightSelectRef.current?.contains(event.target as Node)) setCopyrightOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCopyrightOpen(false);
+    };
+    document.addEventListener("mousedown", closeCopyrightSelect);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeCopyrightSelect);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
   if (!user) return null;
 
   const displayName = profile?.nickname || user.user_metadata?.username || user.email?.split("@")[0] || "用户";
   const avatarUrl = profile?.avatar_url || "";
+  const selectedCopyright = copyrightPolicyMap[copyrightLicense] || copyrightPolicyOptions[0];
+  const levelProgress = Math.min(100, Math.round((level.current / level.next) * 100));
 
   async function saveCopyright() {
     if (savingCopyright) return;
@@ -113,7 +112,7 @@ export default function AccountSettingsPanel() {
       <div className="account-settings-heading">
         <div>
           <h2 id="account-settings-title" className="settings-panel-title">账号设置</h2>
-          <p className="settings-panel-desc">查看账号信息，管理资料展示、版权和兴趣领域。</p>
+          <p className="settings-panel-desc">查看账号信息，管理资料展示和版权偏好。</p>
         </div>
         <Link className="settings-btn-secondary" href="/settings?tab=profile">编辑资料</Link>
       </div>
@@ -126,8 +125,61 @@ export default function AccountSettingsPanel() {
           </div>
           <div className="account-settings-profile-copy">
             <div className="account-settings-profile-name">{displayName}</div>
-            <div className="account-settings-profile-level">Lv.1 · Inkland 用户</div>
+            <div className="account-settings-profile-level">Lv.{level.number} · Inkland 用户</div>
           </div>
+        </div>
+        <div className="account-settings-status-grid">
+          <section className="account-settings-status-card" aria-labelledby="account-level-title">
+            <div className="account-settings-status-heading">
+              <div>
+                <h4 id="account-level-title">当前等级</h4>
+                <p>等级会记录你在 Inkland 的创作与互动积累</p>
+              </div>
+              <strong>Lv.{level.number}</strong>
+            </div>
+            <div className="account-settings-progress-meta">
+              <span>当前经验值 {level.current} / {level.next}</span>
+              <span>还需 {level.next - level.current} 升级</span>
+            </div>
+            <div className="account-settings-progress" role="progressbar" aria-label={`等级经验值 ${level.current} / ${level.next}`} aria-valuemin={0} aria-valuemax={level.next} aria-valuenow={level.current}>
+              <span style={{ width: `${levelProgress}%` }} />
+            </div>
+            <p className="account-settings-status-note">等级福利暂未开放，后续会围绕创作、互动和社区活动逐步开放。</p>
+            <div className="account-settings-rule-heading">经验值获取方式（规划）</div>
+            <div className="account-settings-rule-grid">
+              {experienceRules.map(([label, value]) => (
+                <div className="account-settings-rule-item" key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="account-settings-status-card" aria-labelledby="account-coin-title">
+            <div className="account-settings-status-heading">
+              <div>
+                <h4 id="account-coin-title">Inkland 币</h4>
+                <p>用于表达支持的站内虚拟道具</p>
+              </div>
+              <strong className="account-settings-coin-balance">{coinBalance}</strong>
+            </div>
+            <div className="account-settings-coin-unit">枚</div>
+            <div className="account-settings-coin-columns">
+              <div>
+                <div className="account-settings-rule-heading">获取方式</div>
+                <ul className="account-settings-bullet-list">
+                  {coinWays.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+              <div>
+                <div className="account-settings-rule-heading">可以做什么</div>
+                <ul className="account-settings-bullet-list">
+                  {coinUses.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+            </div>
+            <p className="account-settings-status-note">系统正在建设中，当前暂不可领取、转赠、出售或兑换现金。</p>
+          </section>
         </div>
         <dl className="account-settings-list">
           <div className="account-settings-row">
@@ -161,21 +213,45 @@ export default function AccountSettingsPanel() {
         <div className="account-settings-section-heading">
           <div>
             <h3 id="account-copyright-title" className="account-settings-section-title">版权设置</h3>
-            <p className="account-settings-section-desc">记录你希望采用的版权倾向，发布作品时可以再次确认。</p>
+            <p className="account-settings-section-desc">用更直白的方式记录你对站外转载和改编的默认态度。</p>
           </div>
-          <a className="account-settings-help-link" href="https://www.lofter.com/CreativeCommons" target="_blank" rel="noreferrer">查看版权说明</a>
+          <Link className="account-settings-help-link" href="/copyright">查看版权说明</Link>
         </div>
         <label className="settings-form-label" htmlFor="account-copyright-license">默认版权偏好</label>
-        <select
-          className="settings-form-select"
-          id="account-copyright-license"
-          value={copyrightLicense}
-          onChange={(event) => { setCopyrightLicense(event.target.value as CopyrightLicense); setCopyrightMessage(""); }}
-        >
-          {copyrightOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        <div className={`account-copyright-select${copyrightOpen ? " open" : ""}`} ref={copyrightSelectRef}>
+          <button
+            type="button"
+            id="account-copyright-license"
+            className="account-copyright-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={copyrightOpen}
+            onClick={() => setCopyrightOpen((current) => !current)}
+          >
+            <span>{selectedCopyright.label}</span>
+            <i className={`fa-solid fa-chevron-down${copyrightOpen ? " up" : ""}`} aria-hidden="true" />
+          </button>
+          {copyrightOpen && (
+            <div className="account-copyright-dropdown" role="listbox" aria-label="选择版权偏好">
+              {copyrightPolicyOptions.map((option) => (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={copyrightLicense === option.value}
+                  className={`account-copyright-option${copyrightLicense === option.value ? " active" : ""}`}
+                  key={option.value}
+                  onClick={() => { setCopyrightLicense(option.value); setCopyrightOpen(false); setCopyrightMessage(""); }}
+                >
+                  <span>
+                    <strong>{option.label}</strong>
+                    <small>{option.description}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <p className="account-settings-copyright-hint">
-          {copyrightOptions.find((option) => option.value === copyrightLicense)?.description} 此设置不会自动改变已发布作品。
+          {selectedCopyright.description} 此设置不会自动改变已发布作品。
         </p>
         {copyrightMessage && <p className="account-settings-message" role="status">{copyrightMessage}</p>}
         <button className="settings-btn-save" disabled={savingCopyright} onClick={() => void saveCopyright()} type="button">

@@ -6,8 +6,15 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { compressImage } from "@/lib/image";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import AccountDatePicker from "@/components/AccountDatePicker";
 import { assertCanProfileEdit } from "@/lib/userRestrictions";
 import { readAccountPreferences, saveAccountPreferences } from "@/lib/accountPreferences";
+
+const genderOptions = [
+  { value: "male", label: "男" },
+  { value: "female", label: "女" },
+  { value: "private", label: "保密" },
+] as const;
 
 export default function ProfileEditForm() {
   const supabase = createClient();
@@ -267,30 +274,25 @@ export default function ProfileEditForm() {
 
               {/* Personal details */}
               <div className="field-group">
-                <label htmlFor="profile-gender" className="field-label">性别</label>
-                <select
-                  id="profile-gender"
-                  name="gender"
-                  className="field-input"
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as "male" | "female" | "private")}
-                >
-                  <option value="private">保密</option>
-                  <option value="male">男</option>
-                  <option value="female">女</option>
-                </select>
+                <span className="field-label">性别</span>
+                <div className="profile-choice-group" role="group" aria-label="选择性别">
+                  {genderOptions.map((option) => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      className={`profile-choice-button${gender === option.value ? " selected" : ""}`}
+                      aria-pressed={gender === option.value}
+                      onClick={() => setGender(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="field-group">
-                <label htmlFor="profile-birth-date" className="field-label">出生日期</label>
-                <input
-                  id="profile-birth-date"
-                  name="birth-date"
-                  type="date"
-                  className="field-input"
-                  value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                />
+                <span className="field-label">出生日期</span>
+                <AccountDatePicker value={birthDate} onChange={setBirthDate} />
               </div>
 
               {/* Email */}

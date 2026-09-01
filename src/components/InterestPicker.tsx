@@ -83,7 +83,7 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
   if (!user) return null;
 
   return (
-    <section className={`${styles.card} ${pickerMode === "settings" ? styles.settingsCard : ""}`} aria-label="兴趣设置">
+    <section className={styles.card} aria-label="兴趣设置">
       <div className={styles.heading}>
         <div>
           <span className={styles.eyebrow}>INKLAND DISCOVERY</span>
@@ -94,11 +94,6 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
               : "选择你感兴趣的内容，可以多选；之后也能在设置里修改。"}
           </p>
         </div>
-      </div>
-
-      <div className={styles.question}>
-        <h2>选择你的兴趣</h2>
-        <p>可以选择多个兴趣，也可以暂时跳过。</p>
       </div>
 
       <div className={styles.options} role="group" aria-label="选择你的兴趣">

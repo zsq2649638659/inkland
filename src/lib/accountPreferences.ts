@@ -1,9 +1,11 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { CopyrightLicense } from "@/lib/copyrightPolicy";
+
+export type { CopyrightLicense } from "@/lib/copyrightPolicy";
 
 export const ACCOUNT_PREFERENCES_KEY = "inkland_account_preferences";
 
 export type Gender = "male" | "female" | "private";
-export type CopyrightLicense = "all-rights-reserved" | "cc-by-nc-nd" | "cc-by-nc-sa" | "cc-by-nc" | "cc-by-nd" | "cc-by-sa" | "cc-by";
 
 export interface AccountPreferences {
   gender: Gender;
@@ -24,7 +26,7 @@ function isGender(value: unknown): value is Gender {
 }
 
 function isCopyrightLicense(value: unknown): value is CopyrightLicense {
-  return value === "all-rights-reserved" || value === "cc-by-nc-nd" || value === "cc-by-nc-sa" || value === "cc-by-nc" || value === "cc-by-nd" || value === "cc-by-sa" || value === "cc-by";
+  return value === "all-rights-reserved" || value === "inkland-reading" || value === "attribution-repost" || value === "attribution-adaptation";
 }
 
 export function readAccountPreferences(user: User | null): AccountPreferences {
