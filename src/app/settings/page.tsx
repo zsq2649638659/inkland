@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
@@ -12,12 +12,15 @@ import AccountSettingsPanel from "@/components/AccountSettingsPanel";
 
 type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
 
+function parseSettingsTab(value: string | null): SettingsTab | null {
+  return value === "account" || value === "profile" || value === "password" || value === "blocked" || value === "notifications" || value === "about" || value === "contact"
+    ? value
+    : null;
+}
+
 function initialSettingsTab(): SettingsTab {
   if (typeof window === "undefined") return "account";
-  const requested = new URLSearchParams(window.location.search).get("tab");
-  return requested === "profile" || requested === "password" || requested === "blocked" || requested === "notifications" || requested === "about" || requested === "contact"
-    ? requested
-    : "account";
+  return parseSettingsTab(new URLSearchParams(window.location.search).get("tab")) || "account";
 }
 
 const siteContactEmail = "inkland@163.com";
@@ -28,6 +31,7 @@ type BlockedProfileRow = { id: string; nickname: string | null; bio: string | nu
 export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialSettingsTab);
   const [feedbackText, setFeedbackText] = useState("");
@@ -46,6 +50,12 @@ export default function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
+
+  useEffect(() => {
+    const requested = parseSettingsTab(searchParams.get("tab"));
+    if (!requested) return;
+    void Promise.resolve().then(() => setActiveTab(requested));
+  }, [searchParams]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
