@@ -9621,7 +9621,8 @@ p {
 #page-profile-edit .inline-edit-btn { display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:500;color:var(--color-primary);padding:4px 10px;border-radius:var(--radius-sm);transition:background .2s ease;border:none;background:transparent;cursor:pointer;font-family:var(--font-family) }
 #page-profile-edit .inline-edit-btn:hover { background:var(--color-primary-bg) }
 #page-profile-edit .inline-edit-row { margin-top:var(--spacing-sm) }
-#page-profile-edit .form-actions { display:flex;justify-content:flex-end;gap:var(--spacing-md);padding-top:var(--spacing-lg);border-top:0 }
+#page-profile-edit .form-actions { display:flex;align-items:center;justify-content:space-between;gap:var(--spacing-lg);padding-top:var(--spacing-lg);border-top:0 }
+#page-profile-edit .form-action-buttons { display:flex;align-items:center;justify-content:flex-end;gap:var(--spacing-md);margin-left:auto; }
 
 /* ===== V2 publish series page ===== */
 .publish-series-page {
@@ -9891,29 +9892,18 @@ p {
 #page-profile-edit .avatar-overlay i { color:#fff;font-size:20px }
 #page-profile-edit .avatar-hint { font-size:13px;color:var(--color-text-muted);margin-top:var(--spacing-sm) }
 
-/* Success toast — refined confirmation card */
+/* Success status */
 #page-profile-edit .success-toast {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #FDF5F2 0%, #FEF9F7 100%);
-  border: 1px solid rgba(242,107,91,0.15);
-  border-left: 3px solid var(--color-primary);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  box-shadow: 0 2px 12px rgba(242,107,91,0.06), 0 1px 3px rgba(0,0,0,0.03);
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:0;
+  margin:0;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
   animation: toastSlideIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
-  position: relative;
-  overflow: hidden;
-}
-#page-profile-edit .success-toast::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: radial-gradient(ellipse at 0% 50%, rgba(242,107,91,0.04) 0%, transparent 70%);
-  pointer-events: none;
 }
 #page-profile-edit .success-toast-icon {
   display: flex;
@@ -9967,8 +9957,6 @@ p {
 [data-theme="dark"] #page-profile-edit .avatar-preview { background:#2A2A2A }
 [data-theme="dark"] #page-profile-edit .page-title { color:#E8E8E8 }
 [data-theme="dark"] #page-profile-edit .field-label { color:#E8E8E8 }
-[data-theme="dark"] #page-profile-edit .success-toast { background:linear-gradient(135deg, rgba(242,107,91,0.08), rgba(242,107,91,0.03));border-color:rgba(242,107,91,0.25);box-shadow:0 2px 12px rgba(242,107,91,0.04) }
-[data-theme="dark"] #page-profile-edit .success-toast::after { background:radial-gradient(ellipse at 0% 50%, rgba(242,107,91,0.06) 0%, transparent 70%) }
 [data-theme="dark"] #page-profile-edit .success-toast-text { color:#F5A09A }
 
 /* Profile edit page responsive */
@@ -9976,7 +9964,8 @@ p {
   #page-profile-edit .main-container { padding:16px var(--spacing-md) 40px }
   #page-profile-edit .form-card { padding:var(--spacing-md) }
   #page-profile-edit .profile-personal-fields { grid-template-columns:1fr;gap:0; }
-  #page-profile-edit .form-actions { flex-direction:column-reverse }
+  #page-profile-edit .form-actions { flex-direction:column;align-items:stretch;gap:12px }
+  #page-profile-edit .form-action-buttons { width:100%;flex-direction:column-reverse;gap:10px;margin-left:0 }
   #page-profile-edit .btn-save,#page-profile-edit .btn-cancel { width:100%;justify-content:center }
   #page-profile-edit .page-title { font-size:20px }
 }

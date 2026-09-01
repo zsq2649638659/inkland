@@ -154,12 +154,12 @@ export default function ProfileEditForm() {
         const { error: revisionError } = await supabase.rpc("profile_revision_submit", { p_fields: submitted });
         if (!revisionError) {
           setRevisionStatus("submitted");
-          setSuccess(personalError ? "头像、昵称和简介已保存，但性别或出生日期保存失败，请稍后重试。" : "保存成功！资料整改内容已提交审核。");
+          if (!personalError) setSuccess("保存成功");
         } else {
-          setSuccess(personalError ? "头像、昵称和简介已保存，但个人信息保存失败，请稍后重试。" : "保存成功！资料整改状态更新失败，请稍后重试。");
+          if (!personalError) setError("资料整改状态更新失败，请稍后重试。");
         }
       } else {
-        setSuccess(personalError ? "头像、昵称和简介已保存，但性别或出生日期保存失败，请稍后重试。" : "保存成功！");
+        if (!personalError) setSuccess("保存成功");
       }
       if (personalError) setError("性别或出生日期暂未保存成功，请稍后重试。");
       setNicknameEditOpen(false);
@@ -335,27 +335,28 @@ export default function ProfileEditForm() {
                   <i className="fa-solid fa-circle-exclamation" style={{ marginRight: "4px" }}></i>{error}
                 </span>
               )}
-              {success && (
-                <div className="success-toast">
-                  <span className="success-toast-icon">
-                    <i className="fa-solid fa-circle-check"></i>
-                  </span>
-                  <span className="success-toast-text">{success}</span>
-                </div>
-              )}
-
               {/* Actions */}
               <div className="form-actions">
-                <button type="button" className="btn-cancel" onClick={handleCancel}>
-                  取消
-                </button>
-                <button type="submit" className="btn-save" disabled={saving}>
-                  {saving ? (
-                    <><i className="fa-solid fa-spinner" style={{ animation: "spin 1s linear infinite" }}></i>保存中...</>
-                  ) : (
-                    <><i className="fa-solid fa-check" aria-hidden="true"></i> 保存</>
-                  )}
-                </button>
+                {success && (
+                  <div className="success-toast" role="status">
+                    <span className="success-toast-icon" aria-hidden="true">
+                      <i className="fa-solid fa-circle-check"></i>
+                    </span>
+                    <span className="success-toast-text">保存成功</span>
+                  </div>
+                )}
+                <div className="form-action-buttons">
+                  <button type="button" className="btn-cancel" onClick={handleCancel}>
+                    取消
+                  </button>
+                  <button type="submit" className="btn-save" disabled={saving}>
+                    {saving ? (
+                      <><i className="fa-solid fa-spinner" style={{ animation: "spin 1s linear infinite" }}></i>保存中...</>
+                    ) : (
+                      <><i className="fa-solid fa-check" aria-hidden="true"></i> 保存</>
+                    )}
+                  </button>
+                </div>
               </div>
     </form>
   );
