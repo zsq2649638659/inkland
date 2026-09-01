@@ -3,7 +3,7 @@ import { cleanImportHeading, extractImportPreamble } from "@/lib/importChapterDe
 export interface TextImportMetadata {
   title: string;
   descriptionCandidate: string;
-  descriptionSource?: "文档开头导语";
+  descriptionSource?: "文档开头导语" | "文档元数据";
 }
 
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -20,12 +20,28 @@ function normalizeMetadataText(value: string) {
 }
 
 export function normalizeImportedTitle(value: string, fallback = "未命名作品") {
-  const normalized = cleanImportHeading(value).replace(/\s+/g, " ").trim();
+  const normalized = cleanImportHeading(value)
+    .replace(/^(?:书名|作品名|作品标题|标题|title)\s*[:：]\s*/i, "")
+    .replace(/^《(.+)》$/, "$1")
+    .replace(/^[「『“](.+)[」』”]$/, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
   return normalized || fallback;
 }
 
 function looksLikeTitle(value: string) {
-  return value.length > 0 && value.length <= 80 && !/[。！？.!?；;]/.test(value);
+  return value.length > 0
+    && value.length <= 80
+    && !/^(?:简介|内容简介|作品简介|description)\s*[:：]/i.test(value)
+    && !/[。！？.!?；;]/.test(value);
+}
+
+function stripDescriptionLabel(value: string) {
+  return value.replace(/^(?:简介|内容简介|作品简介|description)\s*[:：]\s*/i, "").trim();
+}
+
+export function normalizeImportedDescription(value: string) {
+  return clampDescription(value);
 }
 
 function clampDescription(value: string) {
@@ -40,10 +56,12 @@ export function extractTextImportMetadata(content: string, fallbackTitle: string
   if (!preamble) return { title: normalizeImportedTitle(fallbackTitle), descriptionCandidate: "" };
 
   const lines = normalizeMetadataText(preamble).split("\n").filter(Boolean);
-  const firstLine = normalizeImportedTitle(lines[0] || "");
-  const hasTitleLine = looksLikeTitle(firstLine);
+  const rawFirstLine = lines[0] || "";
+  const labeledTitle = rawFirstLine.match(/^(?:书名|作品名|作品标题|标题|title)\s*[:：]\s*(.+)$/i)?.[1] || "";
+  const firstLine = normalizeImportedTitle(labeledTitle || rawFirstLine, "");
+  const hasTitleLine = Boolean(labeledTitle) || looksLikeTitle(firstLine);
   const title = hasTitleLine ? firstLine : normalizeImportedTitle(fallbackTitle);
-  const description = clampDescription((hasTitleLine ? lines.slice(1) : lines).join("\n"));
+  const description = clampDescription((hasTitleLine ? lines.slice(1) : lines).map(stripDescriptionLabel).filter(Boolean).join("\n"));
   return {
     title,
     descriptionCandidate: description,

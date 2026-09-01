@@ -11,7 +11,7 @@ import { assertCanPublish } from "@/lib/userRestrictions";
 import { cleanImportHeading, extractImportPreamble, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
 import { clearImportBatch, loadImportBatch, saveImportBatch, type ImportBatchSnapshot } from "@/lib/importBatchStore";
 import { findImportDuplicate, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
-import { extractTextImportMetadata, normalizeImportedTitle } from "@/lib/importMetadata";
+import { extractTextImportMetadata, normalizeImportedDescription, normalizeImportedTitle } from "@/lib/importMetadata";
 import { addTags, MAX_TAGS_PER_WORK, splitTags } from "@/lib/tagRules";
 import styles from "./import.module.css";
 
@@ -78,6 +78,7 @@ interface TextImportPlan {
   descriptionCandidate: string;
   descriptionCandidateSource?: string;
   descriptionCandidateAccepted?: boolean;
+  warning?: string;
 }
 
 function getTextPlanIdentity(plan: Pick<TextImportPlan, "sourceType" | "content">) {
@@ -153,6 +154,23 @@ function removeImportedPreamble(content: string, preamble: string) {
   return normalizedPreamble && normalizedContent.startsWith(prefix)
     ? normalizeContent(normalizedContent.slice(prefix.length))
     : normalizedContent;
+}
+
+function extractHtmlDocumentTitle(raw: string) {
+  if (typeof DOMParser === "undefined") return "";
+  const documentNode = new DOMParser().parseFromString(raw, "text/html");
+  return documentNode.querySelector("h1")?.textContent?.trim()
+    || documentNode.querySelector("title")?.textContent?.trim()
+    || "";
+}
+
+function removeLeadingMarkdownHeading(content: string, title: string) {
+  const lines = content.split("\n");
+  const firstContentLine = lines.findIndex((line) => line.trim());
+  if (firstContentLine < 0) return "";
+  const heading = lines[firstContentLine].match(/^#{1,6}\s+(.+)$/)?.[1]?.trim();
+  if (!heading || normalizeImportedTitle(heading, "") !== normalizeImportedTitle(title, "")) return normalizeContent(content);
+  return normalizeContent(lines.slice(firstContentLine + 1).join("\n"));
 }
 
 const TEXT_ENCODINGS = ["utf-8", "gb18030", "big5", "utf-16le", "utf-16be"] as const;
@@ -357,7 +375,48 @@ function resolveZipPath(baseFile: string, href: string) {
   return normalized.join("/");
 }
 
-async function parseEpub(file: File): Promise<ParsedWork[]> {
+function createTextImportPlan(input: {
+  fileName: string;
+  sourceType: string;
+  sourceUrl?: string;
+  bytes?: ArrayBuffer;
+  canChangeEncoding: boolean;
+  encoding: string;
+  detectedEncoding: string;
+  content: string;
+  fallbackTitle: string;
+  titleOverride?: string;
+  chapters?: ImportChapter[];
+  warning?: string;
+  descriptionCandidateOverride?: string;
+  descriptionCandidateSourceOverride?: string;
+}): TextImportPlan {
+  const content = normalizeContent(input.content);
+  const chapters = input.chapters || splitImportChapters(content);
+  const metadata = extractTextImportMetadata(content, input.fallbackTitle);
+  const descriptionCandidate = input.descriptionCandidateOverride ?? metadata.descriptionCandidate;
+  return {
+    id: crypto.randomUUID(),
+    fileName: input.fileName,
+    sourceType: input.sourceType,
+    sourceUrl: input.sourceUrl,
+    bytes: input.bytes,
+    canChangeEncoding: input.canChangeEncoding,
+    encoding: input.encoding,
+    detectedEncoding: input.detectedEncoding,
+    content,
+    chapters,
+    mode: chapters.length >= 2 ? "serial" : "single",
+    groupName: normalizeImportedTitle(input.titleOverride || metadata.title || input.fallbackTitle),
+    groupDescription: "",
+    groupTags: [],
+    descriptionCandidate,
+    descriptionCandidateSource: input.descriptionCandidateSourceOverride || (descriptionCandidate ? metadata.descriptionSource : undefined),
+    warning: input.warning,
+  };
+}
+
+async function parseEpub(file: File): Promise<ParsedFileResult> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const containerFile = zip.file("META-INF/container.xml");
   if (!containerFile) throw new Error(`${file.name} 不是有效的 EPUB 文件`);
@@ -367,7 +426,9 @@ async function parseEpub(file: File): Promise<ParsedWork[]> {
   const opfFile = zip.file(opfPath);
   if (!opfFile) throw new Error(`${file.name} 的 EPUB 内容目录无法读取`);
   const opf = new DOMParser().parseFromString(await opfFile.async("string"), "application/xml");
-  const bookTitle = opf.querySelector("metadata title")?.textContent?.trim() || titleFromFileName(file.name);
+  const xmlText = (localName: string) => Array.from(opf.getElementsByTagName("*")).find((element) => element.localName === localName)?.textContent?.trim() || "";
+  const bookTitle = normalizeImportedTitle(xmlText("title") || titleFromFileName(file.name), titleFromFileName(file.name));
+  const description = normalizeImportedDescription(xmlText("description"));
   const manifest = new Map<string, string>();
   opf.querySelectorAll("manifest item").forEach((item) => {
     const id = item.getAttribute("id");
@@ -378,7 +439,7 @@ async function parseEpub(file: File): Promise<ParsedWork[]> {
   const chapterPaths = Array.from(opf.querySelectorAll("spine itemref"))
     .map((item) => manifest.get(item.getAttribute("idref") || ""))
     .filter((value): value is string => Boolean(value));
-  const chapters: ParsedWork[] = [];
+  const chapters: ImportChapter[] = [];
   for (const [index, path] of chapterPaths.entries()) {
     const chapterFile = zip.file(path);
     if (!chapterFile) continue;
@@ -386,23 +447,39 @@ async function parseEpub(file: File): Promise<ParsedWork[]> {
     const documentNode = new DOMParser().parseFromString(html, "text/html");
     const heading = documentNode.querySelector("h1,h2,h3")?.textContent?.trim();
     const pageTitle = documentNode.querySelector("title")?.textContent?.trim();
-    const title = heading || pageTitle || (chapterPaths.length === 1 ? bookTitle : `${bookTitle} · 第${index + 1}章`);
-    const content = htmlToMarkdown(html);
+    const title = normalizeImportedTitle(heading || pageTitle || (chapterPaths.length === 1 ? bookTitle : `${bookTitle} · 第${index + 1}章`));
+    const content = removeLeadingMarkdownHeading(htmlToMarkdown(html), title);
     if (!content) continue;
-    chapters.push(await makeParsedWork({
-      title,
-      content,
-      sourceName: `${file.name} · ${title}`,
-      sourceType: "epub",
-      warning: "EPUB 已按阅读顺序拆分；图片、脚注跳转和复杂样式不会导入，请检查正文。",
-    }));
+    chapters.push({ title, content });
   }
   if (chapters.length === 0) throw new Error(`${file.name} 没有识别到可导入的章节`);
-  return chapters;
+  const chapterContent = chapters.map((chapter) => `${chapter.title}\n\n${chapter.content}`).join("\n\n");
+  const plan = createTextImportPlan({
+    fileName: file.name,
+    sourceType: "epub",
+    canChangeEncoding: false,
+    encoding: "utf-8",
+    detectedEncoding: "utf-8",
+    content: [bookTitle, description, chapterContent].filter(Boolean).join("\n\n"),
+    fallbackTitle: bookTitle,
+    chapters,
+    warning: "EPUB 已按阅读顺序拆分；图片、脚注跳转和复杂样式不会导入，请检查正文。",
+    descriptionCandidateOverride: description || undefined,
+    descriptionCandidateSourceOverride: description ? "文档元数据" : undefined,
+  });
+  return { works: await buildTextWorks(plan), textPlan: plan };
 }
 
 async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
-  const sourceLabel = plan.canChangeEncoding ? "TXT" : "在线文档";
+  const sourceLabel = plan.canChangeEncoding
+    ? "TXT"
+    : plan.sourceType === "epub"
+      ? "EPUB"
+      : plan.sourceType === "docx"
+        ? "Word"
+        : plan.sourceType === "html" || plan.sourceType === "htm"
+          ? "HTML"
+          : "在线文档";
   const common = {
     sourceType: plan.sourceType,
     sourceUrl: plan.sourceUrl,
@@ -413,6 +490,7 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
     groupTags: plan.groupTags,
     descriptionCandidate: plan.descriptionCandidate,
     descriptionCandidateSource: plan.descriptionCandidateSource,
+    warning: plan.warning,
   };
   if (plan.mode === "single" || plan.chapters.length < 2) {
     return [await makeParsedWork({
@@ -445,10 +523,7 @@ async function parseTextFile(file: File): Promise<ParsedFileResult> {
   const bytes = await file.arrayBuffer();
   const detectedEncoding = detectTextEncoding(bytes);
   const content = normalizeContent(decodeText(bytes, detectedEncoding));
-  const chapters = splitImportChapters(content);
-  const metadata = extractTextImportMetadata(content, titleFromFileName(file.name));
-  const plan: TextImportPlan = {
-    id: crypto.randomUUID(),
+  const plan = createTextImportPlan({
     fileName: file.name,
     sourceType: getExtension(file.name),
     bytes,
@@ -456,42 +531,61 @@ async function parseTextFile(file: File): Promise<ParsedFileResult> {
     encoding: detectedEncoding,
     detectedEncoding,
     content,
-    chapters,
-    mode: chapters.length >= 2 ? "serial" : "single",
-    groupName: metadata.title,
-    groupDescription: "",
-    groupTags: [],
-    descriptionCandidate: metadata.descriptionCandidate,
-    descriptionCandidateSource: metadata.descriptionSource,
-  };
+    fallbackTitle: titleFromFileName(file.name),
+  });
   return { works: await buildTextWorks(plan), textPlan: plan };
+}
+
+async function extractDocxTitle(bytes: ArrayBuffer) {
+  try {
+    const zip = await JSZip.loadAsync(bytes);
+    const coreFile = zip.file("docProps/core.xml");
+    if (!coreFile) return "";
+    const documentNode = new DOMParser().parseFromString(await coreFile.async("string"), "application/xml");
+    const title = Array.from(documentNode.getElementsByTagName("*")).find((element) => element.localName === "title")?.textContent?.trim() || "";
+    return normalizeImportedTitle(title, "");
+  } catch {
+    return "";
+  }
 }
 
 async function parseFile(file: File): Promise<ParsedFileResult> {
   const extension = getExtension(file.name);
-  let content = "";
-  let warning: string | undefined;
-
   if (["txt", "text", "md", "markdown"].includes(extension)) return parseTextFile(file);
-  if (extension === "epub") return { works: await parseEpub(file) };
+  if (extension === "epub") return parseEpub(file);
+
+  let content = "";
+  let fallbackTitle = titleFromFileName(file.name);
+  let warning: string | undefined;
+  let bytes: ArrayBuffer | undefined;
+
   if (extension === "docx") {
-    const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    bytes = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: bytes });
     content = result.value;
-    warning = "Word 仅提取正文；复杂排版、批注、修订历史、文档元数据和图片不会导入。";
+    fallbackTitle = await extractDocxTitle(bytes) || fallbackTitle;
+    warning = "Word 仅提取正文；复杂排版、批注、修订历史和图片不会导入。";
   } else {
     const raw = await file.text();
-    if (extension === "html" || extension === "htm") content = htmlToMarkdown(raw);
-    else content = normalizeContent(raw);
+    if (extension === "html" || extension === "htm") {
+      fallbackTitle = extractHtmlDocumentTitle(raw) || fallbackTitle;
+      content = htmlToMarkdown(raw);
+    } else content = normalizeContent(raw);
   }
 
-  const title = titleFromFileName(file.name);
-  return { works: [await makeParsedWork({
-    title,
-    content,
-    sourceName: file.name,
+  const plan = createTextImportPlan({
+    fileName: file.name,
     sourceType: extension,
+    bytes,
+    canChangeEncoding: false,
+    encoding: "utf-8",
+    detectedEncoding: "utf-8",
+    content,
+    fallbackTitle,
+    titleOverride: fallbackTitle,
     warning,
-  })] };
+  });
+  return { works: await buildTextWorks(plan), textPlan: plan };
 }
 
 function TagEditor({ tags = [], onChange, disabled = false, showHint = true, placeholder = "多个标签可用逗号或空格隔开" }: { tags?: string[]; onChange: (tags: string[]) => void; disabled?: boolean; showHint?: boolean; placeholder?: string }) {
@@ -1070,9 +1164,7 @@ export default function ImportWorkspace() {
         return;
       }
       const chapters = splitImportChapters(content);
-      const metadata = extractTextImportMetadata(content, normalizedTitle);
-      const plan: TextImportPlan = {
-        id: crypto.randomUUID(),
+      const plan = createTextImportPlan({
         fileName: normalizedTitle,
         sourceType: payload.sourceType || provider,
         sourceUrl,
@@ -1080,14 +1172,10 @@ export default function ImportWorkspace() {
         encoding: "utf-8",
         detectedEncoding: "utf-8",
         content,
+        fallbackTitle: normalizedTitle,
+        titleOverride: normalizedTitle,
         chapters,
-        mode: chapters.length >= 2 ? "serial" : "single",
-        groupName: metadata.title,
-        groupDescription: "",
-        groupTags: [],
-        descriptionCandidate: metadata.descriptionCandidate,
-        descriptionCandidateSource: metadata.descriptionSource,
-      };
+      });
       const works = await buildTextWorks(plan);
       await addParsedWorks(works, [plan]);
     } catch (readError) {
@@ -1449,6 +1537,10 @@ export default function ImportWorkspace() {
     .map((plan) => `已按章节拆分，并保留“${plan.groupName.trim() || titleFromFileName(plan.fileName)}”分组关系。`)
     .filter((summary, index, summaries) => summaries.indexOf(summary) === index)
     .join(" ");
+  const importResultSummary = [
+    splitSummary,
+    duplicateSkippedCount > 0 ? `将跳过 ${duplicateSkippedCount} 篇重复内容${duplicateUpdateCount > 0 ? `；更新 ${duplicateUpdateCount} 个已有章节` : ""}。` : "",
+  ].filter(Boolean).join(" ");
   const importQueueEntries = Array.from(parsedWorks.reduce((groups, work) => {
     const key = work.sourceBatchId || work.id;
     const current = groups.get(key);
@@ -1596,7 +1688,7 @@ export default function ImportWorkspace() {
               </div>}
 
               {currentStep === 4 && <div className={styles.previewSection}>
-                <div className={styles.sectionHeader}><div><h2>确认发布</h2><p>本批次共 {selectedParsedCount} 篇内容，请选择最终处理方式。</p>{duplicateSkippedCount > 0 && <p className={styles.duplicateSummary}>将跳过 {duplicateSkippedCount} 篇重复内容{duplicateUpdateCount > 0 ? `；更新 ${duplicateUpdateCount} 个已有章节` : ""}。</p>}</div></div>
+                <div className={styles.sectionHeader}><div><h2>确认发布</h2><p>本批次共 {selectedParsedCount} 篇内容，请选择最终处理方式。</p>{importResultSummary && <p className={styles.importResultSummary}>{importResultSummary}</p>}</div></div>
                 <ul className={styles.publishSummary}>{parsedWorks.filter((work) => work.selected).map((work) => <li key={work.id}><strong>{work.title}</strong><span>{work.groupMode === "serial" ? `${work.groupName} · ${(work.groupTags || []).map((tag) => `#${tag}`).join(" ")}` : bulkTags.map((tag) => `#${tag}`).join(" ")}</span></li>)}</ul>
                 <section className={styles.publishPanel} aria-label="确认发布">
                   <fieldset className={`${styles.publishModes} collection-options`}>
