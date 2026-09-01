@@ -29,16 +29,23 @@ const fallbackActivity: AccountActivity = {
   bookmarks: 0,
 };
 
-const experiencePerLevel = 100;
+const levelBands = [
+  { number: 1, start: 0, end: 100 },
+  { number: 2, start: 100, end: 2000 },
+  { number: 3, start: 2000, end: 5000 },
+  { number: 4, start: 5000, end: 10000 },
+  { number: 5, start: 10000, end: 18000 },
+  { number: 6, start: 18000, end: 28800 },
+] as const;
 
 function deriveExperience(activity: AccountActivity) {
   // 目前数据库还没有经验流水表，先按现有可核实记录折算历史经验：
   // 发布作品按现行规则计 20 经验；收藏/关注任务按完成过一次计 5 经验；当前登录计 5 经验。
   const activityExperience = activity.publishedWorks * 20 + (activity.following + activity.bookmarks > 0 ? 5 : 0);
   const total = Math.max(5, activityExperience + 5);
-  const number = Math.floor(total / experiencePerLevel) + 1;
-  const current = total % experiencePerLevel;
-  return { total, current, next: experiencePerLevel, number };
+  const band = levelBands.find(({ end }) => total < end) || levelBands[levelBands.length - 1];
+  const current = Math.min(Math.max(0, total - band.start), band.end - band.start);
+  return { total, current, next: band.end - band.start, number: band.number, start: band.start, end: band.end };
 }
 
 const experienceRules = [
@@ -203,7 +210,6 @@ export default function AccountSettingsPanel() {
                     <small>不可转赠、出售或兑换现金</small>
                   </div>
                 </div>
-                <strong className="account-settings-level-label">LV.{experience.number}</strong>
                 <div
                   className="account-settings-level-progress"
                   role="progressbar"
@@ -214,8 +220,10 @@ export default function AccountSettingsPanel() {
                   aria-valuenow={experience.current}
                 >
                   <span style={{ width: `${levelProgress}%` }} />
+                  <strong>LV.{experience.number}</strong>
                   <div className="account-settings-tooltip account-settings-experience-tooltip" role="tooltip">
                     <strong>经验值获取方式</strong>
+                    <p className="account-settings-experience-summary">累计经验 {experience.total} · 本级进度 {experience.current}/{experience.next}</p>
                     <ul>
                       {experienceRules.map(([label, value]) => <li key={label}><span>{label}</span><b>{value}</b></li>)}
                     </ul>
@@ -224,9 +232,6 @@ export default function AccountSettingsPanel() {
                 <span className="account-settings-experience-value">{experience.current}/{experience.next}</span>
               </div>
             </div>
-          </div>
-          <div className="account-settings-profile-actions">
-            <Link className="settings-btn-secondary" href="/settings?tab=profile">编辑资料</Link>
           </div>
         </div>
         <div className="account-settings-profile-fields">
