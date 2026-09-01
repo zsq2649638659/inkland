@@ -10240,7 +10240,10 @@ p {
   .account-settings-profile { width:100%; }
   .account-settings-experience-tooltip { left:auto;right:0;width:min(248px,calc(100vw - 32px)); }
   .account-settings-experience-tooltip::before { left:auto;right:18px; }
-  .account-settings-coin-tooltip { left:0;right:auto;width:min(260px,calc(100vw - 32px)); }
+  .account-settings-coin-tooltip { left:50%;right:auto;width:min(260px,calc(100vw - 32px));transform:translate(-50%,-3px); }
+  .account-settings-coin:hover .account-settings-coin-tooltip,
+  .account-settings-coin:focus-within .account-settings-coin-tooltip,
+  .account-settings-coin-tooltip.open { transform:translate(-50%,0); }
   .account-settings-list { grid-template-columns:1fr; }
   .account-settings-profile-fields { margin-top:0; }
   .account-settings-row { grid-template-columns:1fr;gap:3px;padding:12px 0; }
