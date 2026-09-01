@@ -7796,6 +7796,10 @@ p {
     overflow-y: auto;
     padding: 24px 20px;
   }
+  #page-search .search-filter-modal .search-refine-options {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
   #page-search .search-filter-modal-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
