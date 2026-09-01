@@ -85,8 +85,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const hydrateSession = async (session: Session | null, version: number) => {
       if (!active || version !== authStateVersion) return;
       const u = session?.user || null;
-      // 如果同一个人（相同 user ID），不更新 user 对象引用，避免触发下游 useEffect
+      // 如果同一个人（相同 user ID），只同步最新对象，不重复拉取 profile。
       if (u && userIdRef.current === u.id) {
+        // USER_UPDATED 会携带最新的用户元数据（例如性别、出生日期、兴趣偏好）。
+        // 保留同一账号的会话状态，同时同步这份新对象，避免设置页继续显示旧值。
+        setUser(u);
         if (active) setLoading(false);
         return;
       }

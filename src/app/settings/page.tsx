@@ -8,9 +8,17 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ProfileEditForm from "@/components/ProfileEditForm";
-import InterestPicker from "@/components/InterestPicker";
+import AccountSettingsPanel from "@/components/AccountSettingsPanel";
 
-type SettingsTab = "profile" | "interests" | "password" | "blocked" | "notifications" | "about" | "contact";
+type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+
+function initialSettingsTab(): SettingsTab {
+  if (typeof window === "undefined") return "account";
+  const requested = new URLSearchParams(window.location.search).get("tab");
+  return requested === "profile" || requested === "password" || requested === "blocked" || requested === "notifications" || requested === "about" || requested === "contact"
+    ? requested
+    : "account";
+}
 
 const siteContactEmail = "inkland@163.com";
 
@@ -21,7 +29,7 @@ export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialSettingsTab);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
@@ -52,7 +60,9 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!user || activeTab !== "blocked") return;
     let active = true;
-    setBlockedLoading(true);
+    void Promise.resolve().then(() => {
+      if (active) setBlockedLoading(true);
+    });
     void (async () => {
       const { data: blocked } = await supabase
         .from("blocked_users")
@@ -83,8 +93,8 @@ export default function SettingsPage() {
   }, [activeTab, supabase, user]);
 
   const tabs: { key: SettingsTab; label: string }[] = [
+    { key: "account", label: "账号设置" },
     { key: "profile", label: "编辑资料" },
-    { key: "interests", label: "兴趣偏好" },
     { key: "password", label: "修改密码" },
     { key: "blocked", label: "屏蔽管理" },
     { key: "notifications", label: "通知设置" },
@@ -216,6 +226,11 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* ---- Panel: 账号设置 ---- */}
+          <div style={{ display: activeTab === "account" ? "block" : "none" }}>
+            <AccountSettingsPanel />
+          </div>
+
           {/* ---- Panel: 编辑资料 ---- */}
           <section className="settings-panel" style={{ display: activeTab === "profile" ? "block" : "none" }}>
             <h2 className="settings-panel-title">编辑资料</h2>
@@ -223,11 +238,6 @@ export default function SettingsPage() {
             <div id="page-profile-edit" className="profile-edit-content">
               <ProfileEditForm />
             </div>
-          </section>
-
-          {/* ---- Panel: 兴趣偏好 ---- */}
-          <section className="settings-panel" style={{ display: activeTab === "interests" ? "block" : "none" }}>
-            <InterestPicker mode="settings" />
           </section>
 
           {/* ---- Panel: 修改密码 ---- */}

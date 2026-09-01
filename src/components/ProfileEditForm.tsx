@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { compressImage } from "@/lib/image";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { assertCanProfileEdit } from "@/lib/userRestrictions";
+import { readAccountPreferences, saveAccountPreferences } from "@/lib/accountPreferences";
 
 export default function ProfileEditForm() {
   const supabase = createClient();
@@ -17,6 +18,8 @@ export default function ProfileEditForm() {
   const [nickname, setNickname] = useState(profile?.nickname || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
+  const [gender, setGender] = useState(readAccountPreferences(user).gender);
+  const [birthDate, setBirthDate] = useState(readAccountPreferences(user).birth_date || "");
   const baselineRef = useRef({ nickname: profile?.nickname || "", bio: profile?.bio || null, avatar_url: profile?.avatar_url || null });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,6 +38,9 @@ export default function ProfileEditForm() {
     setNickname(profile.nickname || "");
     setBio(profile.bio || "");
     setAvatarUrl(profile.avatar_url || "");
+    const accountPreferences = readAccountPreferences(user);
+    setGender(accountPreferences.gender);
+    setBirthDate(accountPreferences.birth_date || "");
     setEmailValue(user.email || "");
     baselineRef.current = { nickname: profile.nickname || "", bio: profile.bio || null, avatar_url: profile.avatar_url || null };
   }, [profile, user]);
@@ -131,17 +137,24 @@ export default function ProfileEditForm() {
       if ((bio.trim() || null) !== previousBaseline.bio) submitted.push("bio");
       if ((avatarUrl || null) !== previousBaseline.avatar_url) submitted.push("avatar");
       baselineRef.current = { nickname: nickname.trim(), bio: bio.trim() || null, avatar_url: avatarUrl || null };
+      const currentAccountPreferences = readAccountPreferences(user);
+      const { error: personalError } = await saveAccountPreferences(supabase, {
+        gender,
+        birth_date: birthDate || null,
+        copyright_license: currentAccountPreferences.copyright_license,
+      });
       if (revisionStatus === "requested" && submitted.length > 0) {
         const { error: revisionError } = await supabase.rpc("profile_revision_submit", { p_fields: submitted });
         if (!revisionError) {
           setRevisionStatus("submitted");
-          setSuccess("保存成功！资料整改内容已提交审核。");
+          setSuccess(personalError ? "头像、昵称和简介已保存，但性别或出生日期保存失败，请稍后重试。" : "保存成功！资料整改内容已提交审核。");
         } else {
-          setSuccess("保存成功！资料整改状态更新失败，请稍后重试。");
+          setSuccess(personalError ? "头像、昵称和简介已保存，但个人信息保存失败，请稍后重试。" : "保存成功！资料整改状态更新失败，请稍后重试。");
         }
       } else {
-        setSuccess("保存成功！");
+        setSuccess(personalError ? "头像、昵称和简介已保存，但性别或出生日期保存失败，请稍后重试。" : "保存成功！");
       }
+      if (personalError) setError("性别或出生日期暂未保存成功，请稍后重试。");
       setNicknameEditOpen(false);
       setEmailEditOpen(false);
       setTimeout(() => setSuccess(""), 2500);
@@ -153,6 +166,9 @@ export default function ProfileEditForm() {
     setNickname(profile?.nickname || "");
     setBio(profile?.bio || "");
     setAvatarUrl(profile?.avatar_url || "");
+    const accountPreferences = readAccountPreferences(user);
+    setGender(accountPreferences.gender);
+    setBirthDate(accountPreferences.birth_date || "");
     setEmailValue(user?.email || "");
     baselineRef.current = { nickname: profile?.nickname || "", bio: profile?.bio || null, avatar_url: profile?.avatar_url || null };
     setNicknameEditOpen(false);
@@ -247,6 +263,34 @@ export default function ProfileEditForm() {
                   {bio.length} / 200
                 </div>
                 <span className="field-error" role="alert">简介不能超过 200 个字符</span>
+              </div>
+
+              {/* Personal details */}
+              <div className="field-group">
+                <label htmlFor="profile-gender" className="field-label">性别</label>
+                <select
+                  id="profile-gender"
+                  name="gender"
+                  className="field-input"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as "male" | "female" | "private")}
+                >
+                  <option value="private">保密</option>
+                  <option value="male">男</option>
+                  <option value="female">女</option>
+                </select>
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="profile-birth-date" className="field-label">出生日期</label>
+                <input
+                  id="profile-birth-date"
+                  name="birth-date"
+                  type="date"
+                  className="field-input"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                />
               </div>
 
               {/* Email */}

@@ -9955,6 +9955,39 @@ p {
 .settings-panel-desc { font-size:13px;color:var(--color-text-muted);margin-bottom:24px;line-height:1.6 }
 .settings-subtitle { font-size:15px;font-weight:600;color:var(--color-text);margin:24px 0 16px;letter-spacing:-0.01em }
 
+/* Account settings */
+.account-settings-panel { max-width: 760px; }
+.account-settings-heading { display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:8px; }
+.account-settings-heading .settings-panel-desc { margin-bottom:0; }
+.account-settings-section { padding:24px 0 28px;border-top:1px solid var(--color-border); }
+.account-settings-section-title { margin:0 0 6px;font-size:15px;font-weight:700;color:var(--color-text);letter-spacing:-0.01em; }
+.account-settings-section-desc { margin:0;color:var(--color-text-muted);font-size:13px;line-height:1.6; }
+.account-settings-profile { display:flex;align-items:center;gap:16px;padding:4px 0 20px;margin-bottom:4px;border-bottom:1px solid var(--color-border); }
+.account-settings-avatar { position:relative;width:72px;height:72px;flex-shrink:0;overflow:hidden;border-radius:50%;background:var(--color-bg-secondary); }
+.account-settings-avatar img { width:100%;height:100%;object-fit:cover; }
+.account-settings-profile-copy { min-width:0; }
+.account-settings-profile-name { overflow:hidden;color:var(--color-text);font-size:18px;font-weight:700;text-overflow:ellipsis;white-space:nowrap; }
+.account-settings-profile-level { margin-top:5px;color:var(--color-text-muted);font-size:13px; }
+.account-settings-list { margin:0; }
+.account-settings-row { display:grid;grid-template-columns:120px minmax(0,1fr);gap:20px;padding:14px 0;border-bottom:1px solid var(--color-border);font-size:14px;line-height:1.6; }
+.account-settings-row:last-child { border-bottom:0; }
+.account-settings-row dt { color:var(--color-text-muted); }
+.account-settings-row dd { min-width:0;margin:0;color:var(--color-text);font-weight:500;overflow-wrap:anywhere; }
+.account-settings-row-stacked dd { white-space:pre-wrap; }
+.account-settings-id { color:var(--color-text-muted) !important;font-family:var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:12px;font-weight:400 !important; }
+.account-settings-section-heading { display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px; }
+.account-settings-help-link { flex-shrink:0;color:var(--color-primary);font-size:13px;font-weight:600;line-height:1.6;text-decoration:none; }
+.account-settings-help-link:hover { color:var(--color-primary-hover);text-decoration:underline; }
+.account-settings-copyright-hint { margin:8px 0 16px;color:var(--color-text-muted);font-size:12px;line-height:1.6; }
+.account-settings-message { margin:12px 0;font-size:13px;color:#31795a; }
+.account-settings-tags { display:flex;flex-wrap:wrap;gap:8px;margin-top:16px; }
+.account-settings-empty { margin:16px 0 0;color:var(--color-text-light);font-size:13px; }
+
+[data-theme="dark"] .account-settings-section,
+[data-theme="dark"] .account-settings-profile,
+[data-theme="dark"] .account-settings-row { border-color:#333; }
+[data-theme="dark"] .account-settings-avatar { background:#2A2A2A; }
+
 /* Form */
 .settings-form-group { margin-bottom:20px }
 .settings-form-label { display:block;font-size:13px;font-weight:600;color:var(--color-text);margin-bottom:6px }
@@ -10104,6 +10137,12 @@ p {
   .settings-about-row { flex-direction:column;gap:4px }
   .settings-about-value { text-align:left }
   .sidebar-dialog { padding:24px }
+  .account-settings-heading { flex-direction:column;gap:16px; }
+  .account-settings-heading .settings-btn-secondary { width:100%; }
+  .account-settings-section-heading { flex-direction:column;gap:8px; }
+  .account-settings-help-link { align-self:flex-start; }
+  .account-settings-row { grid-template-columns:1fr;gap:3px;padding:12px 0; }
+  .account-settings-id { word-break:break-all; }
 }
 
 /* ===== Series Page (Catalog & Manage) ===== */

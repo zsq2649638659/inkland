@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import {
   emptyInterestPreferences,
+  interestOptions,
   readInterestPreferences,
   saveInterestPreferences,
 } from "@/lib/interestPreferences";
@@ -13,28 +14,12 @@ import styles from "./InterestPicker.module.css";
 
 type PickerMode = "onboarding" | "settings";
 
-const interestOptions = [
-  "绘画",
-  "影视",
-  "娱乐",
-  "二次元",
-  "文字",
-  "视频",
-  "听书",
-  "乙游",
-  "约稿吃谷",
-  "连载",
-];
-
-function safeNextPath(value: string | null) {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/discover";
-}
-
 export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerMode }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const pickerMode: PickerMode = mode === "settings" || searchParams.get("mode") === "settings" ? "settings" : "onboarding";
   const { user, loading: authLoading } = useAuth();
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -86,25 +71,25 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
     }
 
     if (skipped) setSelectedInterests([]);
-    if (mode === "settings") {
+    if (pickerMode === "settings") {
       setSaved(true);
       return;
     }
 
-    router.replace(safeNextPath(searchParams.get("next")));
+    router.replace("/");
   }
 
   if (authLoading) return <div className={styles.state}>正在确认登录状态…</div>;
   if (!user) return null;
 
   return (
-    <section className={`${styles.card} ${mode === "settings" ? styles.settingsCard : ""}`} aria-label="兴趣设置">
+    <section className={`${styles.card} ${pickerMode === "settings" ? styles.settingsCard : ""}`} aria-label="兴趣设置">
       <div className={styles.heading}>
         <div>
           <span className={styles.eyebrow}>INKLAND DISCOVERY</span>
-          <h1>{mode === "settings" ? "兴趣偏好" : "选择你的兴趣"}</h1>
+          <h1>{pickerMode === "settings" ? "兴趣偏好" : "选择你的兴趣"}</h1>
           <p>
-            {mode === "settings"
+            {pickerMode === "settings"
               ? "选择你想看的内容，这些选择只用于兴趣发现，不会替换首页的关注流。"
               : "选择你感兴趣的内容，可以多选；之后也能在设置里修改。"}
           </p>
@@ -127,7 +112,6 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
               onClick={() => toggleInterest(item)}
               type="button"
             >
-              <span className={styles.optionMarker} aria-hidden="true">{selected ? "✓" : ""}</span>
               {item}
             </button>
           );
@@ -139,11 +123,11 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
 
       <div className={styles.actions}>
         <button className={styles.skip} disabled={saving} onClick={() => void finish(true)} type="button">
-          {mode === "settings" ? "清空偏好" : "跳过，先去逛逛"}
+          {pickerMode === "settings" ? "清空偏好" : "跳过，先去逛逛"}
         </button>
         <div className={styles.actionGroup}>
           <button className={styles.primary} disabled={saving} onClick={() => void finish()} type="button">
-            {saving ? "保存中…" : mode === "settings" ? "保存偏好" : "保存并开始发现"}
+            {saving ? "保存中…" : pickerMode === "settings" ? "保存偏好" : "进入首页"}
           </button>
         </div>
       </div>

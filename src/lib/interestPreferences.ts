@@ -9,10 +9,7 @@ export interface InterestPreferences {
   completed_at: string | null;
 }
 
-export const interestDomains = ["影视", "动画", "游戏", "小说", "音乐", "原创", "插画摄影"];
-export const interestDimensions = ["CP", "角色", "世界观", "无 CP", "短篇", "长篇连载"];
-export const visualInterestOptions = ["插画", "摄影", "角色设计", "场景氛围"];
-export const visualInterestDimensions = ["构图", "色彩", "教程", "作品集"];
+export const interestOptions = ["绘画", "影视", "娱乐", "二次元", "文字", "乙游", "连载"];
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -24,9 +21,10 @@ export function readInterestPreferences(user: User | null): InterestPreferences 
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
   return {
-    domains: stringArray(value.domains),
-    original_works: stringArray(value.original_works),
-    dimensions: stringArray(value.dimensions),
+    domains: stringArray(value.domains).filter((item) => interestOptions.includes(item)),
+    // 旧版曾保存原作和兴趣维度；当前兴趣引导为单层选择，不再把它们带回页面。
+    original_works: [],
+    dimensions: [],
     completed_at: typeof value.completed_at === "string" ? value.completed_at : null,
   };
 }

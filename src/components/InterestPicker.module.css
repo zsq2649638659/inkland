@@ -90,7 +90,6 @@
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  gap: 8px;
   padding: 0 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
@@ -123,24 +122,6 @@
   border-color: var(--color-primary);
   background: var(--color-primary-bg);
   color: var(--color-primary-hover);
-}
-
-.optionMarker {
-  display: inline-grid;
-  width: 18px;
-  height: 18px;
-  place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: 50%;
-  color: transparent;
-  font-size: 11px;
-  line-height: 1;
-}
-
-.selected .optionMarker {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: #fff;
 }
 
 .loadingNote,
