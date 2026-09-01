@@ -6,33 +6,38 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
 export default function MobileNav() {
   const pathname = usePathname();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
-    const cached = readClientCache<number>(`notification-count:${user.id}`, 30_000, true);
+    const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}`;
+    const cached = readClientCache<number>(cacheKey, 30_000, true);
     if (cached !== undefined) setNotificationCount(cached);
     const fetchCount = () => {
-      void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
-        const { count } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false)
-        .eq("is_test_data", false)
+      void getOrCreateClientCache(cacheKey, async () => {
+        const query = withTestDataVisibility(
+          supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("read", false),
+          includeTestDataForProfile(profile),
+        );
+        const { count } = await query;
         return count || 0;
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
     if (cached === undefined) fetchCount();
     const timer = window.setInterval(fetchCount, 30_000);
     return () => window.clearInterval(timer);
-  }, [user, supabase]);
+  }, [user, profile?.is_test_account, supabase]);
 
   const navItems = [
     { href: "/", label: "首页", icon: "fa-house" },

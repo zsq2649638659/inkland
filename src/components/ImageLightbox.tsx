@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 import LikeButton from "@/components/LikeButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import InlineCommentPanel from "@/components/InlineCommentPanel";
@@ -79,7 +80,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
         .eq("post_id", post.id).order("created_at", { ascending: false }).limit(50);
       if (!active) return;
       const baseComments: Comment[] = (data || [])
-        .filter((row: Record<string, unknown>) => !((row.author as { is_test_account?: boolean } | null)?.is_test_account))
+        .filter((row: Record<string, unknown>) => includeTestDataForProfile(profile) || !((row.author as { is_test_account?: boolean } | null)?.is_test_account))
         .map((row: Record<string, unknown>) => {
         const author = row.author as { nickname?: string; avatar_url?: string | null } | null;
         return { id: row.id as string, post_id: post.id, user_id: row.user_id as string, parent_id: (row.parent_id as string | null) || null, paragraph_index: null, content: row.content as string, created_at: row.created_at as string, author: { nickname: author?.nickname || "匿名用户", avatar_url: author?.avatar_url || null } };
@@ -102,7 +103,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
       setLoadingComments(false);
     })();
     return () => { active = false; };
-  }, [post.id, user?.id]);
+  }, [post.id, user?.id, profile?.is_test_account]);
 
   useEffect(() => {
     if (!menuOpen) return;

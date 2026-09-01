@@ -73,7 +73,7 @@ export async function assembleSeriesInfo(
 
   const chapterIds = chapters.map((chapter) => chapter.id);
   const latestIds = [...latestBySeries.values()].map((chapter) => chapter.id);
-  const [latestResult, likeResult, commentResult, bookmarkResult] = await Promise.all([
+  const [latestResult, statsResult] = await Promise.all([
     latestIds.length > 0
       ? (() => {
         let query = supabase.from("posts").select("id, title, content").in("id", latestIds);
@@ -82,13 +82,7 @@ export async function assembleSeriesInfo(
       })()
       : Promise.resolve({ data: null }),
     chapterIds.length > 0
-      ? supabase.from("likes").select("post_id").in("post_id", chapterIds)
-      : Promise.resolve({ data: null }),
-    chapterIds.length > 0
-      ? supabase.from("comments").select("post_id").in("post_id", chapterIds)
-      : Promise.resolve({ data: null }),
-    chapterIds.length > 0
-      ? supabase.from("bookmarks").select("post_id").in("post_id", chapterIds)
+      ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", chapterIds)
       : Promise.resolve({ data: null }),
   ]);
 
@@ -100,17 +94,22 @@ export async function assembleSeriesInfo(
     });
   }
 
-  const countByPost = (rows: unknown): Map<string, number> => {
-    const counts = new Map<string, number>();
-    for (const row of (rows || []) as Array<{ post_id?: string | null }>) {
-      if (row.post_id) counts.set(row.post_id, (counts.get(row.post_id) || 0) + 1);
-    }
-    return counts;
-  };
-  const likeCounts = countByPost(likeResult.data);
-  const commentCounts = countByPost(commentResult.data);
-  const bookmarkCounts = countByPost(bookmarkResult.data);
-  const sumCounts = (rows: typeof chapters, counts: Map<string, number>) => rows.reduce((total, row) => total + (counts.get(row.id) || 0), 0);
+  const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();
+  for (const row of (statsResult.data || []) as Array<Record<string, unknown>>) {
+    statsMap.set(row.id as string, {
+      like_count: Number(row.like_count) || 0,
+      comment_count: Number(row.comment_count) || 0,
+      bookmark_count: Number(row.bookmark_count) || 0,
+    });
+  }
+  const sumStats = (rows: typeof chapters) => rows.reduce((total, row) => {
+    const stats = statsMap.get(row.id);
+    return {
+      like_count: total.like_count + (stats?.like_count || 0),
+      comment_count: total.comment_count + (stats?.comment_count || 0),
+      bookmark_count: total.bookmark_count + (stats?.bookmark_count || 0),
+    };
+  }, { like_count: 0, comment_count: 0, bookmark_count: 0 });
 
   return series.map((item) => {
     const latest = latestBySeries.get(item.name);
@@ -118,9 +117,7 @@ export async function assembleSeriesInfo(
     const rows = chaptersBySeries.get(item.name) || [];
     return {
       ...item,
-      like_count: sumCounts(rows, likeCounts),
-      comment_count: sumCounts(rows, commentCounts),
-      bookmark_count: sumCounts(rows, bookmarkCounts),
+      ...sumStats(rows),
       latestChapterId: latest?.id || null,
       latestChapterNumber: latest?.chapter_number ?? null,
       latestChapterTitle: detail?.title || null,

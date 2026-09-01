@@ -18,6 +18,7 @@ import ModerationReasonModal from "@/components/ModerationReasonModal";
 import { assertCanInteract } from "@/lib/userRestrictions";
 import { assembleSeriesInfo } from "@/lib/seriesInfo";
 import { slimContent } from "@/lib/feed";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface FollowUser {
   id: string;
@@ -52,7 +53,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "works";
   const supabase = createClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, profile: currentProfile } = useAuth();
   const dialog = useAppDialog();
   const [posts, setPosts] = useState<Post[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesInfo[]>([]);
@@ -91,7 +92,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     if (activeTab === "followers") loadFollowers();
     else if (activeTab === "following") loadFollowing();
-  }, [activeTab, id]);
+  }, [activeTab, id, currentProfile?.is_test_account]);
 
   const loadFollowers = async () => {
     setTabLoading(true);
@@ -102,7 +103,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       .limit(50);
     if (fData) {
       const users = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
-        .filter((f) => f.profiles && !(f.profiles as { is_test_account?: boolean }).is_test_account)
+        .filter((f) => f.profiles && (includeTestDataForProfile(currentProfile) || !(f.profiles as { is_test_account?: boolean }).is_test_account))
         .map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
@@ -123,7 +124,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       .limit(50);
     if (fData) {
       const users = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
-        .filter((f) => f.profiles && !(f.profiles as { is_test_account?: boolean }).is_test_account)
+        .filter((f) => f.profiles && (includeTestDataForProfile(currentProfile) || !(f.profiles as { is_test_account?: boolean }).is_test_account))
         .map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
@@ -136,19 +137,30 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const loadStats = useCallback(async (userId: string) => {
+    const includeTestData = includeTestDataForProfile(currentProfile);
+    let postIdsQuery = supabase
+      .from("posts")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "published");
+    postIdsQuery = withTestDataVisibility(postIdsQuery, includeTestData);
+    let followingQuery = supabase
+      .from("follows")
+      .select("id, target:profiles!follows_following_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+      .eq("follower_id", userId);
+    let followerQuery = supabase
+      .from("follows")
+      .select("id, source:profiles!follows_follower_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+      .eq("following_id", userId);
+    if (!includeTestData) {
+      followingQuery = followingQuery.eq("target.is_test_account", false);
+      followerQuery = followerQuery.eq("source.is_test_account", false);
+    }
     // 个人资料统计互不依赖；帖子 ID 同时用于帖子总数和互动汇总，避免重复查一遍 posts。
     const [postIdsResult, followingResult, followerResult] = await Promise.all([
-      supabase.from("posts").select("id").eq("user_id", userId).eq("status", "published").eq("is_test_data", false),
-      supabase
-        .from("follows")
-        .select("id, target:profiles!follows_following_id_fkey!inner(is_test_account)", { count: "exact", head: true })
-        .eq("follower_id", userId)
-        .eq("target.is_test_account", false),
-      supabase
-        .from("follows")
-        .select("id, source:profiles!follows_follower_id_fkey!inner(is_test_account)", { count: "exact", head: true })
-        .eq("following_id", userId)
-        .eq("source.is_test_account", false),
+      postIdsQuery,
+      followingQuery,
+      followerQuery,
     ]);
     const postIds = (postIdsResult.data || []) as Array<{ id: string }>;
     setPostCount(postIds.length);
@@ -172,22 +184,28 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       setLikeCount(0);
       setBookmarkCount(0);
     }
-  }, [supabase]);
+  }, [supabase, currentProfile?.is_test_account]);
 
   useEffect(() => {
     const load = async () => {
-      const profilePromise = supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id).eq("is_test_account", false).single();
-      const postsPromise = supabase
-        .from("posts")
-        .select("id, title, content, word_count, post_type, created_at, series_name, chapter_number, cover_url, user_id, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)")
-        .eq("user_id", id).eq("status", "published").eq("is_test_data", false)
-        .order("created_at", { ascending: false }).limit(50);
-      const seriesPromise = supabase
-        .from("series")
-        .select("id, name, cover_url, description, series_type, tags, status, created_at")
-        .eq("user_id", id)
-        .eq("is_test_data", false)
-        .order("created_at", { ascending: false });
+      const includeTestData = includeTestDataForProfile(currentProfile);
+      let profileQuery = supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id);
+      if (!includeTestData) profileQuery = profileQuery.eq("is_test_account", false);
+      const profilePromise = profileQuery.single();
+      const postsPromise = withTestDataVisibility(
+        supabase
+          .from("posts")
+          .select("id, title, content, word_count, post_type, created_at, series_name, chapter_number, cover_url, user_id, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)")
+          .eq("user_id", id).eq("status", "published"),
+        includeTestData,
+      ).order("created_at", { ascending: false }).limit(50);
+      const seriesPromise = withTestDataVisibility(
+        supabase
+          .from("series")
+          .select("id, name, cover_url, description, series_type, tags, status, created_at")
+          .eq("user_id", id),
+        includeTestData,
+      ).order("created_at", { ascending: false });
       void loadStats(id);
       const [{ data: prof }, { data: rawData }, { data: allSeriesData }] = await Promise.all([
         profilePromise,
@@ -282,7 +300,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             return true;
           });
 
-          const seriesWithChapters = await assembleSeriesInfo(supabase, deduped);
+          const seriesWithChapters = await assembleSeriesInfo(supabase, deduped, { includeTestData });
 
           setSeriesList(seriesWithChapters);
         }
@@ -299,7 +317,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       setLoading(false);
     };
     load();
-  }, [id, supabase, currentUser, isOwnProfile, loadStats]);
+  }, [id, supabase, currentUser, currentProfile?.is_test_account, isOwnProfile, loadStats]);
 
   const handleFollow = async () => {
     if (!currentUser) return;

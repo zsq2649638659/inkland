@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface Suggestion {
   name: string;
@@ -25,7 +26,7 @@ interface SuggestionResult {
 }
 
 export default function Navbar() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { open, openDrawer } = useMobileDrawer();
@@ -42,14 +43,15 @@ export default function Navbar() {
       return;
     }
     const fetchNotificationCount = (force = false) => {
-      if (force) invalidateClientCache(`notification-count:${user.id}`);
-      void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
+      const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}`;
+      if (force) invalidateClientCache(cacheKey);
+      void getOrCreateClientCache(cacheKey, async () => {
         let query = supabase
           .from("notifications")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
           .eq("read", false);
-        const { count } = await query.eq("is_test_data", false);
+        const { count } = await withTestDataVisibility(query, includeTestDataForProfile(profile));
         return count || 0;
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
@@ -63,7 +65,7 @@ export default function Navbar() {
       window.clearInterval(timer);
       void supabase.removeChannel(channel);
     };
-  }, [supabase, user]);
+  }, [supabase, user, profile?.is_test_account]);
 
   useEffect(() => {
     const t = document.documentElement.getAttribute("data-theme");
@@ -112,14 +114,14 @@ export default function Navbar() {
     }
     setSearching(true);
     const result = await getOrCreateClientCache<SuggestionResult>(
-      `search-suggestions:${user?.id || "anon"}:${q.toLowerCase()}`,
+      `search-suggestions:${user?.id || "anon"}:${includeTestDataForProfile(profile) ? "test" : "public"}:${q.toLowerCase()}`,
       async () => {
         const [blockedRes, tagsRes, usersRes, titleRes, contentRes] = await Promise.all([
           user ? supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id) : Promise.resolve({ data: [] as unknown[] }),
           supabase.from("tags").select("id, name").ilike("name", `%${q}%`).limit(5),
-          supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).eq("is_test_account", false).limit(5),
-          supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").eq("is_test_data", false).order("created_at", { ascending: false }).limit(5),
-          supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").eq("is_test_data", false).order("created_at", { ascending: false }).limit(5),
+          withTestDataVisibility(supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(5), includeTestDataForProfile(profile)),
+          withTestDataVisibility(supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5), includeTestDataForProfile(profile)),
+          withTestDataVisibility(supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5), includeTestDataForProfile(profile)),
         ]);
         const blockedIds = new Set((blockedRes.data || []).map((row: Record<string, unknown>) => row.blocked_user_id as string));
         const users = (usersRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.id as string));
@@ -134,7 +136,7 @@ export default function Navbar() {
             .in("tag_id", tagRows.map((tag) => tag.id));
           const postIds = [...new Set((tagLinks || []).map((link: Record<string, unknown>) => link.post_id as string).filter(Boolean))];
           const { data: publicPosts } = postIds.length > 0
-            ? await supabase.from("posts").select("id").in("id", postIds).eq("is_test_data", false)
+            ? await withTestDataVisibility(supabase.from("posts").select("id").in("id", postIds), includeTestDataForProfile(profile))
             : { data: [] as unknown[] };
           const publicPostIds = new Set((publicPosts || []).map((post: Record<string, unknown>) => post.id as string));
           for (const link of (tagLinks || []) as Array<{ tag_id: string; post_id: string }>) {
@@ -161,7 +163,7 @@ export default function Navbar() {
     setPostSuggestions(result.posts);
     setContentSuggestions(result.content);
     setSearching(false);
-  }, [supabase, user]);
+  }, [supabase, user, profile?.is_test_account]);
 
   const handleSearchInput = (val: string) => {
     setSearchQuery(val);

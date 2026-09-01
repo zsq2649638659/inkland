@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import PostTagCard from "@/components/PostTagCard";
 import type { Post } from "@/lib/types";
 import { slimContent } from "@/lib/feed";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type TagTab = "latest" | "hottest";
 type TimeFilter = "all" | "day" | "week" | "month";
@@ -39,7 +40,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   const supabase = createClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [standalonePosts, setStandalonePosts] = useState<Post[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +58,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
 
   useEffect(() => {
     const load = async () => {
+      const includeTestData = includeTestDataForProfile(profile);
       const { data: tag } = await supabase
         .from("tags")
         .select("id, post_count")
@@ -70,7 +72,10 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
       // 帖子关联和 series.tags 关联互不依赖，合并成同一波请求。
       const [{ data: ptData }, { data: seriesByTag }] = await Promise.all([
         supabase.from("post_tags").select("post_id").eq("tag_id", tagId),
-        supabase.from("series").select("name").contains("tags", [decodedName]).eq("is_test_data", false),
+        withTestDataVisibility(
+          supabase.from("series").select("name").contains("tags", [decodedName]),
+          includeTestData,
+        ),
       ]);
 
       let allPosts: Post[] = [];
@@ -79,12 +84,14 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
 
       if (ptData && ptData.length > 0) {
         const postIds = ptData.map((p: Record<string, unknown>) => p.post_id as string);
-        const postsPromise = supabase
-          .from("posts")
-          .select("id, title, content, word_count, post_type, chapter_number, series_name, created_at, cover_url, user_id, author:profiles!posts_user_id_fkey(nickname, avatar_url), post_tags(tags(name))")
-          .in("id", postIds)
-          .eq("status", "published")
-          .eq("is_test_data", false);
+        const postsPromise = withTestDataVisibility(
+          supabase
+            .from("posts")
+            .select("id, title, content, word_count, post_type, chapter_number, series_name, created_at, cover_url, user_id, author:profiles!posts_user_id_fkey(nickname, avatar_url), post_tags(tags(name))")
+            .in("id", postIds)
+            .eq("status", "published"),
+          includeTestData,
+        );
         const statsPromise = supabase
           .from("post_stats")
           .select("id, like_count, comment_count, bookmark_count")
@@ -148,23 +155,27 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
       // 3. 获取系列详情
       let matchedSeries: SeriesEntry[] = [];
       if (allSeriesNames.size > 0) {
-        const { data: seriesData } = await supabase
-          .from("series")
-          .select("id, name, cover_url, description, tags, status, series_type, created_at, user_id")
-          .in("name", [...allSeriesNames])
-          .eq("is_test_data", false);
+        const { data: seriesData } = await withTestDataVisibility(
+          supabase
+            .from("series")
+            .select("id, name, cover_url, description, tags, status, series_type, created_at, user_id")
+            .in("name", [...allSeriesNames]),
+          includeTestData,
+        );
 
         if (seriesData && seriesData.length > 0) {
           const rawSeries = seriesData as unknown as SeriesEntry[];
 
           const userIds = [...new Set(rawSeries.map((s) => s.user_id))];
-          const chapterRowsPromise = supabase
-            .from("posts")
-            .select("id, series_name, chapter_number, created_at")
-            .in("series_name", [...allSeriesNames])
-            .eq("post_type", "serial")
-            .eq("status", "published")
-            .eq("is_test_data", false);
+          const chapterRowsPromise = withTestDataVisibility(
+            supabase
+              .from("posts")
+              .select("id, series_name, chapter_number, created_at")
+              .in("series_name", [...allSeriesNames])
+              .eq("post_type", "serial")
+              .eq("status", "published"),
+            includeTestData,
+          );
           const profilesPromise = userIds.length > 0
             ? supabase.from("profiles").select("id, nickname, avatar_url").in("id", userIds)
             : Promise.resolve({ data: null });
@@ -206,7 +217,10 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           const latestIds = [...latestBySeries.values()].map((chapter) => chapter.id);
           const [latestResult, statsResult] = await Promise.all([
             latestIds.length > 0
-              ? supabase.from("posts").select("id, title, content").in("id", latestIds).eq("is_test_data", false)
+              ? withTestDataVisibility(
+                supabase.from("posts").select("id, title, content").in("id", latestIds),
+                includeTestData,
+              )
               : Promise.resolve({ data: null }),
             chapterIds.length > 0
               ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", chapterIds)
@@ -283,7 +297,8 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
       }
       setViewCount(totalInteractions);
 
-      if (totalCount !== (tag as Record<string, unknown>).post_count) {
+      // post_count 是正式空间的共享冗余字段，测试账号的可见数量不能回写进去。
+      if (!includeTestData && totalCount !== (tag as Record<string, unknown>).post_count) {
         supabase.from("tags").update({ post_count: totalCount }).eq("id", tagId).then(({ error }: { error: { message?: string } | null }) => {
           if (error) console.error("更新标签篇数失败:", error);
         });
@@ -292,7 +307,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
       setLoading(false);
     };
     load();
-  }, [decodedName, supabase]);
+  }, [decodedName, supabase, profile?.is_test_account]);
 
   // 登录状态只影响关注按钮，不应让整张标签页重新查询帖子和系列。
   useEffect(() => {

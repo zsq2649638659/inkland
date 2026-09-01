@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { getOrCreateClientCache, invalidateClientCache, readClientCache } from "@/lib/client-cache";
 
@@ -113,29 +114,36 @@ export default function HomeSidebar() {
     } catch { /* ignore unavailable local storage */ }
 
     if (!lastSeen || pathname === "/") return;
-    void getOrCreateClientCache(`new-works:${user.id}:${lastSeen}`, async () => {
-      const { count } = await supabase
-        .from("posts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "published")
-        .eq("is_test_data", false)
-        .gt("created_at", lastSeen);
+    void getOrCreateClientCache(`new-works:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}:${lastSeen}`, async () => {
+      const query = withTestDataVisibility(
+        supabase
+          .from("posts")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "published")
+          .gt("created_at", lastSeen),
+        includeTestDataForProfile(profile),
+      );
+      const { count } = await query;
       return count || 0;
     }, { ttlMs: 30_000, persist: true }).then((count) => setNewWorksCount(count));
-  }, [user, pathname, supabase]);
+  }, [user, profile?.is_test_account, pathname, supabase]);
 
   useEffect(() => {
     if (!user) return;
-    const cached = readClientCache<number>(`notification-count:${user.id}`, 30_000, true);
+    const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}`;
+    const cached = readClientCache<number>(cacheKey, 30_000, true);
     if (cached !== undefined) setNotificationCount(cached);
     const fetchNotificationCount = () => {
-      void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
-        const { count } = await supabase
-          .from("notifications")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("read", false)
-          .eq("is_test_data", false);
+      void getOrCreateClientCache(cacheKey, async () => {
+        const query = withTestDataVisibility(
+          supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("read", false),
+          includeTestDataForProfile(profile),
+        );
+        const { count } = await query;
         return count || 0;
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
@@ -144,7 +152,7 @@ export default function HomeSidebar() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [user, supabase]);
+  }, [user, profile?.is_test_account, supabase]);
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";

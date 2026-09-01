@@ -14,6 +14,7 @@ import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Comment } from "@/lib/types";
+import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 
 export interface SerialPostCardData {
   chapterId: string;
@@ -207,7 +208,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
         .order("created_at", { ascending: false })
         .limit(5);
       if (raw) {
-        setComments(raw.filter((c: Record<string, unknown>) => !((c.author as { is_test_account?: boolean } | null)?.is_test_account)).map((c: Record<string, unknown>) => {
+        setComments(raw.filter((c: Record<string, unknown>) => includeTestDataForProfile(profile) || !((c.author as { is_test_account?: boolean } | null)?.is_test_account)).map((c: Record<string, unknown>) => {
           const author = c.author as { nickname?: string; avatar_url?: string | null } | null;
           return {
             id: c.id as string,

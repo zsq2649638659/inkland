@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Post } from "@/lib/types";
 import type { SerialPostCardData } from "@/components/SerialPostCard";
+import { canViewTestData, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 export type FeedTab = "following" | "myTags" | "hot24";
 
@@ -52,9 +53,10 @@ export async function loadFeed(
   const { tab, userId = null } = opts;
   const limit = opts.limit ?? 50;
   const needsFollow = tab === "following";
+  const includeTestData = await canViewTestData(supabase, userId);
 
   if (tab === "myTags") {
-    return loadFollowedTags(supabase, userId);
+    return loadFollowedTags(supabase, userId, includeTestData);
   }
 
   if (needsFollow && !userId) {
@@ -63,7 +65,8 @@ export async function loadFeed(
 
   // RPC 单查询快速路径：浏览器端直接调用 get_home_feed（已部署 get-home-feed.sql 后生效）。
   // 单次数据库往返完成全部聚合，命中即返回；函数缺失/形状不合法时安全回落下方波数逻辑。
-  if (opts.tryRpc !== false) {
+  // 旧 RPC 只返回正式数据；测试账号需要走下方回退查询以共享测试空间。
+  if (opts.tryRpc !== false && !includeTestData) {
     const rpc = await supabase.rpc("get_home_feed", {
       p_user_id: needsFollow ? userId : null,
       p_tab: tab,
@@ -94,7 +97,10 @@ export async function loadFeed(
 
   const blockedIds = new Set((blockedRows || []).map((row) => (row as Record<string, unknown>).blocked_user_id as string));
 
-  let query = supabase.from("posts").select(postSelect).eq("status", "published").eq("is_test_data", false);
+  let query = withTestDataVisibility(
+    supabase.from("posts").select(postSelect).eq("status", "published"),
+    includeTestData,
+  );
   let bookmarkedPostIds: string[] = [];
 
   if (needsFollow) {
@@ -106,7 +112,10 @@ export async function loadFeed(
 
   // ---- wave 2：主 feed 与收藏作品解析并行（二者只依赖 wave1） ----
   const bookmarkedPostsPromise = bookmarkedPostIds.length > 0
-    ? supabase.from("posts").select("id, series_name, post_type, chapter_number").in("id", bookmarkedPostIds).eq("status", "published").eq("is_test_data", false)
+    ? withTestDataVisibility(
+      supabase.from("posts").select("id, series_name, post_type, chapter_number").in("id", bookmarkedPostIds).eq("status", "published"),
+      includeTestData,
+    )
     : Promise.resolve({ data: [] as unknown[] });
 
   const [{ data: rawPosts, error: err }, { data: bookmarkedPosts }] = await Promise.all([
@@ -138,11 +147,17 @@ export async function loadFeed(
     .select("id, like_count, comment_count, bookmark_count")
     .in("id", feedIds);
   const seriesFullPostsPromise = bookmarkedSeriesNames.length > 0
-    ? supabase.from("posts").select(postSelect).in("series_name", bookmarkedSeriesNames).eq("status", "published").eq("is_test_data", false)
+    ? withTestDataVisibility(
+      supabase.from("posts").select(postSelect).in("series_name", bookmarkedSeriesNames).eq("status", "published"),
+      includeTestData,
+    )
     : Promise.resolve({ data: [] as unknown[] });
   const seriesMetaNames = [...new Set([...bookmarkedSeriesNames, ...seriesNames])];
   const seriesMetaPromise = seriesMetaNames.length > 0
-    ? supabase.from("series").select("name, description, cover_url, tags, status, series_type").in("name", seriesMetaNames).eq("is_test_data", false)
+    ? withTestDataVisibility(
+      supabase.from("series").select("name, description, cover_url, tags, status, series_type").in("name", seriesMetaNames),
+      includeTestData,
+    )
     : Promise.resolve({ data: [] as unknown[] });
 
   const [{ data: stats }, { data: rawSeriesPosts }, { data: seriesData }] = await Promise.all([
@@ -304,7 +319,7 @@ export async function loadFeed(
   return { posts: formatted, serialCards: serialCardList, followedTags: [] };
 }
 
-async function loadFollowedTags(supabase: SupabaseClient, userId: string | null): Promise<FeedResult> {
+async function loadFollowedTags(supabase: SupabaseClient, userId: string | null, includeTestData: boolean): Promise<FeedResult> {
   if (!userId) return { posts: [], serialCards: [], followedTags: [] };
   const { data: follows } = await supabase.from("tag_follows").select("tag_id").eq("user_id", userId);
   if (!follows || follows.length === 0) return { posts: [], serialCards: [], followedTags: [] };
@@ -319,12 +334,14 @@ async function loadFollowedTags(supabase: SupabaseClient, userId: string | null)
   const postIds = [...new Set((rawCounts || []).map((r: Record<string, unknown>) => r.post_id as string))];
   let validPostIds = new Set<string>();
   if (postIds.length > 0) {
-    const { data: posts } = await supabase
-      .from("posts")
-      .select("id, post_type, chapter_number")
-      .in("id", postIds)
-      .eq("status", "published")
-      .eq("is_test_data", false);
+    const { data: posts } = await withTestDataVisibility(
+      supabase
+        .from("posts")
+        .select("id, post_type, chapter_number")
+        .in("id", postIds)
+        .eq("status", "published"),
+      includeTestData,
+    );
     validPostIds = new Set((posts || []).filter((p: Record<string, unknown>) => {
       return !(p.post_type === "serial" && p.chapter_number && (p.chapter_number as number) > 0);
     }).map((p: Record<string, unknown>) => p.id as string));

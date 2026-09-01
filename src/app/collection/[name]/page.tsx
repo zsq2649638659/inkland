@@ -7,6 +7,8 @@ import { SkeletonCollectionDetail } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { slimContent } from "@/lib/feed";
+import { useAuth } from "@/components/AuthProvider";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type CollectionInfo = {
   name: string;
@@ -30,6 +32,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   const supabase = createClient();
+  const { profile } = useAuth();
   const [collection, setCollection] = useState<CollectionInfo | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<CollectionFilter>("all");
@@ -39,21 +42,24 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
 
   useEffect(() => {
     const load = async () => {
+      const includeTestData = includeTestDataForProfile(profile);
       const [{ data: series }, { data: postData }] = await Promise.all([
-        supabase
-          .from("series")
-          .select("name, description, created_at, updated_at, user_id")
-          .eq("name", decodedName)
-          .eq("is_test_data", false)
-          .maybeSingle(),
-        supabase
-          .from("posts")
-          .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, user_id, post_tags(tags(name))")
-          .eq("series_name", decodedName)
-          .neq("post_type", "serial")
-          .eq("status", "published")
-          .eq("is_test_data", false)
-          .order("created_at", { ascending: false }),
+        withTestDataVisibility(
+          supabase
+            .from("series")
+            .select("name, description, created_at, updated_at, user_id")
+            .eq("name", decodedName),
+          includeTestData,
+        ).maybeSingle(),
+        withTestDataVisibility(
+          supabase
+            .from("posts")
+            .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, user_id, post_tags(tags(name))")
+            .eq("series_name", decodedName)
+            .neq("post_type", "serial")
+            .eq("status", "published"),
+          includeTestData,
+        ).order("created_at", { ascending: false }),
       ]);
 
       const rawPosts = (postData || []) as unknown as Array<Record<string, unknown>>;
@@ -96,7 +102,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
       setLoading(false);
     };
     load();
-  }, [decodedName, supabase]);
+  }, [decodedName, supabase, profile?.is_test_account]);
 
   const filteredPosts = posts.filter((post) => {
     if (filter === "all") return true;

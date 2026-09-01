@@ -28,8 +28,14 @@ declare
   v_me uuid := auth.uid();
   v_blocked uuid[];
   v_following uuid[];
+  v_can_view_test_data boolean := false;
   v_result json;
 begin
+  select coalesce(p.is_test_account, false)
+    into v_can_view_test_data
+  from public.profiles p
+  where p.id = v_me;
+
   -- 屏蔽名单（对所有 tab 生效，和原客户端逻辑一致）
   select coalesce(array_agg(blocked_user_id), '{}') into v_blocked
   from public.blocked_users
@@ -44,7 +50,7 @@ begin
         from public.tag_follows tf
         join public.tags tg on tg.id = tf.tag_id
         left join public.post_tags pt on pt.tag_id = tf.tag_id
-        left join public.posts p on p.id = pt.post_id and p.status = 'published' and p.is_test_data = false
+        left join public.posts p on p.id = pt.post_id and p.status = 'published' and (p.is_test_data = false or v_can_view_test_data)
         where tf.user_id = v_me
           and not (p.post_type = 'serial' and p.chapter_number > 0) -- 排除连载章节
           and coalesce(p.post_type, 'x') <> 'serial'
@@ -60,7 +66,7 @@ begin
       select p.*
       from public.posts p
       where p.status = 'published'
-        and p.is_test_data = false
+        and (p.is_test_data = false or v_can_view_test_data)
         and not (p.user_id = any(v_blocked))
       order by p.created_at desc
       limit p_limit
@@ -89,7 +95,7 @@ begin
           select distinct p.series_name from feed p
           where p.post_type = 'serial' and p.chapter_number > 0 and p.series_name is not null
         )
-          and ss.is_test_data = false
+          and (ss.is_test_data = false or v_can_view_test_data)
       ) m), '[]'::json),
       'followedTags', '[]'::json
     ) into v_result;
@@ -106,7 +112,7 @@ begin
       select p.*
       from public.posts p
       where p.status = 'published'
-        and p.is_test_data = false
+        and (p.is_test_data = false or v_can_view_test_data)
         and p.user_id = any(v_following)
         and not (p.user_id = any(v_blocked))
       order by p.created_at desc
@@ -124,7 +130,7 @@ begin
       select p.*
       from public.posts p
       where p.status = 'published'
-        and p.is_test_data = false
+        and (p.is_test_data = false or v_can_view_test_data)
         and p.series_name in (select series_name from bookmarked_series)
         and not (p.user_id = any(v_blocked))
     ),
@@ -159,7 +165,7 @@ begin
           select distinct p.series_name from merged p
           where p.post_type = 'serial' and p.chapter_number > 0 and p.series_name is not null
         )
-          and ss.is_test_data = false
+          and (ss.is_test_data = false or v_can_view_test_data)
       ) m), '[]'::json),
       'followedTags', '[]'::json
     ) into v_result;

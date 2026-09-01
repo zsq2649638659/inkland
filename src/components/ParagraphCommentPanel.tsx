@@ -9,6 +9,7 @@ import DefaultAvatar from "@/components/DefaultAvatar";
 import { createNotification } from "@/lib/notifications";
 import { assertCanComment } from "@/lib/userRestrictions";
 import type { Comment } from "@/lib/types";
+import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 
 interface ParagraphCommentPanelProps {
   postId: string;
@@ -116,7 +117,7 @@ onReport,
     }
 
     const formatted: Comment[] = (parentData as Record<string, unknown>[])
-      .filter((c) => !((c.author as { is_test_account?: boolean } | null)?.is_test_account))
+      .filter((c) => includeTestDataForProfile(profile) || !((c.author as { is_test_account?: boolean } | null)?.is_test_account))
       .map((c: Record<string, unknown>) => {
       const author = c.author as { nickname: string; avatar_url: string | null } | null;
       const st = statsMap.get(c.id as string) || { like_count: 0, reply_count: 0 };
@@ -161,7 +162,7 @@ onReport,
         loadReplies(c.id);
       }
     }
-  }, [postId, paragraphIndex, supabase, user]);
+  }, [postId, paragraphIndex, supabase, user, profile?.is_test_account]);
 
   useEffect(() => {
     if (open) {
@@ -343,7 +344,7 @@ onReport,
       }
 
       const replies: Comment[] = (data as Array<Record<string, unknown>>)
-        .filter((r) => !((r.author as { is_test_account?: boolean } | null)?.is_test_account))
+        .filter((r) => includeTestDataForProfile(profile) || !((r.author as { is_test_account?: boolean } | null)?.is_test_account))
         .map((r) => {
         const author = r.author as { nickname: string; avatar_url: string | null } | null;
         const st = rStatsMap.get(r.id as string) || { like_count: 0, reply_count: 0 };

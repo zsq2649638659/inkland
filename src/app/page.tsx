@@ -13,6 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import { loadFeed, type FeedResult } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 import { readClientCache, writeClientCache } from "@/lib/client-cache";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type TabType = "following" | "myTags" | "hot24";
 
@@ -55,7 +56,7 @@ function writeFeedCache(key: string, result: FeedResult) {
 
 export default function HomePage() {
   const supabase = useMemo(() => createClient(), []);
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<TabType>("following");
   const [posts, setPosts] = useState<Post[]>([]);
   const [serialCards, setSerialCards] = useState<SerialPostCardData[]>([]);
@@ -78,12 +79,14 @@ export default function HomePage() {
 
   const checkNewPosts = useCallback(async () => {
     if (!latestPostTimeRef.current) return;
-    let query = supabase
-      .from("posts")
-      .select("id, created_at")
-      .eq("status", "published")
-      .eq("is_test_data", false)
-      .gt("created_at", latestPostTimeRef.current);
+    let query = withTestDataVisibility(
+      supabase
+        .from("posts")
+        .select("id, created_at")
+        .eq("status", "published")
+        .gt("created_at", latestPostTimeRef.current),
+      includeTestDataForProfile(profile),
+    );
 
     let bookmarkedSeriesNames: string[] = [];
     if (tab === "following" && user) {
@@ -101,12 +104,14 @@ export default function HomePage() {
       const bookmarkRows = (bookmarks || []) as Array<{ post_id?: string | null }>;
       const bookmarkedPostIds = [...new Set(bookmarkRows.map((bookmark) => bookmark.post_id).filter((id): id is string => Boolean(id)))];
       if (bookmarkedPostIds.length > 0) {
-        const { data: bookmarkedPosts } = await supabase
-          .from("posts")
-          .select("series_name, post_type, chapter_number")
-          .in("id", bookmarkedPostIds)
-          .eq("status", "published")
-          .eq("is_test_data", false);
+        const { data: bookmarkedPosts } = await withTestDataVisibility(
+          supabase
+            .from("posts")
+            .select("series_name, post_type, chapter_number")
+            .in("id", bookmarkedPostIds)
+            .eq("status", "published"),
+          includeTestDataForProfile(profile),
+        );
         const bookmarkedPostRows = (bookmarkedPosts || []) as Array<{ post_type?: string; chapter_number?: number | null; series_name?: string | null }>;
         bookmarkedSeriesNames = [...new Set(bookmarkedPostRows
           .filter((post) => post.post_type === "serial" && post.chapter_number && post.series_name)
@@ -120,17 +125,19 @@ export default function HomePage() {
       return;
     }
     if (tab === "following" && bookmarkedSeriesNames.length > 0) {
-      const { data: newSeriesPosts } = await supabase
-        .from("posts")
-        .select("id, created_at")
-        .eq("status", "published")
-        .eq("is_test_data", false)
-        .gt("created_at", latestPostTimeRef.current)
-        .in("series_name", bookmarkedSeriesNames)
-        .limit(1);
+      const { data: newSeriesPosts } = await withTestDataVisibility(
+        supabase
+          .from("posts")
+          .select("id, created_at")
+          .eq("status", "published")
+          .gt("created_at", latestPostTimeRef.current)
+          .in("series_name", bookmarkedSeriesNames)
+          .limit(1),
+        includeTestDataForProfile(profile),
+      );
       if (newSeriesPosts && newSeriesPosts.length > 0) setHasNewPosts(true);
     }
-  }, [supabase, tab, user, latestPostTimeRef]);
+  }, [supabase, tab, user, profile, latestPostTimeRef]);
 
   useEffect(() => {
     if (tab === "myTags") return;
@@ -169,7 +176,9 @@ export default function HomePage() {
 
   const loadPosts = async (opts?: { force?: boolean }) => {
     // 命中缓存：立即秒开（不闪骨架屏），后台照常静默刷新
-    const cacheKey = user ? `${user.id}:${tab}` : `anon:${tab}`;
+    const cacheKey = user
+      ? `${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}:${tab}`
+      : `anon:${tab}`;
     const hit = !opts?.force ? readFeedCache(cacheKey) : undefined;
 
     if (hit) {
@@ -224,7 +233,7 @@ export default function HomePage() {
       setLoading(false);
       return;
     }
-    const cacheKey = `${user.id}:myTags`;
+    const cacheKey = `${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}:myTags`;
     const hit = readFeedCache(cacheKey);
     if (hit) {
       setFollowedTags(hit.followedTags || []);
@@ -256,7 +265,7 @@ export default function HomePage() {
     } else {
       loadPosts();
     }
-  }, [tab, user]);
+  }, [tab, user, profile?.is_test_account]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const tabs: { key: TabType; label: string }[] = [

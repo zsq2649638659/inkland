@@ -3,6 +3,7 @@ import ReaderClient from "@/components/ReaderClient";
 import ImageReaderClient from "@/components/ImageReaderClient";
 import { createClient } from "@/lib/supabase/server";
 import type { Post } from "@/lib/types";
+import { canViewTestData, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface ImageItem {
   url: string;
@@ -32,15 +33,19 @@ export default async function ReadPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const includeTestData = await canViewTestData(supabase, user?.id);
 
   // Fetch post data using Supabase server client
-  const { data: posts, error: postError } = await supabase
-    .from("posts")
-    .select("id,title,content,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url,bio),post_tags(tags!inner(name))")
-    .eq("id", id)
-    .eq("status", "published")
-    .eq("is_test_data", false)
-    .limit(1);
+  const postQuery = withTestDataVisibility(
+    supabase
+      .from("posts")
+      .select("id,title,content,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url,bio),post_tags(tags!inner(name))")
+      .eq("id", id)
+      .eq("status", "published"),
+    includeTestData,
+  ).limit(1);
+  const { data: posts, error: postError } = await postQuery;
 
   if (postError) {
     console.error(`Supabase fetch failed: ${postError.message} for posts`);
