@@ -8,9 +8,10 @@ import mammoth from "mammoth";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
-import { cleanImportHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
+import { cleanImportHeading, extractImportPreamble, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
 import { clearImportBatch, loadImportBatch, saveImportBatch, type ImportBatchSnapshot } from "@/lib/importBatchStore";
 import { findImportDuplicate, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
+import { extractTextImportMetadata, normalizeImportedTitle } from "@/lib/importMetadata";
 import { addTags, MAX_TAGS_PER_WORK, splitTags } from "@/lib/tagRules";
 import styles from "./import.module.css";
 
@@ -36,6 +37,8 @@ interface ParsedWork {
   groupName?: string;
   groupDescription?: string;
   groupTags?: string[];
+  descriptionCandidate?: string;
+  descriptionCandidateSource?: string;
   chapterNumber?: number;
   chapterTitle?: string;
   detectedEncoding?: string;
@@ -72,6 +75,23 @@ interface TextImportPlan {
   groupName: string;
   groupDescription: string;
   groupTags: string[];
+  descriptionCandidate: string;
+  descriptionCandidateSource?: string;
+  descriptionCandidateAccepted?: boolean;
+}
+
+function getTextPlanIdentity(plan: Pick<TextImportPlan, "sourceType" | "content">) {
+  return `${plan.sourceType}\u0000${plan.content}`;
+}
+
+function getUniqueTextPlans(plans: TextImportPlan[]) {
+  const seen = new Set<string>();
+  return plans.filter((plan) => {
+    const identity = getTextPlanIdentity(plan);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
 }
 
 interface ParsedFileResult {
@@ -97,12 +117,25 @@ function getErrorMessage(error: unknown, fallback: string) {
     : fallback;
 }
 
+function getDuplicateNoticeTitle(kind: ImportDuplicateMatch["kind"]) {
+  if (kind === "exact") return "完全重复";
+  if (kind === "update") return "检测到已有章节";
+  if (kind === "batch") return "本批次章节冲突";
+  return "疑似重复";
+}
+
+function getDuplicateKeepLabel(kind: ImportDuplicateMatch["kind"]) {
+  if (kind === "exact") return "保留为新作";
+  if (kind === "batch") return "保留为独立内容";
+  return "保留为新作";
+}
+
 function getExtension(fileName: string) {
   return fileName.toLowerCase().split(".").pop() || "";
 }
 
 function titleFromFileName(fileName: string) {
-  return fileName.replace(/\.[^.]+$/, "").trim() || "未命名作品";
+  return normalizeImportedTitle(fileName.replace(/\.[^.]+$/, ""));
 }
 
 function countWords(content: string) {
@@ -111,6 +144,15 @@ function countWords(content: string) {
 
 function normalizeContent(content: string) {
   return content.replace(/\r\n?/g, "\n").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function removeImportedPreamble(content: string, preamble: string) {
+  const normalizedContent = normalizeContent(content);
+  const normalizedPreamble = normalizeContent(preamble);
+  const prefix = `${normalizedPreamble}\n\n`;
+  return normalizedPreamble && normalizedContent.startsWith(prefix)
+    ? normalizeContent(normalizedContent.slice(prefix.length))
+    : normalizedContent;
 }
 
 const TEXT_ENCODINGS = ["utf-8", "gb18030", "big5", "utf-16le", "utf-16be"] as const;
@@ -369,11 +411,13 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
     detectedEncoding: plan.canChangeEncoding ? plan.encoding : undefined,
     groupDescription: plan.groupDescription,
     groupTags: plan.groupTags,
+    descriptionCandidate: plan.descriptionCandidate,
+    descriptionCandidateSource: plan.descriptionCandidateSource,
   };
   if (plan.mode === "single" || plan.chapters.length < 2) {
     return [await makeParsedWork({
       ...common,
-      title: titleFromFileName(plan.fileName),
+      title: normalizeImportedTitle(plan.groupName, titleFromFileName(plan.fileName)),
       content: plan.content,
       sourceName: plan.fileName,
       groupMode: "single",
@@ -386,13 +430,14 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
   return Promise.all(plan.chapters.map((chapter, index) => makeParsedWork({
     ...common,
     title: chapter.title,
-    content: chapter.content,
+    content: index === 0 && plan.descriptionCandidateAccepted
+      ? removeImportedPreamble(chapter.content, extractImportPreamble(plan.content))
+      : chapter.content,
     sourceName: `${plan.fileName} · ${chapter.title}`,
     groupMode: plan.mode,
     groupName: plan.groupName.trim() || titleFromFileName(plan.fileName),
     chapterNumber: plan.mode === "serial" ? (chapter.number || index + 1) : undefined,
     chapterTitle: plan.mode === "serial" ? chapter.title : undefined,
-    warning: `已从同一份${sourceLabel}中拆出第 ${index + 1}/${plan.chapters.length} 部分，并保留“${plan.groupName.trim() || titleFromFileName(plan.fileName)}”分组关系。`,
   })));
 }
 
@@ -401,6 +446,7 @@ async function parseTextFile(file: File): Promise<ParsedFileResult> {
   const detectedEncoding = detectTextEncoding(bytes);
   const content = normalizeContent(decodeText(bytes, detectedEncoding));
   const chapters = splitImportChapters(content);
+  const metadata = extractTextImportMetadata(content, titleFromFileName(file.name));
   const plan: TextImportPlan = {
     id: crypto.randomUUID(),
     fileName: file.name,
@@ -412,9 +458,11 @@ async function parseTextFile(file: File): Promise<ParsedFileResult> {
     content,
     chapters,
     mode: chapters.length >= 2 ? "serial" : "single",
-    groupName: titleFromFileName(file.name),
+    groupName: metadata.title,
     groupDescription: "",
     groupTags: [],
+    descriptionCandidate: metadata.descriptionCandidate,
+    descriptionCandidateSource: metadata.descriptionSource,
   };
   return { works: await buildTextWorks(plan), textPlan: plan };
 }
@@ -424,7 +472,7 @@ async function parseFile(file: File): Promise<ParsedFileResult> {
   let content = "";
   let warning: string | undefined;
 
-  if (extension === "txt" || extension === "text") return parseTextFile(file);
+  if (["txt", "text", "md", "markdown"].includes(extension)) return parseTextFile(file);
   if (extension === "epub") return { works: await parseEpub(file) };
   if (extension === "docx") {
     const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
@@ -590,6 +638,10 @@ export default function ImportWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeModalWorkId, setNoticeModalWorkId] = useState<string | null>(null);
+  const [noticeModalWorkIds, setNoticeModalWorkIds] = useState<string[]>([]);
+  const [metadataCandidateModalPlanId, setMetadataCandidateModalPlanId] = useState<string | null>(null);
+  const metadataCandidatePromptedPlanRef = useRef<string | null>(null);
   const [bulkTags, setBulkTags] = useState<string[]>([]);
   const [copyrightConfirmed, setCopyrightConfirmed] = useState(false);
   const [publishMode, setPublishMode] = useState<"publish" | "draft" | "schedule">("publish");
@@ -656,8 +708,11 @@ export default function ImportWorkspace() {
           return item.status === "publishing" ? { ...item, status: "failed", message: "页面在处理过程中中断，可点击“重试失败内容”。" } : item;
         })
         : [];
+      const restoredWorks = (snapshot.parsedWorks as ParsedWork[]).map((work) => (
+        work.warning?.startsWith("已从同一份") ? { ...work, warning: undefined } : work
+      ));
       setBatchId(snapshot.batchId);
-      setParsedWorks(snapshot.parsedWorks as ParsedWork[]);
+      setParsedWorks(restoredWorks);
       setTextPlans((snapshot.textPlans || []) as TextImportPlan[]);
       setBulkTags(snapshot.bulkTags || []);
       setPublishMode(snapshot.publishMode || "publish");
@@ -692,6 +747,38 @@ export default function ImportWorkspace() {
       if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
     };
   }, [batchId, bulkTags, currentStep, parsedWorks, publishComplete, publishMode, publishProgress, publishResults, textPlans, user]);
+
+  useEffect(() => {
+    if (!noticeModalWorkId && !metadataCandidateModalPlanId) return;
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setNoticeModalWorkId(null);
+        setNoticeModalWorkIds([]);
+        setMetadataCandidateModalPlanId(null);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [metadataCandidateModalPlanId, noticeModalWorkId]);
+
+  useEffect(() => {
+    if (currentStep !== 3) {
+      metadataCandidatePromptedPlanRef.current = null;
+      return;
+    }
+    if (busy || noticeModalWorkId || metadataCandidateModalPlanId) return;
+    const candidatePlan = getUniqueTextPlans(textPlans).find((plan) => (
+      plan.mode !== "single"
+      && Boolean(plan.descriptionCandidate)
+      && !plan.descriptionCandidateAccepted
+      && textPlans.some((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan)
+        && parsedWorks.some((work) => work.selected && work.sourcePlanId === item.id))
+    ));
+    if (candidatePlan && metadataCandidatePromptedPlanRef.current !== candidatePlan.id) {
+      metadataCandidatePromptedPlanRef.current = candidatePlan.id;
+      setMetadataCandidateModalPlanId(candidatePlan.id);
+    }
+  }, [busy, currentStep, metadataCandidateModalPlanId, noticeModalWorkId, parsedWorks, textPlans]);
 
   const loadExistingPosts = async (): Promise<ExistingImportPost[]> => {
     if (!user) throw new Error("请先登录");
@@ -784,6 +871,32 @@ export default function ImportWorkspace() {
     setError("");
   };
 
+  const openImportNotices = (workIds: string[]) => {
+    setError("");
+    setNoticeModalWorkIds(workIds);
+    setNoticeModalWorkId(workIds[0] || null);
+  };
+
+  const closeImportNotices = () => {
+    setNoticeModalWorkId(null);
+    setNoticeModalWorkIds([]);
+  };
+
+  const finishImportNotice = (action?: ImportDuplicateAction) => {
+    if (!noticeModalWorkId) return;
+    const currentWorkId = noticeModalWorkId;
+    if (action) setDuplicateAction(currentWorkId, action);
+    const remainingWorkIds = noticeModalWorkIds.filter((workId) => workId !== currentWorkId);
+    setNoticeModalWorkIds(remainingWorkIds);
+    if (remainingWorkIds.length > 0) {
+      setNoticeModalWorkId(remainingWorkIds[0]);
+      return;
+    }
+    setNoticeModalWorkId(null);
+    const selectedAfter = parsedWorks.filter((work) => work.id === currentWorkId ? action !== "skip" : work.selected).length;
+    if (selectedAfter > 0) setCurrentStep(3);
+  };
+
   const setParsedSelection = (workId: string, selected: boolean) => {
     setParsedWorks((works) => works.map((work) => {
       if (work.id !== workId) return work;
@@ -848,28 +961,46 @@ export default function ImportWorkspace() {
   const updateTextPlan = async (planId: string, changes: Partial<Pick<TextImportPlan, "encoding" | "mode" | "groupName">>) => {
     const current = textPlans.find((plan) => plan.id === planId);
     if (!current) return;
+    const equivalentPlanIds = new Set(textPlans
+      .filter((plan) => changes.encoding !== undefined ? plan.canChangeEncoding : plan.chapters.length >= 2)
+      .map((plan) => plan.id));
     setBusy(true);
     setError("");
     try {
-      const encoding = changes.encoding || current.encoding;
-      const content = changes.encoding && current.bytes ? normalizeContent(decodeText(current.bytes, encoding)) : current.content;
-      const chapters = changes.encoding ? splitImportChapters(content) : current.chapters;
-      const mode = changes.mode || (chapters.length >= 2 ? current.mode : "single");
-      const nextPlan: TextImportPlan = { ...current, ...changes, encoding, content, chapters, mode };
-      const works = await buildTextWorks(nextPlan);
-      const remainingWorks = parsedWorks.filter((work) => work.sourcePlanId !== planId);
+      const nextPlans: TextImportPlan[] = [];
+      const works: ParsedWork[] = [];
+      for (const plan of textPlans.filter((item) => equivalentPlanIds.has(item.id))) {
+        const encoding = changes.encoding || plan.encoding;
+        const content = changes.encoding && plan.bytes ? normalizeContent(decodeText(plan.bytes, encoding)) : plan.content;
+        const chapters = changes.encoding ? splitImportChapters(content) : plan.chapters;
+        const mode = changes.mode || (chapters.length >= 2 ? plan.mode : "single");
+        const metadata = changes.encoding ? extractTextImportMetadata(content, plan.groupName || titleFromFileName(plan.fileName)) : undefined;
+        const nextPlan: TextImportPlan = {
+          ...plan,
+          ...changes,
+          encoding,
+          content,
+          chapters,
+          mode,
+          ...(metadata ? { descriptionCandidate: metadata.descriptionCandidate, descriptionCandidateSource: metadata.descriptionSource, descriptionCandidateAccepted: false } : {}),
+        };
+        nextPlans.push(nextPlan);
+        works.push(...await buildTextWorks(nextPlan));
+      }
+      const remainingWorks = parsedWorks.filter((work) => !equivalentPlanIds.has(work.sourcePlanId || ""));
       const existingPosts = await loadExistingPosts();
       const annotatedWorks = annotateImportWorks(works, [
         ...existingPosts,
         ...remainingWorks.map(toExistingImportPost),
       ]);
-      setTextPlans((plans) => plans.map((plan) => plan.id === planId ? nextPlan : plan));
+      const nextPlansById = new Map(nextPlans.map((plan) => [plan.id, plan]));
+      setTextPlans((plans) => plans.map((plan) => nextPlansById.get(plan.id) || plan));
       setParsedWorks((items) => [
-        ...items.filter((work) => work.sourcePlanId !== planId),
+        ...items.filter((work) => !equivalentPlanIds.has(work.sourcePlanId || "")),
         ...annotatedWorks,
       ]);
       setNotice(changes.encoding
-        ? `已按 ${encoding.toUpperCase()} 重新读取“${current.fileName}”，识别到 ${chapters.length} 个章节。`
+        ? `已按 ${(changes.encoding || current.encoding).toUpperCase()} 重新读取“${current.fileName}”，识别到 ${nextPlans[0]?.chapters.length || 0} 个章节。`
         : `已更新“${current.fileName}”的拆分方式，共生成 ${works.length} 篇内容。`);
     } catch (planError) {
       setError(getErrorMessage(planError, "重新检测和拆分内容失败"));
@@ -939,6 +1070,7 @@ export default function ImportWorkspace() {
         return;
       }
       const chapters = splitImportChapters(content);
+      const metadata = extractTextImportMetadata(content, normalizedTitle);
       const plan: TextImportPlan = {
         id: crypto.randomUUID(),
         fileName: normalizedTitle,
@@ -950,9 +1082,11 @@ export default function ImportWorkspace() {
         content,
         chapters,
         mode: chapters.length >= 2 ? "serial" : "single",
-        groupName: normalizedTitle,
+        groupName: metadata.title,
         groupDescription: "",
         groupTags: [],
+        descriptionCandidate: metadata.descriptionCandidate,
+        descriptionCandidateSource: metadata.descriptionSource,
       };
       const works = await buildTextWorks(plan);
       await addParsedWorks(works, [plan]);
@@ -1026,13 +1160,58 @@ export default function ImportWorkspace() {
   };
 
   const updateGroupInformation = (planId: string, changes: Partial<Pick<TextImportPlan, "groupName" | "groupDescription" | "groupTags">>) => {
-    setTextPlans((plans) => plans.map((plan) => plan.id === planId ? { ...plan, ...changes } : plan));
-    setParsedWorks((works) => works.map((work) => work.sourcePlanId === planId ? {
+    const current = textPlans.find((plan) => plan.id === planId);
+    if (!current) return;
+    const activeGroupedPlanIds = new Set(textPlans
+      .filter((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id))
+      .map((plan) => plan.id));
+    const targetPlanIds = activeGroupedPlanIds.has(planId) ? activeGroupedPlanIds : new Set(textPlans
+      .filter((plan) => getTextPlanIdentity(plan) === getTextPlanIdentity(current))
+      .map((plan) => plan.id));
+    setTextPlans((plans) => plans.map((plan) => targetPlanIds.has(plan.id) ? { ...plan, ...changes } : plan));
+    setParsedWorks((works) => works.map((work) => targetPlanIds.has(work.sourcePlanId || "") ? {
       ...work,
       ...(changes.groupName !== undefined ? { groupName: changes.groupName } : {}),
       ...(changes.groupDescription !== undefined ? { groupDescription: changes.groupDescription } : {}),
       ...(changes.groupTags !== undefined ? { groupTags: changes.groupTags } : {}),
     } : work));
+  };
+
+  const adoptDescriptionCandidate = (planId: string) => {
+    const plan = textPlans.find((item) => item.id === planId);
+    if (!plan?.descriptionCandidate) return;
+    const groupedPlanIds = new Set(textPlans
+      .filter((item) => item.mode === plan.mode && item.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === item.id))
+      .map((item) => item.id));
+    const targetPlanIds = groupedPlanIds.size > 0 ? groupedPlanIds : new Set(textPlans
+      .filter((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan))
+      .map((item) => item.id));
+    const preamble = extractImportPreamble(plan.content);
+    setTextPlans((plans) => plans.map((item) => targetPlanIds.has(item.id) ? {
+      ...item,
+      groupDescription: plan.descriptionCandidate,
+      descriptionCandidateAccepted: true,
+    } : item));
+    setParsedWorks((works) => {
+      const firstChapterIndexes = new Map<string, number>();
+      works.forEach((work, index) => {
+        if (work.sourcePlanId && targetPlanIds.has(work.sourcePlanId) && !firstChapterIndexes.has(work.sourcePlanId)) {
+          firstChapterIndexes.set(work.sourcePlanId, index);
+        }
+      });
+      return works.map((work, index) => {
+        if (!work.sourcePlanId || !targetPlanIds.has(work.sourcePlanId)) return work;
+        if (index === firstChapterIndexes.get(work.sourcePlanId)) {
+          const content = removeImportedPreamble(work.content, preamble);
+          return content === work.content
+            ? { ...work, groupDescription: plan.descriptionCandidate }
+            : { ...work, content, wordCount: countWords(content), groupDescription: plan.descriptionCandidate };
+        }
+        return { ...work, groupDescription: plan.descriptionCandidate };
+      });
+    });
+    setNotice("已采用简介候选；候选来源的开头导语也已从首章正文中移除。你仍可以继续修改简介和正文。");
+    setMetadataCandidateModalPlanId(null);
   };
 
   const validateEditingInformation = (items: ParsedWork[]) => {
@@ -1070,6 +1249,9 @@ export default function ImportWorkspace() {
     setCurrentStep(1);
     setParsedWorks([]);
     setTextPlans([]);
+    setNoticeModalWorkId(null);
+    setNoticeModalWorkIds([]);
+    setMetadataCandidateModalPlanId(null);
     setBulkTags([]);
     setCopyrightConfirmed(false);
     setPublishMode("publish");
@@ -1114,8 +1296,13 @@ export default function ImportWorkspace() {
       const selected = annotatedWorks.filter((work) => work.selected);
       if (selected.length === 0) { setError("请至少选择一篇作品"); return; }
       if (selected.some((work) => !work.title.trim() || !work.content.trim())) { setError("标题和正文不能为空"); return; }
-      if (selected.some((work) => work.duplicateMatch && (!work.duplicateAction || work.duplicateAction === "review" || work.duplicateAction === "skip"))) {
-        setError("请先为选中的重复内容选择处理方式");
+      const noticeWorks = selected.filter((work) => {
+        const needsDuplicateDecision = work.duplicateMatch
+          && (!work.duplicateAction || work.duplicateAction === "review" || (work.duplicateAction === "skip" && work.selected));
+        return Boolean(work.warning || needsDuplicateDecision);
+      });
+      if (noticeWorks.length > 0) {
+        openImportNotices(noticeWorks.map((work) => work.id));
         return;
       }
       setCurrentStep(3);
@@ -1251,7 +1438,17 @@ export default function ImportWorkspace() {
   const publishSuccessCount = publishResults.filter((result) => result.status === "success").length;
   const publishFailedCount = publishResults.filter((result) => result.status === "failed").length;
   const publishingItem = publishResults.find((result) => result.status === "publishing");
-  const activeGroupedPlans = textPlans.filter((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
+  const encodingPlan = textPlans.find((plan) => plan.canChangeEncoding);
+  const splitPlan = textPlans.find((plan) => plan.chapters.length >= 2);
+  const activeGroupedPlan = textPlans.find((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
+  const activeGroupedPlans = activeGroupedPlan ? [activeGroupedPlan] : [];
+  const noticeModalWork = parsedWorks.find((work) => work.id === noticeModalWorkId);
+  const metadataCandidateModalPlan = textPlans.find((plan) => plan.id === metadataCandidateModalPlanId);
+  const splitSummary = textPlans
+    .filter((plan) => plan.chapters.length >= 2 && plan.mode !== "single")
+    .map((plan) => `已按章节拆分，并保留“${plan.groupName.trim() || titleFromFileName(plan.fileName)}”分组关系。`)
+    .filter((summary, index, summaries) => summaries.indexOf(summary) === index)
+    .join(" ");
   const importQueueEntries = Array.from(parsedWorks.reduce((groups, work) => {
     const key = work.sourceBatchId || work.id;
     const current = groups.get(key);
@@ -1364,21 +1561,30 @@ export default function ImportWorkspace() {
               </>}
 
               {currentStep === 2 && <div className={styles.stepPage}>
-                {textPlans.length > 0 && <div className={styles.textPlanList}>{textPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
-                    <div className={styles.textPlanHeading}><div><strong>{plan.fileName}</strong><p>{plan.canChangeEncoding ? `当前编码：${plan.encoding.toUpperCase()}；` : `来源：${plan.sourceType.toUpperCase()}；`}{plan.chapters.length >= 2 ? `识别到 ${plan.chapters.length} 个章节标题` : "暂未识别到可拆分的章节"}</p></div>{plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}</div>
-                    {plan.chapters.length >= 2 ? <fieldset className={styles.splitOptions}><legend>导入类型</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />作为一部长篇的 {plan.chapters.length} 个章节</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />作为一个合集里的 {plan.chapters.length} 篇单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持为一篇，不拆分</label></fieldset> : <p className={styles.noChaptersHint}>章节标题支持“第一章、序章、番外、尾声、Chapter 1”等常见写法；未识别时会保持整篇。</p>}
-                  </section>)}</div>}
+                {(encodingPlan || splitPlan) && <div className={styles.textPlanList}>
+                  {encodingPlan && <section className={styles.textPlanCard}>
+                    <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={encodingPlan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(encodingPlan.id, { encoding })} /></div>
+                  </section>}
+                  {splitPlan && <section className={styles.textPlanCard}>
+                    <fieldset className={styles.splitOptions}><legend>导入方式</legend><label><input type="radio" name="import-mode" checked={splitPlan.mode === "serial"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "serial" })} />长篇连载</label><label><input type="radio" name="import-mode" checked={splitPlan.mode === "collection"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "collection" })} />合集单篇</label><label><input type="radio" name="import-mode" checked={splitPlan.mode === "single"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "single" })} />保持整篇</label></fieldset>
+                  </section>}
+                </div>}
                 <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setAllParsedSelection(event.target.checked)} /> 全选</label></div>
+                {splitSummary && <p className={styles.previewDescription}>{splitSummary}</p>}
                 <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
-                <div className={styles.previewList}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div><div className={styles.fileMeta}>{work.sourceName} · {work.wordCount.toLocaleString()} 字</div>{work.warning && <p className={styles.warning}>{work.warning}</p>}{work.duplicateMatch && <div className={`${styles.duplicateNotice} ${styles[`duplicate${work.duplicateMatch.kind}`]}`} role="status"><div><strong>{work.duplicateMatch.kind === "exact" ? "完全重复" : work.duplicateMatch.kind === "update" ? "检测到已有章节" : work.duplicateMatch.kind === "batch" ? "本批次章节号冲突" : "疑似重复"}</strong><p>{work.duplicateMatch.message}</p></div><div className={styles.duplicateActions}><button type="button" className={styles.textButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "skip"); }}>跳过</button>{work.duplicateMatch.kind === "update" ? <><button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "update"); }}>更新已有版本</button><button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "keep"); }}>作为新章节</button></> : <button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); setDuplicateAction(work.id, "keep"); }}>{work.duplicateMatch.kind === "exact" ? "仍保留为新作品" : work.duplicateMatch.kind === "batch" ? "保留为独立内容" : "保留为新作品"}</button>}</div></div>}<label className={styles.contentField}><span>正文</span><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /></label></div></article>)}</div>
+                <div className={`${styles.previewList} ${parsedWorks.length === 1 ? styles.previewListSingle : parsedWorks.length === 2 ? styles.previewListDouble : ""}`}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div><label className={styles.contentField}><span>正文</span><div className={styles.contentFieldControl}><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /><span className={styles.wordCount}>{work.wordCount.toLocaleString()} 字</span></div></label></div></article>)}</div>
                 </div>
                 <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>下一步</button></div>
               </div>}
 
               {currentStep === 3 && <div className={styles.stepPage}>
-                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>长篇标签属于连载本身；单篇标签会应用到本次选中的每篇单篇。</p></div></div>
+                <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>确认简介后，才会写入连载或合集。</p></div></div>
                 <div className={styles.stepScrollArea}>
-                  {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}><label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label><label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>{plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}</section>)}
+                  {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}>
+                    <label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label>
+                    <label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="请确认或填写简介，最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>
+                    {plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}
+                  </section>)}
                   {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <>
                     <div className={styles.bulkTagBar}>
                       <span>批量添加单篇标签</span>
@@ -1440,6 +1646,49 @@ export default function ImportWorkspace() {
                 </section>
               </div>}
           </section>
+          {metadataCandidateModalPlan && typeof document !== "undefined" && createPortal(
+            <div className="modal-overlay active" onClick={() => setMetadataCandidateModalPlanId(null)}>
+              <div className="modal" role="dialog" aria-modal="true" aria-labelledby={`metadata-candidate-modal-title-${metadataCandidateModalPlan.id}`} onClick={(event) => event.stopPropagation()}>
+                <div className="modal-title" id={`metadata-candidate-modal-title-${metadataCandidateModalPlan.id}`}>已识别出的{metadataCandidateModalPlan.mode === "serial" ? "连载" : "合集"}简介</div>
+                <div className="modal-body">
+                  <p className={styles.importNoticeWorkTitle}>《{metadataCandidateModalPlan.groupName.trim() || "未命名作品"}》</p>
+                  <p>{metadataCandidateModalPlan.descriptionCandidate}</p>
+                </div>
+                <div className="modal-actions importNoticeActions metadataCandidateModalActions">
+                  <button type="button" className="btn-modal btn-modal-cancel" onClick={() => setMetadataCandidateModalPlanId(null)}>取消</button>
+                  <button type="button" className="btn-modal btn-modal-primary" onClick={() => adoptDescriptionCandidate(metadataCandidateModalPlan.id)}>采用</button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+          {noticeModalWork && typeof document !== "undefined" && createPortal(
+            <div className="modal-overlay active" onClick={closeImportNotices}>
+              <div className="modal" role="dialog" aria-modal="true" aria-labelledby={`import-notice-title-${noticeModalWork.id}`} onClick={(event) => event.stopPropagation()}>
+                <div className="modal-title" id={`import-notice-title-${noticeModalWork.id}`}>{noticeModalWork.duplicateMatch ? getDuplicateNoticeTitle(noticeModalWork.duplicateMatch.kind) : "导入提示"}</div>
+                <div className="modal-body">
+                  <p className={styles.importNoticeWorkTitle}>《{noticeModalWork.title}》</p>
+                  {noticeModalWork.warning && <p>{noticeModalWork.warning}</p>}
+                  {noticeModalWork.duplicateMatch && <p>{noticeModalWork.duplicateMatch.message}</p>}
+                </div>
+                <div className="modal-actions importNoticeActions">
+                  {noticeModalWork.duplicateMatch
+                    ? <>
+                      <button type="button" className="btn-modal btn-modal-cancel" onClick={closeImportNotices}>取消</button>
+                      {noticeModalWork.duplicateMatch.kind === "update" && <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("update")}>更新已有版本</button>}
+                      {noticeModalWork.duplicateMatch.kind === "update"
+                        ? <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("keep")}>作为新章节</button>
+                        : <>
+                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("skip")}>跳过</button>
+                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("keep")}>{getDuplicateKeepLabel(noticeModalWork.duplicateMatch.kind)}</button>
+                        </>}
+                    </>
+                    : <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice()}>知道了</button>}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
         </main>
     </div>
   );

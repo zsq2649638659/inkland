@@ -48,6 +48,15 @@ function chapterNumberFromTitle(title: string) {
   return matched ? chineseNumberValue(matched[1]) : undefined;
 }
 
+export function extractImportPreamble(content: string) {
+  const lines = normalizeChapterContent(content).split("\n");
+  const headings = lines
+    .map((line, index) => ({ index, title: cleanImportHeading(line) }))
+    .filter(({ title }) => title.length > 0 && title.length <= 80 && CHAPTER_HEADING.test(title));
+  if (headings.length < 2) return "";
+  return normalizeChapterContent(lines.slice(0, headings[0].index).join("\n"));
+}
+
 export function splitImportChapters(content: string): ImportChapter[] {
   const lines = normalizeChapterContent(content).split("\n");
   const headings = lines
