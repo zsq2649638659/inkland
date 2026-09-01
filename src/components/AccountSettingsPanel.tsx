@@ -31,28 +31,28 @@ const fallbackActivity: AccountActivity = {
 
 const levelBands = [
   { number: 1, start: 0, end: 100 },
-  { number: 2, start: 100, end: 2000 },
-  { number: 3, start: 2000, end: 5000 },
-  { number: 4, start: 5000, end: 10000 },
-  { number: 5, start: 10000, end: 18000 },
-  { number: 6, start: 18000, end: 28800 },
+  { number: 2, start: 100, end: 500 },
+  { number: 3, start: 500, end: 2500 },
+  { number: 4, start: 2500, end: 10000 },
+  { number: 5, start: 10000, end: 20000 },
+  { number: 6, start: 20000, end: 100000 },
 ] as const;
 
 function deriveExperience(activity: AccountActivity) {
   // 目前数据库还没有经验流水表，先按现有可核实记录折算历史经验：
-  // 发布作品按现行规则计 20 经验；收藏/关注任务按完成过一次计 5 经验；当前登录计 5 经验。
-  const activityExperience = activity.publishedWorks * 20 + (activity.following + activity.bookmarks > 0 ? 5 : 0);
-  const total = Math.max(5, activityExperience + 5);
+  // 发布作品按 10 经验计；收藏/关注任务按完成过一次计 2 经验；当前登录计 2 经验。
+  const activityExperience = activity.publishedWorks * 10 + (activity.following + activity.bookmarks > 0 ? 2 : 0);
+  const total = Math.max(2, activityExperience + 2);
   const band = levelBands.find(({ end }) => total < end) || levelBands[levelBands.length - 1];
   const current = Math.min(Math.max(0, total - band.start), band.end - band.start);
   return { total, current, next: band.end - band.start, number: band.number, start: band.start, end: band.end };
 }
 
 const experienceRules = [
-  ["每日登录", "+5 经验"],
-  ["阅读作品", "+5 经验 / 日"],
-  ["收藏或关注作品", "+5 经验 / 日"],
-  ["发布通过审核的作品", "+20 经验 / 日"],
+  ["每日登录", "+2 经验"],
+  ["阅读作品", "+2 经验"],
+  ["收藏或关注作品", "+2 经验"],
+  ["发布审核通过的作品", "+10 经验"],
 ] as const;
 
 const coinBalance = 0;
