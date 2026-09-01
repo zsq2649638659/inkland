@@ -9931,6 +9931,22 @@ p {
 
 /* ===== Settings Page ===== */
 #page-settings .content-area { padding-bottom: 60px; }
+#page-discover .content-area { padding-bottom: 60px; }
+#page-discover .interest-discover-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+#page-discover .interest-discover-summary { margin-bottom: 16px; padding: 16px 20px; }
+#page-discover .interest-summary-label { margin-bottom: 10px; color: var(--color-text-muted); font-size: 13px; font-weight: 600; }
+#page-discover .interest-discover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--spacing-md); }
+#page-discover .interest-discover-item { display: flex; align-items: flex-start; gap: 14px; margin: 0; text-decoration: none; }
+#page-discover .interest-discover-item:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+#page-discover .interest-discover-item-icon { display: flex; width: 46px; height: 46px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: var(--radius-sm); background: var(--color-bg-page); color: var(--color-primary); font-size: 18px; }
+#page-discover .interest-discover-item-body { min-width: 0; }
+#page-discover .interest-discover-item-body h2 { margin: 0 0 5px; overflow: hidden; color: var(--color-text); font-size: 15px; font-weight: 600; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+#page-discover .interest-discover-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--color-text-muted); font-size: 12px; }
+#page-discover .interest-discover-item-body p { display: -webkit-box; margin-top: 8px; overflow: hidden; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+@media (max-width: 700px) {
+  #page-discover .interest-discover-header { align-items: stretch; flex-direction: column; }
+  #page-discover .interest-discover-grid { grid-template-columns: 1fr; }
+}
 
 /* Panel */
 .settings-panel { animation: settingsFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }

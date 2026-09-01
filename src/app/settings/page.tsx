@@ -8,8 +8,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ProfileEditForm from "@/components/ProfileEditForm";
+import InterestPicker from "@/components/InterestPicker";
 
-type SettingsTab = "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+type SettingsTab = "profile" | "interests" | "password" | "blocked" | "notifications" | "about" | "contact";
 
 const siteContactEmail = "inkland@163.com";
 
@@ -83,6 +84,7 @@ export default function SettingsPage() {
 
   const tabs: { key: SettingsTab; label: string }[] = [
     { key: "profile", label: "编辑资料" },
+    { key: "interests", label: "兴趣偏好" },
     { key: "password", label: "修改密码" },
     { key: "blocked", label: "屏蔽管理" },
     { key: "notifications", label: "通知设置" },
@@ -221,6 +223,11 @@ export default function SettingsPage() {
             <div id="page-profile-edit" className="profile-edit-content">
               <ProfileEditForm />
             </div>
+          </section>
+
+          {/* ---- Panel: 兴趣偏好 ---- */}
+          <section className="settings-panel" style={{ display: activeTab === "interests" ? "block" : "none" }}>
+            <InterestPicker mode="settings" />
           </section>
 
           {/* ---- Panel: 修改密码 ---- */}
