@@ -54,7 +54,7 @@ function parseSort(value: string | null): SortFilter {
 }
 
 const SORT_OPTIONS: Array<{ value: SortFilter; label: string }> = [
-  { value: "latest", label: "按更新时间" },
+  { value: "latest", label: "按时间" },
   { value: "hot", label: "按热度" },
   { value: "bookmarks", label: "按收藏量" },
 ];
@@ -565,7 +565,6 @@ function SearchContent() {
                           }}
                         >
                           <span>{option.label}</span>
-                          {sortBy === option.value && <i className="fa-solid fa-check" aria-hidden="true"></i>}
                         </button>
                       ))}
                     </div>
