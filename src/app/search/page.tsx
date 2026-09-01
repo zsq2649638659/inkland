@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import HomeSidebar from "@/components/HomeSidebar";
@@ -13,6 +13,9 @@ import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type SearchFilter = "tags" | "users" | "works" | "posts";
+type WorkTypeFilter = "all" | "single" | "image" | "serial";
+type SeriesStatusFilter = "all" | "ongoing" | "completed";
+type SortFilter = "latest" | "hot" | "bookmarks";
 
 interface TagResult {
   name: string;
@@ -25,17 +28,84 @@ interface UserResult {
   avatar_url: string | null;
 }
 
+type SearchPost = Post & {
+  series_status?: SeriesStatusFilter;
+};
+
+const IMAGE_POST_TYPES = ["illustration", "comic", "cosplay"] as const;
+const SINGLE_POST_TYPES = ["illustration", "comic", "cosplay", "serial"] as const;
+const SEARCH_RESULT_LIMIT = 20;
+const SEARCH_SORT_CANDIDATE_LIMIT = 100;
+
+function parseSearchFilter(value: string | null): SearchFilter {
+  return value === "users" || value === "works" || value === "posts" ? value : "tags";
+}
+
+function parseWorkType(value: string | null): WorkTypeFilter {
+  return value === "single" || value === "image" || value === "serial" ? value : "all";
+}
+
+function parseSeriesStatus(value: string | null): SeriesStatusFilter {
+  return value === "ongoing" || value === "completed" ? value : "all";
+}
+
+function parseSort(value: string | null): SortFilter {
+  return value === "hot" || value === "bookmarks" ? value : "latest";
+}
+
+function parseWordValue(value: string | null): string {
+  return value && /^\d+$/.test(value) ? value : "";
+}
+
+function getPostVisual(postType?: string) {
+  switch (postType) {
+    case "serial": return { label: "长篇连载", icon: "fa-book-open", kind: "series" };
+    case "illustration":
+    case "comic":
+    case "cosplay": return { label: "图片", icon: "fa-image", kind: "image" };
+    default: return { label: "单篇", icon: "fa-file-lines", kind: "single" };
+  }
+}
+
+function getPostHeat(post: SearchPost): number {
+  return (post.like_count || 0) + (post.comment_count || 0) + (post.bookmark_count || 0);
+}
+
+function sortPosts(posts: SearchPost[], sortBy: SortFilter): SearchPost[] {
+  if (sortBy === "latest") {
+    return [...posts].sort((a, b) => {
+      const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
+      const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
+      return bTime - aTime;
+    });
+  }
+
+  return [...posts].sort((a, b) => {
+    const aValue = sortBy === "hot" ? getPostHeat(a) : (a.bookmark_count || 0);
+    const bValue = sortBy === "hot" ? getPostHeat(b) : (b.bookmark_count || 0);
+    if (bValue !== aValue) return bValue - aValue;
+    const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
+    const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
-  const initialType = (searchParams.get("type") || "tags") as SearchFilter;
+  const initialType = parseSearchFilter(searchParams.get("type"));
   const supabase = createClient();
   const { user, profile, loading: authLoading } = useAuth();
 
   const [inputValue, setInputValue] = useState(initialQuery);
   const [activeFilter, setActiveFilter] = useState<SearchFilter>(initialType);
+  const [workType, setWorkType] = useState<WorkTypeFilter>(parseWorkType(searchParams.get("workType")));
+  const [seriesStatus, setSeriesStatus] = useState<SeriesStatusFilter>(parseSeriesStatus(searchParams.get("seriesStatus")));
+  const [sortBy, setSortBy] = useState<SortFilter>(parseSort(searchParams.get("sort")));
+  const [minWords, setMinWords] = useState(parseWordValue(searchParams.get("minWords")));
+  const [maxWords, setMaxWords] = useState(parseWordValue(searchParams.get("maxWords")));
   // 作品（标题匹配）和正文（内容匹配）分开存储，不再混入标签关联作品
-  const [titlePosts, setTitlePosts] = useState<Post[]>([]);
+  const [titlePosts, setTitlePosts] = useState<SearchPost[]>([]);
   const [contentPosts, setContentPosts] = useState<Post[]>([]);
   const [tags, setTags] = useState<TagResult[]>([]);
   const [users, setUsers] = useState<UserResult[]>([]);
@@ -52,6 +122,28 @@ function SearchContent() {
     { key: "works", label: "作品" },
     { key: "posts", label: "正文" },
   ];
+
+  const syncSearchUrl = (overrides: { query?: string; type?: SearchFilter } = {}) => {
+    const url = new URL(window.location.href);
+    const query = overrides.query ?? inputValue.trim();
+    const type = overrides.type ?? activeFilter;
+    const nextValues: Array<[string, string]> = [
+      ["q", query],
+      ["type", type],
+      ["workType", workType],
+      ["seriesStatus", seriesStatus],
+      ["sort", sortBy],
+      ["minWords", minWords],
+      ["maxWords", maxWords],
+    ];
+
+    ["q", "type", "workType", "seriesStatus", "sort", "minWords", "maxWords"].forEach((key) => url.searchParams.delete(key));
+    nextValues.forEach(([key, value]) => {
+      if (!value || (key === "type" && value === "tags") || (key === "workType" && value === "all") || (key === "seriesStatus" && value === "all") || (key === "sort" && value === "latest")) return;
+      url.searchParams.set(key, value);
+    });
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  };
 
   const doSearch = useCallback(async (query: string, rid: number) => {
     if (!query.trim() || !user) {
@@ -70,11 +162,55 @@ function SearchContent() {
 
     const q = query.trim();
     const includeTestData = includeTestDataForProfile(profile);
+    const applyWorkRefine = activeFilter === "works";
+    const minWordCount = minWords ? Number(minWords) : null;
+    const maxWordCount = maxWords ? Number(maxWords) : null;
+    const postSelect = "id, title, content, word_count, post_type, created_at, updated_at, cover_url, user_id, series_name, chapter_number, author:profiles!posts_user_id_fkey(nickname, avatar_url)";
 
-    const postSelect = "id, title, content, word_count, post_type, created_at, cover_url, user_id, series_name, chapter_number, author:profiles!posts_user_id_fkey(nickname, avatar_url)";
+    let allowedSeriesNames: string[] | null = null;
+    if (applyWorkRefine && seriesStatus !== "all") {
+      const seriesQuery = withTestDataVisibility(
+        supabase.from("series").select("name").eq("status", seriesStatus),
+        includeTestData,
+      );
+      const { data: seriesRows } = await seriesQuery;
+      allowedSeriesNames = ((seriesRows || []) as Array<{ name?: string | null }>)
+        .map((row) => row.name || "")
+        .filter(Boolean);
+    }
+
+    if (rid !== requestIdRef.current) return;
+
+    const makePostQuery = (matchColumn: "title" | "content", refineWorks: boolean) => {
+      let queryBuilder = withTestDataVisibility(
+        supabase
+          .from("posts")
+          .select(postSelect)
+          .ilike(matchColumn, `%${q}%`)
+          .eq("status", "published"),
+        includeTestData,
+      );
+
+      if (refineWorks) {
+        if (workType === "serial") queryBuilder = queryBuilder.eq("post_type", "serial");
+        if (workType === "image") queryBuilder = queryBuilder.in("post_type", [...IMAGE_POST_TYPES]);
+        if (workType === "single") queryBuilder = queryBuilder.not("post_type", "in", `(${SINGLE_POST_TYPES.join(",")})`);
+        if (seriesStatus !== "all") {
+          if (!allowedSeriesNames || allowedSeriesNames.length === 0) return null;
+          queryBuilder = queryBuilder.in("series_name", allowedSeriesNames);
+        }
+        if (minWordCount !== null) queryBuilder = queryBuilder.gte("word_count", minWordCount);
+        if (maxWordCount !== null) queryBuilder = queryBuilder.lte("word_count", maxWordCount);
+      }
+
+      return queryBuilder
+        .order("updated_at", { ascending: false })
+        .limit(refineWorks && sortBy !== "latest" ? SEARCH_SORT_CANDIDATE_LIMIT : SEARCH_RESULT_LIMIT);
+    };
 
     // 第一波并行：屏蔽关系 + 标签 + 用户 + 作品标题 + 正文。
-    // 屏蔽关系不应再单独占用一轮跨区往返。
+    // 作品筛选只作用于“作品”结果，正文搜索保留原有语义。
+    const titleQuery = makePostQuery("title", applyWorkRefine);
     const [blockedRes, tagRes, userRes, titleRes, contentRes] = await Promise.all([
       supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id),
       supabase.from("tags").select("id, name").ilike("name", `%${q}%`).limit(20),
@@ -82,34 +218,50 @@ function SearchContent() {
         supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(20),
         includeTestData,
       ),
-      // 作品：只搜标题
-      withTestDataVisibility(
-        supabase.from("posts").select(postSelect).ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(20),
-        includeTestData,
-      ),
-      // 正文：只搜内容
-      withTestDataVisibility(
-        supabase.from("posts").select(postSelect).ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(20),
-        includeTestData,
-      ),
+      titleQuery || Promise.resolve({ data: [] as unknown[] }),
+      makePostQuery("content", false),
     ]);
 
     if (rid !== requestIdRef.current) return;
 
     const blockedIds = new Set(((blockedRes.data || []) as Array<{ blocked_user_id?: string | null }>).map((row) => row.blocked_user_id as string));
-
-    // 先展示主结果；标签篇数在后台补齐，不再让一条统计查询阻塞整页。
     const tagRows = (tagRes.data || []) as Array<{ id: string; name: string }>;
     const visibleUsers = ((userRes.data || []) as UserResult[]).filter((item) => !blockedIds.has(item.id));
-    const visibleTitlePosts = ((titleRes.data || []) as unknown as Post[])
+    const rawTitlePosts = ((titleRes.data || []) as unknown as SearchPost[])
+      .filter((post) => !blockedIds.has(post.user_id || ""));
+    const visibleContentPosts = ((contentRes?.data || []) as unknown as Post[])
       .filter((post) => !blockedIds.has(post.user_id || ""))
       .map((post) => ({ ...post, content: slimContent(post.content || "") }));
-    const visibleContentPosts = ((contentRes.data || []) as unknown as Post[])
-      .filter((post) => !blockedIds.has(post.user_id || ""))
-      .map((post) => ({ ...post, content: slimContent(post.content || "") }));
+
+    const serialNames = [...new Set(rawTitlePosts.filter((post) => post.post_type === "serial" && post.series_name).map((post) => post.series_name as string))];
+    const seriesQuery = serialNames.length > 0
+      ? withTestDataVisibility(supabase.from("series").select("name, status").in("name", serialNames), includeTestData)
+      : null;
+    const statsQuery = applyWorkRefine && sortBy !== "latest" && rawTitlePosts.length > 0
+      ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", rawTitlePosts.map((post) => post.id))
+      : null;
+    const [{ data: seriesRows }, { data: statsRows }] = await Promise.all([
+      seriesQuery || Promise.resolve({ data: [] as unknown[] }),
+      statsQuery || Promise.resolve({ data: [] as unknown[] }),
+    ]);
+
+    const seriesStatusMap = new Map(((seriesRows || []) as Array<{ name?: string | null; status?: SeriesStatusFilter }>).map((row) => [row.name || "", row.status || "ongoing"]));
+    const statsMap = new Map(((statsRows || []) as Array<{ id?: string; like_count?: number; comment_count?: number; bookmark_count?: number }>).map((row) => [row.id || "", row]));
+    const visibleTitlePosts = rawTitlePosts
+      .map((post) => ({
+        ...post,
+        content: slimContent(post.content || ""),
+        series_status: post.post_type === "serial" ? (seriesStatusMap.get(post.series_name || "") || "ongoing") : undefined,
+        like_count: statsMap.get(post.id)?.like_count || 0,
+        comment_count: statsMap.get(post.id)?.comment_count || 0,
+        bookmark_count: statsMap.get(post.id)?.bookmark_count || 0,
+      }));
+
+    if (rid !== requestIdRef.current) return;
+
     setTags([]);
     setUsers(visibleUsers);
-    setTitlePosts(visibleTitlePosts);
+    setTitlePosts(sortPosts(visibleTitlePosts, applyWorkRefine ? sortBy : "latest").slice(0, SEARCH_RESULT_LIMIT));
     setContentPosts(visibleContentPosts);
     setLoading(false);
 
@@ -117,9 +269,9 @@ function SearchContent() {
 
     const tagIds = tagRows.map((t) => t.id);
     const { data: ptCounts } = await supabase
-        .from("post_tags")
-        .select("tag_id, post_id")
-        .in("tag_id", tagIds);
+      .from("post_tags")
+      .select("tag_id, post_id")
+      .in("tag_id", tagIds);
 
     if (rid !== requestIdRef.current) return;
 
@@ -140,72 +292,69 @@ function SearchContent() {
       .filter((tag) => (countMap.get(tag.id) || 0) > 0)
       .map((tag) => ({ name: tag.name, post_count: countMap.get(tag.id) || 0 }))
       .sort((a, b) => b.post_count - a.post_count));
-  }, [supabase, user, profile?.is_test_account]);
+  }, [activeFilter, maxWords, minWords, profile, seriesStatus, sortBy, supabase, user, workType]);
 
-  // URL 参数同步（初始加载）
-  useEffect(() => {
-    setInputValue(initialQuery);
-  }, [initialQuery]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 输入防抖自动搜索（300ms）
+  // 输入和筛选条件共用防抖自动搜索（300ms）
   useEffect(() => {
     if (!user) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const q = inputValue.trim();
     if (!q) {
-      setTitlePosts([]);
-      setContentPosts([]);
-      setTags([]);
-      setUsers([]);
-      setLoading(false);
-      setHasSearched(false);
+      syncSearchUrl({ query: "" });
       return;
     }
 
-    setLoading(true);
     debounceRef.current = setTimeout(() => {
       const rid = ++requestIdRef.current;
-      doSearch(q, rid);
-      // 同步 URL（不触发 React 重渲染）
-      window.history.replaceState(null, "", `/search?q=${encodeURIComponent(q)}&type=${activeFilter}`);
+      setLoading(true);
+      syncSearchUrl({ query: q });
+      void doSearch(q, rid);
     }, 300);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [inputValue, user, profile?.is_test_account]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeFilter, doSearch, inputValue, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleInputChange = (value: string) => {
-    setInputValue(value);
-  };
-
-  const handleClear = () => {
-    setInputValue("");
+  const clearResults = () => {
+    requestIdRef.current += 1;
     setTitlePosts([]);
     setContentPosts([]);
     setTags([]);
     setUsers([]);
+    setLoading(false);
     setHasSearched(false);
-    window.history.replaceState(null, "", "/search");
+  };
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    if (!value.trim()) clearResults();
+  };
+
+  const handleClear = () => {
+    setInputValue("");
+    clearResults();
+    syncSearchUrl({ query: "" });
   };
 
   const handleFilterClick = (filter: SearchFilter) => {
     setActiveFilter(filter);
     const q = inputValue.trim();
-    if (q) {
-      window.history.replaceState(null, "", `/search?q=${encodeURIComponent(q)}&type=${filter}`);
-    }
+    syncSearchUrl({ query: q, type: filter });
   };
 
-  const getPostVisual = (postType?: string) => {
-    switch (postType) {
-      case "serial": return { label: "长篇连载", icon: "fa-book-open", kind: "series" };
-      case "illustration":
-      case "comic":
-      case "cosplay": return { label: "图片", icon: "fa-image", kind: "image" };
-      default: return { label: "单篇", icon: "fa-file-lines", kind: "single" };
-    }
+  const handleWorkTypeChange = (nextType: WorkTypeFilter) => {
+    setWorkType(nextType);
+    if (nextType === "single" || nextType === "image") setSeriesStatus("all");
+  };
+
+  const resetRefine = () => {
+    setWorkType("all");
+    setSeriesStatus("all");
+    setSortBy("latest");
+    setMinWords("");
+    setMaxWords("");
   };
 
   if (authLoading) {
@@ -231,7 +380,7 @@ function SearchContent() {
                 autoComplete="off"
               />
               <div className="search-actions">
-                <button className="search-clear-btn" aria-label="清除搜索">
+                <button type="button" className="search-clear-btn" aria-label="清除搜索">
                   <i className="fa-solid fa-xmark"></i>
                 </button>
               </div>
@@ -240,6 +389,7 @@ function SearchContent() {
           <div className="filter-tabs" role="tablist">
             {filters.map((f) => (
               <button
+                type="button"
                 key={f.key}
                 className={`filter-tab${activeFilter === f.key ? " active" : ""}`}
                 role="tab"
@@ -271,16 +421,24 @@ function SearchContent() {
     );
   }
 
-  // 结果计数
   const tagCount = tags.length;
   const userCount = users.length;
   const workCount = titlePosts.length;
   const postCount = contentPosts.length;
-
   const hasTagResults = tagCount > 0;
   const hasUserResults = userCount > 0;
   const hasWorkResults = workCount > 0;
   const hasPostResults = postCount > 0;
+  const minWordCount = minWords ? Number(minWords) : null;
+  const maxWordCount = maxWords ? Number(maxWords) : null;
+  const rangeInvalid = minWordCount !== null && maxWordCount !== null && minWordCount > maxWordCount;
+  const refineCount = [
+    workType !== "all",
+    seriesStatus !== "all",
+    sortBy !== "latest",
+    minWords !== "",
+    maxWords !== "",
+  ].filter(Boolean).length;
 
   const currentHasResults = (() => {
     switch (activeFilter) {
@@ -309,6 +467,7 @@ function SearchContent() {
             />
             <div className="search-actions">
               <button
+                type="button"
                 className={`search-clear-btn${inputValue ? " visible" : ""}`}
                 onClick={handleClear}
                 aria-label="清除搜索"
@@ -322,6 +481,7 @@ function SearchContent() {
         <div className="filter-tabs" role="tablist">
           {filters.map((f) => (
             <button
+              type="button"
               key={f.key}
               className={`filter-tab${activeFilter === f.key ? " active" : ""}`}
               role="tab"
@@ -333,12 +493,108 @@ function SearchContent() {
           ))}
         </div>
 
-        {/* Loading */}
-        {loading && (
-          <SkeletonSearchResults />
+        {activeFilter === "works" && (
+          <section className="search-refine-panel" aria-labelledby="search-refine-title">
+            <div className="search-refine-heading">
+              <div>
+                <h2 id="search-refine-title" className="search-refine-title">筛选作品</h2>
+                <p className="search-refine-subtitle">按需要缩小结果</p>
+              </div>
+              <button type="button" className="search-refine-reset" onClick={resetRefine} disabled={refineCount === 0}>
+                重置{refineCount > 0 ? `（${refineCount}）` : ""}
+              </button>
+            </div>
+
+            <div className="search-refine-grid">
+              <fieldset className="search-refine-group">
+                <legend>作品类型</legend>
+                <div className="search-refine-options" role="radiogroup" aria-label="作品类型">
+                  {(["all", "single", "image", "serial"] as WorkTypeFilter[]).map((type) => {
+                    const labels: Record<WorkTypeFilter, string> = { all: "全部", single: "单篇", image: "图片", serial: "连载" };
+                    return (
+                      <button
+                        type="button"
+                        key={type}
+                        className={`search-refine-chip${workType === type ? " active" : ""}`}
+                        role="radio"
+                        aria-checked={workType === type}
+                        onClick={() => handleWorkTypeChange(type)}
+                      >
+                        {labels[type]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <fieldset className="search-refine-group" disabled={workType === "single" || workType === "image"}>
+                <legend>连载状态 <span className="search-refine-legend-note">仅连载</span></legend>
+                <div className="search-refine-options" role="radiogroup" aria-label="连载状态">
+                  {(["all", "ongoing", "completed"] as SeriesStatusFilter[]).map((status) => {
+                    const labels: Record<SeriesStatusFilter, string> = { all: "全部", ongoing: "连载中", completed: "已完结" };
+                    return (
+                      <button
+                        type="button"
+                        key={status}
+                        className={`search-refine-chip${seriesStatus === status ? " active" : ""}`}
+                        role="radio"
+                        aria-checked={seriesStatus === status}
+                        onClick={() => setSeriesStatus(status)}
+                      >
+                        {labels[status]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <div className="search-refine-control">
+                <label htmlFor="search-sort">排序方式</label>
+                <div className="search-refine-select-wrap">
+                  <select id="search-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortFilter)}>
+                    <option value="latest">按更新时间</option>
+                    <option value="hot">按热度</option>
+                    <option value="bookmarks">按收藏量</option>
+                  </select>
+                  <i className="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </div>
+              </div>
+
+              <div className="search-refine-control">
+                <span className="search-refine-label">字数范围</span>
+                <div className="search-refine-range">
+                  <label>
+                    <span className="sr-only">最少字数</span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      placeholder="最少"
+                      value={minWords}
+                      onChange={(e) => setMinWords(e.target.value.replace(/\D/g, ""))}
+                    />
+                  </label>
+                  <span className="search-refine-range-separator">至</span>
+                  <label>
+                    <span className="sr-only">最多字数</span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      placeholder="最多"
+                      value={maxWords}
+                      onChange={(e) => setMaxWords(e.target.value.replace(/\D/g, ""))}
+                    />
+                  </label>
+                </div>
+                {rangeInvalid && <p className="search-refine-error" role="alert">最少字数不能大于最多字数</p>}
+              </div>
+            </div>
+          </section>
         )}
 
-        {/* Initial empty state */}
+        {loading && <SkeletonSearchResults />}
+
         {!loading && !hasSearched && (
           <div className="results-area">
             <div className="feed-empty-state">
@@ -356,27 +612,23 @@ function SearchContent() {
           </div>
         )}
 
-        {/* No results */}
         {!loading && hasSearched && !currentHasResults && (
           <div className="no-results visible">
             <i className="fa-solid fa-magnifying-glass"></i>
-            <p>没有找到相关结果</p>
+            <p>{activeFilter === "works" && refineCount > 0 ? "没有符合当前筛选条件的作品" : "没有找到相关结果"}</p>
+            {activeFilter === "works" && refineCount > 0 && (
+              <button type="button" className="search-empty-action" onClick={resetRefine}>重置筛选</button>
+            )}
           </div>
         )}
 
-        {/* Results */}
         {!loading && hasSearched && (
           <div className="results-area">
-            {/* Tags Section */}
-            {(activeFilter === "tags") && hasTagResults && (
+            {activeFilter === "tags" && hasTagResults && (
               <div className="result-section" data-section="tags">
                 <div className="tags-grid">
                   {tags.map((tag) => (
-                    <Link
-                      key={tag.name}
-                      href={`/tag/${encodeURIComponent(tag.name)}`}
-                      className="tag-card"
-                    >
+                    <Link key={tag.name} href={`/tag/${encodeURIComponent(tag.name)}`} className="tag-card">
                       <span className="tag-icon"><i className="fa-solid fa-tag"></i></span>
                       <span className="tag-name">{tag.name}</span>
                       <span className="tag-count">{tag.post_count} 篇作品</span>
@@ -386,72 +638,52 @@ function SearchContent() {
               </div>
             )}
 
-            {/* Users Section */}
-            {(activeFilter === "users") && hasUserResults && (
+            {activeFilter === "users" && hasUserResults && (
               <div className="result-section" data-section="users">
                 <div className="user-cards-grid">
                   {users.map((u) => (
                     <div key={u.id} className="user-card">
                       <div className="user-avatar">
                         {u.avatar_url ? (
-                          <img
-                            src={u.avatar_url}
-                            alt={u.nickname || ""}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              borderRadius: "50%",
-                              objectFit: "cover",
-                              position: "absolute",
-                              inset: 0,
-                            }}
-                          />
+                          <img src={u.avatar_url} alt={u.nickname || ""} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", position: "absolute", inset: 0 }} />
                         ) : (
                           <DefaultAvatar name={u.nickname || "?"} />
                         )}
                       </div>
-                      <div className="user-info">
-                        <div className="user-name">{u.nickname}</div>
-                      </div>
-                      <div className="user-actions">
-                        <Link
-                          href={`/user/${u.id}`}
-                          className="btn-follow"
-                        >
-                          查看主页
-                        </Link>
-                      </div>
+                      <div className="user-info"><div className="user-name">{u.nickname}</div></div>
+                      <div className="user-actions"><Link href={`/user/${u.id}`} className="btn-follow">查看主页</Link></div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Works Section */}
-            {(activeFilter === "works") && hasWorkResults && (
+            {activeFilter === "works" && hasWorkResults && (
               <div className="result-section" data-section="works">
+                <div className="search-result-summary">
+                  <span>显示 {workCount} 个作品</span>
+                  <span>·</span>
+                  <span>{sortBy === "latest" ? "按更新时间" : sortBy === "hot" ? "按热度" : "按收藏量"}</span>
+                </div>
                 <div className="work-list">
                   {titlePosts.map((post) => {
                     const raw = post as unknown as Record<string, unknown>;
                     const author = raw.author as { nickname: string } | null;
                     const visual = getPostVisual(post.post_type);
+                    const statLabel = sortBy === "hot" ? `热度 ${getPostHeat(post)}` : sortBy === "bookmarks" ? `收藏 ${post.bookmark_count || 0}` : "";
                     return (
-                      <Link
-                        key={post.id}
-                        href={`/read/${post.id}`}
-                        className="work-item"
-                      >
-                        <div className={`work-item-icon ${visual.kind}`}>
-                          <i className={`fa-solid ${visual.icon}`}></i>
-                        </div>
+                      <Link key={post.id} href={`/read/${post.id}`} className="work-item">
+                        <div className={`work-item-icon ${visual.kind}`}><i className={`fa-solid ${visual.icon}`}></i></div>
                         <div className="work-info">
                           <div className="work-title">{post.title}</div>
                           <div className="work-meta">
                             <span className="work-type-badge">{visual.label}</span>
+                            {post.post_type === "serial" && <span className={`work-status-badge${post.series_status === "completed" ? " completed" : ""}`}>{post.series_status === "completed" ? "已完结" : "连载中"}</span>}
                             <span className="meta-dot"></span>
                             <span>{post.word_count?.toLocaleString() || 0} 字</span>
                             <span className="meta-dot"></span>
                             <span>{author?.nickname || "匿名"}</span>
+                            {statLabel && <span className="work-sort-stat"><i className={`fa-solid ${sortBy === "hot" ? "fa-fire" : "fa-bookmark"}`}></i>{statLabel}</span>}
                           </div>
                         </div>
                       </Link>
@@ -461,8 +693,7 @@ function SearchContent() {
               </div>
             )}
 
-            {/* Posts Section */}
-            {(activeFilter === "posts") && hasPostResults && (
+            {activeFilter === "posts" && hasPostResults && (
               <div className="result-section" data-section="posts">
                 <div className="post-list">
                   {contentPosts.map((post) => {
@@ -476,21 +707,11 @@ function SearchContent() {
                       .replace(/\s+/g, " ")
                       .trim();
                     return (
-                      <Link
-                        key={post.id}
-                        href={`/read/${post.id}`}
-                        className="post-item"
-                      >
-                        <div className="post-item-icon">
-                          <i className="fa-solid fa-file-lines"></i>
-                        </div>
+                      <Link key={post.id} href={`/read/${post.id}`} className="post-item">
+                        <div className="post-item-icon"><i className="fa-solid fa-file-lines"></i></div>
                         <div className="post-item-content">
                           <div className="post-snippet">{plainText}</div>
-                          <div className="post-source">
-                            <i className="fa-solid fa-book"></i>
-                            <span>{post.title}</span>
-                            <span>— {author?.nickname || "匿名"}</span>
-                          </div>
+                          <div className="post-source"><i className="fa-solid fa-book"></i><span>{post.title}</span><span>— {author?.nickname || "匿名"}</span></div>
                         </div>
                       </Link>
                     );
@@ -511,11 +732,7 @@ export default function SearchPage() {
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
-          <Suspense fallback={
-            <div className="flex items-center justify-center py-20">
-              <p className="text-muted">加载中...</p>
-            </div>
-          }>
+          <Suspense fallback={<div className="flex items-center justify-center py-20"><p className="text-muted">加载中...</p></div>}>
             <SearchContent />
           </Suspense>
         </div>
