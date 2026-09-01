@@ -80,6 +80,20 @@ interface TextImportPlan {
   descriptionCandidateAccepted?: boolean;
 }
 
+function getTextPlanIdentity(plan: Pick<TextImportPlan, "sourceType" | "content">) {
+  return `${plan.sourceType}\u0000${plan.content}`;
+}
+
+function getUniqueTextPlans(plans: TextImportPlan[]) {
+  const seen = new Set<string>();
+  return plans.filter((plan) => {
+    const identity = getTextPlanIdentity(plan);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
 interface ParsedFileResult {
   works: ParsedWork[];
   textPlan?: TextImportPlan;
@@ -753,11 +767,12 @@ export default function ImportWorkspace() {
       return;
     }
     if (busy || noticeModalWorkId || metadataCandidateModalPlanId) return;
-    const candidatePlan = textPlans.find((plan) => (
+    const candidatePlan = getUniqueTextPlans(textPlans).find((plan) => (
       plan.mode !== "single"
       && Boolean(plan.descriptionCandidate)
       && !plan.descriptionCandidateAccepted
-      && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id)
+      && textPlans.some((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan)
+        && parsedWorks.some((work) => work.selected && work.sourcePlanId === item.id))
     ));
     if (candidatePlan && metadataCandidatePromptedPlanRef.current !== candidatePlan.id) {
       metadataCandidatePromptedPlanRef.current = candidatePlan.id;
@@ -946,37 +961,46 @@ export default function ImportWorkspace() {
   const updateTextPlan = async (planId: string, changes: Partial<Pick<TextImportPlan, "encoding" | "mode" | "groupName">>) => {
     const current = textPlans.find((plan) => plan.id === planId);
     if (!current) return;
+    const equivalentPlanIds = new Set(textPlans
+      .filter((plan) => getTextPlanIdentity(plan) === getTextPlanIdentity(current))
+      .map((plan) => plan.id));
     setBusy(true);
     setError("");
     try {
-      const encoding = changes.encoding || current.encoding;
-      const content = changes.encoding && current.bytes ? normalizeContent(decodeText(current.bytes, encoding)) : current.content;
-      const chapters = changes.encoding ? splitImportChapters(content) : current.chapters;
-      const mode = changes.mode || (chapters.length >= 2 ? current.mode : "single");
-      const metadata = changes.encoding ? extractTextImportMetadata(content, current.groupName || titleFromFileName(current.fileName)) : undefined;
-      const nextPlan: TextImportPlan = {
-        ...current,
-        ...changes,
-        encoding,
-        content,
-        chapters,
-        mode,
-        ...(metadata ? { descriptionCandidate: metadata.descriptionCandidate, descriptionCandidateSource: metadata.descriptionSource, descriptionCandidateAccepted: false } : {}),
-      };
-      const works = await buildTextWorks(nextPlan);
-      const remainingWorks = parsedWorks.filter((work) => work.sourcePlanId !== planId);
+      const nextPlans: TextImportPlan[] = [];
+      const works: ParsedWork[] = [];
+      for (const plan of textPlans.filter((item) => equivalentPlanIds.has(item.id))) {
+        const encoding = changes.encoding || plan.encoding;
+        const content = changes.encoding && plan.bytes ? normalizeContent(decodeText(plan.bytes, encoding)) : plan.content;
+        const chapters = changes.encoding ? splitImportChapters(content) : plan.chapters;
+        const mode = changes.mode || (chapters.length >= 2 ? plan.mode : "single");
+        const metadata = changes.encoding ? extractTextImportMetadata(content, plan.groupName || titleFromFileName(plan.fileName)) : undefined;
+        const nextPlan: TextImportPlan = {
+          ...plan,
+          ...changes,
+          encoding,
+          content,
+          chapters,
+          mode,
+          ...(metadata ? { descriptionCandidate: metadata.descriptionCandidate, descriptionCandidateSource: metadata.descriptionSource, descriptionCandidateAccepted: false } : {}),
+        };
+        nextPlans.push(nextPlan);
+        works.push(...await buildTextWorks(nextPlan));
+      }
+      const remainingWorks = parsedWorks.filter((work) => !equivalentPlanIds.has(work.sourcePlanId || ""));
       const existingPosts = await loadExistingPosts();
       const annotatedWorks = annotateImportWorks(works, [
         ...existingPosts,
         ...remainingWorks.map(toExistingImportPost),
       ]);
-      setTextPlans((plans) => plans.map((plan) => plan.id === planId ? nextPlan : plan));
+      const nextPlansById = new Map(nextPlans.map((plan) => [plan.id, plan]));
+      setTextPlans((plans) => plans.map((plan) => nextPlansById.get(plan.id) || plan));
       setParsedWorks((items) => [
-        ...items.filter((work) => work.sourcePlanId !== planId),
+        ...items.filter((work) => !equivalentPlanIds.has(work.sourcePlanId || "")),
         ...annotatedWorks,
       ]);
       setNotice(changes.encoding
-        ? `已按 ${encoding.toUpperCase()} 重新读取“${current.fileName}”，识别到 ${chapters.length} 个章节。`
+        ? `已按 ${(changes.encoding || current.encoding).toUpperCase()} 重新读取“${current.fileName}”，识别到 ${nextPlans[0]?.chapters.length || 0} 个章节。`
         : `已更新“${current.fileName}”的拆分方式，共生成 ${works.length} 篇内容。`);
     } catch (planError) {
       setError(getErrorMessage(planError, "重新检测和拆分内容失败"));
@@ -1136,8 +1160,13 @@ export default function ImportWorkspace() {
   };
 
   const updateGroupInformation = (planId: string, changes: Partial<Pick<TextImportPlan, "groupName" | "groupDescription" | "groupTags">>) => {
-    setTextPlans((plans) => plans.map((plan) => plan.id === planId ? { ...plan, ...changes } : plan));
-    setParsedWorks((works) => works.map((work) => work.sourcePlanId === planId ? {
+    const current = textPlans.find((plan) => plan.id === planId);
+    if (!current) return;
+    const equivalentPlanIds = new Set(textPlans
+      .filter((plan) => getTextPlanIdentity(plan) === getTextPlanIdentity(current))
+      .map((plan) => plan.id));
+    setTextPlans((plans) => plans.map((plan) => equivalentPlanIds.has(plan.id) ? { ...plan, ...changes } : plan));
+    setParsedWorks((works) => works.map((work) => equivalentPlanIds.has(work.sourcePlanId || "") ? {
       ...work,
       ...(changes.groupName !== undefined ? { groupName: changes.groupName } : {}),
       ...(changes.groupDescription !== undefined ? { groupDescription: changes.groupDescription } : {}),
@@ -1148,22 +1177,30 @@ export default function ImportWorkspace() {
   const adoptDescriptionCandidate = (planId: string) => {
     const plan = textPlans.find((item) => item.id === planId);
     if (!plan?.descriptionCandidate) return;
+    const equivalentPlanIds = new Set(textPlans
+      .filter((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan))
+      .map((item) => item.id));
     const preamble = extractImportPreamble(plan.content);
-    setTextPlans((plans) => plans.map((item) => item.id === planId ? {
+    setTextPlans((plans) => plans.map((item) => equivalentPlanIds.has(item.id) ? {
       ...item,
-      groupDescription: item.descriptionCandidate,
+      groupDescription: plan.descriptionCandidate,
       descriptionCandidateAccepted: true,
     } : item));
     setParsedWorks((works) => {
-      const firstChapterIndex = works.findIndex((work) => work.sourcePlanId === planId);
-      if (firstChapterIndex < 0) return works;
-      const firstChapter = works[firstChapterIndex];
-      const content = removeImportedPreamble(firstChapter.content, preamble);
+      const firstChapterIndexes = new Map<string, number>();
+      works.forEach((work, index) => {
+        if (work.sourcePlanId && equivalentPlanIds.has(work.sourcePlanId) && !firstChapterIndexes.has(work.sourcePlanId)) {
+          firstChapterIndexes.set(work.sourcePlanId, index);
+        }
+      });
       return works.map((work, index) => {
-        if (work.sourcePlanId !== planId) return work;
-        if (index === firstChapterIndex) return content === work.content
-          ? { ...work, groupDescription: plan.descriptionCandidate }
-          : { ...work, content, wordCount: countWords(content), groupDescription: plan.descriptionCandidate };
+        if (!work.sourcePlanId || !equivalentPlanIds.has(work.sourcePlanId)) return work;
+        if (index === firstChapterIndexes.get(work.sourcePlanId)) {
+          const content = removeImportedPreamble(work.content, preamble);
+          return content === work.content
+            ? { ...work, groupDescription: plan.descriptionCandidate }
+            : { ...work, content, wordCount: countWords(content), groupDescription: plan.descriptionCandidate };
+        }
         return { ...work, groupDescription: plan.descriptionCandidate };
       });
     });
@@ -1395,7 +1432,10 @@ export default function ImportWorkspace() {
   const publishSuccessCount = publishResults.filter((result) => result.status === "success").length;
   const publishFailedCount = publishResults.filter((result) => result.status === "failed").length;
   const publishingItem = publishResults.find((result) => result.status === "publishing");
-  const activeGroupedPlans = textPlans.filter((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
+  const uniqueTextPlans = getUniqueTextPlans(textPlans);
+  const activeGroupedPlans = uniqueTextPlans.filter((plan) => plan.mode !== "single"
+    && textPlans.some((item) => getTextPlanIdentity(item) === getTextPlanIdentity(plan)
+      && parsedWorks.some((work) => work.selected && work.sourcePlanId === item.id)));
   const noticeModalWork = parsedWorks.find((work) => work.id === noticeModalWorkId);
   const metadataCandidateModalPlan = textPlans.find((plan) => plan.id === metadataCandidateModalPlanId);
   const splitSummary = textPlans
@@ -1515,7 +1555,7 @@ export default function ImportWorkspace() {
               </>}
 
               {currentStep === 2 && <div className={styles.stepPage}>
-                {textPlans.length > 0 && <div className={styles.textPlanList}>{textPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
+                {uniqueTextPlans.length > 0 && <div className={styles.textPlanList}>{uniqueTextPlans.map((plan) => <section className={styles.textPlanCard} key={plan.id}>
                     {plan.canChangeEncoding && <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={plan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(plan.id, { encoding })} /></div>}
                     {plan.chapters.length >= 2 && <fieldset className={styles.splitOptions}><legend>导入方式</legend><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "serial"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "serial" })} />长篇连载</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "collection"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "collection" })} />合集单篇</label><label><input type="radio" name={`mode-${plan.id}`} checked={plan.mode === "single"} disabled={busy} onChange={() => void updateTextPlan(plan.id, { mode: "single" })} />保持整篇</label></fieldset>}
                   </section>)}</div>}
