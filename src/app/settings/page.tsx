@@ -489,7 +489,10 @@ export default function SettingsPage() {
               ></textarea>
             </div>
 
-            <div className="settings-form-actions">
+            <div className="settings-form-actions settings-feedback-actions">
+              <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
+                <i className={`fa-solid ${feedbackSubmitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} aria-hidden="true"></i> {feedbackSubmitting ? "提交中…" : "提交反馈"}
+              </button>
               {feedbackSuccess && (
                 <SettingsStatus kind="success" message={feedbackSuccess} />
               )}
@@ -497,10 +500,6 @@ export default function SettingsPage() {
               {feedbackError && (
                 <SettingsStatus kind="error" message={feedbackError} />
               )}
-
-              <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
-                <i className={`fa-solid ${feedbackSubmitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} aria-hidden="true"></i> {feedbackSubmitting ? "提交中…" : "提交反馈"}
-              </button>
             </div>
           </div>
         </div>

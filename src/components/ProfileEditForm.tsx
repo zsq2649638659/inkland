@@ -32,6 +32,7 @@ export default function ProfileEditForm() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [errorKind, setErrorKind] = useState<"warning" | "error" | "">("");
   const [success, setSuccess] = useState("");
   const [revisionStatus, setRevisionStatus] = useState<string | null>(null);
 
@@ -75,16 +76,19 @@ export default function ProfileEditForm() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
+      setErrorKind("error");
       setError("请选择图片文件");
       return;
     }
     setUploading(true);
+    setErrorKind("");
     setError("");
 
     let compressedFile: File;
     try {
       compressedFile = (await compressImage(file, { maxDimension: 512, maxBytes: 512 * 1024, quality: 0.88 })).file;
     } catch (compressionError) {
+      setErrorKind("error");
       setError(compressionError instanceof Error ? compressionError.message : "图片处理失败，请换一张图片重试");
       setUploading(false);
       return;
@@ -98,6 +102,7 @@ export default function ProfileEditForm() {
       .upload(fileName, compressedFile, { upsert: true, contentType: "image/webp" });
 
     if (uploadErr) {
+      setErrorKind("error");
       setError(`上传失败: ${uploadErr.message}`);
       setUploading(false);
       return;
@@ -112,15 +117,19 @@ export default function ProfileEditForm() {
 
   const handleSave = async () => {
     if (!nickname.trim()) {
+      setSuccess("");
+      setErrorKind("warning");
       setError("昵称不能为空");
       return;
     }
     setSaving(true);
     setError("");
+    setErrorKind("");
     setSuccess("");
 
     const blocked = await assertCanProfileEdit();
     if (blocked) {
+      setErrorKind("error");
       setError(blocked);
       setSaving(false);
       return;
@@ -136,6 +145,7 @@ export default function ProfileEditForm() {
       .eq("id", user.id);
 
     if (updateErr) {
+      setErrorKind("error");
       setError(`保存失败: ${updateErr.message}`);
     } else {
       await refreshProfile();
@@ -157,12 +167,18 @@ export default function ProfileEditForm() {
           setRevisionStatus("submitted");
           if (!personalError) setSuccess("保存成功");
         } else {
-          if (!personalError) setError("资料整改状态更新失败，请稍后重试。");
+          if (!personalError) {
+            setErrorKind("error");
+            setError("资料整改状态更新失败，请稍后重试。");
+          }
         }
       } else {
         if (!personalError) setSuccess("保存成功");
       }
-      if (personalError) setError("性别或出生日期暂未保存成功，请稍后重试。");
+      if (personalError) {
+        setErrorKind("error");
+        setError("性别或出生日期暂未保存成功，请稍后重试。");
+      }
       setNicknameEditOpen(false);
       setEmailEditOpen(false);
       setTimeout(() => setSuccess(""), 2500);
@@ -182,6 +198,7 @@ export default function ProfileEditForm() {
     setNicknameEditOpen(false);
     setEmailEditOpen(false);
     setError("");
+    setErrorKind("");
     setSuccess("");
   };
 
@@ -247,9 +264,6 @@ export default function ProfileEditForm() {
                     <div className={`char-count${nickname.length > 30 ? " over" : ""}`}>
                       {nickname.length} / 30
                     </div>
-                    <span className={`field-error${!nickname.trim() ? " visible" : ""}`} role="alert">
-                      昵称不能为空
-                    </span>
                   </div>
                 )}
               </div>
@@ -270,7 +284,6 @@ export default function ProfileEditForm() {
                 <div className={`char-count${bio.length > 200 ? " over" : ""}`}>
                   {bio.length} / 200
                 </div>
-                <span className="field-error" role="alert">简介不能超过 200 个字符</span>
               </div>
 
               {/* Personal details */}
@@ -325,19 +338,15 @@ export default function ProfileEditForm() {
                     <div className={`char-count${emailValue.length > 50 ? " over" : ""}`}>
                       {emailValue.length} / 50
                     </div>
-                    <span className="field-error" role="alert">请输入有效的邮箱地址</span>
                   </div>
                 )}
               </div>
 
-              {/* 错误/成功提示 */}
-              {error && (
-                <span className="field-error visible" role="alert" style={{ display: "block", marginBottom: "16px" }}>
-                  <i className="fa-solid fa-circle-exclamation" style={{ marginRight: "4px" }}></i>{error}
-                </span>
-              )}
               {/* Actions */}
               <div className="form-actions">
+                {error && (
+                  <SettingsStatus kind={errorKind === "warning" ? "warning" : "error"} message={error} />
+                )}
                 {success && (
                   <SettingsStatus kind="success" message="保存成功" />
                 )}

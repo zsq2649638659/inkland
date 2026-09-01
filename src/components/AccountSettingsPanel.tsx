@@ -94,6 +94,7 @@ export default function AccountSettingsPanel() {
   const [copyrightMessage, setCopyrightMessage] = useState("");
   const [copyrightMessageKind, setCopyrightMessageKind] = useState<"success" | "error" | "">("");
   const [copyrightOpen, setCopyrightOpen] = useState(false);
+  const copyrightMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [coinInfoOpen, setCoinInfoOpen] = useState(false);
   const [activity, setActivity] = useState<AccountActivity | null>(null);
   const copyrightSelectRef = useRef<HTMLDivElement>(null);
@@ -168,6 +169,10 @@ export default function AccountSettingsPanel() {
     };
   }, []);
 
+  useEffect(() => () => {
+    if (copyrightMessageTimerRef.current) clearTimeout(copyrightMessageTimerRef.current);
+  }, []);
+
   if (!user) return null;
 
   const displayName = profile?.nickname || user.user_metadata?.username || user.email?.split("@")[0] || "用户";
@@ -176,9 +181,26 @@ export default function AccountSettingsPanel() {
   const experience = deriveExperience(activity || fallbackActivity);
   const levelProgress = Math.min(100, Math.round((experience.current / experience.next) * 100));
 
+  function clearCopyrightMessageTimer() {
+    if (copyrightMessageTimerRef.current) {
+      clearTimeout(copyrightMessageTimerRef.current);
+      copyrightMessageTimerRef.current = null;
+    }
+  }
+
+  function scheduleCopyrightMessageDismissal() {
+    clearCopyrightMessageTimer();
+    copyrightMessageTimerRef.current = setTimeout(() => {
+      setCopyrightMessage("");
+      setCopyrightMessageKind("");
+      copyrightMessageTimerRef.current = null;
+    }, 3000);
+  }
+
   async function saveCopyright() {
     if (savingCopyright) return;
     setSavingCopyright(true);
+    clearCopyrightMessageTimer();
     setCopyrightMessage("");
     setCopyrightMessageKind("");
     const { error } = await saveAccountPreferences(supabase, {
@@ -190,11 +212,13 @@ export default function AccountSettingsPanel() {
     if (error) {
       setCopyrightMessageKind("error");
       setCopyrightMessage("版权设置保存失败，请稍后再试。");
+      scheduleCopyrightMessageDismissal();
       return;
     }
     setAccountPreferences((current) => ({ ...current, copyright_license: copyrightLicense }));
     setCopyrightMessageKind("success");
     setCopyrightMessage("版权设置已保存。");
+    scheduleCopyrightMessageDismissal();
   }
 
   return (
@@ -312,7 +336,13 @@ export default function AccountSettingsPanel() {
                   aria-selected={copyrightLicense === option.value}
                   className={`account-copyright-option${copyrightLicense === option.value ? " active" : ""}`}
                   key={option.value}
-                  onClick={() => { setCopyrightLicense(option.value); setCopyrightOpen(false); setCopyrightMessage(""); }}
+                  onClick={() => {
+                    setCopyrightLicense(option.value);
+                    setCopyrightOpen(false);
+                    clearCopyrightMessageTimer();
+                    setCopyrightMessage("");
+                    setCopyrightMessageKind("");
+                  }}
                 >
                   <span>
                     <strong>{option.label}</strong>

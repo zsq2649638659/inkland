@@ -9612,8 +9612,6 @@ p {
 #page-profile-edit .account-calendar-footer button { flex-shrink:0;padding:5px 8px;border:0;border-radius:6px;background:transparent;color:var(--color-primary);font:inherit;cursor:pointer; }
 #page-profile-edit .account-calendar-footer button:hover { background:var(--color-primary-bg); }
 #page-profile-edit .field-input.error,#page-profile-edit .field-textarea.error { border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(242,107,91,0.12) }
-#page-profile-edit .field-error { font-size:13px;color:var(--color-primary);margin-top:var(--spacing-xs);display:none }
-#page-profile-edit .field-error.visible { display:block }
 #page-profile-edit .char-count { text-align:right;font-size:13px;color:var(--color-text-light);margin-top:var(--spacing-xs);font-variant-numeric:tabular-nums }
 #page-profile-edit .char-count.over { color:var(--color-primary) }
 #page-profile-edit .inline-display { display:flex;align-items:center;justify-content:space-between;padding:10px var(--spacing-md);background:var(--color-bg-page);border:1.5px solid var(--color-border);border-radius:var(--radius-md) }
@@ -9929,6 +9927,8 @@ p {
   line-height: 1.4;
   overflow-wrap:anywhere;
 }
+.settings-status.settings-status-warning .settings-status-icon { background:linear-gradient(135deg,#E6A23C,#D88A16); }
+.settings-status.settings-status-warning .settings-status-text { color:#9A6800; }
 .settings-status.settings-status-error .settings-status-icon { background:linear-gradient(135deg,#D96259,#B8443B); }
 .settings-status.settings-status-error .settings-status-text { color:#B84B42; }
 @keyframes toastSlideIn {
@@ -9963,6 +9963,7 @@ p {
 [data-theme="dark"] #page-profile-edit .page-title { color:#E8E8E8 }
 [data-theme="dark"] #page-profile-edit .field-label { color:#E8E8E8 }
 [data-theme="dark"] .settings-status-text { color:#F5A09A }
+[data-theme="dark"] .settings-status.settings-status-warning .settings-status-text { color:#F0C36A }
 [data-theme="dark"] .settings-status.settings-status-error .settings-status-text { color:#F09B94 }
 
 /* Profile edit page responsive */
@@ -10095,6 +10096,8 @@ p {
 .settings-form-textarea { min-height:100px;padding:12px 14px;resize:vertical;line-height:1.5;max-width:100% }
 .settings-form-actions { display:flex;align-items:center;justify-content:space-between;gap:var(--spacing-lg);margin-top:4px; }
 .settings-form-actions .settings-status { flex:1; }
+.settings-feedback-actions { justify-content:flex-start; }
+.settings-feedback-actions .settings-status { flex:0 1 auto; }
 /* Custom select dropdown */
 .settings-form-select-wrapper { position:relative;width:100% }
 .settings-form-select { width:100%;height:42px;padding:0 36px 0 14px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-page);color:var(--color-text);font-size:14px;outline:none;font-family:var(--font-family);appearance:none;cursor:pointer;transition:border-color .25s ease,box-shadow .25s ease;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%236B6B6B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center }
