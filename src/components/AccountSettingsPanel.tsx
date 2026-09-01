@@ -115,7 +115,7 @@ export default function AccountSettingsPanel() {
           <h2 id="account-settings-title" className="settings-panel-title">账号设置</h2>
           <p className="settings-panel-desc">查看账号信息，管理资料展示、版权和兴趣领域。</p>
         </div>
-        <Link className="settings-btn-secondary" href="/profile/edit">编辑资料</Link>
+        <Link className="settings-btn-secondary" href="/settings?tab=profile">编辑资料</Link>
       </div>
 
       <section className="account-settings-section" aria-labelledby="account-basic-title">
