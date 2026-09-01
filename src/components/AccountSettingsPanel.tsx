@@ -17,11 +17,29 @@ import {
 import { copyrightPolicyMap, copyrightPolicyOptions } from "@/lib/copyrightPolicy";
 import { readInterestPreferences } from "@/lib/interestPreferences";
 
-const level = {
-  current: 0,
-  next: 100,
-  number: 1,
+type AccountActivity = {
+  publishedWorks: number;
+  following: number;
+  bookmarks: number;
 };
+
+const fallbackActivity: AccountActivity = {
+  publishedWorks: 0,
+  following: 0,
+  bookmarks: 0,
+};
+
+const experiencePerLevel = 100;
+
+function deriveExperience(activity: AccountActivity) {
+  // 目前数据库还没有经验流水表，先按现有可核实记录折算历史经验：
+  // 发布作品按现行规则计 20 经验；收藏/关注任务按完成过一次计 5 经验；当前登录计 5 经验。
+  const activityExperience = activity.publishedWorks * 20 + (activity.following + activity.bookmarks > 0 ? 5 : 0);
+  const total = Math.max(5, activityExperience + 5);
+  const number = Math.floor(total / experiencePerLevel) + 1;
+  const current = total % experiencePerLevel;
+  return { total, current, next: experiencePerLevel, number };
+}
 
 const experienceRules = [
   ["每日登录", "+5 经验"],
@@ -50,6 +68,7 @@ export default function AccountSettingsPanel() {
   const [copyrightMessage, setCopyrightMessage] = useState("");
   const [copyrightOpen, setCopyrightOpen] = useState(false);
   const [coinInfoOpen, setCoinInfoOpen] = useState(false);
+  const [activity, setActivity] = useState<AccountActivity | null>(null);
   const copyrightSelectRef = useRef<HTMLDivElement>(null);
   const coinInfoRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +84,35 @@ export default function AccountSettingsPanel() {
       setAccountPreferences(nextPreferences);
       setCopyrightLicense(nextPreferences.copyright_license);
       setInterests(nextInterests);
+    })();
+    return () => { active = false; };
+  }, [supabase, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    void (async () => {
+      const [{ data: publishedPosts }, { data: series }, { count: followingCount }, { count: bookmarkCount }] = await Promise.all([
+        supabase
+          .from("posts")
+          .select("id, review_status")
+          .eq("user_id", user.id)
+          .eq("status", "published")
+          .neq("post_type", "serial")
+          .neq("review_status", "rejected"),
+        supabase.from("series").select("name").eq("user_id", user.id),
+        supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
+        supabase.from("bookmarks").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+      ]);
+      if (!active) return;
+      const seriesCount = new Set(((series || []) as Array<{ name?: string | null }>)
+        .map((item) => item.name)
+        .filter(Boolean)).size;
+      setActivity({
+        publishedWorks: (publishedPosts || []).length + seriesCount,
+        following: followingCount || 0,
+        bookmarks: bookmarkCount || 0,
+      });
     })();
     return () => { active = false; };
   }, [supabase, user]);
@@ -97,7 +145,8 @@ export default function AccountSettingsPanel() {
   const displayName = profile?.nickname || user.user_metadata?.username || user.email?.split("@")[0] || "用户";
   const avatarUrl = profile?.avatar_url || "";
   const selectedCopyright = copyrightPolicyMap[copyrightLicense] || copyrightPolicyOptions[0];
-  const levelProgress = Math.min(100, Math.round((level.current / level.next) * 100));
+  const experience = deriveExperience(activity || fallbackActivity);
+  const levelProgress = Math.min(100, Math.round((experience.current / experience.next) * 100));
 
   async function saveCopyright() {
     if (savingCopyright) return;
@@ -154,17 +203,17 @@ export default function AccountSettingsPanel() {
                     <small>不可转赠、出售或兑换现金</small>
                   </div>
                 </div>
+                <strong className="account-settings-level-label">LV.{experience.number}</strong>
                 <div
                   className="account-settings-level-progress"
                   role="progressbar"
                   tabIndex={0}
-                  aria-label={`等级 LV.${level.number}，经验值 ${level.current} / ${level.next}`}
+                  aria-label={`等级 LV.${experience.number}，经验值 ${experience.current} / ${experience.next}`}
                   aria-valuemin={0}
-                  aria-valuemax={level.next}
-                  aria-valuenow={level.current}
+                  aria-valuemax={experience.next}
+                  aria-valuenow={experience.current}
                 >
                   <span style={{ width: `${levelProgress}%` }} />
-                  <strong>LV.{level.number}</strong>
                   <div className="account-settings-tooltip account-settings-experience-tooltip" role="tooltip">
                     <strong>经验值获取方式</strong>
                     <ul>
@@ -172,7 +221,7 @@ export default function AccountSettingsPanel() {
                     </ul>
                   </div>
                 </div>
-                <span className="account-settings-experience-value">{level.current}/{level.next}</span>
+                <span className="account-settings-experience-value">{experience.current}/{experience.next}</span>
               </div>
             </div>
           </div>
