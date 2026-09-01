@@ -7566,7 +7566,8 @@ p {
 }
 #page-search .search-refine-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: max-content max-content max-content;
+  justify-content: space-between;
   gap: 16px;
 }
 #page-search .search-refine-group {
@@ -7608,6 +7609,7 @@ p {
   font-weight: 500;
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
   touch-action: manipulation;
   transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
@@ -7635,7 +7637,6 @@ p {
   position: relative;
 }
 #page-search .search-refine-sort-trigger {
-  width: 100%;
   min-height: 44px;
   padding: 0 24px;
   display: flex;
