@@ -23,6 +23,8 @@ export function normalizeImportedTitle(value: string, fallback = "未命名作�
   const normalized = cleanImportHeading(value)
     .replace(/^(?:书名|作品名|作品标题|标题|title)\s*[:：]\s*/i, "")
     .replace(/^《(.+)》$/, "$1")
+    .replace(/^"(.+)"$/, "$1")
+    .replace(/^“(.+)”$/, "$1")
     .replace(/^[「『“](.+)[」』”]$/, "$1")
     .replace(/\s+/g, " ")
     .trim();
@@ -41,7 +43,18 @@ function stripDescriptionLabel(value: string) {
 }
 
 export function normalizeImportedDescription(value: string) {
-  return clampDescription(value);
+  return clampDescription(stripHtmlFragment(value));
+}
+
+function stripHtmlFragment(value: string) {
+  if (!/<\/?[a-z][^>]*>/i.test(value)) return value;
+  const withLineBreaks = value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(?:p|div|li|blockquote|section|article)>/gi, "\n")
+    .replace(/<(?:p|div|li|blockquote|section|article)\b[^>]*>/gi, "");
+  if (typeof DOMParser === "undefined") return withLineBreaks.replace(/<[^>]+>/g, "");
+  const documentNode = new DOMParser().parseFromString(withLineBreaks, "text/html");
+  return documentNode.body.textContent || "";
 }
 
 function clampDescription(value: string) {

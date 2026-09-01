@@ -344,6 +344,71 @@ function htmlToMarkdown(html: string) {
   return normalizeContent(renderNode(documentNode.body));
 }
 
+interface Ao3DocumentResult {
+  title: string;
+  description: string;
+  chapters: ImportChapter[];
+}
+
+function isAo3UserstuffElement(element: Element) {
+  return Array.from(element.classList).some((className) => className === "userstuff" || className.startsWith("userstuff"));
+}
+
+function findAo3ChapterBody(heading: Element) {
+  const headingContainer = heading.closest(".meta.group") || heading.parentElement;
+  let sibling = headingContainer?.nextElementSibling || null;
+  while (sibling) {
+    if (sibling.matches(".meta.group")) return null;
+    if (isAo3UserstuffElement(sibling)) return sibling;
+    sibling = sibling.nextElementSibling;
+  }
+  return null;
+}
+
+function parseAo3Document(documentNode: Document, fallbackTitle: string): Ao3DocumentResult | null {
+  const preface = documentNode.querySelector("#preface");
+  const chapterRoot = documentNode.querySelector("#chapters");
+  const afterword = documentNode.querySelector("#afterword");
+  if (!preface && !chapterRoot && !afterword) return null;
+
+  const title = normalizeImportedTitle(
+    preface?.querySelector("h1")?.textContent?.trim()
+      || (preface ? documentNode.querySelector("title")?.textContent?.trim() : "")
+      || fallbackTitle,
+    fallbackTitle,
+  );
+  const summary = preface?.querySelector("blockquote.userstuff");
+  const description = summary
+    ? normalizeImportedDescription(htmlToMarkdown(summary.innerHTML))
+    : "";
+  const chapters: ImportChapter[] = [];
+  const chapterHeadings = Array.from(chapterRoot?.querySelectorAll("h1.heading,h2.heading,h3.heading") || []);
+
+  chapterHeadings.forEach((heading, index) => {
+    const body = findAo3ChapterBody(heading);
+    if (!body) return;
+    const content = normalizeContent(htmlToMarkdown(body.outerHTML));
+    if (!content) return;
+    chapters.push({
+      title: normalizeImportedTitle(heading.textContent?.trim() || `${title} · 第${index + 1}章`, `${title} · 第${index + 1}章`),
+      content,
+    });
+  });
+
+  if (chapterHeadings.length === 0 && chapterRoot) {
+    const body = Array.from(chapterRoot.children).find(isAo3UserstuffElement);
+    const content = body ? normalizeContent(htmlToMarkdown(body.outerHTML)) : "";
+    if (content) chapters.push({ title, content });
+  }
+
+  return { title, description, chapters };
+}
+
+function parseAo3HtmlExport(raw: string, fallbackTitle: string) {
+  if (typeof DOMParser === "undefined") return null;
+  return parseAo3Document(new DOMParser().parseFromString(raw, "text/html"), fallbackTitle);
+}
+
 async function hashContent(value: string) {
   const data = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", data);
@@ -428,7 +493,7 @@ async function parseEpub(file: File): Promise<ParsedFileResult> {
   const opf = new DOMParser().parseFromString(await opfFile.async("string"), "application/xml");
   const xmlText = (localName: string) => Array.from(opf.getElementsByTagName("*")).find((element) => element.localName === localName)?.textContent?.trim() || "";
   const bookTitle = normalizeImportedTitle(xmlText("title") || titleFromFileName(file.name), titleFromFileName(file.name));
-  const description = normalizeImportedDescription(xmlText("description"));
+  let description = normalizeImportedDescription(xmlText("description"));
   const manifest = new Map<string, string>();
   opf.querySelectorAll("manifest item").forEach((item) => {
     const id = item.getAttribute("id");
@@ -440,11 +505,20 @@ async function parseEpub(file: File): Promise<ParsedFileResult> {
     .map((item) => manifest.get(item.getAttribute("idref") || ""))
     .filter((value): value is string => Boolean(value));
   const chapters: ImportChapter[] = [];
+  let isAo3Epub = false;
   for (const [index, path] of chapterPaths.entries()) {
     const chapterFile = zip.file(path);
     if (!chapterFile) continue;
     const html = await chapterFile.async("string");
     const documentNode = new DOMParser().parseFromString(html, "text/html");
+    const ao3Document = parseAo3Document(documentNode, bookTitle);
+    if (ao3Document) {
+      isAo3Epub = true;
+      if (!description && ao3Document.description) description = ao3Document.description;
+      chapters.push(...ao3Document.chapters);
+      continue;
+    }
+    if (isAo3Epub) continue;
     const heading = documentNode.querySelector("h1,h2,h3")?.textContent?.trim();
     const pageTitle = documentNode.querySelector("title")?.textContent?.trim();
     const title = normalizeImportedTitle(heading || pageTitle || (chapterPaths.length === 1 ? bookTitle : `${bookTitle} · 第${index + 1}章`));
@@ -460,7 +534,7 @@ async function parseEpub(file: File): Promise<ParsedFileResult> {
     canChangeEncoding: false,
     encoding: "utf-8",
     detectedEncoding: "utf-8",
-    content: [bookTitle, description, chapterContent].filter(Boolean).join("\n\n"),
+    content: chapters.length >= 2 ? chapterContent : chapters[0]?.content || chapterContent,
     fallbackTitle: bookTitle,
     chapters,
     warning: "EPUB 已按阅读顺序拆分；图片、脚注跳转和复杂样式不会导入，请检查正文。",
@@ -499,9 +573,9 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
       content: plan.content,
       sourceName: plan.fileName,
       groupMode: "single",
-      warning: plan.chapters.length >= 2
+      warning: plan.warning || (plan.chapters.length >= 2
         ? `检测到 ${plan.chapters.length} 个章节标题，目前选择保持整篇。`
-        : `没有识别到至少两个常见章节标题；这份${sourceLabel}将保持整篇，你仍可在下方检查并编辑正文。`,
+        : `没有识别到至少两个常见章节标题；这份${sourceLabel}将保持整篇，你仍可在下方检查并编辑正文。`),
     })];
   }
 
@@ -568,6 +642,27 @@ async function parseFile(file: File): Promise<ParsedFileResult> {
   } else {
     const raw = await file.text();
     if (extension === "html" || extension === "htm") {
+      const ao3Document = parseAo3HtmlExport(raw, fallbackTitle);
+      if (ao3Document) {
+        if (ao3Document.chapters.length === 0) throw new Error(`${file.name} 没有识别到可导入的 AO3 正文章节`);
+        const chapterContent = ao3Document.chapters.map((chapter) => `${chapter.title}\n\n${chapter.content}`).join("\n\n");
+        const isSerial = ao3Document.chapters.length >= 2;
+        const plan = createTextImportPlan({
+          fileName: file.name,
+          sourceType: extension,
+          canChangeEncoding: false,
+          encoding: "utf-8",
+          detectedEncoding: "utf-8",
+          content: isSerial ? chapterContent : ao3Document.chapters[0].content,
+          fallbackTitle: ao3Document.title,
+          titleOverride: ao3Document.title,
+          chapters: ao3Document.chapters,
+          warning: "AO3 HTML 已提取作品简介并按正文结构拆分；Preface、Afterword 和页面元数据不会导入。",
+          descriptionCandidateOverride: ao3Document.description || undefined,
+          descriptionCandidateSourceOverride: ao3Document.description ? "文档元数据" : undefined,
+        });
+        return { works: await buildTextWorks(plan), textPlan: plan };
+      }
       fallbackTitle = extractHtmlDocumentTitle(raw) || fallbackTitle;
       content = htmlToMarkdown(raw);
     } else content = normalizeContent(raw);
