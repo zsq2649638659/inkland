@@ -94,22 +94,9 @@
 .groupInfoCard > label > span { padding-top: 9px; font-weight: 700; }
 .groupInfoCard input, .groupInfoCard textarea { width: 100%; box-sizing: border-box; border: 1px solid #cfc5bf; background: #fff; padding: 9px 10px; font: inherit; }
 .groupInfoCard textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
-.metadataCandidate { padding: 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: 10px; background: color-mix(in srgb, var(--color-primary) 4%, var(--color-card)); color: var(--color-text); }
-.metadataCandidateBody { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; }
-.metadataCandidateCopy { display: grid; min-width: 0; gap: 8px; }
-.metadataCandidateCopy h3 { margin: 0; color: var(--color-text); font-size: 15px; line-height: 1.35; }
-.metadataHint { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; }
-.metadataCandidateText { padding: 0; }
-.metadataCandidateText p { margin: 0; white-space: pre-wrap; color: var(--color-text); font-size: 14px; line-height: 1.65; }
-.metadataCandidateActions { display: flex; flex: none; align-self: center; align-items: center; justify-content: flex-end; gap: 8px; }
-.metadataCandidateStatus { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid #b9d2bb; border-radius: 999px; color: #35633a; background: #f1f7f1; font-size: 12px; font-weight: 700; }
-.metadataCandidateButton { display: inline-flex; min-height: 40px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--color-primary); border-radius: 8px; background: var(--color-primary); color: #fff; padding: 8px 13px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; transition: filter var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast); }
-.metadataCandidateButton:hover:not(:disabled) { filter: brightness(.94); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
-.metadataCandidateButton:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent); outline-offset: 2px; }
-.metadataCandidateButton:disabled { border-color: #d7cfca; background: #e9e3df; color: #756b66; cursor: not-allowed; }
-.metadataCandidateAccepted { border-color: #b9d2bb; background: color-mix(in srgb, #f1f7f1 70%, var(--color-card)); }
-:global(.importNoticeActions) { flex-wrap: wrap; }
-.metadataHint { margin: 0; }
+.importNoticeWorkTitle { margin-top: 0 !important; color: var(--color-text) !important; font-weight: 700; }
+:global(.importNoticeActions) { flex-wrap: nowrap; gap: 6px; }
+:global(.importNoticeActions .btn-modal) { min-width: 0; padding: 10px 12px; font-size: 13px; white-space: nowrap; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
 .publishSummary li { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid #ddd5d0; }
 .publishSummary strong, .publishSummary span { overflow-wrap: anywhere; }
@@ -1196,26 +1183,6 @@
   text-align: right;
 }
 
-.previewNoticeTrigger {
-  justify-self: start;
-  min-height: 32px;
-  padding: 4px 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.previewNoticeTrigger:hover { color: var(--color-primary-hover); }
-.previewNoticeTrigger:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
-  outline-offset: 2px;
-}
-.previewNoticeTrigger:disabled { color: var(--color-text-muted); cursor: not-allowed; }
-
 .contentField > span {
   font-size: var(--font-size-sm);
   letter-spacing: -.01em;
@@ -1427,23 +1394,6 @@
 .bulkTagBar .tagInputWrapper:focus-within {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
-}
-
-:global([data-theme="dark"]) .metadataCandidateAccepted {
-  border-color: #416448;
-  background: #213326;
-}
-
-:global([data-theme="dark"]) .metadataCandidateStatus {
-  border-color: #416448;
-  color: #a9d6ad;
-  background: #213326;
-}
-
-@media (max-width: 520px) {
-  .metadataCandidate { padding: 13px; }
-  .metadataCandidateBody { grid-template-columns: 1fr; gap: 10px; }
-  .metadataCandidateActions { justify-content: flex-end; }
 }
 
 @keyframes importCalendarIn {
