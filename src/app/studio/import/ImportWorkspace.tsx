@@ -111,9 +111,9 @@ function getDuplicateNoticeTitle(kind: ImportDuplicateMatch["kind"]) {
 }
 
 function getDuplicateKeepLabel(kind: ImportDuplicateMatch["kind"]) {
-  if (kind === "exact") return "仍保留为新作品";
+  if (kind === "exact") return "保留为新作";
   if (kind === "batch") return "保留为独立内容";
-  return "保留为新作品";
+  return "保留为新作";
 }
 
 function getExtension(fileName: string) {
