@@ -7558,6 +7558,50 @@ p {
 }
 
 /* Search refinements — reuse the existing segmented controls and pill tokens. */
+#page-search .search-filter-mobile-trigger {
+  display: none;
+  min-height: 44px;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  padding: 0 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-card);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+#page-search .search-filter-mobile-trigger:hover,
+#page-search .search-filter-mobile-trigger[aria-expanded="true"],
+#page-search .search-filter-mobile-trigger:focus-visible {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(242, 107, 91, 0.12);
+}
+#page-search .search-filter-modal-body {
+  display: grid;
+  gap: 20px;
+}
+#page-search .search-filter-modal-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+#page-search .search-filter-modal-group legend {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
 #page-search .search-refine-panel {
   padding: 0;
   border: 0;
@@ -7741,8 +7785,28 @@ p {
 }
 @media (max-width: 700px) {
   #page-search .search-palette { gap: 16px; }
+  #page-search .search-filter-mobile-trigger { display: inline-flex; }
+  #page-search .search-refine-panel { display: none; }
   #page-search .search-refine-grid { grid-template-columns: 1fr; gap: 12px; }
   #page-search .search-refine-chip { flex: 1 1 auto; }
+  #page-search .search-filter-modal-overlay { padding: 16px; }
+  #page-search .search-filter-modal {
+    width: min(420px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    padding: 24px 20px;
+  }
+  #page-search .search-filter-modal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  #page-search .search-filter-modal-actions .btn-modal {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+    padding: 10px 24px;
+  }
   #page-search .work-sort-stat { margin-left: 0; }
 }
 
@@ -7750,6 +7814,7 @@ p {
   #page-search .search-palette,
   #page-search .result-section { animation: none; }
   #page-search .search-refine-chip,
+  #page-search .search-filter-mobile-trigger,
   #page-search .search-refine-sort-trigger,
   #page-search .search-refine-sort-option { transition: none; }
 }
