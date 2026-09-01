@@ -18,15 +18,15 @@ import { copyrightPolicyMap, copyrightPolicyOptions } from "@/lib/copyrightPolic
 import { readInterestPreferences } from "@/lib/interestPreferences";
 
 type AccountActivity = {
-  publishedWorks: number;
-  following: number;
-  bookmarks: number;
+  publishedDays: number;
+  readingDays: number;
+  engagementDays: number;
 };
 
 const fallbackActivity: AccountActivity = {
-  publishedWorks: 0,
-  following: 0,
-  bookmarks: 0,
+  publishedDays: 0,
+  readingDays: 0,
+  engagementDays: 0,
 };
 
 const levelBands = [
@@ -40,12 +40,30 @@ const levelBands = [
 
 function deriveExperience(activity: AccountActivity) {
   // 目前数据库还没有经验流水表，先按现有可核实记录折算历史经验：
-  // 发布作品按 10 经验计；收藏/关注任务按完成过一次计 2 经验；当前登录计 2 经验。
-  const activityExperience = activity.publishedWorks * 10 + (activity.following + activity.bookmarks > 0 ? 2 : 0);
+  // 发布、阅读、收藏/关注都按活跃日计分，同一天的多次行为只计一次；当前登录计 2 经验。
+  const activityExperience = activity.publishedDays * 10 + activity.readingDays * 2 + activity.engagementDays * 2;
   const total = Math.max(2, activityExperience + 2);
   const band = levelBands.find(({ end }) => total < end) || levelBands[levelBands.length - 1];
   const current = Math.min(Math.max(0, total - band.start), band.end - band.start);
   return { total, current, next: band.end - band.start, number: band.number, start: band.start, end: band.end };
+}
+
+function calendarDay(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value: partValue }) => [type, partValue]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function countActivityDays(values: Array<string | null | undefined>) {
+  return new Set(values.map(calendarDay).filter((value): value is string => Boolean(value))).size;
 }
 
 const experienceRules = [
@@ -99,26 +117,27 @@ export default function AccountSettingsPanel() {
     if (!user) return;
     let active = true;
     void (async () => {
-      const [{ data: publishedPosts }, { data: series }, { count: followingCount }, { count: bookmarkCount }] = await Promise.all([
+      const [{ data: publishedPosts }, { data: followingRows }, { data: bookmarkRows }, { data: readingRows }] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, review_status")
+          .select("created_at, published_at, review_status")
           .eq("user_id", user.id)
-          .eq("status", "published")
-          .neq("post_type", "serial")
-          .neq("review_status", "rejected"),
-        supabase.from("series").select("name").eq("user_id", user.id),
-        supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
-        supabase.from("bookmarks").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+          .eq("status", "published"),
+        supabase.from("follows").select("created_at").eq("follower_id", user.id),
+        supabase.from("bookmarks").select("created_at").eq("user_id", user.id),
+        supabase.from("reading_history").select("last_read_at").eq("user_id", user.id),
       ]);
       if (!active) return;
-      const seriesCount = new Set(((series || []) as Array<{ name?: string | null }>)
-        .map((item) => item.name)
-        .filter(Boolean)).size;
+      const publishRows = (publishedPosts || []) as Array<{ created_at?: string | null; published_at?: string | null; review_status?: string | null }>;
+      const followingDates = ((followingRows || []) as Array<{ created_at?: string | null }>).map((row) => row.created_at);
+      const bookmarkDates = ((bookmarkRows || []) as Array<{ created_at?: string | null }>).map((row) => row.created_at);
+      const readingDates = ((readingRows || []) as Array<{ last_read_at?: string | null }>).map((row) => row.last_read_at);
       setActivity({
-        publishedWorks: (publishedPosts || []).length + seriesCount,
-        following: followingCount || 0,
-        bookmarks: bookmarkCount || 0,
+        publishedDays: countActivityDays(publishRows
+          .filter((row) => row.review_status !== "rejected")
+          .map((row) => row.published_at || row.created_at)),
+        readingDays: countActivityDays(readingDates),
+        engagementDays: countActivityDays([...followingDates, ...bookmarkDates]),
       });
     })();
     return () => { active = false; };
