@@ -118,6 +118,7 @@ export default function HomeSidebar() {
         .from("posts")
         .select("id", { count: "exact", head: true })
         .eq("status", "published")
+        .eq("is_test_data", false)
         .gt("created_at", lastSeen);
       return count || 0;
     }, { ttlMs: 30_000, persist: true }).then((count) => setNewWorksCount(count));
@@ -133,7 +134,8 @@ export default function HomeSidebar() {
           .from("notifications")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
-          .eq("read", false);
+          .eq("read", false)
+          .eq("is_test_data", false);
         return count || 0;
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };

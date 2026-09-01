@@ -186,6 +186,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       .select("id, title, chapter_number, created_at")
       .eq("series_name", sn)
       .eq("status", "published")
+      .eq("is_test_data", false)
       .order("created_at", { ascending: true });
 
     if (!allPosts || allPosts.length === 0) return;
@@ -225,13 +226,15 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   const loadComments = async () => {
     const { data } = await supabase
       .from("comments")
-      .select("id, content, created_at, user_id, parent_id, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
+      .select("id, content, created_at, user_id, parent_id, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
       .eq("post_id", post.id)
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (data) {
-      const all: Comment[] = (data as Record<string, unknown>[]).map((c) => {
+      const all: Comment[] = (data as Record<string, unknown>[])
+        .filter((c) => !((c.author as { is_test_account?: boolean } | null)?.is_test_account))
+        .map((c) => {
         const author = c.author as { nickname: string; avatar_url: string | null } | null;
         return {
           id: c.id as string,

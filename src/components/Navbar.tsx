@@ -44,11 +44,12 @@ export default function Navbar() {
     const fetchNotificationCount = (force = false) => {
       if (force) invalidateClientCache(`notification-count:${user.id}`);
       void getOrCreateClientCache(`notification-count:${user.id}`, async () => {
-        const { count } = await supabase
+        let query = supabase
           .from("notifications")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
           .eq("read", false);
+        const { count } = await query.eq("is_test_data", false);
         return count || 0;
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
@@ -115,17 +116,35 @@ export default function Navbar() {
       async () => {
         const [blockedRes, tagsRes, usersRes, titleRes, contentRes] = await Promise.all([
           user ? supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id) : Promise.resolve({ data: [] as unknown[] }),
-          supabase.from("tags").select("name, post_count").ilike("name", `%${q}%`).order("post_count", { ascending: false }).limit(5),
-          supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(5),
-          supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5),
-          supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5),
+          supabase.from("tags").select("id, name").ilike("name", `%${q}%`).limit(5),
+          supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).eq("is_test_account", false).limit(5),
+          supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").eq("is_test_data", false).order("created_at", { ascending: false }).limit(5),
+          supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").eq("is_test_data", false).order("created_at", { ascending: false }).limit(5),
         ]);
         const blockedIds = new Set((blockedRes.data || []).map((row: Record<string, unknown>) => row.blocked_user_id as string));
         const users = (usersRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.id as string));
         const posts = (titleRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.user_id as string));
         const content = (contentRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.user_id as string));
+        const tagRows = (tagsRes.data || []) as Array<{ id: string; name: string }>;
+        const tagCountMap = new Map<string, number>();
+        if (tagRows.length > 0) {
+          const { data: tagLinks } = await supabase
+            .from("post_tags")
+            .select("tag_id, post_id")
+            .in("tag_id", tagRows.map((tag) => tag.id));
+          const postIds = [...new Set((tagLinks || []).map((link: Record<string, unknown>) => link.post_id as string).filter(Boolean))];
+          const { data: publicPosts } = postIds.length > 0
+            ? await supabase.from("posts").select("id").in("id", postIds).eq("is_test_data", false)
+            : { data: [] as unknown[] };
+          const publicPostIds = new Set((publicPosts || []).map((post: Record<string, unknown>) => post.id as string));
+          for (const link of (tagLinks || []) as Array<{ tag_id: string; post_id: string }>) {
+            if (publicPostIds.has(link.post_id)) tagCountMap.set(link.tag_id, (tagCountMap.get(link.tag_id) || 0) + 1);
+          }
+        }
         return {
-          tags: (tagsRes.data || []).map((t: Record<string, unknown>) => ({ name: t.name as string, type: "tag" as const, subtitle: `${t.post_count} 篇` })),
+          tags: tagRows
+            .filter((tag) => (tagCountMap.get(tag.id) || 0) > 0)
+            .map((tag) => ({ name: tag.name, type: "tag" as const, subtitle: `${tagCountMap.get(tag.id) || 0} 篇` })),
           users: users.map((item: Record<string, unknown>) => ({ name: (item.nickname as string) || "匿名用户", type: "user" as const, id: item.id as string, subtitle: (item.avatar_url as string) || "" })),
           posts: posts.map((item: Record<string, unknown>) => ({ name: (item.title as string) || "无标题", type: "post" as const, id: item.id as string })),
           content: content.map((item: Record<string, unknown>) => {

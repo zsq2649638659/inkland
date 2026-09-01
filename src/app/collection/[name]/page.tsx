@@ -44,6 +44,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
           .from("series")
           .select("name, description, created_at, updated_at, user_id")
           .eq("name", decodedName)
+          .eq("is_test_data", false)
           .maybeSingle(),
         supabase
           .from("posts")
@@ -51,6 +52,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
           .eq("series_name", decodedName)
           .neq("post_type", "serial")
           .eq("status", "published")
+          .eq("is_test_data", false)
           .order("created_at", { ascending: false }),
       ]);
 
@@ -61,12 +63,13 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
         ? supabase.from("profiles").select("nickname, avatar_url").eq("id", authorId).maybeSingle()
         : Promise.resolve({ data: null });
       const bookmarkPromise = postIds.length > 0
-        ? supabase.from("bookmarks").select("id", { count: "exact", head: true }).in("post_id", postIds)
-        : Promise.resolve({ count: 0 });
-      const [{ data: author }, { count }] = await Promise.all([authorPromise, bookmarkPromise]);
+        ? supabase.from("post_stats").select("bookmark_count").in("id", postIds)
+        : Promise.resolve({ data: [] as unknown[] });
+      const [{ data: author }, { data: bookmarkStats }] = await Promise.all([authorPromise, bookmarkPromise]);
       const nickname = (author?.nickname as string) || "匿名用户";
       const avatarUrl = (author?.avatar_url as string | null) || null;
-      const bookmarkCount = count || 0;
+      const bookmarkCount = ((bookmarkStats || []) as Array<{ bookmark_count?: number | null }>)
+        .reduce((total, stat) => total + (stat.bookmark_count || 0), 0);
 
       const formatted = rawPosts
         .map((post) => {

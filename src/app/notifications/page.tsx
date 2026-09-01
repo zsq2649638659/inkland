@@ -92,11 +92,13 @@ export default function NotificationsPage() {
 
   async function loadUnreadByType() {
     if (!user) return;
-    const { data, error } = await supabase
+    let q = supabase
       .from("notifications")
       .select("type")
       .eq("user_id", user.id)
       .eq("read", false);
+    q = q.eq("is_test_data", false);
+    const { data, error } = await q;
     if (error || !data) return;
     const counts: Record<string, number> = {};
     for (const item of data as Array<{ type: string }>) {
@@ -120,6 +122,7 @@ export default function NotificationsPage() {
       .order("created_at", { ascending: false })
       .limit(50);
 
+    q = q.eq("is_test_data", false);
     if (filterType !== "all") {
       q = q.eq("type", filterType);
     }

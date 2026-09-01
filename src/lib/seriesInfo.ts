@@ -31,17 +31,20 @@ const stripMarkdown = (text: string): string => text
 // 系列列表统一批量加载章节、最新章节和互动统计，避免每个系列触发 4 个请求。
 export async function assembleSeriesInfo(
   supabase: SupabaseClient,
-  series: SeriesInfoSummary[]
+  series: SeriesInfoSummary[],
+  opts: { includeTestData?: boolean } = {},
 ): Promise<SeriesInfoSummary[]> {
   if (series.length === 0) return [];
 
   const names = [...new Set(series.map((item) => item.name))];
-  const { data: chapterRows } = await supabase
+  let chapterQuery = supabase
     .from("posts")
     .select("id, series_name, chapter_number, created_at")
     .in("series_name", names)
     .eq("post_type", "serial")
     .eq("status", "published");
+  if (!opts.includeTestData) chapterQuery = chapterQuery.eq("is_test_data", false);
+  const { data: chapterRows } = await chapterQuery;
   const chapters = (chapterRows || []) as Array<{
     id: string;
     series_name: string | null;
@@ -72,7 +75,11 @@ export async function assembleSeriesInfo(
   const latestIds = [...latestBySeries.values()].map((chapter) => chapter.id);
   const [latestResult, likeResult, commentResult, bookmarkResult] = await Promise.all([
     latestIds.length > 0
-      ? supabase.from("posts").select("id, title, content").in("id", latestIds)
+      ? (() => {
+        let query = supabase.from("posts").select("id, title, content").in("id", latestIds);
+        if (!opts.includeTestData) query = query.eq("is_test_data", false);
+        return query;
+      })()
       : Promise.resolve({ data: null }),
     chapterIds.length > 0
       ? supabase.from("likes").select("post_id").in("post_id", chapterIds)

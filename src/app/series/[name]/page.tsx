@@ -56,6 +56,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
           .from("series")
           .select("id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at")
           .eq("name", decodedName)
+          .eq("is_test_data", false)
           .maybeSingle(),
         supabase
           .from("posts")
@@ -63,6 +64,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
           .eq("series_name", decodedName)
           .eq("post_type", "serial")
           .eq("status", "published")
+          .eq("is_test_data", false)
           .gt("chapter_number", 0)
           .order("chapter_number", { ascending: true }),
       ]);

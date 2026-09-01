@@ -34,7 +34,8 @@ export default function MobileDrawer() {
           .from("notifications")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
-          .eq("read", false);
+          .eq("read", false)
+          .eq("is_test_data", false);
         return count || 0;
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };

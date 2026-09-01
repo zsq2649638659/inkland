@@ -94,7 +94,7 @@ export async function loadFeed(
 
   const blockedIds = new Set((blockedRows || []).map((row) => (row as Record<string, unknown>).blocked_user_id as string));
 
-  let query = supabase.from("posts").select(postSelect).eq("status", "published");
+  let query = supabase.from("posts").select(postSelect).eq("status", "published").eq("is_test_data", false);
   let bookmarkedPostIds: string[] = [];
 
   if (needsFollow) {
@@ -106,7 +106,7 @@ export async function loadFeed(
 
   // ---- wave 2：主 feed 与收藏作品解析并行（二者只依赖 wave1） ----
   const bookmarkedPostsPromise = bookmarkedPostIds.length > 0
-    ? supabase.from("posts").select("id, series_name, post_type, chapter_number").in("id", bookmarkedPostIds).eq("status", "published")
+    ? supabase.from("posts").select("id, series_name, post_type, chapter_number").in("id", bookmarkedPostIds).eq("status", "published").eq("is_test_data", false)
     : Promise.resolve({ data: [] as unknown[] });
 
   const [{ data: rawPosts, error: err }, { data: bookmarkedPosts }] = await Promise.all([
@@ -138,11 +138,11 @@ export async function loadFeed(
     .select("id, like_count, comment_count, bookmark_count")
     .in("id", feedIds);
   const seriesFullPostsPromise = bookmarkedSeriesNames.length > 0
-    ? supabase.from("posts").select(postSelect).in("series_name", bookmarkedSeriesNames).eq("status", "published")
+    ? supabase.from("posts").select(postSelect).in("series_name", bookmarkedSeriesNames).eq("status", "published").eq("is_test_data", false)
     : Promise.resolve({ data: [] as unknown[] });
   const seriesMetaNames = [...new Set([...bookmarkedSeriesNames, ...seriesNames])];
   const seriesMetaPromise = seriesMetaNames.length > 0
-    ? supabase.from("series").select("name, description, cover_url, tags, status, series_type").in("name", seriesMetaNames)
+    ? supabase.from("series").select("name, description, cover_url, tags, status, series_type").in("name", seriesMetaNames).eq("is_test_data", false)
     : Promise.resolve({ data: [] as unknown[] });
 
   const [{ data: stats }, { data: rawSeriesPosts }, { data: seriesData }] = await Promise.all([
@@ -323,7 +323,8 @@ async function loadFollowedTags(supabase: SupabaseClient, userId: string | null)
       .from("posts")
       .select("id, post_type, chapter_number")
       .in("id", postIds)
-      .eq("status", "published");
+      .eq("status", "published")
+      .eq("is_test_data", false);
     validPostIds = new Set((posts || []).filter((p: Record<string, unknown>) => {
       return !(p.post_type === "serial" && p.chapter_number && (p.chapter_number as number) > 0);
     }).map((p: Record<string, unknown>) => p.id as string));
@@ -338,10 +339,12 @@ async function loadFollowedTags(supabase: SupabaseClient, userId: string | null)
     if (tagName) countMap.set(tagName, (countMap.get(tagName) || 0) + 1);
   }
 
-  const followedTags: TagItem[] = tagNames.map((n) => ({
-    name: n,
-    post_count: countMap.get(n) || 0,
-  }));
+  const followedTags: TagItem[] = tagNames
+    .filter((name) => (countMap.get(name) || 0) > 0)
+    .map((name) => ({
+      name,
+      post_count: countMap.get(name) || 0,
+    }));
   return { posts: [], serialCards: [], followedTags };
 }
 
@@ -381,6 +384,7 @@ async function normalizeRpcResult(
     !p
     || typeof p.id !== "string"
     || typeof p.content !== "string"
+    || p.is_test_data !== false
   ))) return null;
 
   const toPost = (p: RpcRow): Post => {
@@ -429,6 +433,7 @@ async function normalizeRpcResult(
   const seriesMeta = new Map<string, RpcRow>();
   if (Array.isArray(data.seriesMeta)) {
     for (const s of data.seriesMeta as RpcRow[]) {
+      if (s && s.is_test_data !== false) return null;
       if (s && typeof s.name === "string") seriesMeta.set(s.name as string, s);
     }
   }
@@ -436,7 +441,8 @@ async function normalizeRpcResult(
     const { data: fetched } = await supabase
       .from("series")
       .select("name, description, cover_url, tags, status, series_type")
-      .in("name", seriesNames.filter((n) => !seriesMeta.has(n)));
+      .in("name", seriesNames.filter((n) => !seriesMeta.has(n)))
+      .eq("is_test_data", false);
     if (fetched) for (const s of fetched as RpcRow[]) seriesMeta.set(s.name as string, s);
   }
 

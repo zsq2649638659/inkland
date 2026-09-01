@@ -73,7 +73,7 @@ onReport,
     setLoading(true);
     const { data: parentData } = await supabase
       .from("comments")
-      .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
+      .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
       .eq("post_id", postId)
       .eq("paragraph_index", paragraphIndex)
       .is("parent_id", null)
@@ -115,7 +115,9 @@ onReport,
       }
     }
 
-    const formatted: Comment[] = parentData.map((c: Record<string, unknown>) => {
+    const formatted: Comment[] = (parentData as Record<string, unknown>[])
+      .filter((c) => !((c.author as { is_test_account?: boolean } | null)?.is_test_account))
+      .map((c: Record<string, unknown>) => {
       const author = c.author as { nickname: string; avatar_url: string | null } | null;
       const st = statsMap.get(c.id as string) || { like_count: 0, reply_count: 0 };
       return {
@@ -307,7 +309,7 @@ onReport,
   const loadReplies = async (commentId: string) => {
     const { data } = await supabase
       .from("comments")
-      .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
+      .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
       .eq("parent_id", commentId)
       .order("created_at", { ascending: true })
       .limit(100);
@@ -340,7 +342,9 @@ onReport,
         }
       }
 
-      const replies: Comment[] = (data as Array<Record<string, unknown>>).map((r) => {
+      const replies: Comment[] = (data as Array<Record<string, unknown>>)
+        .filter((r) => !((r.author as { is_test_account?: boolean } | null)?.is_test_account))
+        .map((r) => {
         const author = r.author as { nickname: string; avatar_url: string | null } | null;
         const st = rStatsMap.get(r.id as string) || { like_count: 0, reply_count: 0 };
         return {

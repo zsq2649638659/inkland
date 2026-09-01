@@ -97,12 +97,12 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     setTabLoading(true);
     const { data: fData } = await supabase
       .from("follows")
-      .select("follower_id, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio)")
+      .select("follower_id, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio, is_test_account)")
       .eq("following_id", id)
       .limit(50);
     if (fData) {
       const users = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
-        .filter((f) => f.profiles)
+        .filter((f) => f.profiles && !(f.profiles as { is_test_account?: boolean }).is_test_account)
         .map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
@@ -118,12 +118,12 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     setTabLoading(true);
     const { data: fData } = await supabase
       .from("follows")
-      .select("following_id, profiles!follows_following_id_fkey(id, nickname, avatar_url, bio)")
+      .select("following_id, profiles!follows_following_id_fkey(id, nickname, avatar_url, bio, is_test_account)")
       .eq("follower_id", id)
       .limit(50);
     if (fData) {
       const users = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
-        .filter((f) => f.profiles)
+        .filter((f) => f.profiles && !(f.profiles as { is_test_account?: boolean }).is_test_account)
         .map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
@@ -138,9 +138,17 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const loadStats = useCallback(async (userId: string) => {
     // 个人资料统计互不依赖；帖子 ID 同时用于帖子总数和互动汇总，避免重复查一遍 posts。
     const [postIdsResult, followingResult, followerResult] = await Promise.all([
-      supabase.from("posts").select("id").eq("user_id", userId).eq("status", "published"),
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", userId),
+      supabase.from("posts").select("id").eq("user_id", userId).eq("status", "published").eq("is_test_data", false),
+      supabase
+        .from("follows")
+        .select("id, target:profiles!follows_following_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+        .eq("follower_id", userId)
+        .eq("target.is_test_account", false),
+      supabase
+        .from("follows")
+        .select("id, source:profiles!follows_follower_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+        .eq("following_id", userId)
+        .eq("source.is_test_account", false),
     ]);
     const postIds = (postIdsResult.data || []) as Array<{ id: string }>;
     setPostCount(postIds.length);
@@ -168,16 +176,17 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
   useEffect(() => {
     const load = async () => {
-      const profilePromise = supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id).single();
+      const profilePromise = supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id).eq("is_test_account", false).single();
       const postsPromise = supabase
         .from("posts")
         .select("id, title, content, word_count, post_type, created_at, series_name, chapter_number, cover_url, user_id, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)")
-        .eq("user_id", id).eq("status", "published")
+        .eq("user_id", id).eq("status", "published").eq("is_test_data", false)
         .order("created_at", { ascending: false }).limit(50);
       const seriesPromise = supabase
         .from("series")
         .select("id, name, cover_url, description, series_type, tags, status, created_at")
         .eq("user_id", id)
+        .eq("is_test_data", false)
         .order("created_at", { ascending: false });
       void loadStats(id);
       const [{ data: prof }, { data: rawData }, { data: allSeriesData }] = await Promise.all([

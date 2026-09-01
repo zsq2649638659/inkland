@@ -33,13 +33,21 @@ export async function createNotification(params: CreateNotificationParams): Prom
   let user_id: string | null = null;
 
   try {
+    const { data: actorProfile } = await supabase
+      .from("profiles")
+      .select("is_test_account")
+      .eq("id", params.actor_id)
+      .maybeSingle();
+    if (actorProfile?.is_test_account === true) return;
+
     if (params.type === "comment" || params.type === "like" || params.type === "bookmark") {
       if (!params.post_id) return;
       const { data: post } = await supabase
         .from("posts")
-        .select("user_id")
+        .select("user_id, is_test_data")
         .eq("id", params.post_id)
         .single();
+      if (post?.is_test_data === true) return;
       if (post) user_id = (post as Record<string, unknown>).user_id as string;
     } else if (params.type === "reply") {
       if (!params.post_id) return;
@@ -50,9 +58,10 @@ export async function createNotification(params: CreateNotificationParams): Prom
       // 改用：查询 post 的 owner 作为通知目标
       const { data: post } = await supabase
         .from("posts")
-        .select("user_id")
+        .select("user_id, is_test_data")
         .eq("id", params.post_id)
         .single();
+      if (post?.is_test_data === true) return;
       if (post) user_id = (post as Record<string, unknown>).user_id as string;
     }
 

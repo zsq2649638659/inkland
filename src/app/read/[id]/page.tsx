@@ -39,6 +39,7 @@ export default async function ReadPage({
     .select("id,title,content,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url,bio),post_tags(tags!inner(name))")
     .eq("id", id)
     .eq("status", "published")
+    .eq("is_test_data", false)
     .limit(1);
 
   if (postError) {

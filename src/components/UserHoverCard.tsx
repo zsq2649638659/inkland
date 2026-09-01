@@ -55,9 +55,17 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
     if (loading) return;
     setLoading(true);
     const [followingRes, followerRes, worksRes] = await Promise.all([
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", userId),
-      supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "published"),
+      supabase
+        .from("follows")
+        .select("id, target:profiles!follows_following_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+        .eq("follower_id", userId)
+        .eq("target.is_test_account", false),
+      supabase
+        .from("follows")
+        .select("id, source:profiles!follows_follower_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+        .eq("following_id", userId)
+        .eq("source.is_test_account", false),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "published").eq("is_test_data", false),
     ]);
     setStats({
       following: followingRes.count || 0,

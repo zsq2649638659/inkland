@@ -70,7 +70,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
       // 帖子关联和 series.tags 关联互不依赖，合并成同一波请求。
       const [{ data: ptData }, { data: seriesByTag }] = await Promise.all([
         supabase.from("post_tags").select("post_id").eq("tag_id", tagId),
-        supabase.from("series").select("name").contains("tags", [decodedName]),
+        supabase.from("series").select("name").contains("tags", [decodedName]).eq("is_test_data", false),
       ]);
 
       let allPosts: Post[] = [];
@@ -83,7 +83,8 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           .from("posts")
           .select("id, title, content, word_count, post_type, chapter_number, series_name, created_at, cover_url, user_id, author:profiles!posts_user_id_fkey(nickname, avatar_url), post_tags(tags(name))")
           .in("id", postIds)
-          .eq("status", "published");
+          .eq("status", "published")
+          .eq("is_test_data", false);
         const statsPromise = supabase
           .from("post_stats")
           .select("id, like_count, comment_count, bookmark_count")
@@ -150,7 +151,8 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
         const { data: seriesData } = await supabase
           .from("series")
           .select("id, name, cover_url, description, tags, status, series_type, created_at, user_id")
-          .in("name", [...allSeriesNames]);
+          .in("name", [...allSeriesNames])
+          .eq("is_test_data", false);
 
         if (seriesData && seriesData.length > 0) {
           const rawSeries = seriesData as unknown as SeriesEntry[];
@@ -161,7 +163,8 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
             .select("id, series_name, chapter_number, created_at")
             .in("series_name", [...allSeriesNames])
             .eq("post_type", "serial")
-            .eq("status", "published");
+            .eq("status", "published")
+            .eq("is_test_data", false);
           const profilesPromise = userIds.length > 0
             ? supabase.from("profiles").select("id, nickname, avatar_url").in("id", userIds)
             : Promise.resolve({ data: null });
@@ -203,7 +206,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           const latestIds = [...latestBySeries.values()].map((chapter) => chapter.id);
           const [latestResult, statsResult] = await Promise.all([
             latestIds.length > 0
-              ? supabase.from("posts").select("id, title, content").in("id", latestIds)
+              ? supabase.from("posts").select("id, title, content").in("id", latestIds).eq("is_test_data", false)
               : Promise.resolve({ data: null }),
             chapterIds.length > 0
               ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", chapterIds)

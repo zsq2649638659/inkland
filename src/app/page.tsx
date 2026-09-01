@@ -82,6 +82,7 @@ export default function HomePage() {
       .from("posts")
       .select("id, created_at")
       .eq("status", "published")
+      .eq("is_test_data", false)
       .gt("created_at", latestPostTimeRef.current);
 
     let bookmarkedSeriesNames: string[] = [];
@@ -104,7 +105,8 @@ export default function HomePage() {
           .from("posts")
           .select("series_name, post_type, chapter_number")
           .in("id", bookmarkedPostIds)
-          .eq("status", "published");
+          .eq("status", "published")
+          .eq("is_test_data", false);
         const bookmarkedPostRows = (bookmarkedPosts || []) as Array<{ post_type?: string; chapter_number?: number | null; series_name?: string | null }>;
         bookmarkedSeriesNames = [...new Set(bookmarkedPostRows
           .filter((post) => post.post_type === "serial" && post.chapter_number && post.series_name)
@@ -122,6 +124,7 @@ export default function HomePage() {
         .from("posts")
         .select("id, created_at")
         .eq("status", "published")
+        .eq("is_test_data", false)
         .gt("created_at", latestPostTimeRef.current)
         .in("series_name", bookmarkedSeriesNames)
         .limit(1);
