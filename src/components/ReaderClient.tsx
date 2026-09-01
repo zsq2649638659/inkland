@@ -18,6 +18,7 @@ import type { Post, Comment } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { isSafeExternalImageUrl, renderSafeInlineMarkdown, renderSafeMarkdown } from "@/lib/markdown";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface ReaderClientProps {
   post: Post;
@@ -171,7 +172,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
         );
       } catch { /* ignore */ }
     }
-  }, [post.id]);
+  }, [post.id, profile?.is_test_account]);
 
   const loadAdjacentChapters = async () => {
     setPrevChapter(null);
@@ -180,12 +181,14 @@ export default function ReaderClient({ post }: ReaderClientProps) {
     if (!sn) return;
 
     // 查询合集中所有已发布的作品，按创建时间排序
-    const { data: allPosts } = await supabase
-      .from("posts")
-      .select("id, title, chapter_number, created_at")
-      .eq("series_name", sn)
-      .eq("status", "published")
-      .order("created_at", { ascending: true });
+    const { data: allPosts } = await withTestDataVisibility(
+      supabase
+        .from("posts")
+        .select("id, title, chapter_number, created_at")
+        .eq("series_name", sn)
+        .eq("status", "published"),
+      includeTestDataForProfile(profile),
+    ).order("created_at", { ascending: true });
 
     if (!allPosts || allPosts.length === 0) return;
 
@@ -228,13 +231,15 @@ export default function ReaderClient({ post }: ReaderClientProps) {
     // 加载所有评论（包括回复）
     const { data } = await supabase
       .from("comments")
-      .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
+      .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
       .eq("post_id", post.id)
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (data) {
-      const all: Comment[] = (data as Record<string, unknown>[]).map((c) => {
+      const all: Comment[] = (data as Record<string, unknown>[])
+        .filter((c) => includeTestDataForProfile(profile) || !((c.author as { is_test_account?: boolean } | null)?.is_test_account))
+        .map((c) => {
         const author = c.author as { nickname: string; avatar_url: string | null } | null;
         return {
           id: c.id as string,

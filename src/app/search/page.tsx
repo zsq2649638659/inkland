@@ -10,6 +10,7 @@ import { SkeletonSearchResults } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { slimContent } from "@/lib/feed";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type SearchFilter = "tags" | "users" | "works" | "posts";
 
@@ -29,7 +30,7 @@ function SearchContent() {
   const initialQuery = searchParams.get("q") || "";
   const initialType = (searchParams.get("type") || "tags") as SearchFilter;
   const supabase = createClient();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
 
   const [inputValue, setInputValue] = useState(initialQuery);
   const [activeFilter, setActiveFilter] = useState<SearchFilter>(initialType);
@@ -68,6 +69,7 @@ function SearchContent() {
     setHasSearched(true);
 
     const q = query.trim();
+    const includeTestData = includeTestDataForProfile(profile);
 
     const postSelect = "id, title, content, word_count, post_type, created_at, cover_url, user_id, series_name, chapter_number, author:profiles!posts_user_id_fkey(nickname, avatar_url)";
 
@@ -76,11 +78,20 @@ function SearchContent() {
     const [blockedRes, tagRes, userRes, titleRes, contentRes] = await Promise.all([
       supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id),
       supabase.from("tags").select("id, name").ilike("name", `%${q}%`).limit(20),
-      supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(20),
+      withTestDataVisibility(
+        supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(20),
+        includeTestData,
+      ),
       // 作品：只搜标题
-      supabase.from("posts").select(postSelect).ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(20),
+      withTestDataVisibility(
+        supabase.from("posts").select(postSelect).ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(20),
+        includeTestData,
+      ),
       // 正文：只搜内容
-      supabase.from("posts").select(postSelect).ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(20),
+      withTestDataVisibility(
+        supabase.from("posts").select(postSelect).ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(20),
+        includeTestData,
+      ),
     ]);
 
     if (rid !== requestIdRef.current) return;
@@ -96,8 +107,7 @@ function SearchContent() {
     const visibleContentPosts = ((contentRes.data || []) as unknown as Post[])
       .filter((post) => !blockedIds.has(post.user_id || ""))
       .map((post) => ({ ...post, content: slimContent(post.content || "") }));
-    const initialTags = tagRows.map((tag) => ({ name: tag.name, post_count: 0 }));
-    setTags(initialTags);
+    setTags([]);
     setUsers(visibleUsers);
     setTitlePosts(visibleTitlePosts);
     setContentPosts(visibleContentPosts);
@@ -114,16 +124,23 @@ function SearchContent() {
     if (rid !== requestIdRef.current) return;
 
     const countMap = new Map<string, number>();
+    const candidatePostIds = [...new Set((ptCounts || []).map((row: Record<string, unknown>) => row.post_id as string).filter(Boolean))];
+    const { data: publicPosts } = candidatePostIds.length > 0
+      ? await withTestDataVisibility(supabase.from("posts").select("id").in("id", candidatePostIds), includeTestData)
+      : { data: [] as unknown[] };
+    const publicPostIds = new Set((publicPosts || []).map((row: Record<string, unknown>) => row.id as string));
     if (ptCounts) {
       for (const row of ptCounts as Array<{ tag_id: string; post_id: string }>) {
+        if (!publicPostIds.has(row.post_id)) continue;
         countMap.set(row.tag_id, (countMap.get(row.tag_id) || 0) + 1);
       }
     }
 
     setTags(tagRows
+      .filter((tag) => (countMap.get(tag.id) || 0) > 0)
       .map((tag) => ({ name: tag.name, post_count: countMap.get(tag.id) || 0 }))
       .sort((a, b) => b.post_count - a.post_count));
-  }, [supabase, user]);
+  }, [supabase, user, profile?.is_test_account]);
 
   // URL 参数同步（初始加载）
   useEffect(() => {
@@ -157,7 +174,7 @@ function SearchContent() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [inputValue, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inputValue, user, profile?.is_test_account]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInputChange = (value: string) => {
     setInputValue(value);

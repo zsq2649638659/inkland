@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
 import { SkeletonNotification } from "@/components/Skeleton";
 import { getNotificationLink, type NotificationMetadata } from "@/lib/notificationLinks";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark" | "reply";
 
@@ -47,7 +48,7 @@ interface ReviewIssueMeta {
 export default function NotificationsPage() {
   const supabase = createClient();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<NotificationType>("all");
@@ -63,12 +64,12 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!user) return;
     loadNotifications();
-  }, [user, filterType]);
+  }, [user, profile?.is_test_account, filterType]);
 
   useEffect(() => {
     if (!user) return;
     loadUnreadByType();
-  }, [user]);
+  }, [user, profile?.is_test_account]);
 
   useEffect(() => {
     if (!user) return;
@@ -88,15 +89,17 @@ export default function NotificationsPage() {
       document.removeEventListener("visibilitychange", handleVisibility);
       void supabase.removeChannel(channel);
     };
-  }, [user, filterType]);
+  }, [user, profile?.is_test_account, filterType]);
 
   async function loadUnreadByType() {
     if (!user) return;
-    const { data, error } = await supabase
+    let q = supabase
       .from("notifications")
       .select("type")
       .eq("user_id", user.id)
       .eq("read", false);
+    q = withTestDataVisibility(q, includeTestDataForProfile(profile));
+    const { data, error } = await q;
     if (error || !data) return;
     const counts: Record<string, number> = {};
     for (const item of data as Array<{ type: string }>) {
@@ -120,6 +123,7 @@ export default function NotificationsPage() {
       .order("created_at", { ascending: false })
       .limit(50);
 
+    q = withTestDataVisibility(q, includeTestDataForProfile(profile));
     if (filterType !== "all") {
       q = q.eq("type", filterType);
     }

@@ -31,6 +31,10 @@ DECLARE
   real_user_id UUID := '46f57789-ee86-489a-ac9c-650392054a13';
   post_count INT;
 BEGIN
+  UPDATE profiles
+  SET is_test_account = TRUE
+  WHERE id = ANY(test_users);
+
   SELECT COUNT(*) INTO post_count FROM posts WHERE user_id = real_user_id AND status = 'published';
 
   FOR p IN SELECT id, title FROM posts WHERE user_id = real_user_id AND status = 'published' LOOP

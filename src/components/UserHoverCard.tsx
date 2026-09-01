@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import type { UserProfile } from "@/components/AuthProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface UserHoverCardProps {
   userId: string;
@@ -18,7 +19,7 @@ interface UserHoverCardProps {
 
 export default function UserHoverCard({ userId, profile, displayName, avatarChar, children }: UserHoverCardProps) {
   const supabase = createClient();
-  const { signOut } = useAuth();
+  const { signOut, profile: currentProfile } = useAuth();
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState({ following: 0, followers: 0, works: 0 });
   const [loading, setLoading] = useState(false);
@@ -54,10 +55,27 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
   const fetchStats = async () => {
     if (loading) return;
     setLoading(true);
-    const [followingRes, followerRes, worksRes] = await Promise.all([
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", userId),
-      supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", userId),
+    const includeTestData = includeTestDataForProfile(currentProfile);
+    let followingQuery = supabase
+      .from("follows")
+      .select("id, target:profiles!follows_following_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+      .eq("follower_id", userId);
+    let followerQuery = supabase
+      .from("follows")
+      .select("id, source:profiles!follows_follower_id_fkey!inner(is_test_account)", { count: "exact", head: true })
+      .eq("following_id", userId);
+    if (!includeTestData) {
+      followingQuery = followingQuery.eq("target.is_test_account", false);
+      followerQuery = followerQuery.eq("source.is_test_account", false);
+    }
+    const worksQuery = withTestDataVisibility(
       supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "published"),
+      includeTestData,
+    );
+    const [followingRes, followerRes, worksRes] = await Promise.all([
+      followingQuery,
+      followerQuery,
+      worksQuery,
     ]);
     setStats({
       following: followingRes.count || 0,

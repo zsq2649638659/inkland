@@ -28,8 +28,14 @@ declare
   v_me uuid := auth.uid();
   v_blocked uuid[];
   v_following uuid[];
+  v_can_view_test_data boolean := false;
   v_result json;
 begin
+  select coalesce(p.is_test_account, false)
+    into v_can_view_test_data
+  from public.profiles p
+  where p.id = v_me;
+
   -- 屏蔽名单（对所有 tab 生效，和原客户端逻辑一致）
   select coalesce(array_agg(blocked_user_id), '{}') into v_blocked
   from public.blocked_users
@@ -44,7 +50,7 @@ begin
         from public.tag_follows tf
         join public.tags tg on tg.id = tf.tag_id
         left join public.post_tags pt on pt.tag_id = tf.tag_id
-        left join public.posts p on p.id = pt.post_id and p.status = 'published'
+        left join public.posts p on p.id = pt.post_id and p.status = 'published' and (p.is_test_data = false or v_can_view_test_data)
         where tf.user_id = v_me
           and not (p.post_type = 'serial' and p.chapter_number > 0) -- 排除连载章节
           and coalesce(p.post_type, 'x') <> 'serial'
@@ -60,13 +66,14 @@ begin
       select p.*
       from public.posts p
       where p.status = 'published'
+        and (p.is_test_data = false or v_can_view_test_data)
         and not (p.user_id = any(v_blocked))
       order by p.created_at desc
       limit p_limit
     )
     select json_build_object(
       'posts', coalesce((select json_agg(x) from (
-        select p.id, p.title, left(p.content, 6000) as content, p.cover_url, p.word_count, p.post_type, p.created_at,
+        select p.id, p.title, left(p.content, 6000) as content, p.cover_url, p.word_count, p.post_type, p.created_at, p.is_test_data,
                p.user_id, p.series_name, p.chapter_number,
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,
@@ -82,12 +89,13 @@ begin
         left join public.post_stats s on s.id = p.id
       ) x), '[]'::json),
       'seriesMeta', coalesce((select json_agg(m) from (
-        select ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type
+        select ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type, ss.is_test_data
         from public.series ss
         where ss.name in (
           select distinct p.series_name from feed p
           where p.post_type = 'serial' and p.chapter_number > 0 and p.series_name is not null
         )
+          and (ss.is_test_data = false or v_can_view_test_data)
       ) m), '[]'::json),
       'followedTags', '[]'::json
     ) into v_result;
@@ -104,6 +112,7 @@ begin
       select p.*
       from public.posts p
       where p.status = 'published'
+        and (p.is_test_data = false or v_can_view_test_data)
         and p.user_id = any(v_following)
         and not (p.user_id = any(v_blocked))
       order by p.created_at desc
@@ -121,6 +130,7 @@ begin
       select p.*
       from public.posts p
       where p.status = 'published'
+        and (p.is_test_data = false or v_can_view_test_data)
         and p.series_name in (select series_name from bookmarked_series)
         and not (p.user_id = any(v_blocked))
     ),
@@ -131,7 +141,7 @@ begin
     )
     select json_build_object(
       'posts', coalesce((select json_agg(x) from (
-        select p.id, p.title, left(p.content, 6000) as content, p.cover_url, p.word_count, p.post_type, p.created_at,
+        select p.id, p.title, left(p.content, 6000) as content, p.cover_url, p.word_count, p.post_type, p.created_at, p.is_test_data,
                p.user_id, p.series_name, p.chapter_number,
                coalesce(pr.nickname, '匿名用户') as author_nickname, pr.avatar_url as author_avatar,
                coalesce(s.like_count, 0) as like_count, coalesce(s.comment_count, 0) as comment_count,
@@ -149,12 +159,13 @@ begin
         limit p_limit
       ) x), '[]'::json),
       'seriesMeta', coalesce((select json_agg(m) from (
-        select ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type
+        select ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type, ss.is_test_data
         from public.series ss
         where ss.name in (
           select distinct p.series_name from merged p
           where p.post_type = 'serial' and p.chapter_number > 0 and p.series_name is not null
         )
+          and (ss.is_test_data = false or v_can_view_test_data)
       ) m), '[]'::json),
       'followedTags', '[]'::json
     ) into v_result;

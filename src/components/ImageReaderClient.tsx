@@ -15,6 +15,7 @@ import { MODERATION_REASON_OPTIONS } from "@shared/moderationReasons";
 import { assertCanComment } from "@/lib/userRestrictions";
 import type { Post, Comment } from "@/lib/types";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface ImageItem {
   url: string;
@@ -173,7 +174,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       const savedTheme = localStorage.getItem("theme");
       if (savedTheme === "dark") applyTheme("dark");
     } catch { /* ignore */ }
-  }, [post.id]);
+  }, [post.id, profile?.is_test_account]);
 
   const loadAdjacentChapters = async () => {
     setPrevChapter(null);
@@ -181,12 +182,14 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
     const sn = post.series_name;
     if (!sn) return;
 
-    const { data: allPosts } = await supabase
-      .from("posts")
-      .select("id, title, chapter_number, created_at")
-      .eq("series_name", sn)
-      .eq("status", "published")
-      .order("created_at", { ascending: true });
+    const { data: allPosts } = await withTestDataVisibility(
+      supabase
+        .from("posts")
+        .select("id, title, chapter_number, created_at")
+        .eq("series_name", sn)
+        .eq("status", "published"),
+      includeTestDataForProfile(profile),
+    ).order("created_at", { ascending: true });
 
     if (!allPosts || allPosts.length === 0) return;
 
@@ -225,13 +228,15 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   const loadComments = async () => {
     const { data } = await supabase
       .from("comments")
-      .select("id, content, created_at, user_id, parent_id, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
+      .select("id, content, created_at, user_id, parent_id, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
       .eq("post_id", post.id)
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (data) {
-      const all: Comment[] = (data as Record<string, unknown>[]).map((c) => {
+      const all: Comment[] = (data as Record<string, unknown>[])
+        .filter((c) => includeTestDataForProfile(profile) || !((c.author as { is_test_account?: boolean } | null)?.is_test_account))
+        .map((c) => {
         const author = c.author as { nickname: string; avatar_url: string | null } | null;
         return {
           id: c.id as string,

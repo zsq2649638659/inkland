@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadFeed, type FeedTab } from "@/lib/feed";
+import { canViewTestData } from "@/lib/test-data-visibility";
 
 // 首页信息流的服务端聚合入口：Vercel→Supabase 走机房级网络（拉全文也快），
 // 服务端把超长正文瘦身后回传，客户端只下载列表所需的轻量数据。
@@ -41,7 +42,8 @@ export async function GET(request: Request) {
       userId = user?.id ?? null;
     }
 
-    const cacheKey = `${userId ?? "anon"}:${tab}`;
+    const includeTestData = await canViewTestData(supabase, userId);
+    const cacheKey = `${userId ?? "anon"}:${includeTestData ? "test" : "public"}:${tab}`;
     const hit = feedApiCache.get(cacheKey);
     if (hit && Date.now() - hit.at < API_CACHE_TTL) {
       return jsonResp(hit.body, url.searchParams.get("u") === "anon" && tab === "hot24");

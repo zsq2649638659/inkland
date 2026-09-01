@@ -14,6 +14,7 @@ import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Comment } from "@/lib/types";
+import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 
 export interface SerialPostCardData {
   chapterId: string;
@@ -202,12 +203,12 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       setLoadingComments(true);
       const { data: raw } = await supabase
         .from("comments")
-        .select("id, content, created_at, user_id, author:profiles!comments_user_id_fkey(nickname, avatar_url)")
+        .select("id, content, created_at, user_id, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
         .eq("post_id", data.chapterId)
         .order("created_at", { ascending: false })
         .limit(5);
       if (raw) {
-        setComments(raw.map((c: Record<string, unknown>) => {
+        setComments(raw.filter((c: Record<string, unknown>) => includeTestDataForProfile(profile) || !((c.author as { is_test_account?: boolean } | null)?.is_test_account)).map((c: Record<string, unknown>) => {
           const author = c.author as { nickname?: string; avatar_url?: string | null } | null;
           return {
             id: c.id as string,

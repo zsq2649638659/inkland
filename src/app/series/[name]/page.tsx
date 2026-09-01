@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { assertCanInteract } from "@/lib/userRestrictions";
+import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface ChapterInfo {
   id: string;
@@ -38,7 +39,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   const supabase = createClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
   const [chapters, setChapters] = useState<ChapterInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,21 +51,27 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   useEffect(() => {
     let active = true;
     const load = async () => {
+      const includeTestData = includeTestDataForProfile(profile);
       // 系列元数据和章节互不依赖，先并行发出，避免跨区域请求瀑布。
       const [{ data: seriesData }, { data: chData }] = await Promise.all([
-        supabase
-          .from("series")
-          .select("id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at")
-          .eq("name", decodedName)
-          .maybeSingle(),
-        supabase
-          .from("posts")
-          .select("id, title, chapter_number, chapter_title, word_count, created_at, user_id, status")
-          .eq("series_name", decodedName)
-          .eq("post_type", "serial")
-          .eq("status", "published")
-          .gt("chapter_number", 0)
-          .order("chapter_number", { ascending: true }),
+        withTestDataVisibility(
+          supabase
+            .from("series")
+            .select("id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at")
+            .eq("name", decodedName),
+          includeTestData,
+        ).maybeSingle(),
+        withTestDataVisibility(
+          supabase
+            .from("posts")
+            .select("id, title, chapter_number, chapter_title, word_count, created_at, user_id, status")
+            .eq("series_name", decodedName)
+            .eq("post_type", "serial")
+            .eq("status", "published")
+            .gt("chapter_number", 0)
+            .order("chapter_number", { ascending: true }),
+          includeTestData,
+        ),
       ]);
 
       if (!active) return;
