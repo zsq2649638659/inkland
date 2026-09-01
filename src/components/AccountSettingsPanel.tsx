@@ -319,10 +319,10 @@ export default function AccountSettingsPanel() {
           )}
         </div>
         <div className="account-settings-copyright-actions">
-          {copyrightMessage && <p className="account-settings-message" role="status">{copyrightMessage}</p>}
           <button className="settings-btn-save" disabled={savingCopyright} onClick={() => void saveCopyright()} type="button">
             {savingCopyright ? "保存中…" : "保存版权设置"}
           </button>
+          {copyrightMessage && <p className="account-settings-message" role="status">{copyrightMessage}</p>}
         </div>
       </section>
 
