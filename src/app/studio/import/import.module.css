@@ -97,6 +97,7 @@
 .importNoticeWorkTitle { margin-top: 0 !important; color: var(--color-text) !important; font-weight: 700; }
 :global(.importNoticeActions) { flex-wrap: nowrap; gap: 6px; }
 :global(.importNoticeActions .btn-modal) { min-width: 0; padding: 10px 12px; font-size: 13px; white-space: nowrap; }
+:global(.metadataCandidateModalActions .btn-modal) { padding-left: 16px; padding-right: 16px; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
 .publishSummary li { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid #ddd5d0; }
 .publishSummary strong, .publishSummary span { overflow-wrap: anywhere; }
