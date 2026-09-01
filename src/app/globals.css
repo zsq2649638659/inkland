@@ -10238,6 +10238,8 @@ p {
   .account-settings-profile-row { align-items:stretch;flex-direction:column;gap:16px; }
   .account-settings-profile { width:100%; }
   .account-settings-level-line { width:100%; }
+  .account-settings-experience-tooltip { left:auto;right:0;width:min(248px,calc(100vw - 32px)); }
+  .account-settings-experience-tooltip::before { left:auto;right:18px; }
   .account-settings-coin-tooltip { left:0;right:auto;width:min(260px,calc(100vw - 32px)); }
   .account-settings-profile-actions { width:100%;justify-content:flex-end; }
   .account-settings-list { grid-template-columns:1fr; }
