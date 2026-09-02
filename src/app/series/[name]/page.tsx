@@ -305,25 +305,6 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               </div>
             </div>
 
-            <div className={`series-reading-summary${readingHistoryLoading ? " is-loading" : ""}`} aria-live="polite" aria-busy={readingHistoryLoading}>
-              <div className="series-reading-summary-copy">
-                <span className="series-reading-summary-label"><i className="fa-regular fa-clock" /> 阅读进度</span>
-                <span className="series-reading-summary-value">
-                  {readingHistoryLoading
-                    ? "正在读取…"
-                    : hasReadingProgress
-                      ? <>已读到第 <strong>{readChapterNumber}</strong> 章 / 共 {chapters.length} 章</>
-                      : <>尚未开始阅读 / 共 {chapters.length} 章</>}
-                </span>
-              </div>
-              {hasReadingProgress && continueChapter && (
-                <Link href={`/read/${continueChapter.id}`} className="series-reading-action">
-                  继续阅读
-                  <i className="fa-solid fa-arrow-right" aria-hidden="true" />
-                </Link>
-              )}
-            </div>
-
             {seriesInfo.description && (
               <>
                 <div className="synopsis-header">
@@ -358,13 +339,23 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               )}
             </div>
 
-            {chapters.length > 0 && lastChapter && (
-              <Link href={`/read/${lastChapter.id}`} className="update-banner" style={{ textDecoration: "none" }}>
+            {chapters.length > 0 && (
+              <div className={`update-banner reading-progress-banner${readingHistoryLoading ? " is-loading" : ""}`} aria-live="polite" aria-busy={readingHistoryLoading}>
                 <span className="banner-dot"></span>
-                <span className="banner-label">最新更新：第{lastChapter.chapter_number}章</span>
-                <span className="banner-chapter">{lastChapter.chapter_title || lastChapter.title || `第${lastChapter.chapter_number}章`}</span>
-                <span className="banner-time">{new Date(lastChapter.created_at).toLocaleDateString("zh-CN")}</span>
-              </Link>
+                <span className="banner-label">阅读进度</span>
+                <span className="banner-chapter">
+                  {readingHistoryLoading
+                    ? "正在读取…"
+                    : hasReadingProgress
+                      ? <>已读到第 {readChapterNumber} 章 / 共 {chapters.length} 章</>
+                      : <>尚未开始阅读 / 共 {chapters.length} 章</>}
+                </span>
+                {hasReadingProgress && continueChapter && (
+                  <Link href={`/read/${continueChapter.id}`} className="banner-time reading-progress-action">
+                    继续阅读 <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
             )}
 
             {chapters.length === 0 ? (
