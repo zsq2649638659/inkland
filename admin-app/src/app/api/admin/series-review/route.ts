@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     await db.from("notifications").insert({
       user_id: series.user_id, type: "system", actor_id: null, content: `你的连载《${series.name}》未通过本次审核。问题类型：${reason}。请修改连载名称或简介后重新提交。`, read: false,
       template_key: "series_review_rejected", related_entity_type: "series", related_entity_id: series.id,
-      metadata: { action_url: `/create?series=${series.id}`, action_label: "查看问题并修改", issue_type: reason }, delivery_status: "sent", sent_at: new Date().toISOString(),
+      metadata: { action_url: `/studio/series/${encodeURIComponent(series.name)}?edit=1`, action_label: "查看问题并修改", issue_type: reason, series_name: series.name }, delivery_status: "sent", sent_at: new Date().toISOString(),
     });
   }
   return NextResponse.json({ success: true });

@@ -542,15 +542,17 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             }
           }
           // 最近一次打回通知里附带的问题清单（含 OCR 图片内文字定位）。
-          const { data: rejectionNotice } = await supabase
+          const { data: rejectionNotices } = await supabase
             .from("notifications")
             .select("metadata")
             .eq("template_key", "post_review_rejected")
             .eq("related_entity_id", editPost)
             .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          const noticeMeta = rejectionNotice?.metadata as { issues?: ReviewIssue[] } | null;
+            .limit(20);
+          const noticeMeta = ((rejectionNotices || []) as Array<{ metadata?: unknown }>)
+            .map((notice) => notice.metadata as { issues?: ReviewIssue[] } | null)
+            .find((metadata) => metadata?.issues?.some((issue) => issue.id === new URLSearchParams(window.location.search).get("reviewIssue")))
+            || ((rejectionNotices || [])[0]?.metadata as { issues?: ReviewIssue[] } | null);
           if (noticeMeta?.issues?.length) setReviewIssues(noticeMeta.issues);
 
           const savedPublishedAt = (p.published_at as string) || null;
@@ -713,6 +715,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [pendingReviewStatus, setPendingReviewStatus] = useState<string | null>(null);
   const [publishedVersionNumber, setPublishedVersionNumber] = useState<number | null>(null);
   const [reviewIssues, setReviewIssues] = useState<ReviewIssue[]>([]);
+  const [reviewIssueFocusId, setReviewIssueFocusId] = useState<string | null>(null);
   const [editingPostSeriesName, setEditingPostSeriesName] = useState<string | null>(null);
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
@@ -720,6 +723,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [chapterTitleMode, setChapterTitleMode] = useState<"numbered" | "free">("numbered");
   const [chapterNumberOverride, setChapterNumberOverride] = useState<number | null>(null);
   const chapterPublishRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const reviewIssue = new URLSearchParams(window.location.search).get("reviewIssue");
+    if (!reviewIssue) return;
+    const timer = window.setTimeout(() => setReviewIssueFocusId(reviewIssue), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!publishMenuOpen || view !== "chapter-create") return;
@@ -1568,6 +1578,16 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       </div>
     );
 
+  useEffect(() => {
+    if (!initDone || !reviewIssueFocusId || reviewIssues.length === 0) return;
+    const timer = window.setTimeout(() => {
+      const issueItem = Array.from(document.querySelectorAll<HTMLElement>(".review-issue-item"))
+        .find((item) => item.dataset.reviewIssueId === reviewIssueFocusId);
+      issueItem?.querySelector<HTMLButtonElement>(".review-issue-locate")?.click();
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [initDone, reviewIssueFocusId, reviewIssues]);
+
   if (!initDone) {
     return (
       <div className="min-h-screen bg-paper flex items-center justify-center" role="status" aria-live="polite">
@@ -1650,7 +1670,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             <div className="review-issues-title">本次标记的问题（{reviewIssues.length}）</div>
             <ul className="review-issues-list">
               {reviewIssues.map((issue, index) => (
-                <li key={issue.id || index} className="review-issue-item">
+                <li key={issue.id || index} className="review-issue-item" data-review-issue-id={issue.id || undefined}>
                   <span className="review-issue-index">{index + 1}</span>
                   <span className="review-issue-field">{fieldLabel(issue.field_name)}</span>
                   {issue.location_type === "paragraph" && issue.paragraph_index != null && (

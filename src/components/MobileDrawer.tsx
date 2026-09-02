@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/browser";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
-import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
+import { fetchVisibleUnreadNotificationCount, notificationPreferencesCacheKey, readNotificationPreferences } from "@/lib/notificationPreferences";
+import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
@@ -27,21 +28,18 @@ export default function MobileDrawer() {
 
   useEffect(() => {
     if (!user) return;
-    const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}`;
+    const notificationPreferences = readNotificationPreferences(user);
+    const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}:${notificationPreferencesCacheKey(notificationPreferences)}`;
     const cached = readClientCache<number>(cacheKey, 30_000, true);
     if (cached !== undefined) setNotificationCount(cached);
     const fetchCount = () => {
       void getOrCreateClientCache(cacheKey, async () => {
-        const query = withTestDataVisibility(
-          supabase
-            .from("notifications")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .eq("read", false),
+        return fetchVisibleUnreadNotificationCount(
+          supabase,
+          user.id,
           includeTestDataForProfile(profile),
+          notificationPreferences,
         );
-        const { count } = await query;
-        return count || 0;
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
     if (cached === undefined) fetchCount();

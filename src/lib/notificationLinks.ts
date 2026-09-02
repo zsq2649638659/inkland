@@ -2,6 +2,7 @@ export interface NotificationMetadata extends Record<string, unknown> {
   action_url?: string;
   action_label?: string;
   case_id?: string;
+  series_name?: string;
   target_type?: string;
   target_id?: string;
   post_id?: string;
@@ -21,6 +22,7 @@ export interface NotificationLinkInput {
   related_entity_id?: string | null;
   link_url?: string | null;
   report_post_id?: string | null;
+  series_name?: string | null;
   metadata?: NotificationMetadata | null;
 }
 
@@ -35,6 +37,15 @@ function isReportNotification(notification: NotificationLinkInput): boolean {
   if (notification.related_entity_type === "report_case") return true;
   const content = notification.content || "";
   return content.includes("举报") && /(受理|处理|举报对象|举报内容)/.test(content);
+}
+
+function reviewIssueQuery(notification: NotificationLinkInput): string {
+  const issues = notification.metadata?.issues;
+  if (!Array.isArray(issues)) return "";
+  const firstIssue = issues.find((issue) => issue && typeof issue === "object") as { id?: unknown } | undefined;
+  return typeof firstIssue?.id === "string" && firstIssue.id
+    ? `&reviewIssue=${encodeURIComponent(firstIssue.id)}`
+    : "";
 }
 
 export function getNotificationLink(notification: NotificationLinkInput): string | null {
@@ -66,6 +77,18 @@ export function getNotificationLink(notification: NotificationLinkInput): string
     return direct && direct !== "/settings" ? direct : null;
   }
 
+  if (template === "series_review_rejected") {
+    const seriesName = notification.series_name || notification.metadata?.series_name;
+    if (seriesName) return `/studio/series/${encodeURIComponent(seriesName)}?edit=1`;
+    // 旧通知没有保存连载名称时，至少回到创作中心，避免打开无效的 /create?series=...
+    return "/studio";
+  }
+
+  if (template === "post_review_rejected" || (notification.content || "").includes("未通过本次审核")) {
+    if (notification.post_id) return `/create?editPost=${encodeURIComponent(notification.post_id)}${reviewIssueQuery(notification)}`;
+    if (direct) return direct;
+  }
+
   if (direct) return direct;
 
   if (notification.post_id && ["comment", "like", "bookmark", "reply"].includes(notification.type)) {
@@ -82,7 +105,21 @@ export function getNotificationLink(notification: NotificationLinkInput): string
     notification.post_id &&
     (template === "post_review_rejected" || (notification.content || "").includes("未通过本次审核"))
   ) {
-    return `/create?editPost=${notification.post_id}`;
+    return `/create?editPost=${encodeURIComponent(notification.post_id)}${reviewIssueQuery(notification)}`;
+  }
+
+  if (notification.type === "system") {
+    if (template === "profile_revision_request") return "/settings?tab=profile";
+    if (template === "feedback_resolved") return "/settings?tab=contact";
+    if (template === "comment_deleted" || template === "post_deleted") {
+      return "/settings?tab=contact";
+    }
+    if (template === "comment_civility_reminder" || template === "content_civility_reminder" || template === "report_rule_reminder") {
+      return "/guidelines";
+    }
+    if (["account_warning", "account_restored", "restriction_comment", "restriction_publish", "restriction_report", "restriction_lifted", "account_suspended", "account_banned"].includes(template)) {
+      return "/settings?tab=account";
+    }
   }
 
   return null;

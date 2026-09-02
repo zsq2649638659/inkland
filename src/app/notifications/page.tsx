@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
 import { SkeletonNotification } from "@/components/Skeleton";
 import { getNotificationLink, type NotificationMetadata } from "@/lib/notificationLinks";
+import { filterVisibleNotifications, readNotificationPreferences } from "@/lib/notificationPreferences";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark" | "reply";
@@ -27,6 +28,7 @@ interface NotificationItem {
   related_entity_id?: string | null;
   link_url?: string | null;
   report_post_id?: string | null;
+  series_name?: string | null;
   metadata?: NotificationMetadata & { issues?: ReviewIssueMeta[] } | null;
   // joined fields
   actor_nickname?: string | null;
@@ -102,12 +104,16 @@ export default function NotificationsPage() {
     const { data, error } = await q;
     if (error || !data) return;
     const counts: Record<string, number> = {};
-    for (const item of data as Array<{ type: string }>) {
+    const visibleRows = filterVisibleNotifications(
+      data as Array<{ type: string }>,
+      readNotificationPreferences(user),
+    );
+    for (const item of visibleRows) {
       counts[item.type] = (counts[item.type] || 0) + 1;
     }
-    counts.all = data.length;
+    counts.all = visibleRows.length;
     setUnreadByType(counts);
-    setUnreadCount(data.length);
+    setUnreadCount(visibleRows.length);
   };
 
   async function loadNotifications() {
@@ -136,19 +142,20 @@ export default function NotificationsPage() {
       return;
     }
 
-    if (!data || data.length === 0) {
+    const raw = data as unknown as Array<NotificationItem & {
+      actor?: { nickname: string | null; avatar_url: string | null } | null;
+      post?: { title: string | null } | null;
+    }>;
+    const visibleRaw = filterVisibleNotifications(raw, readNotificationPreferences(user));
+
+    if (visibleRaw.length === 0) {
       setNotifications([]);
       setLoading(false);
       return;
     }
 
-    const raw = data as unknown as Array<NotificationItem & {
-      actor?: { nickname: string | null; avatar_url: string | null } | null;
-      post?: { title: string | null } | null;
-    }>;
-
     const reportCommentIds = Array.from(new Set(
-      raw
+      visibleRaw
         .filter((notification) =>
           notification.type === "system" &&
           (notification.template_key?.startsWith("report_") || (notification.content || "").includes("举报")) &&
@@ -172,7 +179,24 @@ export default function NotificationsPage() {
       }
     }
 
-    const enriched = raw.map((n) => {
+    const seriesIds = Array.from(new Set(
+      visibleRaw
+        .filter((notification) => notification.template_key === "series_review_rejected" && notification.related_entity_type === "series")
+        .map((notification) => notification.related_entity_id)
+        .filter((id): id is string => Boolean(id)),
+    ));
+    const seriesNameById = new Map<string, string>();
+    if (seriesIds.length > 0) {
+      const { data: seriesRows } = await supabase
+        .from("series")
+        .select("id, name")
+        .in("id", seriesIds);
+      for (const series of (seriesRows || []) as Array<{ id: string; name: string | null }>) {
+        if (series.name) seriesNameById.set(series.id, series.name);
+      }
+    }
+
+    const enriched = visibleRaw.map((n) => {
       const reportCommentId = n.related_entity_type === "comment"
         ? n.related_entity_id
         : n.metadata?.target_type === "comment"
@@ -184,6 +208,7 @@ export default function NotificationsPage() {
         actor_avatar_url: n.actor?.avatar_url || null,
         post_title: n.post ? (n.post.title || "未知作品") : null,
         report_post_id: reportCommentId ? reportPostByComment.get(reportCommentId) || null : null,
+        series_name: n.related_entity_id ? seriesNameById.get(n.related_entity_id) || null : null,
       };
     });
 
@@ -317,11 +342,19 @@ export default function NotificationsPage() {
 
   const getNotificationTitle = (notification: NotificationItem): ReactNode => {
     if (notification.type === "system") {
+      if (notification.template_key === "series_review_rejected") return "连载未通过审核";
       if (notification.template_key === "post_review_rejected" || notification.content.includes("未通过本次审核")) return "作品未通过审核";
+      if (notification.template_key === "post_review_approved") return "作品已通过审核";
+      if (notification.template_key === "feedback_resolved") return "反馈已处理";
+      if (notification.template_key === "profile_revision_request") return "个人资料需要修改";
+      if (notification.template_key === "report_received") return "举报已受理";
+      if (notification.template_key === "report_handled") return "举报已有处理结果";
       const activity = notification.content.match(/「([^」]+)」/);
       if (notification.content.includes("活动") && activity) {
         return <>活动提醒：<span className="highlight"><a href={`/search?q=${encodeURIComponent(activity[1])}`} onClick={(event) => event.stopPropagation()}>「{activity[1]}」</a></span> 投稿即将截止</>;
       }
+      const headline = notification.content.split(/\r?\n/, 1)[0]?.trim();
+      if (headline && headline.length <= 30) return headline;
     }
     switch (notification.type) {
       case "like": return "你的作品被点赞了";
@@ -426,6 +459,36 @@ export default function NotificationsPage() {
     return base;
   };
 
+  const getNotificationAction = (notification: NotificationItem): string | null => {
+    if (!getNotificationLink(notification)) return null;
+    if (notification.type === "like" || notification.type === "bookmark") return "查看作品";
+    if (notification.type === "comment" || notification.type === "reply") return "查看评论";
+    if (notification.type === "follow") return "查看主页";
+    switch (notification.template_key) {
+      case "post_review_rejected": return "去修改作品";
+      case "post_review_approved": return "查看作品";
+      case "series_review_rejected": return "去修改连载";
+      case "report_received": return "查看举报对象";
+      case "report_handled": return "查看处理状态";
+      case "feedback_resolved": return "查看反馈";
+      case "profile_revision_request": return "去修改资料";
+      case "account_warning":
+      case "account_restored":
+      case "restriction_comment":
+      case "restriction_publish":
+      case "restriction_report":
+      case "restriction_lifted":
+      case "account_suspended":
+      case "account_banned": return "查看账号状态";
+      case "comment_civility_reminder":
+      case "content_civility_reminder":
+      case "report_rule_reminder": return "查看社区规范";
+      case "comment_deleted":
+      case "post_deleted": return "提交复核或反馈";
+      default: return "查看详情";
+    }
+  };
+
   return (
     <div id="page-notifications" className="min-h-screen bg-paper pb-20 lg:pb-0">
       <div className="main-container">
@@ -482,7 +545,10 @@ export default function NotificationsPage() {
               </div>
             ) : (
               <div className="notification-list">
-                {notifications.map((n) => (
+                {notifications.map((n) => {
+                  const actionHref = getNotificationLink(n);
+                  const actionLabel = getNotificationAction(n);
+                  return (
                   <div
                     key={n.id}
                     className={`notification-item ${!n.read ? "unread" : ""}`}
@@ -501,9 +567,28 @@ export default function NotificationsPage() {
                         <span className="notification-timestamp">{formatTime(n.created_at)}</span>
                       </div>
                       <div className="notification-desc">{getNotificationDescription(n)}</div>
+                      {actionHref && actionLabel && (
+                        <div className="notification-action-row">
+                          <Link
+                            href={actionHref}
+                            className="notification-action"
+                            onClick={async (event) => {
+                              event.stopPropagation();
+                              if (!n.read) {
+                                event.preventDefault();
+                                await markAsRead(n.id);
+                                window.location.assign(actionHref);
+                              }
+                            }}
+                          >
+                            {actionLabel}<i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
