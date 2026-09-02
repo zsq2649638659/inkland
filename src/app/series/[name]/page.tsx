@@ -10,6 +10,7 @@ import DefaultAvatar from "@/components/DefaultAvatar";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { assertCanInteract } from "@/lib/userRestrictions";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
+import { loadReadingHistory, type ReadingHistoryRecord } from "@/lib/readingHistory";
 
 interface ChapterInfo {
   id: string;
@@ -44,7 +45,8 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   const [chapters, setChapters] = useState<ChapterInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryRecord[]>([]);
+  const [readingHistoryUserId, setReadingHistoryUserId] = useState<string | null>(null);
 
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
@@ -112,7 +114,6 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
           status: (seriesRow?.status as string) || "ongoing",
           series_type: (seriesRow?.series_type as string) || "fanfic",
         });
-        setIsOwner(user?.id === authorId);
       }
 
       setChapters(chapters.map((chapter) => ({
@@ -127,16 +128,23 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
     };
     void load();
     return () => { active = false; };
-  }, [decodedName, supabase]);
+  }, [decodedName, profile, supabase, user?.id]);
+
+  // 连载进度只读取当前用户自己的阅读记录；章节本身仍由上面的可见性查询控制。
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    void loadReadingHistory(supabase, user.id).then(({ records }) => {
+      if (!active) return;
+      setReadingHistory(records);
+      setReadingHistoryUserId(user.id);
+    });
+    return () => { active = false; };
+  }, [supabase, user]);
 
   // 关注状态依赖登录用户，但不应让整页内容重复请求。
   useEffect(() => {
-    if (!user || !seriesInfo) {
-      setIsFollowing(false);
-      return;
-    }
-    setIsOwner(user.id === seriesInfo.user_id);
-    if (user.id === seriesInfo.user_id) return;
+    if (!user || !seriesInfo || user.id === seriesInfo.user_id) return;
     let active = true;
     void supabase
       .from("follows")
@@ -146,7 +154,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
       .maybeSingle()
       .then((result: { data: unknown }) => { if (active) setIsFollowing(!!result.data); });
     return () => { active = false; };
-  }, [seriesInfo, supabase, user?.id]);
+  }, [seriesInfo, supabase, user]);
 
   const handleFollow = async () => {
     if (!user || !seriesInfo) return;
@@ -175,6 +183,10 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   }
 
   const totalWords = seriesInfo.word_count;
+  const isOwner = Boolean(user && user.id === seriesInfo.user_id);
+  const readingHistoryReady = Boolean(user && readingHistoryUserId === user.id);
+  const visibleReadingHistory = readingHistoryReady ? readingHistory : [];
+  const readingHistoryLoading = Boolean(user && !readingHistoryReady);
 
   const sortedChapters = [...chapters].sort((a, b) => {
     return sortOrder === "asc"
@@ -187,6 +199,28 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   };
 
   const lastChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
+
+  const seriesReadingRecords = visibleReadingHistory.filter((record) => {
+    const snapshot = record.post;
+    // 本地记录可能还没有关联的 post 快照，用当前目录中的章节 id 兜底识别。
+    return (snapshot?.series_name === decodedName && snapshot.post_type === "serial")
+      || chapters.some((chapter) => chapter.id === record.post_id);
+  });
+  const readChapterNumber = seriesReadingRecords.reduce((max, record) => {
+    const chapterNumber = record.chapter_number ?? record.post?.chapter_number ?? 0;
+    return Math.max(max, chapterNumber);
+  }, 0);
+  const continueRecord = [...seriesReadingRecords]
+    .filter((record) => (record.chapter_number ?? record.post?.chapter_number ?? 0) > 0)
+    .sort((a, b) => {
+      const chapterDiff = (b.chapter_number ?? b.post?.chapter_number ?? 0) - (a.chapter_number ?? a.post?.chapter_number ?? 0);
+      if (chapterDiff !== 0) return chapterDiff;
+      return new Date(b.last_read_at).getTime() - new Date(a.last_read_at).getTime();
+    })[0] || null;
+  const continueChapter = continueRecord
+    ? chapters.find((chapter) => chapter.id === continueRecord.post_id) || null
+    : null;
+  const hasReadingProgress = readChapterNumber > 0;
 
   return (
     <div id="page-series" className="min-h-screen bg-paper">
@@ -209,13 +243,16 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                   </Link>
                 )}
                 {user && !isOwner && (
-                  <button
-                    className={`hero-action-btn ${isFollowing ? "bookmarked" : "primary"}`}
-                    onClick={handleFollow}
-                  >
-                    <i className="fa-solid fa-bookmark" />
-                    {isFollowing ? "已收藏" : "加入收藏"}
-                  </button>
+                  <div className="series-follow-action">
+                    <button
+                      className={`hero-action-btn ${isFollowing ? "bookmarked" : "primary"}`}
+                      onClick={handleFollow}
+                    >
+                      <i className="fa-solid fa-bookmark" />
+                      {isFollowing ? "已收藏" : "收藏连载"}
+                    </button>
+                    <span className="series-follow-note">新章节会出现在首页“关注”内容中</span>
+                  </div>
                 )}
                 {isOwner && (
                   <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="hero-action-btn">
@@ -268,6 +305,25 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               </div>
             </div>
 
+            <div className={`series-reading-summary${readingHistoryLoading ? " is-loading" : ""}`} aria-live="polite" aria-busy={readingHistoryLoading}>
+              <div className="series-reading-summary-copy">
+                <span className="series-reading-summary-label"><i className="fa-regular fa-clock" /> 阅读进度</span>
+                <span className="series-reading-summary-value">
+                  {readingHistoryLoading
+                    ? "正在读取…"
+                    : hasReadingProgress
+                      ? <>已读到第 <strong>{readChapterNumber}</strong> 章 / 共 {chapters.length} 章</>
+                      : <>尚未开始阅读 / 共 {chapters.length} 章</>}
+                </span>
+              </div>
+              {hasReadingProgress && continueChapter && (
+                <Link href={`/read/${continueChapter.id}`} className="series-reading-action">
+                  继续阅读
+                  <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                </Link>
+              )}
+            </div>
+
             {seriesInfo.description && (
               <>
                 <div className="synopsis-header">
@@ -305,7 +361,8 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
             {chapters.length > 0 && lastChapter && (
               <Link href={`/read/${lastChapter.id}`} className="update-banner" style={{ textDecoration: "none" }}>
                 <span className="banner-dot"></span>
-                最新章 <span className="banner-chapter">{lastChapter.chapter_title || lastChapter.title || `第${lastChapter.chapter_number}章`}</span>
+                <span className="banner-label">最新更新：第{lastChapter.chapter_number}章</span>
+                <span className="banner-chapter">{lastChapter.chapter_title || lastChapter.title || `第${lastChapter.chapter_number}章`}</span>
                 <span className="banner-time">{new Date(lastChapter.created_at).toLocaleDateString("zh-CN")}</span>
               </Link>
             )}
