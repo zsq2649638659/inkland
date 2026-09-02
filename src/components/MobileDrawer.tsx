@@ -81,6 +81,7 @@ export default function MobileDrawer() {
     { page: "home", icon: "fa-house", label: "首页", href: "/" },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
     { page: "profile", icon: "fa-circle-user", label: "个人中心", href: "/profile" },
+    { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
     { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
   ];
