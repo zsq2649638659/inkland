@@ -16,6 +16,7 @@ import { assertCanComment } from "@/lib/userRestrictions";
 import type { Post, Comment } from "@/lib/types";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
+import { loadReadingHistory, saveReadingHistory } from "@/lib/readingHistory";
 
 interface ImageItem {
   url: string;
@@ -74,6 +75,8 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   // Lightbox 状态
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const readingSaveTimerRef = useRef<number | null>(null);
+  const readingRestoredRef = useRef(false);
 
   // 图片列表
   const images: ImageItem[] = initialImages || (post.images as string[] | undefined)?.map((url) => ({ url } as ImageItem)) || [];
@@ -350,6 +353,85 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   // 移除 Markdown 图片链接，只保留纯文本描述
   const cleanContent = content.replace(/!\[.*?\]\(.*?\)/g, "").trim();
 
+  const saveCurrentReading = useCallback(() => {
+    if (authLoading || !user) return;
+
+    const scrollableHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const progressRatio = scrollableHeight > 0 ? window.scrollY / scrollableHeight : 0;
+    const imagesOnPage = Array.from(document.querySelectorAll<HTMLElement>("[data-image-index]"));
+    const currentImage = imagesOnPage.find((element) => element.getBoundingClientRect().bottom >= 120);
+    const imageIndex = currentImage ? Number(currentImage.dataset.imageIndex) : null;
+    const percent = Math.round(Math.min(1, Math.max(0, progressRatio)) * 100);
+    const positionLabel = imageIndex === null ? `已读${percent}%` : `第${imageIndex + 1}张 · ${percent}%`;
+
+    void saveReadingHistory(supabase, {
+      user_id: user.id,
+      post_id: post.id,
+      progress_ratio: Math.min(1, Math.max(0, progressRatio)),
+      paragraph_index: imageIndex,
+      position_label: positionLabel,
+      chapter_number: post.chapter_number ?? null,
+      post: {
+        id: post.id,
+        title: post.title ?? null,
+        post_type: post.post_type ?? null,
+        series_name: post.series_name ?? null,
+        chapter_number: post.chapter_number ?? null,
+        word_count: post.word_count ?? null,
+        cover_url: post.cover_url ?? null,
+      },
+    }).catch(() => {
+      // 本地记录已经保存；数据库不可用时不打断阅读。
+    });
+  }, [authLoading, post, supabase, user]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    let active = true;
+    readingRestoredRef.current = false;
+
+    const restoreReadingPosition = async () => {
+      const { records } = await loadReadingHistory(supabase, user.id);
+      if (!active) return;
+      const currentRecord = records.find((record) => record.post_id === post.id);
+      if (!currentRecord) {
+        readingRestoredRef.current = true;
+        saveCurrentReading();
+        return;
+      }
+
+      window.requestAnimationFrame(() => {
+        if (!active) return;
+        if (currentRecord.paragraph_index !== null && currentRecord.paragraph_index !== undefined) {
+          const image = document.querySelector<HTMLElement>(`[data-image-index="${currentRecord.paragraph_index}"]`);
+          image?.scrollIntoView({ block: "center" });
+        } else if (currentRecord.progress_ratio > 0) {
+          const scrollableHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+          window.scrollTo({ top: scrollableHeight * currentRecord.progress_ratio, behavior: "auto" });
+        }
+        readingRestoredRef.current = true;
+      });
+    };
+
+    const handleScroll = () => {
+      if (readingSaveTimerRef.current !== null) window.clearTimeout(readingSaveTimerRef.current);
+      readingSaveTimerRef.current = window.setTimeout(() => {
+        readingSaveTimerRef.current = null;
+        if (readingRestoredRef.current) saveCurrentReading();
+      }, 900);
+    };
+
+    void restoreReadingPosition();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      active = false;
+      window.removeEventListener("scroll", handleScroll);
+      if (readingSaveTimerRef.current !== null) window.clearTimeout(readingSaveTimerRef.current);
+      readingSaveTimerRef.current = null;
+      saveCurrentReading();
+    };
+  }, [authLoading, post.id, saveCurrentReading, supabase, user]);
+
   const tags = Array.isArray(post.tags) ? post.tags : [];
   const tagNames = tags.map((t) => (typeof t === "string" ? t : t.name));
   const createdAt = post.created_at
@@ -542,9 +624,9 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
 
         {/* 图片列表 */}
         {images.length > 0 && (
-          <div className="work-content">
+            <div className="work-content">
             {images.map((img, idx) => (
-              <div key={idx} className="image-container">
+              <div key={idx} className="image-container" data-image-index={idx}>
                 <img
                   src={img.url}
                   alt={`图片 ${idx + 1}`}

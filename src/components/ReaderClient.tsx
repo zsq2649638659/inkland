@@ -19,6 +19,7 @@ import DefaultAvatar from "@/components/DefaultAvatar";
 import { isSafeExternalImageUrl, renderSafeInlineMarkdown, renderSafeMarkdown } from "@/lib/markdown";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
+import { loadReadingHistory, saveReadingHistory } from "@/lib/readingHistory";
 
 interface ReaderClientProps {
   post: Post;
@@ -72,6 +73,8 @@ export default function ReaderClient({ post }: ReaderClientProps) {
   const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null);
   // Toast 提示
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const readingSaveTimerRef = useRef<number | null>(null);
+  const readingRestoredRef = useRef(false);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -372,6 +375,89 @@ export default function ReaderClient({ post }: ReaderClientProps) {
   const paragraphs = isTextPost
     ? content.split(/\r?\n+/).filter((p) => p.trim())
     : [];
+
+  const saveCurrentReading = useCallback(() => {
+    if (authLoading || !user) return;
+
+    const scrollableHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const progressRatio = scrollableHeight > 0 ? window.scrollY / scrollableHeight : 0;
+    const paragraphsOnPage = Array.from(document.querySelectorAll<HTMLElement>("[data-para-index]"));
+    const currentParagraph = paragraphsOnPage.find((element) => element.getBoundingClientRect().bottom >= 120);
+    const paragraphIndex = currentParagraph ? Number(currentParagraph.dataset.paraIndex) : null;
+    const percent = Math.round(Math.min(1, Math.max(0, progressRatio)) * 100);
+    const positionLabel = post.series_name && post.chapter_number
+      ? `第${post.chapter_number}章 · ${paragraphIndex === null ? `已读${percent}%` : `第${paragraphIndex + 1}段`}`
+      : paragraphIndex === null
+        ? `已读${percent}%`
+        : `第${paragraphIndex + 1}段 · ${percent}%`;
+
+    void saveReadingHistory(supabase, {
+      user_id: user.id,
+      post_id: post.id,
+      progress_ratio: Math.min(1, Math.max(0, progressRatio)),
+      paragraph_index: paragraphIndex,
+      position_label: positionLabel,
+      chapter_number: post.chapter_number ?? null,
+      post: {
+        id: post.id,
+        title: post.title ?? null,
+        post_type: post.post_type ?? null,
+        series_name: post.series_name ?? null,
+        chapter_number: post.chapter_number ?? null,
+        word_count: post.word_count ?? null,
+        cover_url: post.cover_url ?? null,
+      },
+    }).catch(() => {
+      // 本地记录已经保存；数据库不可用时不打断阅读。
+    });
+  }, [authLoading, post, supabase, user]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    let active = true;
+    readingRestoredRef.current = false;
+
+    const restoreReadingPosition = async () => {
+      const { records } = await loadReadingHistory(supabase, user.id);
+      if (!active) return;
+      const currentRecord = records.find((record) => record.post_id === post.id);
+      if (!currentRecord) {
+        readingRestoredRef.current = true;
+        saveCurrentReading();
+        return;
+      }
+
+      window.requestAnimationFrame(() => {
+        if (!active) return;
+        if (currentRecord.paragraph_index !== null && currentRecord.paragraph_index !== undefined) {
+          const paragraph = document.querySelector<HTMLElement>(`[data-para-index="${currentRecord.paragraph_index}"]`);
+          paragraph?.scrollIntoView({ block: "center" });
+        } else if (currentRecord.progress_ratio > 0) {
+          const scrollableHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+          window.scrollTo({ top: scrollableHeight * currentRecord.progress_ratio, behavior: "auto" });
+        }
+        readingRestoredRef.current = true;
+      });
+    };
+
+    const handleScroll = () => {
+      if (readingSaveTimerRef.current !== null) window.clearTimeout(readingSaveTimerRef.current);
+      readingSaveTimerRef.current = window.setTimeout(() => {
+        readingSaveTimerRef.current = null;
+        if (readingRestoredRef.current) saveCurrentReading();
+      }, 900);
+    };
+
+    void restoreReadingPosition();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      active = false;
+      window.removeEventListener("scroll", handleScroll);
+      if (readingSaveTimerRef.current !== null) window.clearTimeout(readingSaveTimerRef.current);
+      readingSaveTimerRef.current = null;
+      saveCurrentReading();
+    };
+  }, [authLoading, post.id, saveCurrentReading, supabase, user]);
 
   const tags = Array.isArray(post.tags) ? post.tags : [];
   const tagNames = tags.map((t) => (typeof t === "string" ? t : t.name));
