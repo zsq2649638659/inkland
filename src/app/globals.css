@@ -1964,6 +1964,28 @@ p {
 #page-notifications .notification-desc a:hover {
   text-decoration: underline;
 }
+#page-notifications .notification-action-row {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+#page-notifications .notification-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 0;
+  color: var(--color-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: color .2s ease, gap .2s ease;
+}
+#page-notifications .notification-action:hover {
+  color: var(--color-primary-dark, #d95748);
+  gap: 8px;
+}
 #page-notifications .notification-review-issues {
   display: flex;
   flex-direction: column;
@@ -2153,6 +2175,10 @@ p {
   }
   #page-notifications .notification-desc {
     font-size: 12.5px;
+  }
+  #page-notifications .notification-action {
+    min-height: 44px;
+    font-size: 13px;
   }
 }
 

@@ -52,6 +52,12 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
   const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("edit") !== "1") return;
+    const timer = window.setTimeout(() => setEditSeries(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     loadData();
   }, [decodedName, user]);
 

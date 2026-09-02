@@ -10,6 +10,15 @@ import DefaultAvatar from "@/components/DefaultAvatar";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import AccountSettingsPanel from "@/components/AccountSettingsPanel";
 import SettingsStatus from "@/components/SettingsStatus";
+import {
+  defaultNotificationPreferences,
+  notificationPreferenceLabels,
+  notificationPreferenceTypes,
+  readNotificationPreferences,
+  saveNotificationPreferences,
+  type NotificationPreferenceType,
+  type NotificationPreferences,
+} from "@/lib/notificationPreferences";
 
 type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
 
@@ -50,6 +59,10 @@ export default function SettingsPage() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordMessageKind, setPasswordMessageKind] = useState<"success" | "error" | "">("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(defaultNotificationPreferences);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationMessageKind, setNotificationMessageKind] = useState<"success" | "error" | "">("");
+  const [notificationSaving, setNotificationSaving] = useState(false);
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
 
@@ -68,6 +81,12 @@ export default function SettingsPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const timer = window.setTimeout(() => setNotificationPreferences(readNotificationPreferences(user)), 0);
+    return () => window.clearTimeout(timer);
+  }, [user]);
 
   useEffect(() => {
     if (!user || activeTab !== "blocked") return;
@@ -216,6 +235,22 @@ export default function SettingsPage() {
     setPasswordSaving(false);
   };
 
+  const handleNotificationPreferencesSave = async () => {
+    if (!user) return;
+    setNotificationSaving(true);
+    setNotificationMessage("");
+    setNotificationMessageKind("");
+    const { error } = await saveNotificationPreferences(supabase, notificationPreferences);
+    if (error) {
+      setNotificationMessageKind("error");
+      setNotificationMessage("通知设置保存失败，请稍后重试。");
+    } else {
+      setNotificationMessageKind("success");
+      setNotificationMessage("保存成功");
+    }
+    setNotificationSaving(false);
+  };
+
   return (
     <div id="page-settings" className="min-h-screen bg-paper pb-20 lg:pb-0">
       <div className="main-container">
@@ -322,53 +357,38 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* ---- Panel: 通知设置 (all toggles default ON) ---- */}
+          {/* ---- Panel: 通知设置 ---- */}
           <div className="settings-panel" style={{ display: activeTab === "notifications" ? "block" : "none" }}>
             <h2 className="settings-panel-title">通知设置</h2>
-            <p className="settings-panel-desc">选择你希望接收的通知类型，保持对重要动态的关注。</p>
+            <p className="settings-panel-desc">只显示你希望接收的站内消息；设置会同步到当前账号。</p>
 
-            <div className="settings-toggle-row">
-              <div>
-                <div className="settings-toggle-label">新作品通知</div>
-                <div className="settings-toggle-desc">关注作者发布新作品时通知</div>
-              </div>
-              <label className="settings-toggle-switch" aria-label="新作品通知">
-                <input type="checkbox" defaultChecked />
-                <span className="settings-toggle-slider"></span>
-              </label>
-            </div>
+            {notificationPreferenceTypes.map((type: NotificationPreferenceType) => {
+              const option = notificationPreferenceLabels[type];
+              return (
+                <div className="settings-toggle-row" key={type}>
+                  <div>
+                    <div className="settings-toggle-label">{option.label}</div>
+                    <div className="settings-toggle-desc">{option.description}</div>
+                  </div>
+                  <label className="settings-toggle-switch" aria-label={option.label}>
+                    <input
+                      type="checkbox"
+                      checked={notificationPreferences[type]}
+                      onChange={(event) => setNotificationPreferences((current) => ({ ...current, [type]: event.target.checked }))}
+                    />
+                    <span className="settings-toggle-slider"></span>
+                  </label>
+                </div>
+              );
+            })}
 
-            <div className="settings-toggle-row">
-              <div>
-                <div className="settings-toggle-label">评论通知</div>
-                <div className="settings-toggle-desc">有人评论你的作品时通知</div>
-              </div>
-              <label className="settings-toggle-switch" aria-label="评论通知">
-                <input type="checkbox" defaultChecked />
-                <span className="settings-toggle-slider"></span>
-              </label>
-            </div>
-
-            <div className="settings-toggle-row">
-              <div>
-                <div className="settings-toggle-label">点赞通知</div>
-                <div className="settings-toggle-desc">有人点赞你的作品或评论时通知</div>
-              </div>
-              <label className="settings-toggle-switch" aria-label="点赞通知">
-                <input type="checkbox" defaultChecked />
-                <span className="settings-toggle-slider"></span>
-              </label>
-            </div>
-
-            <div className="settings-toggle-row">
-              <div>
-                <div className="settings-toggle-label">系统通知</div>
-                <div className="settings-toggle-desc">平台公告、活动信息和系统消息</div>
-              </div>
-              <label className="settings-toggle-switch" aria-label="系统通知">
-                <input type="checkbox" defaultChecked />
-                <span className="settings-toggle-slider"></span>
-              </label>
+            <div className="settings-form-actions settings-notification-actions">
+              {notificationMessage && (
+                <SettingsStatus kind={notificationMessageKind === "error" ? "error" : "success"} message={notificationMessage} />
+              )}
+              <button type="button" className="settings-btn-save" onClick={() => void handleNotificationPreferencesSave()} disabled={notificationSaving}>
+                <i className="fa-solid fa-check" aria-hidden="true"></i> {notificationSaving ? "保存中…" : "保存设置"}
+              </button>
             </div>
           </div>
 

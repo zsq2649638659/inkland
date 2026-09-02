@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useMobileDrawer } from "@/components/MobileDrawerContext";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
+import { fetchVisibleUnreadNotificationCount, notificationPreferencesCacheKey, readNotificationPreferences } from "@/lib/notificationPreferences";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 interface Suggestion {
@@ -42,17 +43,17 @@ export default function Navbar() {
       setNotificationCount(0);
       return;
     }
+    const notificationPreferences = readNotificationPreferences(user);
     const fetchNotificationCount = (force = false) => {
-      const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}`;
+      const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}:${notificationPreferencesCacheKey(notificationPreferences)}`;
       if (force) invalidateClientCache(cacheKey);
       void getOrCreateClientCache(cacheKey, async () => {
-        let query = supabase
-          .from("notifications")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("read", false);
-        const { count } = await withTestDataVisibility(query, includeTestDataForProfile(profile));
-        return count || 0;
+        return fetchVisibleUnreadNotificationCount(
+          supabase,
+          user.id,
+          includeTestDataForProfile(profile),
+          notificationPreferences,
+        );
       }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
     };
     fetchNotificationCount();
