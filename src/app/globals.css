@@ -10267,6 +10267,8 @@ p {
 #page-series .hero-title-row { display: flex; align-items: flex-start; gap: var(--spacing-md); margin-bottom: 6px; }
 #page-series .hero-title-left { display: flex; align-items: center; gap: var(--spacing-sm); flex: 1; min-width: 0; margin-bottom: var(--spacing-md); }
 #page-series .hero-actions { display: flex; align-items: center; gap: var(--spacing-sm); flex-shrink: 0; padding-top: 2px; }
+#page-series .series-follow-action { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+#page-series .series-follow-note { max-width: 220px; color: var(--color-text-light, #888); font-size: 11px; line-height: 1.4; text-align: right; }
 #page-series .hero-action-btn {
   display: inline-flex; align-items: center; gap: 5px; padding: 6px 16px;
   border-radius: var(--radius-full); border: 1px solid var(--color-border, #E6E2DD);
@@ -10612,6 +10614,11 @@ p {
 }
 #page-series .update-banner .banner-chapter { color: var(--color-text); font-weight: 500; }
 #page-series .update-banner .banner-time { color: var(--color-text-light, #888); margin-left: auto; }
+#page-series .reading-progress-banner { cursor: default; }
+#page-series .reading-progress-banner:hover { background: #FAFAFA; }
+#page-series .reading-progress-banner .banner-label { color: var(--color-text-muted, #999); font-weight: 600; white-space: nowrap; }
+#page-series .reading-progress-action { display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
+#page-series .reading-progress-action:hover { color: var(--color-primary, #F26B5B); }
 
 /* Chapter Grid (non-creator) */
 #page-series .chapter-grid-wrapper { padding: 0 var(--spacing-xl) var(--spacing-lg) var(--spacing-xl); }
@@ -10732,7 +10739,9 @@ p {
   #page-series .hero-title { font-size: 20px; }
   #page-series .hero-stats-row { gap: 2px; }
   #page-series .hero-title-row { flex-wrap: wrap; }
-  #page-series .hero-actions { width: 100%; }
+  #page-series .hero-actions { align-items: flex-start; width: 100%; }
+  #page-series .series-follow-action { align-items: flex-start; }
+  #page-series .series-follow-note { text-align: left; }
   #page-series .hero-meta-row { gap: 4px; }
   #page-series .chapter-grid { grid-template-columns: repeat(2, 1fr); gap: 2px var(--spacing-md); }
   #page-series .chapter-grid-wrapper { padding: var(--spacing-md); }
