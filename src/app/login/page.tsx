@@ -1,4 +1,6 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
+import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -276,7 +278,7 @@ export default function LoginPage() {
     clearStatus();
   };
 
-  const statusIcon = {
+  const statusIcon: Record<Exclude<StatusType, null>, InklandIconName> = {
     error: "fa-circle-exclamation",
     success: "fa-circle-check",
     info: "fa-circle-info",
@@ -319,7 +321,7 @@ export default function LoginPage() {
           {/* Status message — fixed height container, always renders to prevent layout shift */}
           <div className="auth-status-wrapper">
             <div className={`auth-status ${status.type ? statusClass[status.type] : "auth-status-hidden"}`}>
-              <i className={`fa-solid ${status.type ? statusIcon[status.type] : "fa-circle-info"}`} />
+              <SiteIcon name={status.type ? statusIcon[status.type] : "fa-circle-info"} variant="solid" />
               <span>{status.message || "\u00A0"}</span>
             </div>
           </div>
@@ -347,7 +349,7 @@ export default function LoginPage() {
               <div className="auth-field">
                 <label className="auth-field-label">昵称</label>
                 <div className="auth-input-wrapper">
-                  <i className="fa-solid fa-user auth-input-icon" />
+                  <SiteIcon name="fa-user" variant="solid" className="auth-input-icon" />
                   <input
                     type="text"
                     className="auth-input"
@@ -367,7 +369,7 @@ export default function LoginPage() {
             <div className="auth-field">
               <label className="auth-field-label">邮箱</label>
               <div className="auth-input-wrapper">
-                <i className="fa-solid fa-envelope auth-input-icon" />
+                <SiteIcon name="fa-envelope" variant="solid" className="auth-input-icon" />
                 <input
                   type="email"
                   className="auth-input"
@@ -385,7 +387,7 @@ export default function LoginPage() {
             <div className="auth-field">
               <label className="auth-field-label">密码</label>
               <div className="auth-input-wrapper">
-                <i className="fa-solid fa-lock auth-input-icon" />
+                <SiteIcon name="fa-lock" variant="solid" className="auth-input-icon" />
                 <input
                   type={showPassword ? "text" : "password"}
                   className="auth-input"
@@ -402,7 +404,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   tabIndex={-1}
                 >
-                  <i className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`} />
+                  <SiteIcon name={showPassword ? "fa-eye-slash" : "fa-eye"} variant="solid" />
                 </button>
               </div>
             </div>
@@ -472,7 +474,7 @@ export default function LoginPage() {
             <div className="auth-decor-ring auth-decor-ring-2" />
             <div className="auth-decor-ring auth-decor-ring-3" />
             <div className="auth-decor-center">
-              <i className={`fa-solid ${mode === "login" ? "fa-feather-pointed" : "fa-sparkles"}`} />
+              <SiteIcon name={mode === "login" ? "fa-feather-pointed" : "fa-sparkles"} variant="solid" />
             </div>
           </div>
 

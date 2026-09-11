@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import Link from "next/link";
 import DefaultAvatar from "@/components/DefaultAvatar";
@@ -74,7 +75,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
           {/* 图片数量角标 */}
           {imageCount > 1 && (
             <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/30 backdrop-blur-sm rounded-full px-2 py-0.5">
-              <i className="fa-solid fa-images text-[0.6rem] text-white/80" />
+              <SiteIcon name="fa-images" variant="solid" className="text-[0.6rem] text-white/80" />
               <span className="text-[0.6rem] text-white/80">{imageCount}</span>
             </div>
           )}
@@ -129,15 +130,15 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-muted">
             <span className="flex items-center gap-1">
-              <i className="fa-solid fa-heart text-[0.6rem] text-red-400" />
+              <SiteIcon name="fa-heart" variant="solid" className="text-[0.6rem] text-red-400" />
               {post.like_count || 0}
             </span>
             <span className="flex items-center gap-1">
-              <i className="fa-solid fa-comment text-[0.6rem]" />
+              <SiteIcon name="fa-comment" variant="solid" className="text-[0.6rem]" />
               {post.comment_count || 0}
             </span>
             <span className="flex items-center gap-1">
-              <i className="fa-solid fa-bookmark text-[0.6rem]" />
+              <SiteIcon name="fa-bookmark" variant="solid" className="text-[0.6rem]" />
               {post.bookmark_count || 0}
             </span>
           </div>

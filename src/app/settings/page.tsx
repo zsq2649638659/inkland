@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -161,7 +162,7 @@ export default function SettingsPage() {
                 <div className="feed-empty-tag-ring">
                   <div className="feed-empty-ring-outer"></div>
                   <div className="feed-empty-ring-inner">
-                    <i className="fa-solid fa-gear"></i>
+                    <SiteIcon name="fa-gear" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -322,7 +323,7 @@ export default function SettingsPage() {
                 <SettingsStatus kind={passwordMessageKind === "error" ? "error" : "success"} message={passwordMessage} />
               )}
               <button type="submit" className="settings-btn-save" disabled={passwordSaving}>
-                <i className="fa-solid fa-check" aria-hidden="true"></i> {passwordSaving ? "保存中…" : "保存修改"}
+                <SiteIcon name="fa-check" variant="solid" aria-hidden="true" /> {passwordSaving ? "保存中…" : "保存修改"}
               </button>
             </div>
           </form>
@@ -347,7 +348,7 @@ export default function SettingsPage() {
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
                     <div className="tag-ring-inner">
-                      <i className="fa-solid fa-user-shield"></i>
+                      <SiteIcon name="fa-user-shield" variant="solid" />
                     </div>
                   </div>
                 </div>
@@ -387,7 +388,7 @@ export default function SettingsPage() {
                 <SettingsStatus kind={notificationMessageKind === "error" ? "error" : "success"} message={notificationMessage} />
               )}
               <button type="button" className="settings-btn-save" onClick={() => void handleNotificationPreferencesSave()} disabled={notificationSaving}>
-                <i className="fa-solid fa-check" aria-hidden="true"></i> {notificationSaving ? "保存中…" : "保存设置"}
+                <SiteIcon name="fa-check" variant="solid" aria-hidden="true" /> {notificationSaving ? "保存中…" : "保存设置"}
               </button>
             </div>
           </div>
@@ -474,9 +475,7 @@ export default function SettingsPage() {
               <div className="settings-custom-select" ref={feedbackSelectRef} tabIndex={0} onClick={() => setFeedbackTypeOpen(!feedbackTypeOpen)}>
                 <span className="settings-custom-select-text">{feedbackType}</span>
                 <span className="settings-custom-select-arrow">
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: feedbackTypeOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
-                    <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <SiteIcon name="fa-chevron-down" variant="solid" size={12} style={{ transform: feedbackTypeOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
                 </span>
                 {feedbackTypeOpen && (
                   <div className="settings-custom-select-dropdown">
@@ -488,9 +487,7 @@ export default function SettingsPage() {
                       >
                         <span>{type}</span>
                         {feedbackType === type && (
-                          <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M1 5L5 9L13 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
+                          <SiteIcon name="fa-check" variant="solid" size={14} />
                         )}
                       </button>
                     ))}
@@ -511,7 +508,7 @@ export default function SettingsPage() {
 
             <div className="settings-form-actions settings-feedback-actions">
               <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
-                <i className={`fa-solid ${feedbackSubmitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} aria-hidden="true"></i> {feedbackSubmitting ? "提交中…" : "提交反馈"}
+                <SiteIcon name={feedbackSubmitting ? "fa-spinner" : "fa-paper-plane"} variant="solid" className={feedbackSubmitting ? "animate-spin" : undefined} aria-hidden="true" /> {feedbackSubmitting ? "提交中…" : "提交反馈"}
               </button>
               {feedbackSuccess && (
                 <SettingsStatus kind="success" message={feedbackSuccess} />

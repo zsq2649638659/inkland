@@ -1,5 +1,7 @@
 "use client";
 
+import SiteIcon from "@/components/SiteIcon";
+
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -127,7 +129,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
             aria-describedby="app-dialog-message"
           >
             <div className="app-dialog-icon" aria-hidden="true">
-              <i className={`fa-solid ${dialog.variant === "danger" ? "fa-trash-can" : dialog.variant === "success" ? "fa-circle-check" : "fa-circle-info"}`} />
+              <SiteIcon name={dialog.variant === "danger" ? "fa-trash-can" : dialog.variant === "success" ? "fa-circle-check" : "fa-circle-info"} variant="solid" />
             </div>
             <h2 id="app-dialog-title">{dialog.title}</h2>
             <p id="app-dialog-message">{dialog.message}</p>
@@ -166,7 +168,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
       )}
       {typeof document !== "undefined" && toastState && createPortal(
         <div key={toastState.id} className={`app-toast app-toast-${toastState.variant}`} role="status" aria-live="polite">
-          <i className={`fa-solid ${toastState.variant === "danger" ? "fa-circle-exclamation" : "fa-circle-check"}`} aria-hidden="true" />
+          <SiteIcon name={toastState.variant === "danger" ? "fa-circle-exclamation" : "fa-circle-check"} variant="solid" aria-hidden="true" />
           <span>{toastState.message}</span>
         </div>,
         document.body

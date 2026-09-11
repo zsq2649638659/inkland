@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -298,11 +299,11 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             </button>
           )}
           <div className="card-more-wrap" ref={cardMenuRef}>
-            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
+            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
             {cardMenuOpen && (
               <div className="card-more-menu">
                 {user?.id !== data.authorId && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
-                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><i className="fa-solid fa-flag" /> 举报</button>
+                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><SiteIcon name="fa-flag" variant="solid" /> 举报</button>
               </div>
             )}
           </div>
@@ -358,12 +359,12 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       <div className="card-actions">
         <LikeButton postId={data.chapterId} initialCount={data.likeCount} onLogin={goToLogin} initialActive={data.likedByMe} />
         <button className="card-action" onClick={handleCommentClick}>
-          <i className="fa-regular fa-comment" />
+          <SiteIcon name="fa-comment" variant="outline" />
           <span>{commentCount}</span>
         </button>
         <BookmarkButton postId={data.chapterId} initialCount={data.bookmarkCount} onLogin={goToLogin} initialActive={data.bookmarkedByMe} />
         <button className="card-action" onClick={handleShare}>
-          <i className="fa-solid fa-arrow-up-from-bracket" />
+          <SiteIcon name="fa-arrow-up-from-bracket" variant="solid" />
           <span>分享</span>
         </button>
       </div>

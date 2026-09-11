@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -170,36 +171,36 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
           className="flex items-center gap-2.5 px-5 py-2.5 text-sm text-warm no-underline hover:bg-accent-light transition-colors"
           onClick={() => setOpen(false)}
         >
-          <i className="fa-solid fa-user text-accent text-xs w-4 text-center" />
+          <SiteIcon name="fa-user" variant="solid" className="text-accent text-xs w-4 text-center" />
           <span>个人中心</span>
-          <i className="fa-solid fa-chevron-right text-[0.6rem] text-muted ml-auto" />
+          <SiteIcon name="fa-chevron-right" variant="solid" className="text-[0.6rem] text-muted ml-auto" />
         </Link>
         <Link
           href="/studio"
           className="flex items-center gap-2.5 px-5 py-2.5 text-sm text-warm no-underline hover:bg-accent-light transition-colors"
           onClick={() => setOpen(false)}
         >
-          <i className="fa-solid fa-pen-to-square text-accent text-xs w-4 text-center" />
+          <SiteIcon name="fa-pen-to-square" variant="solid" className="text-accent text-xs w-4 text-center" />
           <span>创作中心</span>
-          <i className="fa-solid fa-chevron-right text-[0.6rem] text-muted ml-auto" />
+          <SiteIcon name="fa-chevron-right" variant="solid" className="text-[0.6rem] text-muted ml-auto" />
         </Link>
         <Link
           href="/profile?tab=likes"
           className="flex items-center gap-2.5 px-5 py-2.5 text-sm text-warm no-underline hover:bg-accent-light transition-colors"
           onClick={() => setOpen(false)}
         >
-          <i className="fa-solid fa-heart text-accent text-xs w-4 text-center" />
+          <SiteIcon name="fa-heart" variant="solid" className="text-accent text-xs w-4 text-center" />
           <span>我的喜欢</span>
-          <i className="fa-solid fa-chevron-right text-[0.6rem] text-muted ml-auto" />
+          <SiteIcon name="fa-chevron-right" variant="solid" className="text-[0.6rem] text-muted ml-auto" />
         </Link>
         <Link
           href="/profile?tab=bookmarks"
           className="flex items-center gap-2.5 px-5 py-2.5 text-sm text-warm no-underline hover:bg-accent-light transition-colors"
           onClick={() => setOpen(false)}
         >
-          <i className="fa-solid fa-bookmark text-accent text-xs w-4 text-center" />
+          <SiteIcon name="fa-bookmark" variant="solid" className="text-accent text-xs w-4 text-center" />
           <span>我的收藏</span>
-          <i className="fa-solid fa-chevron-right text-[0.6rem] text-muted ml-auto" />
+          <SiteIcon name="fa-chevron-right" variant="solid" className="text-[0.6rem] text-muted ml-auto" />
         </Link>
       </div>
 
@@ -214,7 +215,7 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
             try { localStorage.setItem("theme", next); } catch { /* ignore */ }
           }}
         >
-          <i className={`fa-solid fa-${theme === "dark" ? "sun" : "moon"} text-xs w-4 text-center`} />
+          <SiteIcon name={theme === "dark" ? "fa-sun" : "fa-moon"} variant="solid" className="text-xs w-4 text-center" />
           <span>{theme === "dark" ? "日间模式" : "夜间模式"}</span>
         </button>
       </div>
@@ -225,7 +226,7 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
           className="w-full text-left flex items-center gap-2.5 px-5 py-2.5 text-sm text-muted hover:bg-accent-light transition-colors"
           onClick={() => { setOpen(false); signOut(); }}
         >
-          <i className="fa-solid fa-right-from-bracket text-xs w-4 text-center" />
+          <SiteIcon name="fa-right-from-bracket" variant="solid" className="text-xs w-4 text-center" />
           <span>退出登录</span>
         </button>
       </div>

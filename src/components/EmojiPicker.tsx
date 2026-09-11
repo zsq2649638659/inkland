@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useState, useRef, useEffect } from "react";
 
@@ -60,7 +61,7 @@ export default function EmojiPicker({ onSelect, darkMode = false }: EmojiPickerP
         onClick={() => setOpen(!open)}
         title="表情"
       >
-        <i className="fa-regular fa-face-smile text-base" />
+        <SiteIcon name="fa-face-smile" variant="outline" className="text-base" />
       </button>
 
       {open && (

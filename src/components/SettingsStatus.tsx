@@ -16,9 +16,10 @@ export default function SettingsStatus({ kind, message }: SettingsStatusProps) {
   return (
     <div className={`settings-status${statusClass}`} role={kind === "success" ? "status" : "alert"}>
       <span className="settings-status-icon" aria-hidden="true">
-        <i className={`fa-solid ${iconClass}`} />
+        <SiteIcon name={iconClass} variant="solid" />
       </span>
       <span className="settings-status-text">{message}</span>
     </div>
   );
 }
+import SiteIcon from "@/components/SiteIcon";

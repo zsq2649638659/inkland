@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import Link from "next/link";
 import { getThumbnailUrl } from "@/lib/image";
@@ -48,7 +49,7 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-rule/60 to-rule/20 p-4">
-            <i className="fa-solid fa-book-open text-4xl text-muted/30 mb-2" />
+            <SiteIcon name="fa-book-open" variant="solid" className="text-4xl text-muted/30 mb-2" />
             <span className="text-xs text-muted/50 line-clamp-3 text-center">{series.name}</span>
           </div>
         )}
@@ -104,15 +105,15 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-muted">
             <span className="flex items-center gap-1">
-              <i className="fa-solid fa-heart text-[0.6rem] text-red-400" />
+              <SiteIcon name="fa-heart" variant="solid" className="text-[0.6rem] text-red-400" />
               0
             </span>
             <span className="flex items-center gap-1">
-              <i className="fa-solid fa-comment text-[0.6rem]" />
+              <SiteIcon name="fa-comment" variant="solid" className="text-[0.6rem]" />
               0
             </span>
             <span className="flex items-center gap-1">
-              <i className="fa-solid fa-bookmark text-[0.6rem]" />
+              <SiteIcon name="fa-bookmark" variant="solid" className="text-[0.6rem]" />
               0
             </span>
           </div>

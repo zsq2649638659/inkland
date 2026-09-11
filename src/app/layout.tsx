@@ -7,7 +7,6 @@ import "@fontsource/noto-sans-sc/700.css";
 import "@fontsource/noto-serif-sc/400.css";
 import "@fontsource/noto-serif-sc/600.css";
 import "@fontsource/noto-serif-sc/700.css";
-import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./globals.css";
 import "./dialogs.css";
 import ClientLayout from "@/components/ClientLayout";

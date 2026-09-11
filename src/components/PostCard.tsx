@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useState, useMemo, useEffect, useRef, useCallback, type CSSProperties, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -378,11 +379,11 @@ export default function PostCard({ post }: PostCardProps) {
             </button>
           )}
           <div className="card-more-wrap" ref={cardMenuRef}>
-            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}>⋮</button>
+            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
             {cardMenuOpen && (
               <div className="card-more-menu">
                 {user?.id !== post.user_id && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
-                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><i className="fa-solid fa-flag" /> 举报</button>
+                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><SiteIcon name="fa-flag" variant="solid" /> 举报</button>
               </div>
             )}
           </div>
@@ -467,13 +468,13 @@ export default function PostCard({ post }: PostCardProps) {
       <div className="card-actions">
         <LikeButton postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} initialActive={post.liked_by_me} />
         <button className="card-action" onClick={handleCommentClick}>
-          <i className="fa-regular fa-comment"></i>
+          <SiteIcon name="fa-comment" variant="outline" />
           <span>{commentCount}</span>
         </button>
         <BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} initialActive={post.bookmarked_by_me} />
         <div className="relative">
           <button className="card-action" onClick={handleShare}>
-            <i className="fa-solid fa-arrow-up-from-bracket"></i>
+            <SiteIcon name="fa-arrow-up-from-bracket" variant="solid" />
             <span>分享</span>
           </button>
           {shareTip && (

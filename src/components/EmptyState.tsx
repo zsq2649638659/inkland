@@ -1,7 +1,9 @@
+import SiteIcon from "@/components/SiteIcon";
+import type { InklandIconName } from "@/components/inkland/iconRegistry";
 import Link from "next/link";
 
 interface EmptyStateProps {
-  icon: string;
+  icon: InklandIconName;
   title: string;
   description?: string;
   actionLabel?: string;
@@ -24,7 +26,7 @@ export default function EmptyState({
     return (
       <div className="text-center py-3">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rule mb-5">
-          <i className={`fa-solid ${icon} text-2xl text-muted/40`} />
+          <SiteIcon name={icon} variant="solid" className="text-2xl text-muted/40" />
         </div>
         <p className="text-sm text-muted mb-1">{title}</p>
         {description && (
@@ -33,12 +35,12 @@ export default function EmptyState({
         {actionLabel && (
           actionHref ? (
             <Link href={actionHref} className="btn-accent no-underline inline-flex items-center gap-1.5 text-sm">
-              <i className="fa-solid fa-pen-to-square text-xs" />
+              <SiteIcon name="fa-pen-to-square" variant="solid" className="text-xs" />
               {actionLabel}
             </Link>
           ) : actionOnClick ? (
             <button onClick={actionOnClick} className="btn-accent inline-flex items-center gap-1.5 text-sm">
-              <i className="fa-solid fa-pen-to-square text-xs" />
+              <SiteIcon name="fa-pen-to-square" variant="solid" className="text-xs" />
               {actionLabel}
             </button>
           ) : null
@@ -54,7 +56,7 @@ export default function EmptyState({
         <div className="feed-empty-tag-ring">
           <div className="feed-empty-ring-outer"></div>
           <div className="feed-empty-ring-inner">
-            <i className={`fa-solid ${icon}`}></i>
+            <SiteIcon name={icon} variant="solid" />
           </div>
         </div>
       </div>

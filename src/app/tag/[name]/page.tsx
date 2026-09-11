@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, use, useCallback } from "react";
 import { createClient } from "@/lib/supabase/browser";
@@ -428,24 +429,24 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
         {/* ===== Profile Section ===== */}
         <section className="profile-section">
           <div className="profile-avatar">
-            <i className="fa-solid fa-hashtag"></i>
+            <SiteIcon name="fa-hashtag" variant="solid" />
           </div>
           <div className="profile-info">
             <h1 className="profile-name">{decodedName}</h1>
             <p className="profile-bio">浏览标签下的所有作品，发现更多精彩内容</p>
             <div className="profile-stats">
               <div className="profile-stat">
-                <i className="fa-solid fa-book"></i>
+                <SiteIcon name="fa-book" variant="solid" />
                 <span>作品</span>
                 <span className="stat-value">{tagInfo ? tagInfo.post_count : 0}</span>
               </div>
               <div className="profile-stat">
-                <i className="fa-solid fa-users"></i>
+                <SiteIcon name="fa-users" variant="solid" />
                 <span>参与</span>
                 <span className="stat-value">{formatCount(participantCount)}</span>
               </div>
               <div className="profile-stat">
-                <i className="fa-solid fa-eye"></i>
+                <SiteIcon name="fa-eye" variant="solid" />
                 <span>浏览</span>
                 <span className="stat-value">{formatCount(viewCount)}</span>
               </div>
@@ -460,16 +461,16 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
                 disabled={followLoading}
               >
                 {followLoading ? (
-                  <i className="fa-solid fa-spinner fa-spin" />
+                  <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />
                 ) : isFollowingTag ? (
-                  <><i className="fa-solid fa-bookmark" /> 已关注</>
+                  <><SiteIcon name="fa-bookmark" variant="solid" /> 已关注</>
                 ) : (
-                  <><i className="fa-solid fa-bookmark" /> 关注标签</>
+                  <><SiteIcon name="fa-bookmark" variant="solid" /> 关注标签</>
                 )}
               </button>
             )}
             <button type="button" className="profile-action-btn" onClick={handleShare}>
-              <i className="fa-solid fa-share-nodes" /> 分享
+              <SiteIcon name="fa-share-nodes" variant="solid" /> 分享
             </button>
           </div>
         </section>
@@ -538,9 +539,9 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
           aria-haspopup="dialog"
           aria-expanded={isFilterModalOpen}
         >
-          <i className="fa-solid fa-sliders" aria-hidden="true" />
+          <SiteIcon name="fa-sliders" variant="solid" aria-hidden="true" />
           <span>筛选</span>
-          {(timeFilter !== "all" || typeFilter !== "all") && <i className="fa-solid fa-circle-check tag-mobile-filter-active" aria-label="已有筛选" />}
+          {(timeFilter !== "all" || typeFilter !== "all") && <SiteIcon name="fa-circle-check" variant="solid" className="tag-mobile-filter-active" aria-label="已有筛选" />}
         </button>
 
         {isFilterModalOpen && (
@@ -560,7 +561,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
                   onClick={() => setIsFilterModalOpen(false)}
                   aria-label="关闭筛选弹窗"
                 >
-                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                  <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                 </button>
               </div>
 
@@ -581,7 +582,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
                         onClick={() => setDraftTimeFilter(value)}
                       >
                         <span>{label}</span>
-                        {draftTimeFilter === value && <i className="fa-solid fa-check" aria-hidden="true" />}
+                        {draftTimeFilter === value && <SiteIcon name="fa-check" variant="solid" aria-hidden="true" />}
                       </button>
                     ))}
                   </div>
@@ -604,7 +605,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
                       onClick={() => setDraftTypeFilter(value)}
                     >
                       <span>{label}</span>
-                      {draftTypeFilter === value && <i className="fa-solid fa-check" aria-hidden="true" />}
+                      {draftTypeFilter === value && <SiteIcon name="fa-check" variant="solid" aria-hidden="true" />}
                     </button>
                   ))}
                 </div>

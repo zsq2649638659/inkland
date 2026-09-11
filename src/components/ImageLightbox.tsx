@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -211,7 +212,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <button type="button" className="image-lightbox-close" onClick={onClose} aria-label="关闭"><i className="fa-solid fa-xmark" /></button>
+      <button type="button" className="image-lightbox-close" onClick={onClose} aria-label="关闭"><SiteIcon name="fa-xmark" variant="solid" /></button>
       <div
         className="image-lightbox-stage"
         onClick={(event) => {
@@ -222,8 +223,8 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
       >
         <img src={currentImage} alt={`${title} 第${index + 1}张`} />
         {images.length > 1 && <>
-          <button type="button" className="image-lightbox-nav prev" onClick={() => setIndex((value) => (value + images.length - 1) % images.length)} aria-label="上一张"><i className="fa-solid fa-chevron-left" /></button>
-          <button type="button" className="image-lightbox-nav next" onClick={() => setIndex((value) => (value + 1) % images.length)} aria-label="下一张"><i className="fa-solid fa-chevron-right" /></button>
+          <button type="button" className="image-lightbox-nav prev" onClick={() => setIndex((value) => (value + images.length - 1) % images.length)} aria-label="上一张"><SiteIcon name="fa-chevron-left" variant="solid" /></button>
+          <button type="button" className="image-lightbox-nav next" onClick={() => setIndex((value) => (value + 1) % images.length)} aria-label="下一张"><SiteIcon name="fa-chevron-right" variant="solid" /></button>
         </>}
         <span className="image-lightbox-counter">{index + 1} / {images.length}</span>
       </div>
@@ -234,10 +235,10 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
           </Link>
           <div><Link href={`/user/${authorId}`}>{authorName}</Link><Link className="image-lightbox-time" href={`/read/${post.id}`}>{timeAgo(date)}</Link></div>
           {user?.id !== authorId && <button type="button" className="image-lightbox-follow" onClick={toggleFollow}>{following ? "已关注" : "+ 关注"}</button>}
-          <div className="image-lightbox-menu-wrap" ref={lightboxMenuRef}><button type="button" className="comment-more-btn inline-comment-more" onClick={() => setMenuOpen(!menuOpen)} aria-label="更多">⋮</button>{menuOpen && <div className="comment-popup show"><button type="button" className="comment-popup-item" onClick={() => { setMenuOpen(false); setModeration({ mode: "block", targetId: authorId, targetType: "user" }); }}><i className="fa-solid fa-ban" /> 屏蔽</button><button type="button" className="comment-popup-item" onClick={() => { setMenuOpen(false); setModeration({ mode: "report", targetId: post.id, targetType: "post" }); }}><i className="fa-solid fa-flag" /> 举报</button></div>}</div>
+          <div className="image-lightbox-menu-wrap" ref={lightboxMenuRef}><button type="button" className="comment-more-btn inline-comment-more" onClick={() => setMenuOpen(!menuOpen)} aria-label="更多"><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>{menuOpen && <div className="comment-popup show"><button type="button" className="comment-popup-item" onClick={() => { setMenuOpen(false); setModeration({ mode: "block", targetId: authorId, targetType: "user" }); }}><SiteIcon name="fa-ban" variant="solid" /> 屏蔽</button><button type="button" className="comment-popup-item" onClick={() => { setMenuOpen(false); setModeration({ mode: "report", targetId: post.id, targetType: "post" }); }}><SiteIcon name="fa-flag" variant="solid" /> 举报</button></div>}</div>
         </div>
         <h2>{title}</h2><p className="image-lightbox-description">{description || "暂无说明"}</p>
-        <div className="image-lightbox-actions card-actions"><LikeButton postId={post.id} initialCount={post.like_count || 0} /><button type="button" className="card-action"><i className="fa-regular fa-comment" /><span>{commentCount}</span></button><BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} /><button type="button" className="card-action" onClick={share}><i className="fa-solid fa-arrow-up-from-bracket" /><span>分享</span></button></div>
+        <div className="image-lightbox-actions card-actions"><LikeButton postId={post.id} initialCount={post.like_count || 0} /><button type="button" className="card-action"><SiteIcon name="fa-comment" variant="outline" /><span>{commentCount}</span></button><BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} /><button type="button" className="card-action" onClick={share}><SiteIcon name="fa-arrow-up-from-bracket" variant="solid" /><span>分享</span></button></div>
         <InlineCommentPanel postId={post.id} user={user} authLoading={authLoading} displayName={profile?.nickname || user?.email?.split("@")[0] || "我"} avatarUrl={profile?.avatar_url} comments={comments} commentCount={commentCount} commentText={commentText} loadingComments={loadingComments} submitting={submitting} onCommentTextChange={setCommentText} onSubmit={submitComment} onReply={submitReply} onDelete={deleteComment} onClose={onClose} onReport={(commentId, commentUserId) => { void commentUserId; setModeration({ mode: "report", targetId: commentId, targetType: "comment" }); }} onBlock={(userId) => setModeration({ mode: "block", targetId: userId, targetType: "user" })} />
       </aside>
       <ModerationReasonModal open={!!moderation && moderation.mode === "report"} mode="report" onClose={() => setModeration(null)} onSubmit={submitModeration} />

@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState } from "react";
 import { AuthProvider } from "@/components/AuthProvider";
@@ -24,7 +25,7 @@ function BackToTop() {
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       className={`back-to-top${visible ? " show" : ""}`}
     >
-      <i className="fa-solid fa-arrow-up" aria-hidden="true" />
+      <SiteIcon name="fa-arrow-up" variant="solid" aria-hidden="true" />
     </button>
   );
 }

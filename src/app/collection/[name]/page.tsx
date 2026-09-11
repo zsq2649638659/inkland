@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { use, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
@@ -140,8 +141,8 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
                 <h1 className="collection-title">{collection.name}</h1>
               </div>
               <div className="collection-hero-actions">
-                <button type="button" className={`collection-action-btn${isSaved ? " saved" : ""}`} onClick={() => setIsSaved((saved) => !saved)}><i className="fa-solid fa-bookmark" /> {isSaved ? "已收藏" : "收藏合集"}</button>
-                <button type="button" className="collection-action-btn" onClick={handleShare}><i className="fa-solid fa-share-nodes" /> 分享</button>
+                <button type="button" className={`collection-action-btn${isSaved ? " saved" : ""}`} onClick={() => setIsSaved((saved) => !saved)}><SiteIcon name="fa-bookmark" variant="solid" /> {isSaved ? "已收藏" : "收藏合集"}</button>
+                <button type="button" className="collection-action-btn" onClick={handleShare}><SiteIcon name="fa-share-nodes" variant="solid" /> 分享</button>
               </div>
             </div>
             {collection.description && <p className="collection-description">{collection.description}</p>}
@@ -160,7 +161,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
               {([{ key: "all", label: "全部" }, { key: "text", label: "单篇" }, { key: "image", label: "图片" }] as Array<{ key: CollectionFilter; label: string }>).map((item) => (
                 <button key={item.key} type="button" role="tab" aria-selected={filter === item.key} className={`type-filter-pill${filter === item.key ? " active" : ""}`} onClick={() => setFilter(item.key)}>{item.label}</button>
               ))}
-              <button type="button" className={`collection-sort-toggle${sortOrder === "asc" ? " reversed" : ""}`} onClick={() => setSortOrder((order) => order === "desc" ? "asc" : "desc")}><i className="fa-solid fa-arrow-down" /> {sortOrder === "desc" ? "正序" : "倒序"}</button>
+              <button type="button" className={`collection-sort-toggle${sortOrder === "asc" ? " reversed" : ""}`} onClick={() => setSortOrder((order) => order === "desc" ? "asc" : "desc")}><SiteIcon name="fa-arrow-down" variant="solid" /> {sortOrder === "desc" ? "正序" : "倒序"}</button>
             </div>
           </div>
 

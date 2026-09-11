@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
@@ -534,22 +535,16 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
             else applyTheme("dark");
           }}
         >
-          <svg width="22" height="22" viewBox="0 0 1024 1024" fill="currentColor">
-            <path d="M513.17 128A255.06 255.06 0 0 0 448 298.67c0 141.38 114.62 256 256 256a255.36 255.36 0 0 0 189.8-84.2c1.45 13.65 2.2 27.5 2.2 41.53 0 212.08-171.93 384-384 384S128 724.07 128 512c0-209.7 168.1-380.16 376.96-383.94z m-117.82 85.93l-3.52 1.41C274.65 262.83 192 377.77 192 512c0 176.73 143.27 320 320 320 145.41 0 268.16-96.98 307.11-229.8l1.54-5.5-1.6 0.64a319.51 319.51 0 0 1-106.5 21.22L704 618.67c-176.73 0-320-143.27-320-320 0-28.48 3.75-56.4 10.94-83.2z"/>
-          </svg>
+          <SiteIcon name="fa-moon" variant="solid" size={22} />
         </button>
         <button className="floating-btn" title="字体设置" onClick={() => togglePanel("font")}>
-          <svg width="22" height="22" viewBox="0 0 1024 1024" fill="currentColor">
-            <path d="M701.6 735.97l-33.8 92.8a32 32 0 0 1-60.15-21.89l130.37-358.08a31.97 31.97 0 0 1 42.01-21.89c10.21 3.71 17.38 12.1 19.97 21.86l130.34 358.08a32 32 0 0 1-60.16 21.92l-33.76-92.8H701.6z m23.26-64h88.26l-44.13-121.28-44.13 121.28zM234.75 576h202.5L336 297.86 234.75 576z m-23.3 64L144.64 823.65a32 32 0 0 1-60.13-21.89L303.36 200.32a32 32 0 0 1 32.64-20.96 32 32 0 0 1 32.64 20.96l218.88 601.4a32 32 0 0 1-60.16 21.89L460.58 640H211.46z"/>
-          </svg>
+          <SiteIcon name="fa-font" variant="solid" size={22} />
         </button>
         <button className="floating-btn" title="页面宽度" onClick={() => togglePanel("width")}>
-          <svg width="22" height="22" viewBox="0 0 1024 1024" fill="currentColor">
-            <path d="M866.18 128c33.15 0.19 47.49 1.15 58.88 6.98a64 64 0 0 1 27.97 27.97C960 176.64 960 194.56 960 244.1v483.58c0 40.7-0.64 56.83-6.98 69.38a64 64 0 0 1-27.97 27.97C911.36 832 893.44 832 843.9 832H168.32c-40.7 0-56.83-0.64-69.38-6.98a64 64 0 0 1-27.97-27.97c-5.76-11.39-6.78-25.73-6.91-58.88V221.82c0.13-33.15 1.09-47.49 6.91-58.88a64 64 0 0 1 27.97-27.97c11.39-5.76 25.73-6.78 58.88-6.91zM896 192H128l0.7 2.56c-0.45 6.78-0.7 23.3-0.7 49.54V768l2.56-0.7c6.78 0.45 23.3 0.7 49.54 0.7H896l-0.7-2.56c0.45-6.78 0.7-23.3 0.7-49.54V192z m-162.56 170.11l88 94.08c1.34 1.28 2.56 2.56 3.71 4.03 12.16 13 11.9 32.58-0.13 44.8l-92.16 93.44a32 32 0 1 1-45.63-44.93l40.96-41.53H301.25l41.28 41.34a32 32 0 1 1-45.25 45.25l-96-96a32 32 0 0 1 0-45.25l96-96a32 32 0 1 1 45.25 45.31L301.25 448h424.83l-39.42-42.11a32 32 0 1 1 46.72-43.78z"/>
-          </svg>
+          <SiteIcon name="fa-expand" variant="solid" size={22} />
         </button>
         <button className="floating-btn" title="举报作品" onClick={handlePostReport}>
-          <i className="fa-regular fa-flag" />
+          <SiteIcon name="fa-flag" variant="outline" />
         </button>
       </div>
 
@@ -591,17 +586,17 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           <div className="work-meta">
             {post.image_count && post.image_count > 0 ? (
               <span className="meta-item">
-                <i className="fa-regular fa-image" />
+                <SiteIcon name="fa-image" variant="outline" />
                 <span className="meta-value">{post.image_count}张</span>
               </span>
             ) : images.length > 0 ? (
               <span className="meta-item">
-                <i className="fa-regular fa-image" />
+                <SiteIcon name="fa-image" variant="outline" />
                 <span className="meta-value">{images.length}张</span>
               </span>
             ) : null}
             <span className="meta-item">
-              <i className="fa-regular fa-calendar" />
+              <SiteIcon name="fa-calendar" variant="outline" />
               <span className="meta-value">{createdAt}</span>
             </span>
           </div>
@@ -650,11 +645,11 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           <div className="chapter-nav">
             {prevChapter ? (
               <Link href={`/read/${prevChapter.id}`} className="chapter-nav-btn prev">
-                <span className="chapter-nav-label"><i className="fa-solid fa-chevron-left" /> 上一篇</span>
+                <span className="chapter-nav-label"><SiteIcon name="fa-chevron-left" variant="solid" /> 上一篇</span>
               </Link>
             ) : (
               <span className="chapter-nav-btn prev disabled">
-                <span className="chapter-nav-label"><i className="fa-solid fa-chevron-left" /> 上一篇</span>
+                <span className="chapter-nav-label"><SiteIcon name="fa-chevron-left" variant="solid" /> 上一篇</span>
               </span>
             )}
             <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(post.series_name)}`} className="chapter-nav-btn back">
@@ -662,11 +657,11 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
             </Link>
             {nextChapter ? (
               <Link href={`/read/${nextChapter.id}`} className="chapter-nav-btn next">
-                <span className="chapter-nav-label">下一篇 <i className="fa-solid fa-chevron-right" /></span>
+                <span className="chapter-nav-label">下一篇 <SiteIcon name="fa-chevron-right" variant="solid" /></span>
               </Link>
             ) : (
               <span className="chapter-nav-btn next disabled">
-                <span className="chapter-nav-label">下一篇 <i className="fa-solid fa-chevron-right" /></span>
+                <span className="chapter-nav-label">下一篇 <SiteIcon name="fa-chevron-right" variant="solid" /></span>
               </span>
             )}
           </div>
@@ -683,7 +678,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
             className="stat-item"
           />
           <span className="stat-item" data-stat="comment">
-            <i className="fa-regular fa-comment" />
+            <SiteIcon name="fa-comment" variant="outline" />
             <span>{stats.comment_count}</span>
           </span>
           <BookmarkButton
@@ -695,7 +690,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
             className="stat-item"
           />
           <button className="stat-item" data-stat="share" onClick={goToLogin}>
-            <i className="fa-regular fa-share-from-square" />
+            <SiteIcon name="fa-share-from-square" variant="outline" />
             <span>分享</span>
           </button>
         </div>
@@ -705,7 +700,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           {authLoading ? (
             <div style={{ marginBottom: 32, padding: 24, textAlign: "center", borderRadius: 12, background: "var(--color-bg-secondary, #E8E4E0)" }} role="status" aria-busy="true">
               <p style={{ fontSize: 14, color: "var(--color-text-muted, #6B6B6B)" }}>
-                <i className="fa-regular fa-message" style={{ marginRight: 6 }} />
+                <SiteIcon name="fa-message" variant="outline" style={{ marginRight: 6 }} />
                 正在确认登录状态…
               </p>
             </div>
@@ -740,7 +735,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                     onClick={submitComment}
                     disabled={commentLoading || !commentText.trim()}
                   >
-                    <i className="fa-solid fa-paper-plane" /> 发布
+                    <SiteIcon name="fa-paper-plane" variant="solid" /> 发布
                   </button>
                 </div>
               </div>
@@ -748,11 +743,11 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
           ) : (
             <div style={{ marginBottom: 32, padding: 24, textAlign: "center", borderRadius: 12, background: "var(--color-bg-secondary, #E8E4E0)" }}>
               <p style={{ fontSize: 14, color: "var(--color-text-muted, #6B6B6B)", marginBottom: 12 }}>
-                <i className="fa-regular fa-message" style={{ marginRight: 6 }} />
+                <SiteIcon name="fa-message" variant="outline" style={{ marginRight: 6 }} />
                 登录后参与评论
               </p>
               <Link href="/login" className="btn-submit" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
-                <i className="fa-solid fa-right-to-bracket" /> 登录
+                <SiteIcon name="fa-right-to-bracket" variant="solid" /> 登录
               </Link>
             </div>
           )}
@@ -799,7 +794,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                           if (!user) { goToLogin(); return; }
                         }}
                       >
-                        <i className="fa-regular fa-heart" />
+                        <SiteIcon name="fa-heart" variant="outline" />
                         <span>{c.like_count || 0}</span>
                       </button>
                       {user && (
@@ -812,7 +807,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                             }
                           }}
                         >
-                          <i className="fa-regular fa-comment" />
+                          <SiteIcon name="fa-comment" variant="outline" />
                           <span>回复</span>
                         </button>
                       )}
@@ -821,7 +816,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                           className="comment-action-btn-delete"
                           onClick={() => handleDeleteComment(c.id)}
                         >
-                          <i className="fa-regular fa-trash-can" />
+                          <SiteIcon name="fa-trash-can" variant="outline" />
                         </button>
                       )}
                       <button
@@ -830,7 +825,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                         title="更多"
                         onClick={() => setCommentMenuId(commentMenuId === c.id ? null : c.id)}
                       >
-                        ⋮
+                        <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
                       </button>
                       {commentMenuId === c.id && (
                         <div className="comment-popup show">
@@ -838,14 +833,14 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                             className="comment-popup-item"
                             onClick={() => { setCommentMenuId(null); handleReport(c.id, c.user_id); }}
                           >
-                            <i className="fa-solid fa-flag" />
+                            <SiteIcon name="fa-flag" variant="solid" />
                             举报
                           </button>
                           <button
                             className="comment-popup-item"
                             onClick={() => { setCommentMenuId(null); handleBlockUser(c.user_id); }}
                           >
-                            <i className="fa-solid fa-ban" />
+                            <SiteIcon name="fa-ban" variant="solid" />
                             屏蔽
                           </button>
                         </div>
@@ -882,7 +877,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                                     if (!user) { goToLogin(); return; }
                                   }}
                                 >
-                                  <i className="fa-regular fa-heart" />
+                                  <SiteIcon name="fa-heart" variant="outline" />
                                   <span>{reply.like_count || 0}</span>
                                 </button>
                                 {user && (
@@ -895,7 +890,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                                       }
                                     }}
                                   >
-                                    <i className="fa-regular fa-comment" />
+                                    <SiteIcon name="fa-comment" variant="outline" />
                                     <span>回复</span>
                                   </button>
                                 )}
@@ -904,7 +899,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                                     className="comment-action-btn-delete"
                                     onClick={() => handleDeleteComment(reply.id)}
                                   >
-                                    <i className="fa-regular fa-trash-can" />
+                                    <SiteIcon name="fa-trash-can" variant="outline" />
                                   </button>
                                 )}
                                 <button
@@ -913,7 +908,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                                   title="更多"
                                   onClick={() => setCommentMenuId(commentMenuId === reply.id ? null : reply.id)}
                                 >
-                                  ⋮
+                                  <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
                                 </button>
                                 {commentMenuId === reply.id && (
                                   <div className="comment-popup show">
@@ -921,14 +916,14 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                                       className="comment-popup-item"
                                       onClick={() => { setCommentMenuId(null); handleReport(reply.id, reply.user_id); }}
                                     >
-                                      <i className="fa-solid fa-flag" />
+                                      <SiteIcon name="fa-flag" variant="solid" />
                                       举报
                                     </button>
                                     <button
                                       className="comment-popup-item"
                                       onClick={() => { setCommentMenuId(null); handleBlockUser(reply.user_id); }}
                                     >
-                                      <i className="fa-solid fa-ban" />
+                                      <SiteIcon name="fa-ban" variant="solid" />
                                       屏蔽
                                     </button>
                                   </div>
@@ -951,9 +946,9 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                             }
                           >
                             {expandedReplyIds.has(c.id) ? (
-                              <>收起回复 <i className="fa-solid fa-chevron-up" /></>
+                              <>收起回复 <SiteIcon name="fa-chevron-up" variant="solid" /></>
                             ) : (
-                              <>展开全部{replies[c.id].length}条回复 <i className="fa-solid fa-chevron-down" /></>
+                              <>展开全部{replies[c.id].length}条回复 <SiteIcon name="fa-chevron-down" variant="solid" /></>
                             )}
                           </button>
                         )}
@@ -1010,7 +1005,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                               setCommentLoading(false);
                             }}
                           >
-                            <i className="fa-solid fa-paper-plane" /> 发布
+                            <SiteIcon name="fa-paper-plane" variant="solid" /> 发布
                           </button>
                         </div>
                       </div>
@@ -1152,7 +1147,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       {lightboxImage && (
         <div className="lightbox-overlay active" onClick={closeLightbox}>
           <button className="lightbox-close" onClick={closeLightbox}>
-            <i className="fa-solid fa-xmark" />
+            <SiteIcon name="fa-xmark" variant="solid" />
           </button>
           <img
             className="lightbox-img"

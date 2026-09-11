@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
@@ -341,7 +342,7 @@ export default function HomePage() {
           {user && tab === "following" && latestReadingPost && (
             <section className="home-continue-reading" aria-label="继续阅读">
               <div className="home-continue-reading-copy">
-                <p className="home-continue-reading-label"><i className="fa-regular fa-clock" />继续阅读</p>
+                <p className="home-continue-reading-label"><SiteIcon name="fa-clock" variant="outline" />继续阅读</p>
                 <h2>{latestReadingPost.title || "未命名作品"}</h2>
                 <p>
                   {latestReadingPost.series_name ? `${latestReadingPost.series_name} · ` : ""}
@@ -364,7 +365,7 @@ export default function HomePage() {
                   <div className="feed-empty-tag-ring">
                     <div className="feed-empty-ring-outer"></div>
                     <div className="feed-empty-ring-inner">
-                      <i className="fa-solid fa-feather-pointed"></i>
+                      <SiteIcon name="fa-feather-pointed" variant="solid" />
                     </div>
                   </div>
                 </div>
@@ -380,7 +381,7 @@ export default function HomePage() {
                     onClick={handleRefresh}
                     className="home-refresh-notice"
                   >
-                    <i className="fa-solid fa-arrow-rotate-right" />
+                    <SiteIcon name="fa-arrow-rotate-right" variant="solid" />
                     有新作品发布，点击查看
                   </button>
                 )}
@@ -406,7 +407,7 @@ export default function HomePage() {
                 {hasMore ? (
                   <div className="text-center py-6">
                     <button className="btn-ghost text-sm" onClick={loadMore}>
-                      <i className="fa-solid fa-chevron-down mr-1" />
+                      <SiteIcon name="fa-chevron-down" variant="solid" className="mr-1" />
                       加载更多
                     </button>
                   </div>
@@ -427,7 +428,7 @@ export default function HomePage() {
                   <div className="feed-empty-tag-ring">
                     <div className="feed-empty-ring-outer"></div>
                     <div className="feed-empty-ring-inner">
-                      <i className="fa-solid fa-tag"></i>
+                      <SiteIcon name="fa-tag" variant="solid" />
                     </div>
                   </div>
                 </div>
@@ -456,7 +457,7 @@ export default function HomePage() {
                         href={`/tag/${encodeURIComponent(tag.name)}`}
                         className="tag-card-item"
                       >
-                        <span className="tag-icon"><i className="fa-solid fa-tag"></i></span>
+                        <span className="tag-icon"><SiteIcon name="fa-tag" variant="solid" /></span>
                         <span className="tag-name">{tag.name}</span>
                         <span className="tag-count">{tag.post_count} 篇作品</span>
                       </a>
@@ -492,7 +493,7 @@ export default function HomePage() {
             {hasMore ? (
               <div className="text-center py-6">
                 <button className="btn-ghost text-sm" onClick={loadMore}>
-                  <i className="fa-solid fa-chevron-down mr-1" />
+                  <SiteIcon name="fa-chevron-down" variant="solid" className="mr-1" />
                   加载更多
                 </button>
               </div>

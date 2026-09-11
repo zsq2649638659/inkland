@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -30,7 +31,7 @@ export default function ChapterPreviewPage() {
   }, []);
 
   if (!preview) {
-    return <main className="chapter-static-preview-empty"><i className="fa-regular fa-file-lines" /><h1>暂无可预览的章节</h1><p>请返回章节编辑页，填写内容后再次点击预览。</p><button type="button" onClick={() => router.back()}>返回编辑</button></main>;
+    return <main className="chapter-static-preview-empty"><SiteIcon name="fa-file-lines" variant="outline" /><h1>暂无可预览的章节</h1><p>请返回章节编辑页，填写内容后再次点击预览。</p><button type="button" onClick={() => router.back()}>返回编辑</button></main>;
   }
 
   const displayTitle = preview.titleMode === "numbered"
@@ -41,23 +42,23 @@ export default function ChapterPreviewPage() {
     <main className="chapter-static-preview-page">
       <div className="chapter-static-preview-toolbar">
         <div><span>章节发布效果预览</span><strong>{preview.seriesName}</strong></div>
-        <button type="button" onClick={() => router.push(preview.returnUrl || `/create?seriesName=${encodeURIComponent(preview.seriesName)}`)}><i className="fa-solid fa-arrow-left" />返回编辑</button>
+        <button type="button" onClick={() => router.push(preview.returnUrl || `/create?seriesName=${encodeURIComponent(preview.seriesName)}`)}><SiteIcon name="fa-arrow-left" variant="solid" />返回编辑</button>
       </div>
       <article className="content-wrapper chapter-static-preview-content">
         <h1 className="work-title">{displayTitle}</h1>
         <div className="chapter-static-preview-meta">
-          <span><i className="fa-solid fa-book-open" />{preview.seriesName}</span>
-          <span><i className="fa-regular fa-file-lines" />{preview.wordCount.toLocaleString()}字</span>
-          <span><i className="fa-regular fa-calendar" />发布后显示日期</span>
+          <span><SiteIcon name="fa-book-open" variant="solid" />{preview.seriesName}</span>
+          <span><SiteIcon name="fa-file-lines" variant="outline" />{preview.wordCount.toLocaleString()}字</span>
+          <span><SiteIcon name="fa-calendar" variant="outline" />发布后显示日期</span>
         </div>
         <div className="work-content">
           <div className="reader-content" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(preview.content) }} />
         </div>
         {preview.authorNote && <aside className="chapter-static-author-note"><strong>作者的话</strong><p>{preview.authorNote}</p></aside>}
         <div className="chapter-nav chapter-static-preview-nav">
-          <span className="chapter-nav-btn prev disabled"><span className="chapter-nav-label"><i className="fa-solid fa-chevron-left" /> 上一章</span></span>
+          <span className="chapter-nav-btn prev disabled"><span className="chapter-nav-label"><SiteIcon name="fa-chevron-left" variant="solid" /> 上一章</span></span>
           <span className="chapter-nav-btn back"><span className="chapter-nav-label">返回目录</span></span>
-          <span className="chapter-nav-btn next disabled"><span className="chapter-nav-label">下一章 <i className="fa-solid fa-chevron-right" /></span></span>
+          <span className="chapter-nav-btn next disabled"><span className="chapter-nav-label">下一章 <SiteIcon name="fa-chevron-right" variant="solid" /></span></span>
         </div>
       </article>
     </main>

@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useRef, useEffect, useState, type CSSProperties, type MouseEvent } from "react";
 import Link from "next/link";
@@ -100,11 +101,11 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
       <div className={`tag-card image${isRejected ? " review-rejected" : ""}`} data-type="image" style={style} onClick={navigateCard} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") router.push(targetHref); }}>
         {seriesContext && (
           <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
-            <i className="fa-solid fa-layer-group"></i> {seriesContext}
+            <SiteIcon name="fa-layer-group" variant="solid" /> {seriesContext}
           </Link>
         )}
         <div className="card-image-stage">
-          {isRejected && <Link href={targetHref} className="profile-review-badge"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
+          {isRejected && <Link href={targetHref} className="profile-review-badge"><SiteIcon name="fa-circle-exclamation" variant="solid" /> 需修改</Link>}
           <button type="button" className="card-image-link" onClick={() => setLightboxOpen(true)} aria-label={`查看${allImages.length}张图片`}>
             <div className="card-image-placeholder">
               {allImages[activeImage] ? (
@@ -116,7 +117,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
                   onError={(event) => event.currentTarget.classList.add("load-error")}
                 />
               ) : (
-                <i className="fa-solid fa-image" />
+                <SiteIcon name="fa-image" variant="solid" />
               )}
             </div>
           </button>
@@ -138,7 +139,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
           )}
           {hasMultipleImages && (
             <span className="card-image-count" aria-label={`共 ${allImages.length} 张图片`}>
-              <i className="fa-regular fa-images" /> {allImages.length}
+              <SiteIcon name="fa-images" variant="outline" /> {allImages.length}
             </span>
           )}
           {hasMultipleImages && !imageTagsInOverlay && (
@@ -156,7 +157,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
                 aria-label="上一张图片"
                 onClick={() => setActiveImage((current) => (current + allImages.length - 1) % allImages.length)}
               >
-                <i className="fa-solid fa-chevron-left" />
+                <SiteIcon name="fa-chevron-left" variant="solid" />
               </button>
               <button
                 type="button"
@@ -164,7 +165,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
                 aria-label="下一张图片"
                 onClick={() => setActiveImage((current) => (current + 1) % allImages.length)}
               >
-                <i className="fa-solid fa-chevron-right" />
+                <SiteIcon name="fa-chevron-right" variant="solid" />
               </button>
             </>
           )}
@@ -183,9 +184,9 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
         )}
         <div className="card-footer">
           <div className="card-stats">
-            <span className="card-stat"><i className="fa-regular fa-heart" /> {post.like_count || 0}</span>
-            <span className="card-stat"><i className="fa-regular fa-comment" /> {post.comment_count || 0}</span>
-            <span className="card-stat"><i className="fa-regular fa-bookmark" /> {post.bookmark_count || 0}</span>
+            <span className="card-stat"><SiteIcon name="fa-heart" variant="outline" /> {post.like_count || 0}</span>
+            <span className="card-stat"><SiteIcon name="fa-comment" variant="outline" /> {post.comment_count || 0}</span>
+            <span className="card-stat"><SiteIcon name="fa-bookmark" variant="outline" /> {post.bookmark_count || 0}</span>
           </div>
           {authorAvatar}
         </div>
@@ -198,10 +199,10 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
     <div className={`tag-card single${isRejected ? " review-rejected" : ""}`} data-type="single" style={style} onClick={navigateCard} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") router.push(targetHref); }}>
       {seriesContext && (
         <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
-          <i className="fa-solid fa-layer-group"></i> {seriesContext}
+          <SiteIcon name="fa-layer-group" variant="solid" /> {seriesContext}
         </Link>
       )}
-      {isRejected && <Link href={targetHref} className="profile-review-badge profile-review-badge--inline"><i className="fa-solid fa-circle-exclamation" /> 需修改</Link>}
+      {isRejected && <Link href={targetHref} className="profile-review-badge profile-review-badge--inline"><SiteIcon name="fa-circle-exclamation" variant="solid" /> 需修改</Link>}
       <Link href={targetHref} className="no-underline">
         <div className="card-title">{post.title || "无标题"}</div>
       </Link>
@@ -220,9 +221,9 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
       )}
       <div className="card-footer">
         <div className="card-stats">
-          <span className="card-stat"><i className="fa-regular fa-heart" /> {post.like_count || 0}</span>
-          <span className="card-stat"><i className="fa-regular fa-comment" /> {post.comment_count || 0}</span>
-          <span className="card-stat"><i className="fa-regular fa-bookmark" /> {post.bookmark_count || 0}</span>
+          <span className="card-stat"><SiteIcon name="fa-heart" variant="outline" /> {post.like_count || 0}</span>
+          <span className="card-stat"><SiteIcon name="fa-comment" variant="outline" /> {post.comment_count || 0}</span>
+          <span className="card-stat"><SiteIcon name="fa-bookmark" variant="outline" /> {post.bookmark_count || 0}</span>
         </div>
         {authorAvatar}
       </div>
