@@ -1298,6 +1298,15 @@ p {
   max-width: var(--main-content-width);
 }
 
+/* 首页按阶段 4 基线使用更窄的侧栏；其他页面继续使用共享侧栏宽度。 */
+#page-home {
+  --sidebar-width: 220px;
+}
+#page-home > .main-container {
+  justify-content: center;
+  padding: var(--spacing-lg) 0;
+}
+
 /* ===== Cards ===== */
 .card {
   background: var(--color-card, #FFFFFF);

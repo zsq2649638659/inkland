@@ -101,9 +101,10 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
 
   return (
     <button
-      className={`card-action ${bookmarked ? "liked" : ""}`}
+      className={`card-action ${className || ""} ${bookmarked ? "liked" : ""}`}
       onClick={toggle}
       disabled={loading || authLoading}
+      aria-pressed={bookmarked}
     >
       <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} hoverVariant={bookmarked ? undefined : "solid"} />
       <span>{count}</span>

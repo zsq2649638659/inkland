@@ -41,7 +41,7 @@ export interface SerialPostCardData {
 
 function stripMarkdown(content?: string): string {
   if (!content) return "";
-  let text = content
+  const text = content
     .replace(/!\[.*?\]\(.*?\)/g, "")
     .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
     .replace(/[*_~`#>|-]/g, "")
@@ -260,19 +260,19 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
 
   return (
     <article
-      className="card"
+      className="site-card site-card--feed site-card--feed-serial"
       role="link"
       tabIndex={0}
       onClick={(event) => {
         const target = event.target as HTMLElement;
-        if (!target.closest("a, button") && target.closest(".card-title, .card-excerpt")) router.push(`/read/${data.chapterId}`);
+        if (!target.closest("a, button") && target.closest(".site-card__title, .site-card__excerpt")) router.push(`/read/${data.chapterId}`);
       }}
       onKeyDown={(event) => { if (event.key === "Enter") router.push(`/read/${data.chapterId}`); }}
     >
       {/* V2: card-header — avatar + author info */}
-      <div className="card-header">
-        <Link href={`/user/${data.authorId}`} className="flex-shrink-0">
-          <div className="card-avatar">
+      <div className="site-card__header">
+        <Link href={`/user/${data.authorId}`} className="site-card__avatar-link">
+          <div className="site-card__avatar">
             {data.authorAvatar ? (
               <img src={data.authorAvatar} alt="" />
             ) : (
@@ -281,25 +281,25 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           </div>
         </Link>
 
-        <div className="card-author-info">
+        <div className="site-card__author">
           <Link href={`/user/${data.authorId}`} className="no-underline">
-            <div className="card-author-name">
+            <strong>
               {data.authorNickname || "匿名用户"}
-            </div>
+            </strong>
           </Link>
-          <Link href={`/read/${data.chapterId}`} className="card-time no-underline">
+          <Link href={`/read/${data.chapterId}`} className="site-card__author-meta no-underline">
             {getTimeAgo(data.createdAt)}
           </Link>
         </div>
 
-        <div className="card-header-actions">
+        <div className="site-card__header-actions">
           {user?.id !== data.authorId && (
-            <button className="card-follow-btn" onClick={toggleFollow} disabled={followLoading}>
+            <button className={`site-card__follow${following ? " site-card__follow--followed" : ""}`} onClick={toggleFollow} disabled={followLoading}>
               {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
             </button>
           )}
           <div className="card-more-wrap" ref={cardMenuRef}>
-            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
+            <button className="site-card__more" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
             {cardMenuOpen && (
               <div className="card-more-menu">
                 {user?.id !== data.authorId && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
@@ -314,57 +314,45 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       {/* V2: card-title — 章节标题 */}
       <Link
         href={`/read/${data.chapterId}`}
-        className="card-title no-underline hover:text-accent"
+        className="site-card__title-link"
       >
-        第{data.chapterNumber}章 {data.chapterTitle || "无标题"}
+        <h3 className="site-card__title">第{data.chapterNumber}章 {data.chapterTitle || "无标题"}</h3>
       </Link>
 
       {/* V2: card-excerpt */}
       {plainExcerpt && (
-        <p className="card-excerpt">
+        <p className="site-card__excerpt site-card__serial-intro">
           {plainExcerpt}
         </p>
       )}
 
       {/* V2: serial-inner — 连载信息内卡片 */}
-      <Link
-        href={`/series/${encodeURIComponent(data.seriesName)}`}
-        className="serial-inner no-underline"
-        style={{ display: "flex" }}
-      >
-        <div className="serial-info">
-          <div className="serial-name-row">
-            <span className="serial-name">{data.seriesName}</span>
-            <span className={`serial-badge ${data.seriesStatus === "completed" ? "completed" : ""}`}>
-              {data.seriesStatus === "ongoing" ? "连载中" : "已完结"}
-            </span>
-          </div>
-          {data.seriesDescription && (
-            <div className="serial-desc">{data.seriesDescription}</div>
-          )}
-          {data.seriesTags.length > 0 && (
-            <div className="serial-tags">
-              {data.seriesTags.slice(0, 4).map((tag) => (
-                <span key={tag} className="card-tag">{tag}</span>
-              ))}
-              {data.seriesTags.length > 4 && (
-                <span className="card-tag">+{data.seriesTags.length - 4}</span>
-              )}
-            </div>
-          )}
+      <div className="site-card__serial-inner">
+        <div className="site-card__serial-heading">
+          <Link href={`/series/${encodeURIComponent(data.seriesName)}`} className="site-card__title-link">
+            <strong>{data.seriesName}</strong>
+          </Link>
+          <span className={`tag tag--status ${data.seriesStatus === "ongoing" ? "tag--status-active" : "tag--status-complete"} site-card__status`}>
+            {data.seriesStatus === "ongoing" ? "连载中" : "已完结"}
+          </span>
         </div>
-      </Link>
+        {data.seriesDescription && <p>{data.seriesDescription}</p>}
+        <div className="site-card__tags">
+          <span className="tag tag--site site-card__tag">第{data.chapterNumber}章</span>
+          {data.seriesTags.map((tag) => <span key={tag} className="tag tag--site site-card__tag">{tag}</span>)}
+        </div>
+      </div>
 
       {/* V2: card-actions — 互动按钮 */}
-      <div className="card-actions">
-        <LikeButton postId={data.chapterId} initialCount={data.likeCount} onLogin={goToLogin} initialActive={data.likedByMe} />
-        <button className="card-action" onClick={handleCommentClick}>
+      <div className="site-card__actions">
+        <LikeButton className="site-card__action" postId={data.chapterId} initialCount={data.likeCount} onLogin={goToLogin} initialActive={data.likedByMe} />
+        <button className="site-card__action" onClick={handleCommentClick}>
           <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
           <span>{commentCount}</span>
         </button>
-        <BookmarkButton postId={data.chapterId} initialCount={data.bookmarkCount} onLogin={goToLogin} initialActive={data.bookmarkedByMe} />
-        <button className="card-action" onClick={handleShare}>
-          <SiteIcon name="fa-arrow-up-from-bracket" variant="solid" />
+        <BookmarkButton className="site-card__action" postId={data.chapterId} initialCount={data.bookmarkCount} onLogin={goToLogin} initialActive={data.bookmarkedByMe} />
+        <button className="site-card__action site-card__share" onClick={handleShare}>
+          <SiteIcon name="fa-share-from-square" variant="outline" hoverVariant="solid" />
           <span>分享</span>
         </button>
       </div>
