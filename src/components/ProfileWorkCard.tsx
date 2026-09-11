@@ -47,8 +47,8 @@ function imagesFor(post: Post): string[] {
   return cover && !fromContent.includes(cover) ? [cover, ...fromContent] : fromContent;
 }
 
-function tagLinks(tags: string[]) {
-  if (!tags.length) return null;
+function tagLinks(tags: string[], mode: ProfileCardMode) {
+  if (!tags.length || mode !== "pc") return null;
   return (
     <div className="site-card__tags" aria-label="作品标签">
       {tags.map((tag) => (
@@ -79,7 +79,7 @@ function imageCard(post: Post, mode: ProfileCardMode) {
           </Link>
         </div>
       </div>
-      {tagLinks((post.tags || []).map((tag) => typeof tag === "string" ? tag : tag.name))}
+      {tagLinks((post.tags || []).map((tag) => typeof tag === "string" ? tag : tag.name), mode)}
     </article>
   );
 }
@@ -92,7 +92,7 @@ function singleCard(post: Post, mode: ProfileCardMode) {
     <article className={`site-card site-card--feed site-card--feed-single site-card--profile-${mode}`} data-card-type="single">
       <Link href={href} className="site-card__title-link"><h3 className="site-card__title">{title}</h3></Link>
       {excerpt && <Link href={href} className="site-card__content-link"><p className="site-card__excerpt">{excerpt}</p></Link>}
-      {tagLinks((post.tags || []).map((tag) => typeof tag === "string" ? tag : tag.name))}
+      {tagLinks((post.tags || []).map((tag) => typeof tag === "string" ? tag : tag.name), mode)}
     </article>
   );
 }
@@ -112,11 +112,11 @@ function serialCard(series: ProfileSeriesCard, mode: ProfileCardMode) {
           <span className={`tag tag--status site-card__status ${statusClass}`}>{series.status === "completed" ? "已完结" : "连载中"}</span>
         </div>
         <Link href={seriesHref} className="site-card__content-link"><p className="site-card__excerpt site-card__serial-intro">{series.description || "暂无简介"}</p></Link>
-        {tagLinks(series.tags || [])}
+        {tagLinks(series.tags || [], mode)}
         {series.latestChapterId && (
           <Link href={chapterHref} className="tag tag--type tag--type-link site-card__latest-chapter" aria-label={`打开${series.name}的${chapterTitle}`}>
             <SiteIcon name="fa-long-serial" variant="outline" aria-hidden="true" />
-            <span>最新章节</span><strong>{chapterTitle}</strong>
+            <strong>{chapterTitle}</strong>
           </Link>
         )}
       </div>

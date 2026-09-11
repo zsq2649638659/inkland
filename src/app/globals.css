@@ -7923,47 +7923,7 @@ p {
 #page-profile .sidebar-stat-link { cursor: pointer; text-decoration: none; }
 #page-profile .sidebar-stat-link:hover { color: inherit; }
 
-#page-profile .profile-filter-toolbar {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--ink-gap-compact);
-  margin-bottom: var(--ink-space-5);
-  padding: var(--ink-space-3);
-  border: var(--ink-border-none);
-  border-radius: var(--ink-radius-sm);
-  background: var(--ink-surface);
-}
-
-#page-profile .profile-filter-search {
-  display: flex;
-  min-width: 160px;
-  flex: 1 1 180px;
-  flex-direction: column;
-  gap: var(--ink-space-1);
-  color: var(--ink-text-secondary);
-  font: var(--ink-font-card-meta);
-}
-
-#page-profile .profile-filter-search input {
-  width: 100%;
-  min-height: var(--ink-input-height-md);
-  padding: 0 var(--ink-space-3);
-  border: var(--ink-border-width-thin) solid var(--ink-border);
-  border-radius: var(--ink-radius-sm);
-  color: var(--ink-text);
-  background: var(--ink-surface);
-  font: var(--ink-font-card-body-mobile);
-}
-
-#page-profile .profile-filter-search input:focus {
-  border-color: var(--ink-primary);
-  outline: var(--ink-outline-none);
-  box-shadow: var(--ink-shadow-focus);
-}
-
-#page-profile .profile-filter-group { display: flex; flex-wrap: wrap; gap: var(--ink-gap-tight); }
-#page-profile .profile-filter-control,
-#page-profile .profile-filter-sort {
+#page-profile .profile-filter-control {
   min-height: var(--ink-height-control-md);
   padding: 0 var(--ink-space-3);
   border: var(--ink-border-width-thin) solid var(--ink-border);
@@ -7974,20 +7934,9 @@ p {
   cursor: pointer;
 }
 #page-profile .profile-filter-control:hover,
-#page-profile .profile-filter-control.is-active,
-#page-profile .profile-filter-sort:hover { border-color: var(--ink-primary); color: var(--ink-primary); background: var(--ink-primary-bg); }
-#page-profile .profile-filter-sort { display: inline-flex; align-items: center; gap: var(--ink-gap-tight); white-space: nowrap; }
+#page-profile .profile-filter-control.is-active { border-color: var(--ink-primary); color: var(--ink-primary); background: var(--ink-primary-bg); }
 #page-profile .profile-mobile-filter-bar,
-#page-profile .profile-filter-drawer-backdrop,
-#page-profile .profile-mobile-layout-switcher { display: none; }
-
-#page-profile .profile-mobile-layout-placeholder {
-  border: var(--ink-border-width-thin) solid var(--ink-border);
-  border-radius: var(--ink-radius-sm);
-  color: var(--ink-text-secondary);
-  background: var(--ink-surface);
-  cursor: pointer;
-}
+#page-profile .profile-filter-drawer-backdrop { display: none; }
 
 #page-profile .profile-filter-drawer-section { display: grid; gap: var(--ink-space-2); margin-top: var(--ink-space-4); }
 #page-profile .profile-filter-drawer-section > div { display: flex; flex-wrap: wrap; gap: var(--ink-gap-tight); }
@@ -7997,14 +7946,9 @@ p {
 
 /* 与组件库 filter.toolbar@0.1 / Input + Select 的同名契约。 */
 #page-profile .filter-system-composition {
-  display: grid;
-  gap: var(--ink-gap-lg);
-  margin-bottom: var(--ink-space-5);
-  padding: var(--ink-space-4);
-  border-radius: var(--ink-radius-md);
-  background: var(--ink-surface-subtle);
+  display: block;
 }
-#page-profile .filter-system-composition-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(130px, 1fr)); gap: var(--ink-gap-sm); align-items: end; }
+#page-profile .filter-system-composition-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(130px, 1fr)); gap: var(--ink-gap-sm); align-items: end; }
 #page-profile .filter-system-field { display: grid; min-width: 0; gap: var(--ink-gap-compact); color: var(--ink-text-secondary); font: var(--ink-font-control); }
 #page-profile .filter-system-field--query { min-width: 0; }
 #page-profile .filter-system-select-wrap { position: relative; display: block; }
@@ -8033,10 +7977,10 @@ p {
 #page-profile .filter-system-field .select-option { display: flex; align-items: center; width: 100%; min-height: var(--ink-input-option-height); padding: 0 var(--ink-input-padding-inline-option); border: var(--ink-border-none); border-radius: var(--ink-input-option-radius); color: var(--ink-text); background: transparent; font: var(--ink-font-control); text-align: left; cursor: pointer; }
 #page-profile .filter-system-field .select-option:hover,
 #page-profile .filter-system-field .select-option[aria-selected="true"] { color: var(--ink-primary); background: var(--ink-primary-bg); }
-#page-profile .filter-system-composition-footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--ink-gap-md); padding-top: var(--ink-space-3); border-top: var(--ink-border-width-thin) solid var(--ink-border-subtle); }
-#page-profile .filter-system-composition-summary { min-width: 0; margin: 0; color: var(--ink-muted); font: var(--ink-font-card-meta); }
-#page-profile .filter-system-clear { min-height: var(--ink-height-control-md); flex: 0 0 auto; padding: 0 var(--ink-space-3); border: var(--ink-border-none); border-radius: var(--ink-radius-md); color: var(--ink-primary); background: transparent; font: var(--ink-font-control); cursor: pointer; }
-#page-profile .filter-system-clear:hover { background: var(--ink-primary-bg); }
+#page-profile .filter-system-reset { display: inline-grid; width: var(--ink-height-control-md); height: var(--ink-height-control-md); place-items: center; border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: transparent; cursor: pointer; }
+#page-profile .filter-system-reset:hover,
+#page-profile .filter-system-reset:focus-visible { color: var(--ink-primary); background: var(--ink-primary-bg); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-focus); }
+#page-profile .filter-system-reset svg { width: 15px; height: 15px; }
 
 @media (max-width: 860px) and (min-width: 769px) {
   #page-profile .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -8367,15 +8311,14 @@ p {
     align-items: flex-start;
   }
 
-  #page-profile .profile-filter-toolbar { display: none; }
   #page-profile .filter-system-composition { display: none; }
   #page-profile .profile-mobile-filter-bar { display: flex; justify-content: space-between; gap: var(--ink-gap-compact); margin-bottom: var(--ink-space-3); }
   #page-profile .profile-mobile-filter-button { min-height: var(--ink-height-control-md); flex: 1; border: var(--ink-border-width-thin) solid var(--ink-border); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); cursor: pointer; }
+  #page-profile .profile-mobile-filter-button.profile-mobile-icon-button { display: inline-grid; width: var(--ink-height-control-md); height: var(--ink-height-control-md); flex: 0 0 var(--ink-height-control-md); place-items: center; padding: 0; }
+  #page-profile .profile-mobile-icon-button svg { width: 15px; height: 15px; }
   #page-profile .profile-mobile-filter-button[aria-pressed="true"] { border-color: var(--ink-primary); color: var(--ink-primary); background: var(--ink-primary-bg); }
   #page-profile .profile-filter-drawer-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
   #page-profile .profile-filter-drawer { width: 100%; padding: var(--ink-space-5); border-radius: var(--ink-radius-lg) var(--ink-radius-lg) 0 0; color: var(--ink-text); background: var(--ink-surface); box-shadow: var(--ink-shadow-lg); }
-  #page-profile .profile-mobile-layout-switcher { display: flex; justify-content: flex-end; margin-bottom: var(--ink-space-2); }
-  #page-profile .profile-mobile-layout-placeholder { padding: var(--ink-space-1) var(--ink-space-3); font: var(--ink-font-card-meta); }
 }
 
 /* ===== Section Title (通用) ===== */

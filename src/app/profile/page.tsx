@@ -181,6 +181,7 @@ export default function ProfilePage() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileDraftFilter, setMobileDraftFilter] = useState<FilterType>("all");
   const [mobileDraftStatus, setMobileDraftStatus] = useState<StatusFilter>("all");
+  const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesInfo[]>([]);
@@ -679,17 +680,15 @@ export default function ProfilePage() {
                     <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
                   </label>
                   <ProfileFilterSelect label="作品类型" id="profile-filter-type-menu" value={activeProfileFilter} options={filterPills.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => updateActiveFilter(value as FilterType)} />
-                  <ProfileFilterSelect label="发布状态" id="profile-filter-status-menu" value={statusFilter} options={[{ value: "all", label: "全部" }, { value: "published", label: "已发布" }, { value: "draft", label: "草稿" }, { value: "rejected", label: "未过审" }]} onChange={(value) => setStatusFilter(value as StatusFilter)} />
                   <ProfileFilterSelect label="排序" id="profile-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最近更新" }, { value: "created", label: "最近创建" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as SortMode)} />
                 </div>
-                <div className="filter-system-composition-footer">
-                  <p className="filter-system-composition-summary" role="status" aria-live="polite">当前条件：{filterPills.find((item) => item.key === activeProfileFilter)?.label || "全部"} · {statusFilter === "all" ? "状态不限" : statusFilter === "published" ? "已发布" : statusFilter === "draft" ? "草稿" : "未过审"} · {sortMode === "hot" ? "热度最高" : sortMode === "created" ? "最近创建" : "最近更新"}</p>
-                  <button className="filter-system-clear" type="button" onClick={() => { setProfileSearch(""); updateActiveFilter("all"); setStatusFilter("all"); setSortMode("latest"); }}>清除条件</button>
-                </div>
+                <button className="filter-system-reset" type="button" aria-label="重置筛选条件" title="重置筛选条件" onClick={() => { setProfileSearch(""); updateActiveFilter("all"); setStatusFilter("all"); setSortMode("latest"); }}>
+                  <SiteIcon name="fa-clear-compact" variant="default" aria-hidden="true" />
+                </button>
               </div>
               <div className="profile-mobile-filter-bar">
-                <button type="button" className="profile-mobile-filter-button" onClick={() => { setMobileDraftFilter(activeProfileFilter); setMobileDraftStatus(statusFilter); setMobileFilterOpen(true); }}>筛选</button>
-                <button type="button" className="profile-mobile-filter-button" onClick={() => setSortMode((current) => current === "latest" ? "hot" : "latest")} aria-pressed={sortMode === "hot"}>{sortMode === "latest" ? "最新" : "最热"}</button>
+                <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(activeProfileFilter); setMobileDraftStatus(statusFilter); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" /></button>
+                <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为单列列表"} aria-pressed={mobileCardLayout === "square"}><SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" /></button>
               </div>
               {mobileFilterOpen && (
                 <div className="profile-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
@@ -702,7 +701,7 @@ export default function ProfilePage() {
                 </div>
               )}
               {(activeProfilePosts.length > 0 || activeProfileSeries.length > 0) ? (
-                <ProfileCardCollection posts={activeProfilePosts} series={activeProfileSeries} filter={activeProfileFilter} query={profileSearch} status={statusFilter} sort={sortMode} limit={shownProfileItems} />
+                <ProfileCardCollection posts={activeProfilePosts} series={activeProfileSeries} filter={activeProfileFilter} query={profileSearch} status={statusFilter} sort={sortMode} limit={shownProfileItems} mobileLayout={mobileCardLayout} />
               ) : !loading ? <div className="empty-state"><h2 className="empty-title">这里还没有作品</h2><p className="empty-desc">发布或收藏作品后，会显示在这里。</p></div> : null}
             </>
           )}

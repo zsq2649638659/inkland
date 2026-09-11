@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Post } from "@/lib/types";
 import ProfileWorkCard, { type ProfileCardMode, type ProfileSeriesCard } from "@/components/ProfileWorkCard";
 
@@ -34,6 +34,7 @@ export default function ProfileCardCollection({
   status,
   sort,
   limit = 12,
+  mobileLayout,
 }: {
   posts: Post[];
   series: ProfileSeriesCard[];
@@ -42,8 +43,8 @@ export default function ProfileCardCollection({
   status: StatusFilter;
   sort: SortMode;
   limit?: number;
+  mobileLayout: "full" | "square";
 }) {
-  const [mobileLayout, setMobileLayout] = useState<"full" | "square">("full");
   const items = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     const postItems: Item[] = posts
@@ -97,11 +98,6 @@ export default function ProfileCardCollection({
     <>
       <div className="profile-card-device profile-card-device--pc card-device-grid" data-card-variant="profile-types">
         <div className="card-device-frame card-device card-device--pc">{renderCards("pc")}</div>
-      </div>
-      <div className="profile-mobile-layout-switcher">
-        <button type="button" className="profile-mobile-layout-placeholder" onClick={() => setMobileLayout((current) => current === "full" ? "square" : "full")} aria-label="切换移动端卡片排列" aria-pressed={mobileLayout === "square"}>
-          {mobileLayout === "full" ? "一行一个" : "一行三个"}
-        </button>
       </div>
       <div className={`profile-card-device profile-card-device--mobile-full card-device-grid${mobileLayout === "full" ? " is-active" : ""}`} data-card-variant="profile-mobile-full">
         <div className="card-device-frame card-device card-device--mobile">{renderCards("mobile-full")}</div>
