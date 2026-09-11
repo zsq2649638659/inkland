@@ -12,16 +12,16 @@ export default function DefaultAvatar({ name, className, style }: DefaultAvatarP
     <span
       className={className}
       style={{
-        ...style,
         display: "flex",
         width: "100%",
         height: "100%",
         alignItems: "center",
         justifyContent: "center",
         borderRadius: "50%",
-        background: "var(--color-bg-secondary, #e8e4e0)",
-        color: "var(--color-gray-900)",
+        background: "var(--color-primary, #f26b5b)",
+        color: "var(--color-on-primary, #fff)",
         fontWeight: 700,
+        ...style,
       }}
       aria-hidden="true"
     >

@@ -32,7 +32,7 @@
 .image-lightbox .image-lightbox-info .image-lightbox-actions .card-action:hover i,
 .image-lightbox .image-lightbox-info .image-lightbox-actions .card-action.liked i { color: var(--color-primary) !important; }
 .image-lightbox .image-lightbox-info .comment-textarea { min-height: 72px; padding: 12px 14px; border: 1px solid var(--color-border) !important; background: var(--color-card) !important; box-shadow: 0 1px 2px rgba(26,26,26,.04); line-height: 1.65; }
-.image-lightbox .image-lightbox-info .comment-textarea:focus { border-color: var(--color-border) !important; box-shadow: 0 1px 2px rgba(26,26,26,.04); }
+.image-lightbox .image-lightbox-info .comment-textarea:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(242,107,91,.15) !important; }
 .image-lightbox .image-lightbox-info .comment-reply-label { color: var(--color-text-light); font-size: 12px; }
 .image-lightbox .image-lightbox-info .comment-mention { color: var(--color-primary); font-size: 13px; font-weight: 500; }
 .image-lightbox .image-lightbox-info .image-lightbox-menu-wrap { position: relative; }
@@ -64,6 +64,16 @@
 .image-lightbox .image-lightbox-info .comment-header { gap: 6px; margin-bottom: 4px; }
 .image-lightbox .image-lightbox-info .comment-text { margin-bottom: 6px; line-height: 1.65; }
 .image-lightbox .image-lightbox-info .comment-actions { gap: 8px; }
+.image-lightbox .image-lightbox-info .comment-action-btn,
+.image-lightbox .image-lightbox-info .comment-action-btn:hover,
+.image-lightbox .image-lightbox-info .comment-action-btn:focus-visible,
+.image-lightbox .image-lightbox-info .comment-action-btn.liked {
+  background: transparent !important;
+  border-radius: 0;
+}
+.image-lightbox .image-lightbox-info .comment-action-btn:hover,
+.image-lightbox .image-lightbox-info .comment-action-btn:focus-visible,
+.image-lightbox .image-lightbox-info .comment-action-btn.liked { color: var(--color-primary) !important; }
 .image-lightbox .comment-action-btn:hover .site-icon-hover > .site-icon-hover__default,
 .image-lightbox .comment-action-btn:focus-visible .site-icon-hover > .site-icon-hover__default { display: none; }
 .image-lightbox .comment-action-btn:hover .site-icon-hover > .site-icon-hover__active,
@@ -74,6 +84,22 @@
 .image-lightbox .image-lightbox-info .inline-reply-composer { padding: 0; background: transparent; }
 .image-lightbox .image-lightbox-info .inline-reply-composer textarea,
 .image-lightbox .image-lightbox-info .inline-reply-composer textarea:focus { border: 1px solid var(--color-border) !important; }
+.image-lightbox .image-lightbox-info .inline-reply-composer textarea:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(242,107,91,.15) !important; }
+.image-lightbox .image-lightbox-info .comment-avatar-placeholder { font-size: 13px !important; }
+.image-lightbox .image-lightbox-info .comment-actions .comment-more-btn,
+.image-lightbox .image-lightbox-info .nested-comment .comment-more-btn {
+  width: var(--ink-avatar-size-sm, 32px);
+  height: var(--ink-avatar-size-sm, 32px);
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+}
+.image-lightbox .image-lightbox-info .comment-actions .comment-more-btn:hover,
+.image-lightbox .image-lightbox-info .comment-actions .comment-more-btn:focus-visible,
+.image-lightbox .image-lightbox-info .nested-comment .comment-more-btn:hover,
+.image-lightbox .image-lightbox-info .nested-comment .comment-more-btn:focus-visible {
+  color: var(--color-primary);
+  background: var(--color-primary-light, #fddcd8);
+}
 
 @media (max-width: 900px) {
   .image-lightbox {

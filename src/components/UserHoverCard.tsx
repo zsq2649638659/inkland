@@ -126,7 +126,7 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
       {/* 用户信息 - 居中布局 */}
       <div className="px-4 pt-5 pb-3 flex flex-col items-center">
         <Link href={`/user/${userId}`} onClick={() => setOpen(false)}>
-          <span className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-md inline-flex">
+          <span className="rounded-full overflow-hidden border-2 border-white shadow-md inline-flex" style={{ width: "var(--ink-avatar-size-lg)", height: "var(--ink-avatar-size-lg)" }}>
             {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" /> : <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%" }} />}
           </span>
         </Link>

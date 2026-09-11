@@ -710,7 +710,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt={displayName} />
                 ) : (
-                  <DefaultAvatar name={displayName} className="avatar" style={{ width: 56, height: 56 }} />
+                  <DefaultAvatar name={displayName} className="avatar" style={{ width: "var(--ink-avatar-size-md)", height: "var(--ink-avatar-size-md)" }} />
                 )}
               </div>
               <div className="comment-input-main">

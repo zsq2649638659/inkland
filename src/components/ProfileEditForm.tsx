@@ -217,7 +217,7 @@ export default function ProfileEditForm() {
                 <div className="avatar-upload">
                   <div className="avatar-preview">
                     {avatarUrl ? (
-                      <Image src={avatarUrl} alt="当前头像" fill sizes="88px" unoptimized />
+                      <Image src={avatarUrl} alt="当前头像" fill sizes="80px" unoptimized />
                     ) : (
                       <DefaultAvatar name={nickname || user?.email?.[0] || "?"} />
                     )}
