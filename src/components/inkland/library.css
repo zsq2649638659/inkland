@@ -206,6 +206,12 @@
   text-decoration: none;
 }
 
+#page-home .site-card__content-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
 #page-home .site-card__title {
   display: -webkit-box;
   margin: 0 0 var(--ink-space-2);

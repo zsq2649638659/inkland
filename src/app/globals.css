@@ -1562,6 +1562,14 @@ p {
 }
 .site-icon-hover__active { display: none; }
 :where(
+  .comment-action-btn:hover .site-icon-hover,
+  .comment-action-btn:focus-visible .site-icon-hover
+) > .site-icon-hover__default { display: none; }
+:where(
+  .comment-action-btn:hover .site-icon-hover,
+  .comment-action-btn:focus-visible .site-icon-hover
+) > .site-icon-hover__active { display: inline-flex; }
+:where(
   .site-icon-hover:hover,
   .card-action:hover .site-icon-hover,
   .card-stat:hover .site-icon-hover,
