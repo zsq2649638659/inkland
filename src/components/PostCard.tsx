@@ -383,7 +383,7 @@ export default function PostCard({ post }: PostCardProps) {
             {cardMenuOpen && (
               <div className="card-more-menu">
                 {user?.id !== post.user_id && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
-                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><SiteIcon name="fa-flag" variant="solid" /> 举报</button>
+                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button>
               </div>
             )}
           </div>
@@ -468,7 +468,7 @@ export default function PostCard({ post }: PostCardProps) {
       <div className="card-actions">
         <LikeButton postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} initialActive={post.liked_by_me} />
         <button className="card-action" onClick={handleCommentClick}>
-          <SiteIcon name="fa-comment" variant="outline" />
+          <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
           <span>{commentCount}</span>
         </button>
         <BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} initialActive={post.bookmarked_by_me} />

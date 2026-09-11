@@ -624,7 +624,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
           <SiteIcon name="fa-expand" variant="solid" size={22} />
         </button>
         <button className="floating-btn" title="举报作品" onClick={handlePostReport}>
-          <SiteIcon name="fa-flag" variant="outline" />
+          <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
         </button>
       </div>
 
@@ -920,7 +920,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
                               className="comment-popup-item"
                               onClick={() => { setCommentMenuId(null); handleReport(c.id, c.user_id); }}
                             >
-                              <SiteIcon name="fa-flag" variant="solid" />
+                              <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
                               举报
                             </button>
                             <button
@@ -1003,7 +1003,7 @@ export default function ReaderClient({ post }: ReaderClientProps) {
                                         className="comment-popup-item"
                                         onClick={() => { setCommentMenuId(null); handleReport(reply.id, reply.user_id); }}
                                       >
-                                        <SiteIcon name="fa-flag" variant="solid" />
+                                        <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
                                         举报
                                       </button>
                                       <button

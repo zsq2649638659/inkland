@@ -506,7 +506,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                       {blockedRecordId ? "取消屏蔽" : "屏蔽"}
                     </button>
                     <button className="more-dropdown-item danger" onClick={handleReport}>
-                      <SiteIcon name="fa-flag" variant="solid" />
+                      <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
                       举报
                     </button>
                   </div>

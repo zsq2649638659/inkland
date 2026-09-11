@@ -1534,6 +1534,31 @@ p {
 .card-action.liked {
   color: var(--color-primary, #F26B5B);
 }
+.site-icon-hover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+.site-icon-hover__active { display: none; }
+:where(
+  .site-icon-hover:hover,
+  .card-action:hover .site-icon-hover,
+  .card-stat:hover .site-icon-hover,
+  .card-more-menu button:hover .site-icon-hover,
+  .comment-popup-item:hover .site-icon-hover,
+  .user-action-popup-item:hover .site-icon-hover,
+  .floating-btn:hover .site-icon-hover
+) > .site-icon-hover__default { display: none; }
+:where(
+  .site-icon-hover:hover,
+  .card-action:hover .site-icon-hover,
+  .card-stat:hover .site-icon-hover,
+  .card-more-menu button:hover .site-icon-hover,
+  .comment-popup-item:hover .site-icon-hover,
+  .user-action-popup-item:hover .site-icon-hover,
+  .floating-btn:hover .site-icon-hover
+) > .site-icon-hover__active { display: inline-flex; }
 
 /* ===== Card Image Strip (PC/Tablet: horizontal scroll) ===== */
 .card-image-strip {

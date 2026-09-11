@@ -184,9 +184,9 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
         )}
         <div className="card-footer">
           <div className="card-stats">
-            <span className="card-stat"><SiteIcon name="fa-heart" variant="outline" /> {post.like_count || 0}</span>
-            <span className="card-stat"><SiteIcon name="fa-comment" variant="outline" /> {post.comment_count || 0}</span>
-            <span className="card-stat"><SiteIcon name="fa-bookmark" variant="outline" /> {post.bookmark_count || 0}</span>
+            <span className="card-stat"><SiteIcon name="fa-heart" variant="outline" hoverVariant="solid" /> {post.like_count || 0}</span>
+            <span className="card-stat"><SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" /> {post.comment_count || 0}</span>
+            <span className="card-stat"><SiteIcon name="fa-bookmark" variant="outline" hoverVariant="solid" /> {post.bookmark_count || 0}</span>
           </div>
           {authorAvatar}
         </div>
@@ -221,9 +221,9 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
       )}
       <div className="card-footer">
         <div className="card-stats">
-          <span className="card-stat"><SiteIcon name="fa-heart" variant="outline" /> {post.like_count || 0}</span>
-          <span className="card-stat"><SiteIcon name="fa-comment" variant="outline" /> {post.comment_count || 0}</span>
-          <span className="card-stat"><SiteIcon name="fa-bookmark" variant="outline" /> {post.bookmark_count || 0}</span>
+          <span className="card-stat"><SiteIcon name="fa-heart" variant="outline" hoverVariant="solid" /> {post.like_count || 0}</span>
+          <span className="card-stat"><SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" /> {post.comment_count || 0}</span>
+          <span className="card-stat"><SiteIcon name="fa-bookmark" variant="outline" hoverVariant="solid" /> {post.bookmark_count || 0}</span>
         </div>
         {authorAvatar}
       </div>
