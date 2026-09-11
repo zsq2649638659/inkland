@@ -199,8 +199,10 @@ export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, In
   "fa-droplet": { viewBox: "0 0 384 512", paths: [
     {"d":"M192 512C86 512 0 426 0 320 0 228.8 130.2 45.9 166.6-3.5 172.5-11.5 181.8-16 191.8-16l.4 0c10 0 19.3 4.5 25.2 12.5 36.4 49.4 166.6 232.3 166.6 323.5 0 106-86 192-192 192zM112 312c0-13.3-10.7-24-24-24s-24 10.7-24 24c0 75.1 60.9 136 136 136 13.3 0 24-10.7 24-24s-10.7-24-24-24c-48.6 0-88-39.4-88-88z","variant":"default","fill":"currentColor"},
   ], supportsVariants: false },
-  "fa-ellipsis-vertical": { viewBox: "0 0 128 512", paths: [
-    {"d":"M64 144a56 56 0 1 1 0-112 56 56 0 1 1 0 112zm0 224c30.9 0 56 25.1 56 56s-25.1 56-56 56-56-25.1-56-56 25.1-56 56-56zm56-112c0 30.9-25.1 56-56 56s-56-25.1-56-56 25.1-56 56-56 56 25.1 56 56z","variant":"default","fill":"currentColor"},
+  "fa-ellipsis-vertical": { viewBox: "0 0 15 15", paths: [
+    {"d":"M8.5 2.875C8.5 3.42728 8.05228 3.875 7.5 3.875C6.94772 3.875 6.5 3.42728 6.5 2.875C6.5 2.32272 6.94772 1.875 7.5 1.875C8.05228 1.875 8.5 2.32272 8.5 2.875Z","variant":"default","fill":"currentColor"},
+    {"d":"M8.5 12.875C8.5 13.4273 8.05228 13.875 7.5 13.875C6.94772 13.875 6.5 13.4273 6.5 12.875C6.5 12.3227 6.94772 11.875 7.5 11.875C8.05228 11.875 8.5 12.3227 8.5 12.875Z","variant":"default","fill":"currentColor"},
+    {"d":"M7.5 8.875C8.05228 8.875 8.5 8.42728 8.5 7.875C8.5 7.32272 8.05228 6.875 7.5 6.875C6.94772 6.875 6.5 7.32272 6.5 7.875C6.5 8.42728 6.94772 8.875 7.5 8.875Z","variant":"default","fill":"currentColor"},
   ], supportsVariants: false },
   "fa-ellipsis-circle": { viewBox: "0 0 18 18", paths: [
     { "d": "M9 1.5A7.5 7.5 0 1 0 9 16.5A7.5 7.5 0 1 0 9 1.5Z", "variant": "outline", "fill": "none", "stroke": "currentColor", "strokeWidth": "2" },

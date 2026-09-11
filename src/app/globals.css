@@ -69,6 +69,11 @@
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
   --max-width: 1280px;
+  /* Site shell: fixed desktop sidebar + content column. The outer width
+     includes the main container's horizontal padding. */
+  --main-content-width: 600px;
+  --main-layout-gap: 16px;
+  --main-layout-width: calc(var(--sidebar-width) + var(--main-content-width) + var(--main-layout-gap) + (var(--spacing-lg) * 2));
   --navbar-height: 64px;
   --sidebar-width: 260px;
   /* Fluid typography */
@@ -548,7 +553,7 @@ p {
   border-bottom: 1px solid var(--color-border, #E5E5E5);
 }
 .navbar-inner {
-  max-width: var(--max-width);
+  max-width: var(--main-layout-width);
   margin: 0 auto;
   height: 100%;
   display: flex;
@@ -912,12 +917,12 @@ p {
 /* ===== Main Layout ===== */
 .main-container {
   width: 100%;
-  max-width: var(--max-width);
+  max-width: var(--main-layout-width);
   box-sizing: border-box;
   margin: 0 auto;
   padding: var(--spacing-lg);
   display: flex;
-  gap: var(--spacing-xl);
+  gap: var(--main-layout-gap);
   min-height: calc(100vh - var(--navbar-height));
 }
 
@@ -1286,10 +1291,11 @@ p {
 
 /* ===== Content Area ===== */
 .content-area {
-  flex: 1;
+  flex: 0 0 var(--main-content-width);
+  width: var(--main-content-width);
   min-width: 0;
   padding-bottom: 120px;
-  max-width: 940px;
+  max-width: var(--main-content-width);
 }
 
 /* ===== Cards ===== */
@@ -1378,15 +1384,20 @@ p {
 .card-more-btn {
   width: 32px;
   height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--color-text-light, #999);
   font-size: 21px;
   line-height: 1;
-  letter-spacing: -2px;
+  letter-spacing: normal;
   cursor: pointer;
 }
+.card-more-btn svg { display: block; flex-shrink: 0; }
 .card-more-btn:hover, .card-more-btn[aria-expanded="true"] {
   color: var(--color-primary, #F26B5B);
   background: var(--color-primary-light, #FDDCD8);
@@ -6711,6 +6722,7 @@ p {
   .content-area {
     flex: 1;
     width: 100%;
+    max-width: none;
   }
   .navbar-center {
     max-width: 360px;
