@@ -289,18 +289,18 @@ export default function HomeSidebar() {
           </Link>
           <div className="sidebar-user-bio">{bio}</div>
           <div className="sidebar-user-stats">
-            <div className="sidebar-stat">
+            <Link href="/profile?tab=following" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
               <div className="sidebar-stat-value">{userStats.following ?? "—"}</div>
               <div className="sidebar-stat-label">关注</div>
-            </div>
-            <div className="sidebar-stat">
+            </Link>
+            <Link href="/profile?tab=followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
               <div className="sidebar-stat-value">{userStats.followers ?? "—"}</div>
               <div className="sidebar-stat-label">粉丝</div>
-            </div>
-            <div className="sidebar-stat">
+            </Link>
+            <Link href="/profile" className="sidebar-stat sidebar-stat-link" aria-label="查看我的作品">
               <div className="sidebar-stat-value">{userStats.works ?? "—"}</div>
               <div className="sidebar-stat-label">作品</div>
-            </div>
+            </Link>
           </div>
         </div>
       </div>

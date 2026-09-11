@@ -9,16 +9,18 @@ import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import PostTagCard from "@/components/PostTagCard";
-import SeriesCardGrid from "@/components/SeriesCardGrid";
+import ProfileCardCollection from "@/components/ProfileCardCollection";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import UserCard from "@/components/UserCard";
 import { SkeletonProfile, SkeletonWorksGrid, SkeletonUserCardList } from "@/components/Skeleton";
-import EmptyState from "@/components/EmptyState";
 import { slimContent } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 import { getOrCreateClientCache } from "@/lib/client-cache";
 
 type FilterType = "all" | "single" | "image" | "series";
 type TabType = "works" | "likes" | "bookmarks" | "following" | "followers";
+type StatusFilter = "all" | "published" | "draft" | "rejected";
+type SortMode = "latest" | "created" | "hot";
 
 interface SeriesInfo {
   id: string;
@@ -173,6 +175,12 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [tab, setTab] = useState<TabType>("works");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("latest");
+  const [profileSearch, setProfileSearch] = useState("");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileDraftFilter, setMobileDraftFilter] = useState<FilterType>("all");
+  const [mobileDraftStatus, setMobileDraftStatus] = useState<StatusFilter>("all");
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesInfo[]>([]);
@@ -597,6 +605,15 @@ export default function ProfilePage() {
       .map((item, index) => [item.id, index] as const),
   );
 
+  const activeProfileFilter = tab === "likes" ? likeFilter : tab === "bookmarks" ? bookmarkFilter : filter;
+  const activeProfilePosts = tab === "likes" ? likedPosts : tab === "bookmarks" ? bookmarkedPosts : displayPosts;
+  const activeProfileSeries = tab === "likes" ? likedSeriesList : tab === "bookmarks" ? bookmarkedSeriesList : seriesList;
+  const updateActiveFilter = (next: FilterType) => {
+    if (tab === "likes") setLikeFilter(next);
+    else if (tab === "bookmarks") setBookmarkFilter(next);
+    else setFilter(next);
+  };
+
   if (authLoading) {
     return <div className="min-h-screen bg-paper pb-20 lg:pb-0"><main className="max-w-4xl mx-auto px-4 py-8"><SkeletonProfile /></main></div>;
   }
@@ -633,6 +650,64 @@ export default function ProfilePage() {
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
+        <div className="profile-primary-content">
+          {showFilters ? (
+            <div className="segmented-tabs segmented-tabs--profile-primary">
+              <div className="segmented-tabs-left">
+                {(["works", "likes", "bookmarks"] as const).map((key) => (
+                  <button key={key} className={`segmented-tab${tab === key ? " active" : ""}`} onClick={() => setTab(key)}>
+                    <span className="my-prefix">我的</span>{key === "works" ? "作品" : key === "likes" ? "喜欢" : "收藏"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="segmented-tabs segmented-tabs--relations">
+              <div className="segmented-tabs-left">
+                <button className={`segmented-tab${tab === "following" ? " active" : ""}`} onClick={() => setTab("following")}><span className="my-prefix">我的</span>关注</button>
+                <button className={`segmented-tab${tab === "followers" ? " active" : ""}`} onClick={() => setTab("followers")}><span className="my-prefix">我的</span>粉丝</button>
+              </div>
+            </div>
+          )}
+
+          {showFilters && (
+            <>
+              <div className="filter-system-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+                <div className="filter-system-composition-row">
+                  <label className="filter-system-field filter-system-field--query">
+                    <span>搜索作品</span>
+                    <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                  </label>
+                  <ProfileFilterSelect label="作品类型" id="profile-filter-type-menu" value={activeProfileFilter} options={filterPills.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => updateActiveFilter(value as FilterType)} />
+                  <ProfileFilterSelect label="发布状态" id="profile-filter-status-menu" value={statusFilter} options={[{ value: "all", label: "全部" }, { value: "published", label: "已发布" }, { value: "draft", label: "草稿" }, { value: "rejected", label: "未过审" }]} onChange={(value) => setStatusFilter(value as StatusFilter)} />
+                  <ProfileFilterSelect label="排序" id="profile-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最近更新" }, { value: "created", label: "最近创建" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as SortMode)} />
+                </div>
+                <div className="filter-system-composition-footer">
+                  <p className="filter-system-composition-summary" role="status" aria-live="polite">当前条件：{filterPills.find((item) => item.key === activeProfileFilter)?.label || "全部"} · {statusFilter === "all" ? "状态不限" : statusFilter === "published" ? "已发布" : statusFilter === "draft" ? "草稿" : "未过审"} · {sortMode === "hot" ? "热度最高" : sortMode === "created" ? "最近创建" : "最近更新"}</p>
+                  <button className="filter-system-clear" type="button" onClick={() => { setProfileSearch(""); updateActiveFilter("all"); setStatusFilter("all"); setSortMode("latest"); }}>清除条件</button>
+                </div>
+              </div>
+              <div className="profile-mobile-filter-bar">
+                <button type="button" className="profile-mobile-filter-button" onClick={() => { setMobileDraftFilter(activeProfileFilter); setMobileDraftStatus(statusFilter); setMobileFilterOpen(true); }}>筛选</button>
+                <button type="button" className="profile-mobile-filter-button" onClick={() => setSortMode((current) => current === "latest" ? "hot" : "latest")} aria-pressed={sortMode === "hot"}>{sortMode === "latest" ? "最新" : "最热"}</button>
+              </div>
+              {mobileFilterOpen && (
+                <div className="profile-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
+                  <section className="profile-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选作品" onClick={(event) => event.stopPropagation()}>
+                    <h2>筛选作品</h2>
+                    <div className="profile-filter-drawer-section"><strong>作品类型</strong><div>{filterPills.map((item) => <button key={item.key} type="button" className={`profile-filter-control${mobileDraftFilter === item.key ? " is-active" : ""}`} onClick={() => setMobileDraftFilter(item.key)}>{item.label}</button>)}</div></div>
+                    <div className="profile-filter-drawer-section"><strong>发布状态</strong><div>{([['all', '全部'], ['published', '已发布'], ['draft', '草稿'], ['rejected', '未过审']] as const).map(([key, label]) => <button key={key} type="button" className={`profile-filter-control${mobileDraftStatus === key ? " is-active" : ""}`} onClick={() => setMobileDraftStatus(key)}>{label}</button>)}</div></div>
+                    <div className="profile-filter-drawer-actions"><button type="button" onClick={() => { setMobileDraftFilter("all"); setMobileDraftStatus("all"); }}>重置</button><button type="button" className="is-primary" onClick={() => { updateActiveFilter(mobileDraftFilter); setStatusFilter(mobileDraftStatus); setMobileFilterOpen(false); }}>应用筛选</button></div>
+                  </section>
+                </div>
+              )}
+              {(activeProfilePosts.length > 0 || activeProfileSeries.length > 0) ? (
+                <ProfileCardCollection posts={activeProfilePosts} series={activeProfileSeries} filter={activeProfileFilter} query={profileSearch} status={statusFilter} sort={sortMode} limit={shownProfileItems} />
+              ) : !loading ? <div className="empty-state"><h2 className="empty-title">这里还没有作品</h2><p className="empty-desc">发布或收藏作品后，会显示在这里。</p></div> : null}
+            </>
+          )}
+        </div>
+        <div className="profile-legacy-render">
         {/* Segmented Tabs */}
         <div className="segmented-tabs">
           <div className="segmented-tabs-left">
@@ -1090,6 +1165,8 @@ export default function ProfilePage() {
               </div>
             );
           })()}
+        </div>
+
         </div>
 
         {/* Tab: Following */}
