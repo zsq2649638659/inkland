@@ -471,14 +471,14 @@ onReport,
                         className={`comment-action-btn${c.liked_by_me ? " liked" : ""}`}
                         onClick={() => toggleLike(c.id)}
                       >
-                        <SiteIcon name="fa-heart" variant={c.liked_by_me ? "solid" : "outline"} />
+                        <SiteIcon name="fa-heart" variant={c.liked_by_me ? "solid" : "outline"} hoverVariant={c.liked_by_me ? undefined : "solid"} />
                         <span>{c.like_count || 0}</span>
                       </button>
                       <button
                         className="comment-action-btn"
                         onClick={() => { setReplyTo(c); setReplyText(""); }}
                       >
-                        <SiteIcon name="fa-comment" variant="outline" />
+                        <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
                         <span>回复</span>
                       </button>
                       {user && c.user_id === user.id && (
@@ -503,7 +503,7 @@ onReport,
                             className="comment-popup-item"
                             onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(c.id, c.user_id); }}
                           >
-                            <SiteIcon name="fa-flag" variant="solid" /> 举报
+                        <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报
                           </button>
                           <button
                             className="comment-popup-item"
@@ -578,14 +578,14 @@ onReport,
                                         className={`comment-action-btn${reply.liked_by_me ? " liked" : ""}`}
                                         onClick={() => toggleLike(reply.id)}
                                       >
-                                        <SiteIcon name="fa-heart" variant={reply.liked_by_me ? "solid" : "outline"} />
+                                        <SiteIcon name="fa-heart" variant={reply.liked_by_me ? "solid" : "outline"} hoverVariant={reply.liked_by_me ? undefined : "solid"} />
                                         <span>{reply.like_count || 0}</span>
                                       </button>
                                       <button
                                         className="comment-action-btn"
                                         onClick={() => { setReplyTo(c); setReplyText(""); }}
                                       >
-                                        <SiteIcon name="fa-comment" variant="outline" />
+                                        <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
                                         <span>回复</span>
                                       </button>
                                       {user && reply.user_id === user.id && (
@@ -610,7 +610,7 @@ onReport,
                                             className="comment-popup-item"
                                             onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(reply.id, reply.user_id); }}
                                           >
-                                            <SiteIcon name="fa-flag" variant="solid" /> 举报
+                                            <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报
                                           </button>
                                           <button
                                             className="comment-popup-item"

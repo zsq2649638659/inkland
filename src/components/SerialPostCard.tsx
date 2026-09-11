@@ -303,7 +303,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             {cardMenuOpen && (
               <div className="card-more-menu">
                 {user?.id !== data.authorId && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
-                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><SiteIcon name="fa-flag" variant="solid" /> 举报</button>
+                <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button>
               </div>
             )}
           </div>
@@ -359,7 +359,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       <div className="card-actions">
         <LikeButton postId={data.chapterId} initialCount={data.likeCount} onLogin={goToLogin} initialActive={data.likedByMe} />
         <button className="card-action" onClick={handleCommentClick}>
-          <SiteIcon name="fa-comment" variant="outline" />
+          <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
           <span>{commentCount}</span>
         </button>
         <BookmarkButton postId={data.chapterId} initialCount={data.bookmarkCount} onLogin={goToLogin} initialActive={data.bookmarkedByMe} />

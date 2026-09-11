@@ -87,14 +87,14 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
     if (plain) {
       return (
         <button className={`stat-item ${className || ""}`} title="点赞" onClick={toggle} disabled={loading || authLoading}>
-          <SiteIcon name="fa-heart" variant={liked ? "solid" : "outline"} style={liked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
+          <SiteIcon name="fa-heart" variant={liked ? "solid" : "outline"} hoverVariant={liked ? undefined : "solid"} style={liked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
           <span>{count}</span>
         </button>
       );
     }
     return (
       <button className="rs-btn flex items-center gap-1" title="点赞" onClick={toggle} disabled={loading || authLoading}>
-        <SiteIcon name="fa-heart" variant={liked ? "solid" : "outline"} style={liked ? { color: "#e74c3c" } : undefined} />
+        <SiteIcon name="fa-heart" variant={liked ? "solid" : "outline"} hoverVariant={liked ? undefined : "solid"} style={liked ? { color: "#e74c3c" } : undefined} />
         <span className="text-xs text-muted">{count}</span>
       </button>
     );
@@ -106,7 +106,7 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
       onClick={toggle}
       disabled={loading || authLoading}
     >
-      <SiteIcon name="fa-heart" variant={liked ? "solid" : "outline"} />
+      <SiteIcon name="fa-heart" variant={liked ? "solid" : "outline"} hoverVariant={liked ? undefined : "solid"} />
       <span>{count}</span>
     </button>
   );

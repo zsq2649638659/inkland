@@ -110,7 +110,7 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
             <SiteIcon name="fa-ban" variant="solid" />屏蔽
           </button>
           <button className="user-action-popup-item" onClick={handleReport}>
-            <SiteIcon name="fa-flag" variant="solid" />举报
+            <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />举报
           </button>
         </div>
       </div>

@@ -87,14 +87,14 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
     if (plain) {
       return (
         <button className={`stat-item ${className || ""}`} title="收藏" onClick={toggle} disabled={loading || authLoading}>
-          <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} style={bookmarked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
+          <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} hoverVariant={bookmarked ? undefined : "solid"} style={bookmarked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
           <span>{count}</span>
         </button>
       );
     }
     return (
       <button className="rs-btn" title="收藏" onClick={toggle} disabled={loading || authLoading}>
-        <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} style={bookmarked ? { color: "#F26B5B" } : undefined} />
+        <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} hoverVariant={bookmarked ? undefined : "solid"} style={bookmarked ? { color: "#F26B5B" } : undefined} />
       </button>
     );
   }
@@ -105,7 +105,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
       onClick={toggle}
       disabled={loading || authLoading}
     >
-      <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} />
+      <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} hoverVariant={bookmarked ? undefined : "solid"} />
       <span>{count}</span>
     </button>
   );
