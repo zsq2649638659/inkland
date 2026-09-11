@@ -358,7 +358,7 @@ export default function PostCard({ post }: PostCardProps) {
               {post.author?.username || post.author?.nickname || "匿名用户"}
             </strong>
           </Link>
-          <Link href={`/read/${post.id}`} className="site-card__author-meta no-underline">
+          <Link href={`/read/${post.id}`} className="site-card__author-meta no-underline" aria-label="打开作品详情" onClick={(event) => event.stopPropagation()}>
             {post.time_ago || post.created_at ? formatHomeFeedTimestamp(post.created_at || "") : "刚刚"}
           </Link>
         </div>
@@ -382,21 +382,21 @@ export default function PostCard({ post }: PostCardProps) {
 
         </div>
 
-      {/* V2: card-title */}
-      {!isPlaceholderTitle(post.title) && (
-        <Link
-          href={`/read/${post.id}`}
-          className="site-card__title-link"
-        >
-          <h3 className="site-card__title">{post.title}</h3>
+      {/* V2: card-content — 单篇作品的标题和正文共用一个详情入口 */}
+      {!isImageCard ? (
+        <Link href={`/read/${post.id}`} className="site-card__content-link">
+          {!isPlaceholderTitle(post.title) && <h3 className="site-card__title">{post.title}</h3>}
+          {plainExcerpt && <p className="site-card__excerpt">{plainExcerpt}</p>}
         </Link>
-      )}
-
-      {/* V2: card-excerpt — 纯文本摘要 */}
-      {plainExcerpt && (
-        <p className="site-card__excerpt">
-          {plainExcerpt}
-        </p>
+      ) : (
+        <>
+          {!isPlaceholderTitle(post.title) && (
+            <Link href={`/read/${post.id}`} className="site-card__title-link">
+              <h3 className="site-card__title">{post.title}</h3>
+            </Link>
+          )}
+          {plainExcerpt && <p className="site-card__excerpt">{plainExcerpt}</p>}
+        </>
       )}
 
       {/* 图片展示：PC端横向滚动 + 渐变遮罩，移动端单图 + 圆点 */}
