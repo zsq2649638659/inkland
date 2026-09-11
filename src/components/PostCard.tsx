@@ -26,7 +26,7 @@ interface PostCardProps {
 // 剥离 Markdown 语法，提取纯文本
 function stripMarkdown(content?: string): string {
   if (!content) return "";
-  let text = content
+  const text = content
     .replace(/!\[.*?\]\(.*?\)/g, "")           // 移除图片
     .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")     // 链接保留文字
     .replace(/[*_~`#>|-]/g, "")                // 移除格式符号
@@ -217,6 +217,7 @@ export default function PostCard({ post }: PostCardProps) {
     if (galleryImages.length > 0) imgs.push(...galleryImages);
     return imgs;
   }, [hasCover, resolvedCover, galleryImages]);
+  const isImageCard = allImages.length > 0 || ["illustration", "comic", "cosplay"].includes(post.post_type || "");
 
   const handleImageScroll = useCallback(() => {
     if (!imageScrollRef.current) return;
@@ -335,13 +336,13 @@ export default function PostCard({ post }: PostCardProps) {
   const navigateCard = (event: MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("a, button, input, textarea, select")) return;
-    if (!target.closest(".card-title, .card-excerpt")) return;
+    if (!target.closest(".site-card__title, .site-card__excerpt")) return;
     router.push(`/read/${post.id}`);
   };
 
   return (
     <article
-      className="card"
+      className={`site-card site-card--feed ${isImageCard ? "site-card--feed-image" : "site-card--feed-single"}`}
       onClick={navigateCard}
       onKeyDown={(event) => {
         if (event.key === "Enter" && event.target === event.currentTarget) router.push(`/read/${post.id}`);
@@ -350,9 +351,9 @@ export default function PostCard({ post }: PostCardProps) {
       tabIndex={0}
     >
       {/* V2: card-header — avatar + author info + follow button */}
-      <div className="card-header">
-        <Link href={`/user/${post.user_id}`} className="flex-shrink-0">
-          <div className="card-avatar">
+      <div className="site-card__header">
+        <Link href={`/user/${post.user_id}`} className="site-card__avatar-link">
+          <div className="site-card__avatar">
             {post.author?.avatar_url ? (
               <img src={post.author.avatar_url} alt="" />
             ) : (
@@ -361,25 +362,25 @@ export default function PostCard({ post }: PostCardProps) {
           </div>
         </Link>
 
-        <div className="card-author-info">
+        <div className="site-card__author">
           <Link href={`/user/${post.user_id}`} className="no-underline">
-            <div className="card-author-name">
+            <strong>
               {post.author?.username || post.author?.nickname || "匿名用户"}
-            </div>
+            </strong>
           </Link>
-          <Link href={`/read/${post.id}`} className="card-time no-underline">
+          <Link href={`/read/${post.id}`} className="site-card__author-meta no-underline">
             {post.time_ago || post.created_at ? getTimeAgo(post.created_at || "") : "刚刚"}
           </Link>
         </div>
 
-        <div className="card-header-actions">
+        <div className="site-card__header-actions">
           {user?.id !== post.user_id && (
-            <button className="card-follow-btn" onClick={toggleFollow} disabled={authLoading || followLoading}>
+            <button className={`site-card__follow${following ? " site-card__follow--followed" : ""}`} onClick={toggleFollow} disabled={authLoading || followLoading}>
               {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
             </button>
           )}
           <div className="card-more-wrap" ref={cardMenuRef}>
-            <button className="card-more-btn" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
+            <button className="site-card__more" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
             {cardMenuOpen && (
               <div className="card-more-menu">
                 {user?.id !== post.user_id && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
@@ -395,30 +396,30 @@ export default function PostCard({ post }: PostCardProps) {
       {!isPlaceholderTitle(post.title) && (
         <Link
           href={`/read/${post.id}`}
-          className="card-title no-underline hover:text-accent"
+          className="site-card__title-link"
         >
-          {post.title}
+          <h3 className="site-card__title">{post.title}</h3>
         </Link>
       )}
 
       {/* V2: card-excerpt — 纯文本摘要 */}
       {plainExcerpt && (
-        <p className="card-excerpt">
+        <p className="site-card__excerpt">
           {plainExcerpt}
         </p>
       )}
 
       {/* 图片展示：PC端横向滚动 + 渐变遮罩，移动端单图 + 圆点 */}
       {allImages.length > 0 && (
-        <div className="card-image-strip">
+        <div className="site-card__feed-images-shell">
           <div
-            className={`card-image-scroll ${allImages.length > 1 ? "has-overflow" : ""}`}
+            className="site-card__feed-images"
             ref={imageScrollRef}
             onScroll={handleImageScroll}
             style={{ "--active-image-ratio": imageAspectRatios[activeImageDot] || 4 / 3 } as CSSProperties}
           >
             {allImages.map((img, i) => (
-              <button key={i} type="button" className="card-image-item card-image-item-button" onClick={() => { setActiveImageDot(i); setLightboxOpen(true); }} aria-label={`查看第${i + 1}张图片`}>
+              <button key={i} type="button" className="site-card__feed-image" onClick={() => { setActiveImageDot(i); setLightboxOpen(true); }} aria-label={`查看第${i + 1}张图片`}>
                 <img
                   src={getThumbnailUrl(img, { width: 400, height: 300, resize: "cover" })}
                   alt=""
@@ -438,10 +439,17 @@ export default function PostCard({ post }: PostCardProps) {
               </button>
             ))}
           </div>
+          <span
+            className={`site-card__feed-image-count${allImages.length >= 3 ? " site-card__feed-image-count--pc" : ""}${allImages.length > 1 ? " site-card__feed-image-count--mobile" : ""}`}
+            aria-hidden="true"
+          >
+            <SiteIcon name="fa-image" variant="default" />
+            <span>{allImages.length}</span>
+          </span>
           {allImages.length > 1 && (
-            <div className="card-image-dots">
+            <div className="site-card__feed-image-indicator" role="img" aria-label={`共 ${allImages.length} 张图片，当前第 ${activeImageDot + 1} 张`}>
               {allImages.map((_, i) => (
-                <span key={i} className={i === activeImageDot ? "active" : ""} />
+                <span key={i} className={i === activeImageDot ? "is-active" : ""} />
               ))}
             </div>
           )}
@@ -452,11 +460,11 @@ export default function PostCard({ post }: PostCardProps) {
 
       {/* V2: 标签 */}
       {post.tags && post.tags.length > 0 && (
-        <div className="card-tags">
+        <div className="site-card__tags">
           {post.tags.map((tag) => {
             const tagName = typeof tag === "string" ? tag : tag.name;
             return (
-              <Link key={tagName} href={`/tag/${tagName}`} className="card-tag no-underline">
+              <Link key={tagName} href={`/tag/${tagName}`} className="tag tag--site site-card__tag">
                 {tagName}
               </Link>
             );
@@ -465,16 +473,16 @@ export default function PostCard({ post }: PostCardProps) {
       )}
 
       {/* V2: card-actions — 互动按钮 */}
-      <div className="card-actions">
-        <LikeButton postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} initialActive={post.liked_by_me} />
-        <button className="card-action" onClick={handleCommentClick}>
+      <div className="site-card__actions">
+        <LikeButton className="site-card__action" postId={post.id} initialCount={post.like_count || 0} onLogin={goToLogin} initialActive={post.liked_by_me} />
+        <button className="site-card__action" onClick={handleCommentClick}>
           <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
           <span>{commentCount}</span>
         </button>
-        <BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} initialActive={post.bookmarked_by_me} />
+        <BookmarkButton className="site-card__action" postId={post.id} initialCount={post.bookmark_count || 0} onLogin={goToLogin} initialActive={post.bookmarked_by_me} />
         <div className="relative">
-          <button className="card-action" onClick={handleShare}>
-            <SiteIcon name="fa-arrow-up-from-bracket" variant="solid" />
+          <button className="site-card__action site-card__share" onClick={handleShare}>
+            <SiteIcon name="fa-share-from-square" variant="outline" hoverVariant="solid" />
             <span>分享</span>
           </button>
           {shareTip && (

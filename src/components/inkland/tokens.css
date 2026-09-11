@@ -1,0 +1,747 @@
+/*
+ * Inkland Design Tokens
+ *
+ * 这是组件库和 React POC 共用的基础令牌入口。
+ * 令牌按“原始色阶 → 语义角色 → 组件兼容别名”组织：
+ * - 原始色阶用于主题扩展和设计审查；
+ * - 语义角色是组件真正应该消费的接口；
+ * - 兼容别名保证已有静态示例和 React POC 可以渐进迁移。
+ *
+ * TDesign 只提供变量的系统性参考，Inkland 继续使用已确认的珊瑚色、
+ * 暖中性色、8px 间距节奏和自己的圆角/排版基线。
+ */
+
+:root,
+:root[data-theme="light"],
+[data-theme="light"] {
+  color-scheme: light;
+
+  --ink-palette-name: "Inkland Pink · Coral Canvas";
+  /* Apple Blue · Frosted Interface remains available as a preserved alternate palette. */
+  --color-apple-blue: #0071e3;
+  --color-link-blue: #0066cc;
+  --color-signal-blue: #2997ff;
+  --color-carbon: #1d1d1f;
+  --color-frost: #f5f5f7;
+  --color-ice: #f4f8fb;
+  --color-smoke: #333333;
+  --color-graphite: #474747;
+  --color-ash: #707070;
+  --color-mist: #858585;
+  --color-onyx: #000000;
+  --color-pebble: #e2e2e5;
+
+  /* Brand scale: Inkland coral, primary remains the confirmed #F26B5B. */
+  --ink-brand-color-1: #fff4f1;
+  --ink-brand-color-2: #ffe6e1;
+  --ink-brand-color-3: #ffd0c9;
+  --ink-brand-color-4: #ffb0a6;
+  --ink-brand-color-5: #f98a7b;
+  --ink-brand-color-6: #f26b5b;
+  --ink-brand-color-7: #e85a4a;
+  --ink-brand-color-8: #c9473d;
+  --ink-brand-color-9: #9f352f;
+  --ink-brand-color-10: #6c231f;
+
+  /* Status scales. Components consume semantic status roles below. */
+  --ink-warning-color-1: #fff8e5;
+  --ink-warning-color-2: #ffedb8;
+  --ink-warning-color-3: #ffdb7a;
+  --ink-warning-color-4: #f6bd45;
+  --ink-warning-color-5: #d49000;
+  --ink-warning-color-6: #b36f00;
+  --ink-warning-color-7: #8d5300;
+  --ink-warning-color-8: #683b00;
+  --ink-warning-color-9: #482700;
+  --ink-warning-color-10: #2d1800;
+
+  --ink-danger-color-1: #fff1ef;
+  --ink-danger-color-2: #ffdeda;
+  --ink-danger-color-3: #ffbcb5;
+  --ink-danger-color-4: #f88e84;
+  --ink-danger-color-5: #df6258;
+  --ink-danger-color-6: #cd0000;
+  --ink-danger-color-7: #aa0000;
+  --ink-danger-color-8: #850000;
+  --ink-danger-color-9: #620000;
+  --ink-danger-color-10: #400000;
+
+  --ink-success-color-1: #edf9f1;
+  --ink-success-color-2: #d7f1df;
+  --ink-success-color-3: #b3e2c2;
+  --ink-success-color-4: #83c89b;
+  --ink-success-color-5: #4fa775;
+  --ink-success-color-6: #31795a;
+  --ink-success-color-7: #256044;
+  --ink-success-color-8: #19472f;
+  --ink-success-color-9: #103321;
+  --ink-success-color-10: #092116;
+
+  --ink-info-color-1: #eef6fa;
+  --ink-info-color-2: #d9eaf1;
+  --ink-info-color-3: #b4d4e1;
+  --ink-info-color-4: #8bb9cc;
+  --ink-info-color-5: #638fa7;
+  --ink-info-color-6: #496b82;
+  --ink-info-color-7: #38566a;
+  --ink-info-color-8: #2a4152;
+  --ink-info-color-9: #1d2f3c;
+  --ink-info-color-10: #13212a;
+
+  /* Warm neutral scale. */
+  --ink-gray-color-1: #faf9f7;
+  --ink-gray-color-2: #f5f2ef;
+  --ink-gray-color-3: #ede9e5;
+  --ink-gray-color-4: #e5e0db;
+  --ink-gray-color-5: #d4cec8;
+  --ink-gray-color-6: #b4aaa3;
+  --ink-gray-color-7: #99908a;
+  --ink-gray-color-8: #7b716b;
+  --ink-gray-color-9: #6b625d;
+  --ink-gray-color-10: #514944;
+  --ink-gray-color-11: #3f3733;
+  --ink-gray-color-12: #2f2926;
+  --ink-gray-color-13: #241f1d;
+  --ink-gray-color-14: #1a1716;
+
+  --ink-white-1: rgba(255, 255, 255, 1);
+  --ink-white-2: rgba(255, 255, 255, .72);
+  --ink-white-3: rgba(255, 255, 255, .48);
+  --ink-white-4: rgba(255, 255, 255, .28);
+  --ink-black-1: rgba(0, 0, 0, .9);
+  --ink-black-2: rgba(0, 0, 0, .6);
+  --ink-black-3: rgba(0, 0, 0, .4);
+  --ink-black-4: rgba(0, 0, 0, .26);
+
+  /* Semantic color roles. */
+  --ink-color-brand: var(--ink-brand-color-6);
+  --ink-color-brand-hover: var(--ink-brand-color-7);
+  --ink-color-brand-active: var(--ink-brand-color-8);
+  --ink-color-brand-focus: var(--ink-brand-color-2);
+  --ink-color-brand-disabled: var(--ink-brand-color-3);
+  --ink-color-brand-light: #fbe4df;
+  --ink-color-brand-light-active: var(--ink-brand-color-2);
+  --ink-color-warning: var(--ink-warning-color-5);
+  --ink-color-warning-hover: var(--ink-warning-color-6);
+  --ink-color-warning-active: var(--ink-warning-color-7);
+  --ink-color-warning-focus: var(--ink-warning-color-2);
+  --ink-color-warning-disabled: var(--ink-warning-color-3);
+  --ink-color-warning-light: #fff3d6;
+  --ink-color-danger: var(--ink-danger-color-6);
+  --ink-color-danger-hover: var(--ink-danger-color-7);
+  --ink-color-danger-active: var(--ink-danger-color-7);
+  --ink-color-danger-focus: var(--ink-danger-color-2);
+  --ink-color-danger-disabled: var(--ink-danger-color-3);
+  --ink-color-danger-light: var(--ink-danger-color-3);
+  --ink-color-success: var(--ink-success-color-6);
+  --ink-color-success-hover: var(--ink-success-color-7);
+  --ink-color-success-active: var(--ink-success-color-7);
+  --ink-color-success-focus: var(--ink-success-color-2);
+  --ink-color-success-disabled: var(--ink-success-color-3);
+  --ink-color-success-light: #e5f6ee;
+  --ink-color-success-muted: color-mix(in srgb, var(--ink-color-success) 12%, var(--ink-color-transparent));
+  --ink-color-info: var(--ink-info-color-6);
+  /* Neutral role for low-emphasis navigation text and quiet boundary rules. */
+  --ink-color-navigation-muted: var(--ink-gray-color-8);
+  --ink-color-mask-active: rgba(29, 23, 21, .46);
+  --ink-color-mask-disabled: rgba(255, 255, 255, .6);
+  --ink-color-mask-background: rgba(255, 255, 255, .96);
+  --ink-color-mask-gradient: rgba(255, 255, 255, 0);
+
+  --ink-color-bg-page: #faf9f7;
+  --ink-color-bg-surface: #ffffff;
+  --ink-color-bg-surface-subtle: #f5f2ef;
+  --ink-color-bg-surface-active: #ede9e5;
+  --ink-color-bg-component: #ede9e5;
+  --ink-color-bg-component-active: #d4cec8;
+  --ink-color-bg-component-disabled: #f5f2ef;
+  --ink-color-bg-elevated: #ffffff;
+  --ink-color-text-primary: #1a1a1a;
+  --ink-color-text-secondary: #6b6b6b;
+  --ink-color-text-tertiary: #999999;
+  --ink-color-text-disabled: #b4aaa3;
+  --ink-color-text-anti: #ffffff;
+  --ink-color-text-brand: var(--ink-color-brand);
+  --ink-color-text-link: var(--ink-color-brand);
+  --ink-color-text-watermark: rgba(0, 0, 0, .1);
+  --ink-color-border-subtle: #ede9e5;
+  --ink-color-border: #e5e5e5;
+  --ink-color-border-strong: #d4cec8;
+  --ink-color-component-stroke: #e5e5e5;
+  --ink-color-component-border: #d4cec8;
+
+  /* Typography scale and semantic aliases. */
+  --ink-font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --ink-font-family-reading: var(--ink-font-family);
+  --ink-font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ink-font-size-xxs: 10px;
+  --ink-font-size-xs: 11px;
+  --ink-font-size-sm: 12px;
+  --ink-font-size-md: 14px;
+  --ink-font-size-xl: 18px;
+  --ink-font-size-2xl: 20px;
+  --ink-font-size-3xl: 24px;
+  --ink-font-size-5xl: 32px;
+  --ink-font-size-display-md: 48px;
+  --ink-font-size-display-lg: 64px;
+  --ink-font-size-link-sm: 12px;
+  --ink-font-size-link-md: 14px;
+  --ink-font-size-link-lg: 16px;
+  --ink-font-size-mark-xs: 10px;
+  --ink-font-size-mark-sm: 12px;
+  --ink-font-size-mark-lg: 16px;
+  --ink-font-size-body-xs: 10px;
+  --ink-font-size-body-sm: 12px;
+  --ink-font-size-body-md: 14px;
+  --ink-font-size-body-lg: 16px;
+  --ink-font-size-title-sm: 14px;
+  --ink-font-size-title-md: 16px;
+  --ink-font-size-title-lg: 18px;
+  --ink-font-size-title-xl: 20px;
+  --ink-font-size-headline-sm: 24px;
+  --ink-font-size-headline-md: 28px;
+  --ink-font-size-headline-lg: 36px;
+  --ink-line-height-link-sm: 20px;
+  --ink-line-height-link-md: 22px;
+  --ink-line-height-link-lg: 24px;
+  --ink-line-height-mark-xs: 16px;
+  --ink-line-height-mark-sm: 20px;
+  --ink-line-height-mark-lg: 24px;
+  --ink-line-height-body-xs: 16px;
+  --ink-line-height-body-sm: 20px;
+  --ink-line-height-body-md: 22px;
+  --ink-line-height-body-lg: 24px;
+  --ink-line-height-title-sm: 22px;
+  --ink-line-height-title-md: 24px;
+  --ink-line-height-title-lg: 26px;
+  --ink-line-height-title-xl: 28px;
+  --ink-line-height-headline-sm: 32px;
+  --ink-line-height-headline-md: 36px;
+  --ink-line-height-headline-lg: 44px;
+  --ink-line-height-display-md: 56px;
+  --ink-line-height-display-lg: 72px;
+  --ink-font-weight-regular: 400;
+  --ink-font-weight-medium: 500;
+  --ink-font-weight-semibold: 600;
+  --ink-font-weight-bold: 700;
+  --ink-font-size-control-label: var(--ink-font-size-sm);
+  --ink-font-size-control: var(--ink-font-size-md);
+  --ink-font-weight-control-label: var(--ink-font-weight-semibold);
+  --ink-font-weight-button: var(--ink-font-weight-semibold);
+  --ink-font-body-sm: 400 var(--ink-font-size-body-sm) / var(--ink-line-height-body-sm) var(--ink-font-family);
+  --ink-font-body-md: 400 var(--ink-font-size-body-md) / var(--ink-line-height-body-md) var(--ink-font-family);
+  --ink-font-mark-sm: 600 var(--ink-font-size-mark-sm) / var(--ink-line-height-mark-sm) var(--ink-font-family);
+  --ink-font-mark-md: var(--ink-font-site-tag);
+  --ink-font-title-sm: 500 var(--ink-font-size-title-sm) / var(--ink-line-height-title-sm) var(--ink-font-family);
+  --ink-font-title-xl: 500 var(--ink-font-size-title-xl) / var(--ink-line-height-title-xl) var(--ink-font-family);
+  --ink-font-control-label: 600 12px / 16px var(--ink-font-family);
+  --ink-font-control: 400 14px / 22px var(--ink-font-family);
+  --ink-font-input-helper: 400 11px / 17px var(--ink-font-family);
+  --ink-font-input-counter: 400 10px / 14px var(--ink-font-family);
+  --ink-font-input-prefix: 600 11px / 11px var(--ink-font-family);
+  --ink-font-button: 600 14px / 22px var(--ink-font-family);
+  --ink-font-button-secondary: 500 14px / 22px var(--ink-font-family);
+  --ink-font-card-title: 500 18px / 26px var(--ink-font-family);
+  --ink-font-card-title-mobile: 500 15px / 22px var(--ink-font-family);
+  --ink-font-card-title-mobile-square: 500 var(--ink-font-size-sm) / 16px var(--ink-font-family);
+  --ink-font-card-author: 600 14px / 20px var(--ink-font-family);
+  --ink-font-card-excerpt: 400 14px / 24px var(--ink-font-family);
+  --ink-font-card-body-mobile: 400 13px / 22px var(--ink-font-family);
+  --ink-font-card-body-mobile-square: 400 var(--ink-font-size-xxs) / 14px var(--ink-font-family);
+  --ink-font-card-meta: 400 12px / 18px var(--ink-font-family);
+  --ink-font-card-follow: 500 12px / 20px var(--ink-font-family);
+  /* All four tag-facing names share one compact 12px / 20px / 500 baseline. */
+  --ink-font-site-tag: 500 var(--ink-font-size-sm) / var(--ink-line-height-mark-sm) var(--ink-font-family);
+  --ink-font-type-tag: var(--ink-font-site-tag);
+  --ink-font-series-tag: var(--ink-font-site-tag);
+  --ink-font-tag-label: var(--ink-font-mark-sm);
+  --ink-font-tag-note: 400 var(--ink-font-size-xs) / var(--ink-line-height-tag-note) var(--ink-font-family);
+  --ink-font-tag-note-strong: 700 var(--ink-font-size-xs) / var(--ink-line-height-tag-note) var(--ink-font-family);
+  --ink-font-tag-meta: 500 var(--ink-font-size-xxs) / var(--ink-line-height-tag-meta) var(--ink-font-family);
+  --ink-font-tag-helper: 400 var(--ink-font-size-xxs) / var(--ink-line-height-tag-helper) var(--ink-font-family);
+  --ink-font-tag-validation: 400 var(--ink-font-size-xs) / var(--ink-line-height-tag-validation) var(--ink-font-family);
+  --ink-font-card-tag: 400 var(--ink-font-size-tag-card) / var(--ink-line-height-tag-card) var(--ink-font-family);
+  --ink-font-card-status: 700 var(--ink-font-size-tag-card) / var(--ink-line-height-tag-card) var(--ink-font-family);
+  --ink-font-tag-remove: 400 var(--ink-font-size-md) / var(--ink-line-height-tag-remove) var(--ink-font-family);
+  --ink-font-tag-input: 400 13px / 22px var(--ink-font-family);
+  --ink-font-tag-input-message: 400 var(--ink-font-size-xs) / 17px var(--ink-font-family);
+  /* Typography specimens use semantic roles so the documentation demonstrates
+     how tokens are applied instead of repeating hard-coded size notes. */
+  --ink-font-typography-body: 400 16px / 28px var(--ink-font-family);
+  --ink-font-typography-body-mobile: 400 14px / 24px var(--ink-font-family);
+  --ink-font-typography-heading: 600 28px / 35px var(--ink-font-family);
+  --ink-font-typography-body-copy: 400 15px / 26px var(--ink-font-family);
+  --ink-font-typography-theme: 500 15px / 24px var(--ink-font-family);
+  --ink-font-typography-theme-mobile: 500 14px / 24px var(--ink-font-family);
+  --ink-font-typography-copy: 400 15px / 24px var(--ink-font-family);
+  --ink-typography-mark-padding-inline: var(--ink-size-2);
+  --ink-font-size-tag-card: 9px;
+  --ink-line-height-tag-note: 16px;
+  --ink-line-height-tag-meta: 14px;
+  --ink-line-height-tag-helper: 15px;
+  --ink-line-height-tag-validation: 16px;
+  --ink-line-height-tag-card: 14px;
+  --ink-line-height-tag-remove: 14px;
+
+  /* Spacing, radius, sizing, motion and layer contracts. */
+  --ink-space-0: 0;
+  --ink-space-1: 4px;
+  --ink-space-2: 8px;
+  --ink-space-3: 12px;
+  --ink-space-4: 16px;
+  --ink-space-5: 24px;
+  --ink-space-6: 32px;
+  --ink-space-7: 48px;
+  --ink-space-8: 64px;
+  --ink-space-9: 80px;
+
+  /* Curated geometry primitives: Apple-style restraint with Inkland component semantics.
+   Numeric aliases are limited to values that are shared by confirmed primitives.
+   One-off specimen dimensions stay local to the documentation page. */
+  --ink-size-0: 0px;
+  --ink-size-1: 1px;
+  --ink-size-2: 2px;
+  --ink-size-3: 3px;
+  --ink-size-4: 4px;
+  --ink-size-5: 5px;
+  --ink-size-6: 6px;
+  --ink-size-8: 8px;
+  --ink-size-10: 10px;
+  --ink-size-12: 12px;
+  --ink-size-14: 14px;
+  --ink-size-15: 15px;
+
+  /* Gaps use semantic names; --ink-gap-4 is retained for the confirmed type/series tag contract. */
+  --ink-gap-0: var(--ink-space-0);
+  --ink-gap-4: var(--ink-space-1);
+  --ink-gap-none: var(--ink-space-0);
+  --ink-gap-hairline: var(--ink-size-1);
+  --ink-gap-2xs: var(--ink-size-2);
+  --ink-gap-tight: var(--ink-size-3);
+  --ink-gap-xs: var(--ink-space-1);
+  --ink-gap-compact-xs: var(--ink-size-5);
+  --ink-gap-compact: var(--ink-size-6);
+  --ink-gap-control: 7px;
+  --ink-gap-inline: var(--ink-space-2);
+  --ink-gap-label: 9px;
+  --ink-gap-sm: 10px;
+  --ink-gap-md: var(--ink-space-3);
+  --ink-gap-lg: 14px;
+  --ink-gap-panel: 15px;
+  --ink-gap-section: var(--ink-space-4);
+  --ink-gap-relaxed: 18px;
+  --ink-gap-2xl-plus: 20px;
+  --ink-gap-3xl: 22px;
+  --ink-gap-page: var(--ink-space-5);
+  --ink-gap-display: 28px;
+  --ink-gap-layout: 40px;
+  --ink-gap-xl: var(--ink-gap-md);
+  --ink-gap-2xl: var(--ink-gap-section);
+  --ink-gap-stack: var(--ink-gap-md);
+
+  /* Height contracts are semantic; documentation-only frames can use local pixel values. */
+  --ink-height-control-sm: 36px;
+  --ink-height-control-md: 44px;
+  --ink-height-control-lg: 52px;
+  --ink-height-touch: 44px;
+  --ink-height-icon-sm: 16px;
+  --ink-height-icon-md: 20px;
+  --ink-height-icon-lg: 24px;
+  --ink-height-badge: 24px;
+  --ink-height-tag: 28px;
+  --ink-height-status: 27px;
+  --ink-height-card-meta: 20px;
+  --ink-height-card-follow: 32px;
+  --ink-height-card-action: 42px;
+  --ink-height-textarea: 112px;
+
+  /* Input family contracts: shared by Input, Textarea, Select, AutoComplete
+     and TagInput in the static shell and the React POC. */
+  --ink-input-border-width: var(--ink-border-width-medium);
+  --ink-input-border-radius: var(--ink-radius-sm);
+  --ink-input-height-sm: var(--ink-height-control-sm);
+  --ink-input-height-md: var(--ink-height-control-md);
+  --ink-input-height-lg: var(--ink-height-control-lg);
+  --ink-input-padding-inline: 14px;
+  --ink-input-padding-inline-compact: 10px;
+  --ink-input-padding-inline-option: var(--ink-space-3);
+  --ink-input-padding-leading: 40px;
+  --ink-input-padding-prefix: 42px;
+  --ink-input-padding-action: 52px;
+  --ink-input-padding-counter: 76px;
+  --ink-input-counter-textarea-padding: 82px;
+  --ink-input-autowidth-min: 60px;
+  --ink-input-leading-offset: 14px;
+  --ink-input-textarea-line-height: 1.65;
+  --ink-input-textarea-state-min-height: 72px;
+  --ink-input-textarea-state-padding-block: 10px;
+  --ink-input-counter-padding-bottom: 32px;
+  --ink-input-counter-offset-right: 12px;
+  --ink-input-counter-offset-bottom: 9px;
+  --ink-input-action-size: var(--ink-height-touch);
+  --ink-input-icon-size: var(--ink-size-15);
+  --ink-input-search-icon-size: var(--ink-size-14);
+  --ink-input-icon-stroke-width: var(--ink-icon-stroke-width);
+  --ink-input-menu-offset: 6px;
+  --ink-input-menu-padding: var(--ink-size-4);
+  --ink-input-menu-z-index: var(--ink-z-popover);
+  --ink-input-menu-max-height: 360px;
+  --ink-input-options-max-height: 240px;
+  --ink-input-menu-shadow: 0 10px 30px rgba(72, 55, 48, .12);
+  --ink-input-option-height: var(--ink-height-touch);
+  --ink-input-suggestion-height: 52px;
+  --ink-input-rich-option-height: 60px;
+  --ink-input-option-radius: var(--ink-radius-xs);
+  --ink-input-option-check-size: 18px;
+  --ink-input-option-check-icon-size: 11px;
+  --ink-input-empty-padding-block: var(--ink-space-4);
+  --ink-input-state-padding: 14px;
+  --ink-input-state-line-height: 1.6;
+  --ink-input-disabled-opacity: var(--ink-opacity-disabled);
+
+  /* Button contract: the adopted subset of TDesign mobile button tokens.
+     TDesign's 2px border, four size steps, icon spacing and semantic theme
+     roles are expressed here without importing Vue or its implementation. */
+  --ink-button-border-radius: var(--ink-radius-sm);
+  --ink-button-border-width: 1px;
+  --ink-button-icon-border-radius: var(--ink-radius-sm);
+  --ink-button-icon-spacer: var(--ink-space-2);
+  --ink-button-extra-small-font: 500 12px / 20px var(--ink-font-family);
+  --ink-button-small-font: 500 12px / 20px var(--ink-font-family);
+  --ink-button-medium-font: var(--ink-font-button);
+  --ink-button-large-font: var(--ink-font-button);
+  --ink-button-extra-small-height: 28px;
+  --ink-button-small-height: 34px;
+  --ink-button-medium-height: 40px;
+  --ink-button-large-height: 48px;
+  --ink-button-extra-small-icon-size: 18px;
+  --ink-button-small-icon-size: 18px;
+  --ink-button-medium-icon-size: 20px;
+  --ink-button-large-icon-size: 24px;
+  --ink-button-extra-small-padding-horizontal: 8px;
+  --ink-button-small-padding-horizontal: 12px;
+  --ink-button-medium-padding-horizontal: 20px;
+  --ink-button-large-padding-horizontal: 28px;
+  --ink-button-outline-active-bg: var(--ink-button-default-bg);
+  --ink-button-text-active-bg: var(--ink-button-default-bg);
+  --ink-button-default-bg: var(--ink-color-bg-component);
+  --ink-button-default-active-bg: var(--ink-color-bg-component-active);
+  --ink-button-default-border: var(--ink-color-component-border);
+  --ink-button-default-color: var(--ink-color-text-secondary);
+  --ink-button-default-disabled-bg: var(--ink-color-bg-component-disabled);
+  --ink-button-default-disabled-color: var(--ink-color-text-disabled);
+  --ink-button-primary-bg: var(--ink-color-brand);
+  --ink-button-primary-active-bg: var(--ink-color-brand-hover);
+  --ink-button-primary-border: var(--ink-color-brand);
+  --ink-button-primary-color: var(--ink-color-text-anti);
+  --ink-button-primary-disabled-bg: var(--ink-color-brand-disabled);
+  --ink-button-primary-disabled-color: var(--ink-color-text-anti);
+  --ink-button-danger-bg: var(--ink-color-danger);
+  --ink-button-danger-active-bg: var(--ink-color-danger-active);
+  --ink-button-danger-border: var(--ink-color-danger);
+  --ink-button-danger-color: var(--ink-color-text-anti);
+  --ink-button-danger-disabled-bg: var(--ink-color-danger-disabled);
+  --ink-button-danger-disabled-color: var(--ink-color-text-anti);
+  --ink-button-light-bg: var(--ink-color-brand-light);
+  --ink-button-light-active-bg: var(--ink-color-brand-light-active);
+  --ink-button-light-color: var(--ink-color-brand);
+  --ink-button-light-disabled-bg: var(--ink-color-brand-light);
+  --ink-button-light-disabled-color: var(--ink-color-brand-disabled);
+
+  /* Badge contract: only the mobile top-bar menu notification count. */
+  --ink-badge-menu-button-size: var(--ink-button-medium-height);
+  --ink-badge-menu-icon-size: var(--ink-button-small-icon-size);
+  --ink-badge-dot-size: var(--ink-size-10);
+  --ink-badge-dot-offset-block: calc(var(--ink-size-2) * -1);
+  --ink-badge-dot-offset-inline: calc(var(--ink-size-2) * -1);
+  --ink-badge-dot-border-width: var(--ink-size-2);
+
+  /* Notification List contract: mirrors the current notification center before
+     individual values are consumed by the static specimen and React POC. */
+  --ink-notification-panel-bg: var(--ink-color-bg-surface);
+  --ink-notification-panel-radius: var(--ink-radius-md);
+  --ink-notification-divider: var(--ink-color-bg-surface-active);
+  --ink-notification-row-hover: rgba(0, 0, 0, .04);
+  --ink-notification-row-padding-block: var(--ink-space-5);
+  --ink-notification-row-padding-inline: var(--ink-space-6);
+  --ink-notification-row-gap: var(--ink-space-4);
+  --ink-notification-content-gap: var(--ink-space-1);
+  --ink-notification-title-row-gap: var(--ink-space-3);
+  --ink-notification-icon-size: var(--ink-height-touch);
+  --ink-notification-icon-glyph-size: var(--ink-height-icon-md);
+  --ink-notification-icon-offset-block: var(--ink-size-2);
+  --ink-notification-icon-hover-scale: 1.05;
+  --ink-notification-divider-leading: 76px;
+  --ink-notification-divider-trailing: var(--ink-space-6);
+  --ink-notification-unread-dot-size: 7px;
+  --ink-notification-unread-dot-gap: var(--ink-space-1);
+  --ink-notification-title-font: 600 15px / 1.35 var(--ink-font-family);
+  --ink-notification-title-letter-spacing: -.1px;
+  --ink-notification-description-font: 400 13.5px / 1.5 var(--ink-font-family);
+  --ink-notification-time-font: 400 12.5px / 1.5 var(--ink-font-family);
+  --ink-notification-motion: 200ms ease;
+  --ink-notification-like: #f26b5b;
+  --ink-notification-comment: #3b82f6;
+  --ink-notification-bookmark: #f59e0b;
+  --ink-notification-reply: #8b5cf6;
+  --ink-notification-follow: #10b981;
+  --ink-notification-system: #6b7280;
+  --ink-notification-type-bg-mix: 12%;
+  --ink-notification-tablet-row-padding-block: var(--ink-space-4);
+  --ink-notification-tablet-row-padding-inline: var(--ink-space-5);
+  --ink-notification-tablet-icon-size: var(--ink-button-medium-height);
+  --ink-notification-tablet-icon-glyph-size: 18px;
+  --ink-notification-tablet-divider-leading: 68px;
+  --ink-notification-tablet-title-font: 600 14px / 1.35 var(--ink-font-family);
+  --ink-notification-tablet-description-font: 400 13px / 1.5 var(--ink-font-family);
+  --ink-notification-mobile-row-padding-block: var(--ink-space-3);
+  --ink-notification-mobile-row-padding-inline: var(--ink-gap-lg);
+  --ink-notification-mobile-row-gap: var(--ink-gap-sm);
+  --ink-notification-mobile-icon-size: var(--ink-height-control-sm);
+  --ink-notification-mobile-icon-glyph-size: var(--ink-height-icon-sm);
+  --ink-notification-mobile-divider-leading: 56px;
+  --ink-notification-mobile-divider-trailing: var(--ink-gap-lg);
+  --ink-notification-mobile-title-font: 600 13.5px / 1.35 var(--ink-font-family);
+  --ink-notification-mobile-description-font: 400 12.5px / 1.5 var(--ink-font-family);
+  --ink-notification-mobile-time-font: 400 11.5px / 1.5 var(--ink-font-family);
+
+  /* Image-only dimensions inherit one stable-container and failure source of truth. */
+  --ink-image-radius: var(--ink-radius-sm);
+  --ink-image-ratio-cover: 4 / 3;
+  --ink-image-ratio-square: 1 / 1;
+  --ink-image-placeholder-bg: var(--ink-surface-subtle);
+  --ink-image-placeholder-glyph-size: var(--ink-height-icon-lg);
+  --ink-image-loading-bg: var(--ink-surface-subtle);
+  --ink-image-error-bg: var(--ink-primary-bg);
+  --ink-image-error-icon-size: var(--ink-height-icon-md);
+  --ink-image-border: var(--ink-border-width-thin) solid var(--ink-color-border);
+  --ink-image-caption-gap: var(--ink-gap-2xs);
+  --ink-image-caption-font: 400 13px / 1.5 var(--ink-font-family);
+  --ink-image-caption-color: var(--ink-color-text-secondary);
+
+  /* Tag-only dimensions remain named so tags inherit one source of truth. */
+  --ink-space-tag-group: 18px;
+  --ink-space-tag-meta: 10px;
+  --ink-space-tag-state: 12px;
+  --ink-space-tag-row-bottom: var(--ink-size-2);
+  --ink-space-tag-status-row: 8px;
+  --ink-space-tag-remove-inline: 5px;
+  --ink-space-tag-remove-start: var(--ink-size-1);
+  --ink-size-tag-type-icon: 15px;
+  --ink-size-tag-series-icon: 10px;
+  --ink-size-tag-status-label: 84px;
+  --ink-size-tag-validation-label: 42px;
+  --ink-size-tag-input-min: 120px;
+  --ink-size-tag-input-field: 140px;
+  --ink-size-tag-token-column: 180px;
+  --ink-height-tag-token-card: 88px;
+  --ink-height-compact: 32px;
+
+  --ink-dimension-auto: auto;
+  --ink-color-transparent: transparent;
+  --ink-opacity-disabled: .55;
+  --ink-border-none: var(--ink-border-width-none) solid var(--ink-color-transparent);
+  --ink-border-width-none: var(--ink-size-0);
+  --ink-border-width-thin: var(--ink-size-1);
+  --ink-border-width-medium: 1.5px;
+  --ink-border-width-focus: 2px;
+  --ink-icon-stroke-width: 1.8;
+  --ink-outline-none: none;
+  --ink-outline-focus: var(--ink-border-width-focus) solid var(--ink-color-brand);
+  --ink-outline-offset-focus: var(--ink-size-3);
+  --ink-shadow-none: none;
+  --ink-radius-none: var(--ink-size-0);
+  --ink-radius-xs: 4px;
+  --ink-radius-sm: 8px;
+  --ink-radius-md: 12px;
+  --ink-radius-lg: 20px;
+  --ink-radius-xl: 28px;
+  --ink-radius-pill: 999px;
+  --ink-radius-circle: 50%;
+  /* Compatibility aliases point at the semantic height contracts above. */
+  --ink-touch-target: var(--ink-height-touch);
+  --ink-content-width-card: 940px;
+  --ink-content-width-phone: 375px;
+  --ink-content-measure: 68ch;
+  --ink-shadow-sm: 0 4px 12px rgba(72, 55, 48, .10);
+  --ink-shadow-md: 0 14px 32px rgba(72, 55, 48, .14);
+  --ink-shadow-lg: 0 26px 60px rgba(72, 55, 48, .20);
+  --ink-shadow-focus: 0 0 0 3px rgba(242, 107, 91, .18);
+  --ink-motion-fast: 150ms;
+  --ink-motion-base: 220ms;
+  --ink-motion-slow: 320ms;
+  --ink-ease-standard: cubic-bezier(.2, .8, .2, 1);
+  --ink-z-sticky: 10;
+  --ink-z-popover: 20;
+  --ink-z-modal: 40;
+  --ink-logo-filter-primary: brightness(0) saturate(100%) invert(49%) sepia(58%) saturate(1512%) hue-rotate(325deg) brightness(102%) contrast(91%);
+  --ink-logo-filter-on-primary: brightness(0) invert(1);
+  --ink-avatar-size-sm: 32px;
+  --ink-avatar-size-md: 44px;
+  --ink-avatar-size-lg: 64px;
+  --ink-avatar-size-card: 36px;
+  --ink-avatar-size-profile: 80px;
+  --ink-avatar-size-profile-mobile: 64px;
+  --ink-avatar-size-compact: 48px;
+  --ink-avatar-size-upload: 80px;
+  /* Public profile keeps the relationship action width stable across states. */
+  --ink-account-follow-width: 112px;
+
+  /* Component aliases used by the existing static page and React POC. */
+  --ink-primary: var(--ink-color-brand);
+  --ink-primary-hover: var(--ink-color-brand-hover);
+  --ink-primary-bg: var(--ink-color-brand-light);
+  --ink-page: var(--ink-color-bg-page);
+  --ink-surface: var(--ink-color-bg-surface);
+  --ink-surface-subtle: var(--ink-color-bg-surface-subtle);
+  --ink-surface-elevated: var(--ink-color-bg-elevated);
+  --ink-text: var(--ink-color-text-primary);
+  --ink-text-strong: var(--ink-color-text-primary);
+  --ink-muted: var(--ink-color-text-secondary);
+  --ink-light: var(--ink-color-text-tertiary);
+  --ink-text-secondary: var(--ink-color-text-secondary);
+  --ink-text-tertiary: var(--ink-color-text-tertiary);
+  --ink-border: var(--ink-color-border);
+  --ink-border-subtle: var(--ink-color-border-subtle);
+  --ink-border-strong: var(--ink-color-border-strong);
+  --ink-success: var(--ink-color-success);
+  --ink-success-bg: var(--ink-color-success-light);
+  --ink-warning: var(--ink-color-warning);
+  --ink-warning-bg: var(--ink-color-warning-light);
+  --ink-danger: var(--ink-color-danger);
+  --ink-danger-bg: var(--ink-color-danger-light);
+  --ink-info: var(--ink-color-info);
+  --ink-on-primary: var(--ink-color-text-anti);
+  --ink-focus: var(--ink-shadow-focus);
+  --ink-radius-full: var(--ink-radius-pill);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ink-brand-color-1: #3b211e;
+  --ink-brand-color-2: #57302b;
+  --ink-brand-color-3: #754038;
+  --ink-brand-color-4: #a65348;
+  --ink-brand-color-5: #d56859;
+  --ink-brand-color-6: #f26b5b;
+  --ink-brand-color-7: #ff8878;
+  --ink-brand-color-8: #ff9f91;
+  --ink-brand-color-9: #ffc5bc;
+  --ink-brand-color-10: #ffe6e1;
+  --ink-color-brand: #f26b5b;
+  --ink-color-brand-hover: #ff8878;
+  --ink-color-brand-active: #ff9f91;
+  --ink-color-brand-focus: rgba(242, 107, 91, .24);
+  --ink-color-brand-light: rgba(242, 107, 91, .12);
+  --ink-color-brand-light-active: rgba(242, 107, 91, .20);
+  --ink-color-bg-page: #1a1a1a;
+  --ink-color-bg-surface: #242424;
+  --ink-color-bg-surface-subtle: #2a2a2a;
+  --ink-color-bg-surface-active: #333333;
+  --ink-color-bg-component: #333333;
+  --ink-color-bg-component-active: #4a4a4a;
+  --ink-color-bg-component-disabled: #2a2a2a;
+  --ink-color-bg-elevated: #2d2d2d;
+  --ink-color-text-primary: #e8e8e8;
+  --ink-color-text-secondary: #a0a0a0;
+  --ink-color-text-tertiary: #777777;
+  --ink-color-text-disabled: #777777;
+  --ink-color-text-anti: #ffffff;
+  --ink-color-border-subtle: #2d2d2d;
+  --ink-color-border: #333333;
+  --ink-color-border-strong: #4a4a4a;
+  --ink-color-component-stroke: #333333;
+  --ink-color-component-border: #4a4a4a;
+  --ink-color-success: #8fd0aa;
+  --ink-color-success-light: rgba(143, 208, 170, .18);
+  --ink-color-warning: #d49000;
+  --ink-color-warning-hover: #f6bd45;
+  --ink-color-warning-active: #b36f00;
+  --ink-color-warning-focus: rgba(255, 237, 184, .36);
+  --ink-color-warning-disabled: #ffdb7a;
+  --ink-color-warning-light: rgba(212, 144, 0, .18);
+  --ink-color-danger: #cd0000;
+  --ink-color-danger-light: rgba(205, 0, 0, .16);
+  --ink-color-info: #9ec2d8;
+  --ink-color-navigation-muted: #b4aaa3;
+  --ink-color-mask-active: rgba(0, 0, 0, .6);
+  --ink-color-mask-disabled: rgba(255, 255, 255, .12);
+  --ink-color-mask-background: rgba(36, 36, 36, .96);
+  --ink-color-mask-gradient: rgba(36, 36, 36, 0);
+  --ink-shadow-sm: 0 4px 14px rgba(0, 0, 0, .18);
+  --ink-shadow-md: 0 18px 44px rgba(0, 0, 0, .28);
+  --ink-shadow-lg: 0 24px 60px rgba(0, 0, 0, .42);
+  --ink-shadow-focus: 0 0 0 3px rgba(242, 107, 91, .24);
+}
+
+/* Legacy names in index.html. They are aliases only; new components should use --ink-* roles. */
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
+  --primary: var(--ink-primary);
+  --primary-hover: var(--ink-primary-hover);
+  --primary-bg: var(--ink-primary-bg);
+  --page: var(--ink-page);
+  --surface: var(--ink-surface);
+  --surface-subtle: var(--ink-surface-subtle);
+  --surface-elevated: var(--ink-surface-elevated);
+  --text: var(--ink-text);
+  --text-strong: var(--ink-text-strong);
+  --muted: var(--ink-muted);
+  --light: var(--ink-light);
+  --text-secondary: var(--ink-text-secondary);
+  --text-tertiary: var(--ink-text-tertiary);
+  --border: var(--ink-border);
+  --border-subtle: var(--ink-border-subtle);
+  --border-strong: var(--ink-border-strong);
+  --success: var(--ink-success);
+  --success-bg: var(--ink-success-bg);
+  --warning: var(--ink-warning);
+  --warning-bg: var(--ink-warning-bg);
+  --danger: var(--ink-danger);
+  --danger-bg: var(--ink-danger-bg);
+  --info: var(--ink-info);
+  --ink-navigation-muted: var(--ink-color-navigation-muted);
+  --on-primary: var(--ink-on-primary);
+  --focus-ring: var(--ink-shadow-focus);
+  --shadow-sm: var(--ink-shadow-sm);
+  --shadow: var(--ink-shadow-md);
+  --shadow-lg: var(--ink-shadow-lg);
+  --radius-sm: var(--ink-radius-sm);
+  --radius-md: var(--ink-radius-md);
+  --radius-lg: var(--ink-radius-lg);
+  --radius-xl: var(--ink-radius-xl);
+  --radius-full: var(--ink-radius-pill);
+  --space-1: var(--ink-space-1);
+  --space-2: var(--ink-space-2);
+  --space-3: var(--ink-space-3);
+  --space-4: var(--ink-space-4);
+  --space-5: var(--ink-space-5);
+  --font-reading: var(--ink-font-family-reading);
+  --font-mono: var(--ink-font-family-mono);
+  --font-size-control-label: var(--ink-font-size-sm);
+  --font-size-control: var(--ink-font-size-md);
+  --font-weight-control-label: var(--ink-font-weight-semibold);
+  --font-weight-button: var(--ink-font-weight-semibold);
+  --motion-fast: var(--ink-motion-fast);
+  --motion-base: var(--ink-motion-base);
+  --logo-filter-primary: var(--ink-logo-filter-primary);
+  --logo-filter-on-primary: var(--ink-logo-filter-on-primary);
+  --avatar-size-sm: var(--ink-avatar-size-sm);
+  --avatar-size-md: var(--ink-avatar-size-md);
+  --avatar-size-lg: var(--ink-avatar-size-lg);
+  --avatar-size-card: var(--ink-avatar-size-card);
+  --avatar-size-profile: var(--ink-avatar-size-profile);
+  --avatar-size-upload: var(--ink-avatar-size-upload);
+  --z-sticky: var(--ink-z-sticky);
+  --z-popover: var(--ink-z-popover);
+  --z-modal: var(--ink-z-modal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ink-motion-fast: 1ms;
+    --ink-motion-base: 1ms;
+    --ink-motion-slow: 1ms;
+  }
+}

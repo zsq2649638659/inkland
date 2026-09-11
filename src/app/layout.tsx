@@ -9,6 +9,8 @@ import "@fontsource/noto-serif-sc/600.css";
 import "@fontsource/noto-serif-sc/700.css";
 import "./globals.css";
 import "./dialogs.css";
+import "@/components/inkland/tokens.css";
+import "@/components/inkland/library.css";
 import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {

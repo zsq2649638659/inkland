@@ -102,9 +102,10 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
 
   return (
     <button
-      className={`card-action ${liked ? "liked" : ""}`}
+      className={`card-action ${className || ""} ${liked ? "liked" : ""}`}
       onClick={toggle}
       disabled={loading || authLoading}
+      aria-pressed={liked}
     >
       <SiteIcon name="fa-heart" variant={liked ? "solid" : "outline"} hoverVariant={liked ? undefined : "solid"} />
       <span>{count}</span>

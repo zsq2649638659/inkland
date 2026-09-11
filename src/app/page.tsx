@@ -316,7 +316,7 @@ export default function HomePage() {
     : "";
 
   return (
-    <div className="min-h-screen bg-paper pb-20 lg:pb-0">
+    <div id="page-home" className="min-h-screen bg-paper pb-20 lg:pb-0">
       {/* V2: main container with sidebar + content */}
       <div className="main-container">
         {/* V2: sidebar on left */}
@@ -356,7 +356,8 @@ export default function HomePage() {
           )}
 
           {/* 关注作品 Feed */}
-          <div className="feed" id="feed-works" style={{ display: tab === "following" ? undefined : "none" }}>
+          <div className="feed home-feed-card-device card-device card-device--pc" id="feed-works" style={{ display: tab === "following" ? undefined : "none" }}>
+            <div className="card-device__cards">
             {authLoading ? (
               <SkeletonHome />
             ) : !user ? (
@@ -416,6 +417,7 @@ export default function HomePage() {
                 ) : null}
               </>
             )}
+            </div>
           </div>
 
           {/* 关注标签 Feed */}
@@ -469,7 +471,8 @@ export default function HomePage() {
           </div>
 
           {/* 发现作品 Feed */}
-          <div className="feed" id="feed-hot" style={{ display: tab === "hot24" ? undefined : "none" }}>
+          <div className="feed home-feed-card-device card-device card-device--pc" id="feed-hot" style={{ display: tab === "hot24" ? undefined : "none" }}>
+            <div className="card-device__cards">
             {feedLoading ? (
               <SkeletonFeed />
             ) : hasContent ? (
@@ -500,6 +503,7 @@ export default function HomePage() {
             ) : hasContent ? (
               <div className="feed-end">已经到达最底端</div>
             ) : null}
+            </div>
           </div>
         </div>
       </div>
