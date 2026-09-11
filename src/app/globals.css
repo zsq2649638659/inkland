@@ -5747,7 +5747,7 @@ p {
 .inline-comment-panel .comment-more-btn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm, 8px);
 }
 
 /* Nested replies (楼中楼) inside the inline panel — matches detail page */
