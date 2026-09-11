@@ -18,6 +18,7 @@ import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ImageLightbox from "@/components/ImageLightbox";
 import type { Post, Comment } from "@/lib/types";
+import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
 
 interface PostCardProps {
   post: Post;
@@ -322,17 +323,6 @@ export default function PostCard({ post }: PostCardProps) {
     setSubmitting(false);
   };
 
-  const getTimeAgo = (dateStr: string): string => {
-    const now = Date.now();
-    const then = new Date(dateStr).getTime();
-    const diff = Math.floor((now - then) / 1000);
-    if (diff < 60) return "刚刚";
-    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
-    if (diff < 2592000) return `${Math.floor(diff / 86400)} 天前`;
-    return new Date(dateStr).toLocaleDateString("zh-CN");
-  };
-
   const navigateCard = (event: MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("a, button, input, textarea, select")) return;
@@ -369,7 +359,7 @@ export default function PostCard({ post }: PostCardProps) {
             </strong>
           </Link>
           <Link href={`/read/${post.id}`} className="site-card__author-meta no-underline">
-            {post.time_ago || post.created_at ? getTimeAgo(post.created_at || "") : "刚刚"}
+            {post.time_ago || post.created_at ? formatHomeFeedTimestamp(post.created_at || "") : "刚刚"}
           </Link>
         </div>
 
