@@ -1384,15 +1384,20 @@ p {
 .card-more-btn {
   width: 32px;
   height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--color-text-light, #999);
   font-size: 21px;
   line-height: 1;
-  letter-spacing: -2px;
+  letter-spacing: normal;
   cursor: pointer;
 }
+.card-more-btn svg { display: block; flex-shrink: 0; }
 .card-more-btn:hover, .card-more-btn[aria-expanded="true"] {
   color: var(--color-primary, #F26B5B);
   background: var(--color-primary-light, #FDDCD8);
