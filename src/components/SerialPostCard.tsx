@@ -16,6 +16,7 @@ import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import type { Comment } from "@/lib/types";
 import { includeTestDataForProfile } from "@/lib/test-data-visibility";
+import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
 
 export interface SerialPostCardData {
   chapterId: string;
@@ -49,20 +50,6 @@ function stripMarkdown(content?: string): string {
     .replace(/\s+/g, " ")
     .trim();
   return text;
-}
-
-function getTimeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = now - then;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes}分钟前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}小时前`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}天前`;
-  return new Date(dateStr).toLocaleDateString("zh-CN");
 }
 
 export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
@@ -288,7 +275,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             </strong>
           </Link>
           <Link href={`/read/${data.chapterId}`} className="site-card__author-meta no-underline">
-            {getTimeAgo(data.createdAt)}
+            {formatHomeFeedTimestamp(data.createdAt)}
           </Link>
         </div>
 
