@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -248,7 +249,7 @@ export default function AccountSettingsPanel() {
                     aria-expanded={coinInfoOpen}
                     onClick={() => setCoinInfoOpen((current) => !current)}
                   >
-                    <span className="account-settings-coin-logo" aria-hidden="true"><i className="fa-solid fa-droplet" /></span>
+                    <span className="account-settings-coin-logo" aria-hidden="true"><SiteIcon name="fa-droplet" variant="solid" /></span>
                     <strong>{coinBalance}</strong>
                   </button>
                   <div className={`account-settings-tooltip account-settings-coin-tooltip${coinInfoOpen ? " open" : ""}`} role="tooltip">
@@ -325,7 +326,7 @@ export default function AccountSettingsPanel() {
             onClick={() => setCopyrightOpen((current) => !current)}
           >
             <span>{selectedCopyright.label}</span>
-            <i className={`fa-solid fa-chevron-down${copyrightOpen ? " up" : ""}`} aria-hidden="true" />
+            <SiteIcon name="fa-chevron-down" variant="solid" className={copyrightOpen ? "up" : undefined} aria-hidden="true" />
           </button>
           {copyrightOpen && (
             <div className="account-copyright-dropdown" role="listbox" aria-label="选择版权偏好">

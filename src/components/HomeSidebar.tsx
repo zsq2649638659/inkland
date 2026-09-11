@@ -1,4 +1,6 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
+import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -164,7 +166,7 @@ export default function HomeSidebar() {
     localStorage.setItem("theme", next);
   };
 
-  const menuItems = [
+  const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/", badge: newWorksCount },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
     { page: "profile", icon: "fa-circle-user", label: "个人中心", href: "/profile" },
@@ -176,7 +178,7 @@ export default function HomeSidebar() {
   // 只有首次鉴权还没完成时才替换成骨架。
   // 页面之间切换时，侧栏会重新挂载，但用户信息应立即保留，统计数据在后台更新即可。
   if (authLoading) {
-    const loadingMenuItems = [
+    const loadingMenuItems: Array<{ icon: InklandIconName; label: string; href: string }> = [
       { icon: "fa-house", label: "首页", href: "/" },
       { icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
       { icon: "fa-circle-user", label: "个人中心", href: "/profile" },
@@ -189,7 +191,7 @@ export default function HomeSidebar() {
         <div className="sidebar-card">
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">
-              <i className="fa-solid fa-user text-white/60" />
+              <SiteIcon name="fa-user" variant="solid" className="text-white/60" />
             </div>
             <div className="sidebar-user-info">
               <div className="sidebar-skeleton-line sidebar-skeleton-name" aria-hidden="true" />
@@ -206,20 +208,20 @@ export default function HomeSidebar() {
           </div>
           {loadingMenuItems.map((item) => (
             <Link key={item.label} href={item.href} className={`sidebar-menu-item ${isActive(item.label === "首页" ? "home" : item.href.slice(1)) ? "active" : ""}`}>
-              <span className="sidebar-menu-icon"><i className={`fa-solid ${item.icon}`} aria-hidden="true" /></span>
+              <span className="sidebar-menu-icon"><InklandIcon name={item.icon} variant={isActive(item.label === "首页" ? "home" : item.href.slice(1)) ? "solid" : "outline"} aria-hidden="true" /></span>
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
           <button className="sidebar-menu-item text-left" onClick={toggleTheme}>
-            <span className="sidebar-menu-icon"><i className="fa-solid fa-moon" /></span>
+            <span className="sidebar-menu-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
             <span className="sidebar-menu-label">日夜模式</span>
           </button>
           <Link href="/settings" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
-            <span className="sidebar-menu-icon"><i className="fa-solid fa-gear" /></span>
+            <span className="sidebar-menu-icon"><SiteIcon name="fa-gear" variant="solid" /></span>
             <span className="sidebar-menu-label">设置</span>
           </Link>
           <button className="sidebar-menu-item text-left" onClick={() => setMoreOpen(!moreOpen)}>
-            <span className="sidebar-menu-icon"><i className="fa-solid fa-ellipsis" /></span>
+            <span className="sidebar-menu-icon"><SiteIcon name="fa-ellipsis-circle" /></span>
             <span className="sidebar-menu-label">更多</span>
           </button>
         </div>
@@ -234,7 +236,7 @@ export default function HomeSidebar() {
         <div className="sidebar-card">
           <div className="sidebar-user sidebar-user-unauth">
             <div className="sidebar-user-avatar">
-              <i className="fa-solid fa-user" />
+              <SiteIcon name="fa-user" variant="solid" />
             </div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">欢迎来到 inkland</div>
@@ -252,13 +254,13 @@ export default function HomeSidebar() {
               className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}
             >
               <span className="sidebar-menu-icon">
-                <i className={`fa-solid ${item.icon}`} />
+                <InklandIcon name={item.icon} variant={isActive(item.page) ? "solid" : "outline"} />
               </span>
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
           <button className="sidebar-menu-item text-left" onClick={toggleTheme}>
-            <span className="sidebar-menu-icon"><i className="fa-solid fa-moon" /></span>
+            <span className="sidebar-menu-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
             <span className="sidebar-menu-label">日夜模式</span>
           </button>
         </div>
@@ -311,7 +313,7 @@ export default function HomeSidebar() {
           className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}
         >
           <span className="sidebar-menu-icon">
-            <i className={`fa-solid ${item.icon}`} />
+            <InklandIcon name={item.icon} variant={isActive(item.page) ? "solid" : "outline"} />
           </span>
           <span className="sidebar-menu-label">{item.label}</span>
           {item.badge !== undefined && item.badge > 0 && (
@@ -328,7 +330,7 @@ export default function HomeSidebar() {
         onClick={toggleTheme}
       >
         <span className="sidebar-menu-icon">
-          <i className="fa-solid fa-moon" />
+          <SiteIcon name="fa-moon" variant="solid" />
         </span>
         <span className="sidebar-menu-label">日夜模式</span>
       </button>
@@ -339,7 +341,7 @@ export default function HomeSidebar() {
         className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}
       >
         <span className="sidebar-menu-icon">
-          <i className="fa-solid fa-gear" />
+          <SiteIcon name="fa-gear" variant="solid" />
         </span>
         <span className="sidebar-menu-label">设置</span>
       </Link>
@@ -351,12 +353,7 @@ export default function HomeSidebar() {
       >
         <span className="sidebar-menu-icon">
           <span className="sidebar-more-icon">
-            <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="2" fill="none" />
-              <circle cx="5.5" cy="9" r="1.2" fill="currentColor" />
-              <circle cx="9" cy="9" r="1.2" fill="currentColor" />
-              <circle cx="12.5" cy="9" r="1.2" fill="currentColor" />
-            </svg>
+            <SiteIcon name="fa-ellipsis-circle" />
           </span>
         </span>
         <span className="sidebar-menu-label">更多</span>
@@ -369,14 +366,14 @@ export default function HomeSidebar() {
             className="sidebar-more-item"
             onClick={() => { setMoreOpen(false); setShowLogout(true); }}
           >
-            <span className="sidebar-more-item-icon"><i className="fa-solid fa-right-from-bracket"></i></span>
+            <span className="sidebar-more-item-icon"><SiteIcon name="fa-right-from-bracket" variant="solid" /></span>
             退出账户
           </button>
           <button
             className="sidebar-more-item sidebar-more-item-danger"
             onClick={() => { setMoreOpen(false); setShowDeleteAccount(true); }}
           >
-            <span className="sidebar-more-item-icon"><i className="fa-solid fa-trash-can"></i></span>
+            <span className="sidebar-more-item-icon"><SiteIcon name="fa-trash-can" variant="solid" /></span>
             注销账户
           </button>
         </div>
@@ -390,7 +387,7 @@ export default function HomeSidebar() {
           <div className="sidebar-overlay" onClick={() => setShowLogout(false)}>
             <div className="sidebar-dialog" onClick={(e) => e.stopPropagation()}>
               <div className="sidebar-dialog-icon" style={{ background: "var(--color-primary-bg)", color: "var(--color-primary)" }}>
-                <i className="fa-solid fa-right-from-bracket"></i>
+                <SiteIcon name="fa-right-from-bracket" variant="solid" />
               </div>
               <div className="sidebar-dialog-title">退出账户</div>
               <div className="sidebar-dialog-text">确定要退出当前账户吗？退出后需要重新登录。</div>
@@ -417,7 +414,7 @@ export default function HomeSidebar() {
           <div className="sidebar-overlay" onClick={() => setShowDeleteAccount(false)}>
             <div className="sidebar-dialog sidebar-dialog-danger" onClick={(e) => e.stopPropagation()}>
               <div className="sidebar-dialog-icon" style={{ background: "rgba(232,72,58,0.1)", color: "#E8483A" }}>
-                <i className="fa-solid fa-triangle-exclamation"></i>
+                <SiteIcon name="fa-triangle-exclamation" variant="solid" />
               </div>
               <div className="sidebar-dialog-title" style={{ color: "#E8483A" }}>注销账户</div>
               <div className="sidebar-dialog-text">
@@ -449,7 +446,7 @@ export default function HomeSidebar() {
                     setDeleteConfirmText("");
                   }}
                 >
-                  <i className="fa-regular fa-trash-can"></i> 永久注销账户
+                  <SiteIcon name="fa-trash-can" variant="outline" /> 永久注销账户
                 </button>
               </div>
             </div>

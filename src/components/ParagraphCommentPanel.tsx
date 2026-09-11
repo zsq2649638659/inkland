@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -424,7 +425,7 @@ onReport,
           </div>
         </div>
         <button className="para-comment-panel-close" onClick={onClose}>
-          <i className="fa-solid fa-xmark" />
+          <SiteIcon name="fa-xmark" variant="solid" />
         </button>
       </div>
 
@@ -470,14 +471,14 @@ onReport,
                         className={`comment-action-btn${c.liked_by_me ? " liked" : ""}`}
                         onClick={() => toggleLike(c.id)}
                       >
-                        <i className={`fa-${c.liked_by_me ? "solid" : "regular"} fa-heart`} />
+                        <SiteIcon name="fa-heart" variant={c.liked_by_me ? "solid" : "outline"} />
                         <span>{c.like_count || 0}</span>
                       </button>
                       <button
                         className="comment-action-btn"
                         onClick={() => { setReplyTo(c); setReplyText(""); }}
                       >
-                        <i className="fa-regular fa-comment" />
+                        <SiteIcon name="fa-comment" variant="outline" />
                         <span>回复</span>
                       </button>
                       {user && c.user_id === user.id && (
@@ -485,7 +486,7 @@ onReport,
                           className="comment-action-btn-delete"
                           onClick={() => handleDeleteComment(c.id)}
                         >
-                          <i className="fa-regular fa-trash-can" />
+                          <SiteIcon name="fa-trash-can" variant="outline" />
                         </button>
                       )}
                       <button
@@ -494,7 +495,7 @@ onReport,
                         title="更多"
                         onClick={(e) => { e.stopPropagation(); setCommentMenuId(commentMenuId === c.id ? null : c.id); }}
                       >
-                        ⋮
+                        <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
                       </button>
                       {commentMenuId === c.id && (
                         <div className="comment-popup show">
@@ -502,13 +503,13 @@ onReport,
                             className="comment-popup-item"
                             onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(c.id, c.user_id); }}
                           >
-                            <i className="fa-solid fa-flag" /> 举报
+                            <SiteIcon name="fa-flag" variant="solid" /> 举报
                           </button>
                           <button
                             className="comment-popup-item"
                             onClick={(e) => { e.stopPropagation(); handleBlockUser(c.user_id); }}
                           >
-                            <i className="fa-solid fa-ban" /> 屏蔽
+                            <SiteIcon name="fa-ban" variant="solid" /> 屏蔽
                           </button>
                         </div>
                       )}
@@ -534,7 +535,7 @@ onReport,
                             onClick={() => submitReply(c)}
                             disabled={submitting || !replyText.trim()}
                           >
-                            <i className="fa-solid fa-paper-plane" /> 发布
+                            <SiteIcon name="fa-paper-plane" variant="solid" /> 发布
                           </button>
                         </div>
                       </div>
@@ -577,14 +578,14 @@ onReport,
                                         className={`comment-action-btn${reply.liked_by_me ? " liked" : ""}`}
                                         onClick={() => toggleLike(reply.id)}
                                       >
-                                        <i className={`fa-${reply.liked_by_me ? "solid" : "regular"} fa-heart`} />
+                                        <SiteIcon name="fa-heart" variant={reply.liked_by_me ? "solid" : "outline"} />
                                         <span>{reply.like_count || 0}</span>
                                       </button>
                                       <button
                                         className="comment-action-btn"
                                         onClick={() => { setReplyTo(c); setReplyText(""); }}
                                       >
-                                        <i className="fa-regular fa-comment" />
+                                        <SiteIcon name="fa-comment" variant="outline" />
                                         <span>回复</span>
                                       </button>
                                       {user && reply.user_id === user.id && (
@@ -592,7 +593,7 @@ onReport,
                                           className="comment-action-btn-delete"
                                           onClick={() => handleDeleteComment(reply.id)}
                                         >
-                                          <i className="fa-regular fa-trash-can" />
+                                          <SiteIcon name="fa-trash-can" variant="outline" />
                                         </button>
                                       )}
                                       <button
@@ -601,7 +602,7 @@ onReport,
                                         title="更多"
                                         onClick={(e) => { e.stopPropagation(); setCommentMenuId(commentMenuId === reply.id ? null : reply.id); }}
                                       >
-                                        ⋮
+                                        <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
                                       </button>
                                       {commentMenuId === reply.id && (
                                         <div className="comment-popup show">
@@ -609,13 +610,13 @@ onReport,
                                             className="comment-popup-item"
                                             onClick={(e) => { e.stopPropagation(); setCommentMenuId(null); if (onReport) onReport(reply.id, reply.user_id); }}
                                           >
-                                            <i className="fa-solid fa-flag" /> 举报
+                                            <SiteIcon name="fa-flag" variant="solid" /> 举报
                                           </button>
                                           <button
                                             className="comment-popup-item"
                                             onClick={(e) => { e.stopPropagation(); handleBlockUser(reply.user_id); }}
                                           >
-                                            <i className="fa-solid fa-ban" /> 屏蔽
+                                            <SiteIcon name="fa-ban" variant="solid" /> 屏蔽
                                           </button>
                                         </div>
                                       )}
@@ -632,9 +633,9 @@ onReport,
                                 onClick={() => toggleExpandReplies(c.id)}
                               >
                                 {expandedReplies.has(c.id) ? (
-                                  <>收起回复 <i className="fa-solid fa-chevron-up" /></>
+                                  <>收起回复 <SiteIcon name="fa-chevron-up" variant="solid" /></>
                                 ) : (
-                                  <>展开全部{c.reply_count}条回复 <i className="fa-solid fa-chevron-down" /></>
+                                  <>展开全部{c.reply_count}条回复 <SiteIcon name="fa-chevron-down" variant="solid" /></>
                                 )}
                               </button>
                             )}

@@ -1,4 +1,6 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
+import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import Link from "next/link";
@@ -276,7 +278,7 @@ export default function NotificationsPage() {
                 <div className="feed-empty-tag-ring">
                   <div className="feed-empty-ring-outer"></div>
                   <div className="feed-empty-ring-inner">
-                    <i className="fa-solid fa-bell"></i>
+                    <SiteIcon name="fa-bell" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -313,7 +315,7 @@ export default function NotificationsPage() {
     }
   };
 
-  const getIconSvg = (type: string): string => {
+  const getIconSvg = (type: string): InklandIconName => {
     switch (type) {
       case "like": return "fa-heart";
       case "comment": return "fa-comment";
@@ -536,7 +538,7 @@ export default function NotificationsPage() {
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
                     <div className="tag-ring-inner">
-                      <i className="fa-solid fa-bell"></i>
+                      <SiteIcon name="fa-bell" variant="solid" />
                     </div>
                   </div>
                 </div>
@@ -557,7 +559,7 @@ export default function NotificationsPage() {
                   >
                     {/* 图标 */}
                     <div className={`icon-wrapper ${getIconClass(n.type)}`}>
-                      <i className={`fa-solid ${getIconSvg(n.type)}`}></i>
+                      <SiteIcon name={getIconSvg(n.type)} variant="solid" />
                     </div>
 
                     {/* 内容 */}
@@ -581,7 +583,7 @@ export default function NotificationsPage() {
                               }
                             }}
                           >
-                            {actionLabel}<i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                            {actionLabel}<SiteIcon name="fa-arrow-right" variant="solid" aria-hidden="true" />
                           </Link>
                         </div>
                       )}

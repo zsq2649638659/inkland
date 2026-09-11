@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, use, useCallback } from "react";
 import Link from "next/link";
@@ -449,27 +450,27 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
             <div className="profile-stats">
               <div className="profile-stat">
-                <i className="fa-solid fa-book"></i>
+                <SiteIcon name="fa-book" variant="solid" />
                 <span>作品数</span>
                 <span className="stat-value">{postCount}</span>
               </div>
               <div className="profile-stat">
-                <i className="fa-regular fa-heart"></i>
+                <SiteIcon name="fa-heart" variant="outline" />
                 <span>喜欢数</span>
                 <span className="stat-value">{likeCount}</span>
               </div>
               <div className="profile-stat">
-                <i className="fa-solid fa-bookmark"></i>
+                <SiteIcon name="fa-bookmark" variant="solid" />
                 <span>收藏数</span>
                 <span className="stat-value">{bookmarkCount}</span>
               </div>
               <div className="profile-stat">
-                <i className="fa-solid fa-user-plus"></i>
+                <SiteIcon name="fa-user-plus" variant="solid" />
                 <span>关注数</span>
                 <span className="stat-value">{followingCount}</span>
               </div>
               <div className="profile-stat">
-                <i className="fa-solid fa-users"></i>
+                <SiteIcon name="fa-users" variant="solid" />
                 <span>粉丝数</span>
                 <span className="stat-value">{followerCount}</span>
               </div>
@@ -483,11 +484,11 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                 disabled={followLoading}
               >
                 {followLoading ? (
-                  <i className="fa-solid fa-spinner fa-spin" />
+                  <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />
                 ) : isFollowing ? (
-                  <><i className="fa-solid fa-check" /> 已关注</>
+                  <><SiteIcon name="fa-check" variant="solid" /> 已关注</>
                 ) : (
-                  <><i className="fa-solid fa-plus" /> 关注</>
+                  <><SiteIcon name="fa-plus" variant="solid" /> 关注</>
                 )}
               </button>
               <div className="profile-actions-wrapper">
@@ -496,16 +497,16 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                   onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }}
                   title="更多"
                 >
-                  <i className="fa-solid fa-ellipsis-vertical" />
+                  <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
                 </button>
                 {moreOpen && (
                   <div className="more-dropdown" onClick={(e) => e.stopPropagation()}>
                     <button className="more-dropdown-item" onClick={() => void handleBlock(id)}>
-                      <i className="fa-solid fa-ban"></i>
+                      <SiteIcon name="fa-ban" variant="solid" />
                       {blockedRecordId ? "取消屏蔽" : "屏蔽"}
                     </button>
                     <button className="more-dropdown-item danger" onClick={handleReport}>
-                      <i className="fa-solid fa-flag"></i>
+                      <SiteIcon name="fa-flag" variant="solid" />
                       举报
                     </button>
                   </div>
@@ -516,7 +517,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           {isOwnProfile && (
             <div className="profile-actions">
               <Link href="/profile/edit" className="btn-edit-profile">
-                <i className="fa-solid fa-pen"></i> 编辑资料
+                <SiteIcon name="fa-pen" variant="solid" /> 编辑资料
               </Link>
             </div>
           )}
@@ -546,7 +547,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                         <div className="font-medium text-sm text-warm">{u.nickname}</div>
                         {u.bio && <div className="text-xs text-muted truncate">{u.bio}</div>}
                       </div>
-                      <i className="fa-solid fa-chevron-right text-xs text-muted" />
+                      <SiteIcon name="fa-chevron-right" variant="solid" className="text-xs text-muted" />
                     </Link>
                     {isOwnProfile && (
                       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -636,7 +637,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                         <div className="series-empty">
                           <div className="series-empty-box">
                             <div className="series-empty-icon">
-                              <i className="fa-regular fa-pen-to-square"></i>
+                              <SiteIcon name="fa-pen-to-square" variant="outline" />
                             </div>
                             <div className="series-empty-info">
                               <div className="series-empty-label">等待开篇</div>
@@ -648,13 +649,13 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                       <div className="card-footer">
                         <div className="card-stats">
                           <span className="card-stat">
-                            <i className="fa-regular fa-heart" /> {series.like_count || 0}
+                            <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
                           </span>
                           <span className="card-stat">
-                            <i className="fa-regular fa-comment" /> {series.comment_count || 0}
+                            <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
                           </span>
                           <span className="card-stat">
-                            <i className="fa-regular fa-bookmark" /> {series.bookmark_count || 0}
+                            <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
                           </span>
                         </div>
                       </div>

@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 // Personal center release marker: keeps the GitHub-to-Vercel deployment trigger explicit.
 
@@ -612,7 +613,7 @@ export default function ProfilePage() {
                 <div className="feed-empty-tag-ring">
                   <div className="feed-empty-ring-outer"></div>
                   <div className="feed-empty-ring-inner">
-                    <i className="fa-solid fa-user-circle"></i>
+                    <SiteIcon name="fa-user-circle" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -696,13 +697,13 @@ export default function ProfilePage() {
                 <div className="empty-tag-ring">
                   <div className="tag-ring-outer"></div>
                   <div className="tag-ring-inner">
-                    <i className="fa-solid fa-book"></i>
+                    <SiteIcon name="fa-book" variant="solid" />
                   </div>
                 </div>
               </div>
               <h2 className="empty-title">还没有发布任何作品</h2>
               <p className="empty-desc">写下你的第一个故事，与世界分享你的创作</p>
-              <Link href="/studio" className="empty-action"><i className="fa-solid fa-pen-to-square" style={{ marginRight: 6 }}></i>发布作品</Link>
+              <Link href="/studio" className="empty-action"><SiteIcon name="fa-pen-to-square" variant="solid" style={{ marginRight: 6 }} />发布作品</Link>
             </div>
           ) : (
             <div className="card-grid">
@@ -736,7 +737,7 @@ export default function ProfilePage() {
                       <div className="series-empty">
                         <div className="series-empty-box">
                           <div className="series-empty-icon">
-                            <i className="fa-regular fa-pen-to-square"></i>
+                            <SiteIcon name="fa-pen-to-square" variant="outline" />
                           </div>
                           <div className="series-empty-info">
                             <div className="series-empty-label">等待开篇</div>
@@ -748,13 +749,13 @@ export default function ProfilePage() {
                     <div className="card-footer">
                       <div className="card-stats">
                         <span className="card-stat">
-                          <i className="fa-regular fa-heart" /> {series.like_count || 0}
+                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-comment" /> {series.comment_count || 0}
+                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-bookmark" /> {series.bookmark_count || 0}
+                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
                         </span>
                       </div>
                     </div>
@@ -788,7 +789,7 @@ export default function ProfilePage() {
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
                     <div className="tag-ring-inner">
-                      <i className="fa-regular fa-heart"></i>
+                      <SiteIcon name="fa-heart" variant="outline" />
                     </div>
                   </div>
                 </div>
@@ -825,7 +826,7 @@ export default function ProfilePage() {
                       <div className="series-empty">
                         <div className="series-empty-box">
                           <div className="series-empty-icon">
-                            <i className="fa-regular fa-pen-to-square"></i>
+                            <SiteIcon name="fa-pen-to-square" variant="outline" />
                           </div>
                           <div className="series-empty-info">
                             <div className="series-empty-label">等待开篇</div>
@@ -837,13 +838,13 @@ export default function ProfilePage() {
                     <div className="card-footer">
                       <div className="card-stats">
                         <span className="card-stat">
-                          <i className="fa-regular fa-heart" /> {series.like_count || 0}
+                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-comment" /> {series.comment_count || 0}
+                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-bookmark" /> {series.bookmark_count || 0}
+                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
                         </span>
                       </div>
                     </div>
@@ -867,7 +868,7 @@ export default function ProfilePage() {
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
                     <div className="tag-ring-inner">
-                      <i className="fa-regular fa-heart"></i>
+                      <SiteIcon name="fa-heart" variant="outline" />
                     </div>
                   </div>
                 </div>
@@ -904,7 +905,7 @@ export default function ProfilePage() {
                       <div className="series-empty">
                         <div className="series-empty-box">
                           <div className="series-empty-icon">
-                            <i className="fa-regular fa-pen-to-square"></i>
+                            <SiteIcon name="fa-pen-to-square" variant="outline" />
                           </div>
                           <div className="series-empty-info">
                             <div className="series-empty-label">等待开篇</div>
@@ -916,13 +917,13 @@ export default function ProfilePage() {
                     <div className="card-footer">
                       <div className="card-stats">
                         <span className="card-stat">
-                          <i className="fa-regular fa-heart" /> {series.like_count || 0}
+                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-comment" /> {series.comment_count || 0}
+                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-bookmark" /> {series.bookmark_count || 0}
+                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
                         </span>
                       </div>
                     </div>
@@ -945,7 +946,7 @@ export default function ProfilePage() {
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
                     <div className="tag-ring-inner">
-                      <i className="fa-solid fa-bookmark"></i>
+                      <SiteIcon name="fa-bookmark" variant="solid" />
                     </div>
                   </div>
                 </div>
@@ -982,7 +983,7 @@ export default function ProfilePage() {
                       <div className="series-empty">
                         <div className="series-empty-box">
                           <div className="series-empty-icon">
-                            <i className="fa-regular fa-pen-to-square"></i>
+                            <SiteIcon name="fa-pen-to-square" variant="outline" />
                           </div>
                           <div className="series-empty-info">
                             <div className="series-empty-label">等待开篇</div>
@@ -994,13 +995,13 @@ export default function ProfilePage() {
                     <div className="card-footer">
                       <div className="card-stats">
                         <span className="card-stat">
-                          <i className="fa-regular fa-heart" /> {series.like_count || 0}
+                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-comment" /> {series.comment_count || 0}
+                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-bookmark" /> {series.bookmark_count || 0}
+                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
                         </span>
                       </div>
                     </div>
@@ -1024,7 +1025,7 @@ export default function ProfilePage() {
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
                     <div className="tag-ring-inner">
-                      <i className="fa-solid fa-bookmark"></i>
+                      <SiteIcon name="fa-bookmark" variant="solid" />
                     </div>
                   </div>
                 </div>
@@ -1061,7 +1062,7 @@ export default function ProfilePage() {
                       <div className="series-empty">
                         <div className="series-empty-box">
                           <div className="series-empty-icon">
-                            <i className="fa-regular fa-pen-to-square"></i>
+                            <SiteIcon name="fa-pen-to-square" variant="outline" />
                           </div>
                           <div className="series-empty-info">
                             <div className="series-empty-label">等待开篇</div>
@@ -1073,13 +1074,13 @@ export default function ProfilePage() {
                     <div className="card-footer">
                       <div className="card-stats">
                         <span className="card-stat">
-                          <i className="fa-regular fa-heart" /> {series.like_count || 0}
+                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-comment" /> {series.comment_count || 0}
+                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
                         </span>
                         <span className="card-stat">
-                          <i className="fa-regular fa-bookmark" /> {series.bookmark_count || 0}
+                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
                         </span>
                       </div>
                     </div>
@@ -1101,7 +1102,7 @@ export default function ProfilePage() {
                 <div className="empty-tag-ring">
                   <div className="tag-ring-outer"></div>
                   <div className="tag-ring-inner">
-                    <i className="fa-solid fa-user-group"></i>
+                    <SiteIcon name="fa-user-group" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -1114,7 +1115,7 @@ export default function ProfilePage() {
                 <span className="section-title">全部关注</span>
                 <div className="list-search-wrapper">
                   <input type="text" className="list-search" id="search-following" placeholder="搜索关注用户..." />
-                  <i className="fa-solid fa-magnifying-glass list-search-icon"></i>
+                  <SiteIcon name="fa-magnifying-glass" variant="solid" className="list-search-icon" />
                 </div>
               </div>
               <div className="user-cards-grid">
@@ -1136,7 +1137,7 @@ export default function ProfilePage() {
                 <div className="empty-tag-ring">
                   <div className="tag-ring-outer"></div>
                   <div className="tag-ring-inner">
-                    <i className="fa-solid fa-users"></i>
+                    <SiteIcon name="fa-users" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -1149,7 +1150,7 @@ export default function ProfilePage() {
                 <span className="section-title">全部粉丝</span>
                 <div className="list-search-wrapper">
                   <input type="text" className="list-search" id="search-followers" placeholder="搜索粉丝用户..." />
-                  <i className="fa-solid fa-magnifying-glass list-search-icon"></i>
+                  <SiteIcon name="fa-magnifying-glass" variant="solid" className="list-search-icon" />
                 </div>
               </div>
               <div className="user-cards-grid">
@@ -1164,7 +1165,7 @@ export default function ProfilePage() {
             <div className="card-load-more" ref={profileLoadMoreRef}>
               {shownProfileItems < profilePageTotal ? (
                 <button type="button" className="btn-load-more" onClick={() => setShownProfileItems((count) => count + 12)}>
-                  <i className="fa-solid fa-angles-down" aria-hidden="true" /> 加载更多
+                  <SiteIcon name="fa-angles-down" variant="solid" aria-hidden="true" /> 加载更多
                 </button>
               ) : (
                 <span className="load-more-end">已加载全部 {profilePageTotal} 项内容</span>

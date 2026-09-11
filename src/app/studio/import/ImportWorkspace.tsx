@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import Link from "next/link";
 import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -54,9 +55,9 @@ interface PublishResult {
 }
 
 const renderStatusMark = (status: PublishResult["status"]) => {
-  if (status === "success") return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-  if (status === "failed") return <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><line x1="4" y1="4" x2="11" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><line x1="11" y1="4" x2="4" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
-  if (status === "publishing") return <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeOpacity=".25" strokeWidth="1.8" /><path d="M7.5 1.5a6 6 0 0 1 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  if (status === "success") return <SiteIcon name="fa-check" variant="solid" size={16} />;
+  if (status === "failed") return <SiteIcon name="fa-xmark" variant="solid" size={15} />;
+  if (status === "publishing") return <SiteIcon name="fa-spinner" variant="solid" size={15} className="animate-spin" />;
   return null;
 };
 
@@ -258,7 +259,7 @@ function EncodingSelect({ value, disabled, onChange }: { value: string; disabled
       }}
     >
       <span>{value.toUpperCase()}</span>
-      <i className={`fa-solid fa-chevron-${open ? "up" : "down"}`} aria-hidden="true" />
+      <SiteIcon name={open ? "fa-chevron-up" : "fa-chevron-down"} variant="solid" aria-hidden="true" />
     </button>
     {open && typeof document !== "undefined" && createPortal(<div ref={menuRef} id={menuId} className={styles.encodingMenu} role="listbox" aria-label="文字编码" style={menuPosition}>
       {TEXT_ENCODINGS.map((encoding, index) => <button
@@ -278,7 +279,7 @@ function EncodingSelect({ value, disabled, onChange }: { value: string; disabled
         }}
       >
         <span>{encoding.toUpperCase()}</span>
-        {encoding === value && <i className="fa-solid fa-check" aria-hidden="true" />}
+        {encoding === value && <SiteIcon name="fa-check" variant="solid" aria-hidden="true" />}
       </button>)}
     </div>, document.body)}
   </div>;
@@ -695,7 +696,7 @@ function TagEditor({ tags = [], onChange, disabled = false, showHint = true, pla
     <div className={styles.tagEditor}>
       <div className={styles.tagInputWrapper}>
         {tags.map((tag) => (
-          <span className={styles.tag} key={tag}>{tag}<button type="button" disabled={disabled} aria-label={`删除标签 ${tag}`} onClick={() => onChange(tags.filter((item) => item !== tag))}>×</button></span>
+          <span className={styles.tag} key={tag}>{tag}<button type="button" disabled={disabled} aria-label={`删除标签 ${tag}`} onClick={() => onChange(tags.filter((item) => item !== tag))}><SiteIcon name="fa-xmark" variant="solid" /></button></span>
         ))}
         <input value={value} disabled={disabled} placeholder={placeholder} onChange={(event) => setValue(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); addTag(); } }} />
       </div>
@@ -740,8 +741,8 @@ function SchedulePicker({ disabled, onChange }: { disabled?: boolean; onChange: 
       <div className={styles.schedulePickerField}>
         <span className={styles.schedulePickerLabel}>公开日期</span>
         <button type="button" className={`${styles.schedulePickerTrigger} ${value ? styles.schedulePickerSelected : ""}`} disabled={disabled} onClick={openDatePicker} aria-expanded={schedulePickerOpen}>
-          <span><i className="fa-regular fa-calendar-days" aria-hidden="true" /> {scheduleDisplayValue}</span>
-          <i className={`fa-solid fa-chevron-down ${schedulePickerOpen ? styles.schedulePickerChevronUp : ""}`} aria-hidden="true" />
+          <span><SiteIcon name="fa-calendar-days" variant="outline" aria-hidden="true" /> {scheduleDisplayValue}</span>
+          <SiteIcon name="fa-chevron-down" variant="solid" className={schedulePickerOpen ? styles.schedulePickerChevronUp : undefined} aria-hidden="true" />
         </button>
         {schedulePickerOpen && (
           <div className={styles.scheduleCalendarPopover} role="dialog" aria-label="选择公开日期">
@@ -749,12 +750,12 @@ function SchedulePicker({ disabled, onChange }: { disabled?: boolean; onChange: 
               <button type="button" aria-label="上个月" disabled={scheduleMonth <= currentCalendarMonth} onClick={() => {
                 const previous = new Date(calendarYear, calendarMonthIndex - 1, 1);
                 setScheduleMonth(`${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`);
-              }}><i className="fa-solid fa-chevron-left" aria-hidden="true" /></button>
+              }}><SiteIcon name="fa-chevron-left" variant="solid" aria-hidden="true" /></button>
               <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
               <button type="button" aria-label="下个月" onClick={() => {
                 const next = new Date(calendarYear, calendarMonthIndex + 1, 1);
                 setScheduleMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
-              }}><i className="fa-solid fa-chevron-right" aria-hidden="true" /></button>
+              }}><SiteIcon name="fa-chevron-right" variant="solid" aria-hidden="true" /></button>
             </div>
             <div className={styles.scheduleCalendarWeekdays}>{["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day}>{day}</span>)}</div>
             <div className={styles.scheduleCalendarGrid}>
@@ -777,8 +778,8 @@ function SchedulePicker({ disabled, onChange }: { disabled?: boolean; onChange: 
       <div className={styles.schedulePickerField}>
         <span className={styles.schedulePickerLabel}>公开时间</span>
         <button type="button" className={`${styles.schedulePickerTrigger} ${timePickerOpen ? styles.schedulePickerOpen : ""}`} disabled={disabled} onClick={openTimePicker} aria-expanded={timePickerOpen}>
-          <span><i className="fa-regular fa-clock" aria-hidden="true" /> {scheduleTime}</span>
-          <i className={`fa-solid fa-chevron-down ${timePickerOpen ? styles.schedulePickerChevronUp : ""}`} aria-hidden="true" />
+          <span><SiteIcon name="fa-clock" variant="outline" aria-hidden="true" /> {scheduleTime}</span>
+          <SiteIcon name="fa-chevron-down" variant="solid" className={timePickerOpen ? styles.schedulePickerChevronUp : undefined} aria-hidden="true" />
         </button>
         {timePickerOpen && (
           <div className={styles.scheduleTimePopover} role="dialog" aria-label="选择公开时间">
@@ -1700,7 +1701,7 @@ export default function ImportWorkspace() {
                 onDragLeave={() => setDragging(false)}
                 onDrop={(event: DragEvent) => { event.preventDefault(); setDragging(false); void handleFiles(event.dataTransfer.files); }}
               >
-                <i className="fa-solid fa-file-arrow-up" aria-hidden="true" />
+                <SiteIcon name="fa-file-arrow-up" variant="solid" aria-hidden="true" />
                 <strong className={styles.uploadHint}>点击上传文件</strong>
                 <p>支持 DOCX、TXT、Markdown、HTML、EPUB；一次最多50个文件，单个不超过20MB。</p>
                 {busy && <span className={styles.uploadBusy}>正在解析...</span>}
@@ -1709,10 +1710,10 @@ export default function ImportWorkspace() {
               {(sourceTab === "notion" || sourceTab === "feishu") && <div className={styles.onlinePanel}>
                 <div className={styles.onlineHeading}>
                   <div><span className={styles.panelEyebrow}>在线文档</span><h2>从{sourceTab === "notion" ? " Notion" : "飞书"}导入</h2><p>先连接账号，再粘贴你要导入的文档链接。</p></div>
-                  <span className={providerStatus[sourceTab].connected ? styles.connectedBadge : styles.disconnectedBadge}><i className={`fa-solid ${providerStatus[sourceTab].connected ? "fa-circle-check" : "fa-circle"}`} aria-hidden="true" />{providerStatus[sourceTab].connected ? "已连接" : "未连接"}</span>
+                  <span className={providerStatus[sourceTab].connected ? styles.connectedBadge : styles.disconnectedBadge}><SiteIcon name={providerStatus[sourceTab].connected ? "fa-circle-check" : "fa-circle"} variant="solid" aria-hidden="true" />{providerStatus[sourceTab].connected ? "已连接" : "未连接"}</span>
                 </div>
                 {!providerStatus[sourceTab].connected ? <div className={styles.connectStage}>
-                  <div className={styles.stageIcon}><i className="fa-solid fa-link" aria-hidden="true" /></div>
+                  <div className={styles.stageIcon}><SiteIcon name="fa-link" variant="solid" aria-hidden="true" /></div>
                   <div><strong>连接你的{sourceTab === "notion" ? " Notion" : "飞书"}账号</strong><p>授权完成后，回到这里粘贴并读取具体文档。</p></div>
                   <button type="button" className={styles.primaryButton} disabled={busy} onClick={() => connectProvider(sourceTab)}>连接并授权</button>
                 </div> : <div className={styles.readStage}>
@@ -1808,8 +1809,8 @@ export default function ImportWorkspace() {
                   <div className={styles.statusHead}>
                     <span className={`${styles.headIcon} ${publishComplete ? styles.headDone : styles.headSpin}`} aria-hidden="true">
                       {publishComplete
-                        ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        : <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.8" stroke="currentColor" strokeOpacity=".25" strokeWidth="2" /><path d="M8.5 1.7a6.8 6.8 0 0 1 6.8 6.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>}
+                        ? <SiteIcon name="fa-check" variant="solid" size={16} />
+                        : <SiteIcon name="fa-spinner" variant="solid" size={17} className="animate-spin" />}
                     </span>
                     <div className={styles.headText}>
                       <h3>{publishComplete ? "处理完成" : "正在写入作品"}<span className={styles.counter}>{publishDoneCount} / {publishResults.length} 篇</span></h3>

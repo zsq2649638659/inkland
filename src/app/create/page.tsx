@@ -1,4 +1,6 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
+import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -133,16 +135,16 @@ function EditorToolbar({
   return (
     <div className="editor-toolbar">
       <button className="toolbar-btn" onClick={onBold} title="加粗" type="button">
-        <i className="fa-solid fa-bold" />
+        <SiteIcon name="fa-bold" variant="solid" />
       </button>
       <button className="toolbar-btn" onClick={onItalic} title="斜体" type="button">
-        <i className="fa-solid fa-italic" />
+        <SiteIcon name="fa-italic" variant="solid" />
       </button>
       <button className="toolbar-btn" onClick={onUnderline} title="下划线" type="button">
-        <i className="fa-solid fa-underline" />
+        <SiteIcon name="fa-underline" variant="solid" />
       </button>
       <button className="toolbar-btn" onClick={onStrikethrough} title="删除线" type="button">
-        <i className="fa-solid fa-strikethrough" />
+        <SiteIcon name="fa-strikethrough" variant="solid" />
       </button>
 
       <div className="toolbar-divider" />
@@ -154,10 +156,10 @@ function EditorToolbar({
         disabled={uploadingImage}
         type="button"
       >
-        <i className={`fa-solid ${uploadingImage ? "fa-spinner animate-spin" : "fa-image"}`} />
+        <SiteIcon name={uploadingImage ? "fa-spinner" : "fa-image"} variant="solid" className={uploadingImage ? "animate-spin" : undefined} />
       </button>
       <button className="toolbar-btn" onClick={onHr} title="分割线" type="button">
-        <i className="fa-solid fa-minus" />
+        <SiteIcon name="fa-minus" variant="solid" />
       </button>
 
       <div className="editor-preview-toggle">
@@ -193,9 +195,9 @@ function ArticleToolbar({ onCommand, onFormat, onImport, onPreview, editorTools 
     return () => document.removeEventListener("pointerdown", close);
   }, [fontSizeOpen]);
 
-  const button = (icon: string, label: string, onClick: () => void) => (
+  const button = (icon: InklandIconName, label: string, onClick: () => void) => (
     <button type="button" className="tb-btn" aria-label={label} title={label} onMouseDown={(event) => event.preventDefault()} onClick={onClick}>
-      <i className={`fa-solid ${icon}`} aria-hidden="true" />
+      <SiteIcon name={icon} variant="solid" aria-hidden="true" />
     </button>
   );
 
@@ -215,10 +217,10 @@ function ArticleToolbar({ onCommand, onFormat, onImport, onPreview, editorTools 
       {button("fa-file-import", "导入文档", onImport)}
       {button("fa-eye", "预览", onPreview)}
       {editorTools && <div className="editor-font-size-control" ref={fontSizeRef}>
-        <button type="button" className={`tb-btn ${fontSizeOpen ? "active" : ""}`} aria-label="调节字号" title="调节字号" aria-expanded={fontSizeOpen} onClick={() => setFontSizeOpen((open) => !open)}><i className="fa-solid fa-font" /></button>
+        <button type="button" className={`tb-btn ${fontSizeOpen ? "active" : ""}`} aria-label="调节字号" title="调节字号" aria-expanded={fontSizeOpen} onClick={() => setFontSizeOpen((open) => !open)}><SiteIcon name="fa-font" variant="solid" /></button>
         {fontSizeOpen && <div className="editor-font-size-popover" role="dialog" aria-label="调节正文字号"><span className="font-size-letter font-size-small" aria-hidden="true">A</span><span className="editor-font-size-track"><span className="editor-font-size-ticks" aria-hidden="true"><i /><i /><i /><i /></span><input type="range" min="12" max="26" step="1" value={fontSize} aria-label="正文字号" onChange={(event) => onFontSizeChange?.(Number(event.target.value))} /></span><span className="font-size-letter font-size-large" aria-hidden="true">A</span></div>}
       </div>}
-      {editorTools && <button type="button" className={`tb-btn ${expanded ? "active" : ""}`} aria-label={expanded ? "退出专注模式" : "放大编辑器"} title={expanded ? "退出专注模式" : "放大编辑器"} onClick={onToggleExpanded}><i className={`fa-solid ${expanded ? "fa-compress" : "fa-expand"}`} /></button>}
+      {editorTools && <button type="button" className={`tb-btn ${expanded ? "active" : ""}`} aria-label={expanded ? "退出专注模式" : "放大编辑器"} title={expanded ? "退出专注模式" : "放大编辑器"} onClick={onToggleExpanded}><SiteIcon name={expanded ? "fa-compress" : "fa-expand"} variant="solid" /></button>}
     </div>
   );
 }
@@ -360,10 +362,10 @@ function ArticleEditorSurface({
           }}
         />
       </div>
-      {importError && <div className="editor-import-error" role="alert"><i className="fa-solid fa-circle-exclamation" />{importError}</div>}
-      {previewOpen && <div className={`modal-overlay active ${previewTitle ? "chapter-preview-overlay" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }}><div className={`modal editor-preview-modal ${previewTitle ? "chapter-preview-modal" : ""}`} role="dialog" aria-modal="true"><button type="button" className="modal-close chapter-preview-close" onClick={() => setPreviewOpen(false)} aria-label="关闭"><i className="fa-solid fa-xmark" /></button>{previewTitle ? <><h1 className="chapter-preview-title">{previewTitle}</h1><div className="editor-preview chapter-preview-body active" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(value) }} /></> : <><div className="modal-title-row"><h2 className="modal-title">内容预览</h2></div><div className="editor-preview active" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(value) }} /></>}</div></div>}
+      {importError && <div className="editor-import-error" role="alert"><SiteIcon name="fa-circle-exclamation" variant="solid" />{importError}</div>}
+      {previewOpen && <div className={`modal-overlay active ${previewTitle ? "chapter-preview-overlay" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }}><div className={`modal editor-preview-modal ${previewTitle ? "chapter-preview-modal" : ""}`} role="dialog" aria-modal="true"><button type="button" className="modal-close chapter-preview-close" onClick={() => setPreviewOpen(false)} aria-label="关闭"><SiteIcon name="fa-xmark" variant="solid" /></button>{previewTitle ? <><h1 className="chapter-preview-title">{previewTitle}</h1><div className="editor-preview chapter-preview-body active" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(value) }} /></> : <><div className="modal-title-row"><h2 className="modal-title">内容预览</h2></div><div className="editor-preview active" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(value) }} /></>}</div></div>}
       <div className="editor-footer">
-        <span><i className="fa-solid fa-check" /> 草稿已保存</span>
+        <span><SiteIcon name="fa-check" variant="solid" /> 草稿已保存</span>
         <span className="char-count">{value.replace(/\s/g, "").length} 字</span>
       </div>
     </div>
@@ -442,12 +444,12 @@ function PublishHeader({
     <header className="sticky top-0 z-50 bg-card border-b border-rule">
       <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
         <Link href="/" className="btn-ghost no-underline">
-          <i className="fa-solid fa-arrow-left mr-1" />返回
+          <SiteIcon name="fa-arrow-left" variant="solid" className="mr-1" />返回
         </Link>
         <span className="text-sm font-medium text-warm">{title}</span>
         {onSubmit ? (
           <button className="submit-btn" onClick={onSubmit} disabled={submitting}>
-            <i className="fa-solid fa-paper-plane mr-1" />
+            <SiteIcon name="fa-paper-plane" variant="solid" className="mr-1" />
             {submitting ? "发布中..." : "发布"}
           </button>
         ) : (
@@ -1000,13 +1002,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     <>
       {errorMsg && (
         <div className="create-notice create-notice-error" role="alert">
-          <i className="fa-solid fa-circle-exclamation" /> {errorMsg}
+          <SiteIcon name="fa-circle-exclamation" variant="solid" /> {errorMsg}
         </div>
       )}
       {successMsg && (
         <div className="create-success-overlay" role="status">
           <div className="create-success-dialog">
-            <span className="create-success-icon"><i className="fa-solid fa-check" /></span>
+            <span className="create-success-icon"><SiteIcon name="fa-check" variant="solid" /></span>
             <strong>操作成功</strong>
             <p>{successMsg}{successAction === "publish" && <><br />即将返回{editPostId ? "创作中心" : "首页"}</>}</p>
             {successAction !== "publish" && (
@@ -1262,10 +1264,10 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       <div className="publish-modal" role="dialog" aria-modal="true" aria-labelledby="image-publish-modal-title">
         <div className="publish-modal-header">
           <div className={`publish-modal-icon publish-modal-icon-${publishModal}`}>
-            <i className={`fa-solid ${publishModal === "schedule" ? "fa-clock" : "fa-bookmark"}`} />
+            <SiteIcon name={publishModal === "schedule" ? "fa-clock" : "fa-bookmark"} variant="solid" />
           </div>
           <button type="button" className="publish-modal-close" aria-label="关闭弹窗" onClick={() => setPublishModal(null)} disabled={submitting}>
-            <i className="fa-solid fa-xmark" />
+            <SiteIcon name="fa-xmark" variant="solid" />
           </button>
         </div>
         <div className="publish-modal-copy">
@@ -1283,8 +1285,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               <span className="publish-datetime-picker">
                 <span className="publish-picker-label">公开日期</span>
                 <button type="button" className={`publish-datetime-trigger ${scheduleValue ? "selected" : ""}`} onClick={() => { setSchedulePickerOpen(!schedulePickerOpen); setTimePickerOpen(false); }} aria-expanded={schedulePickerOpen}>
-                  <span><i className="fa-regular fa-calendar-days" /> {scheduleDisplayValue}</span>
-                  <i className={`fa-solid fa-chevron-down ${schedulePickerOpen ? "up" : ""}`} />
+                  <span><SiteIcon name="fa-calendar-days" variant="outline" /> {scheduleDisplayValue}</span>
+                  <SiteIcon name="fa-chevron-down" variant="solid" className={schedulePickerOpen ? "up" : undefined} />
                 </button>
                 {schedulePickerOpen && (
                   <span className="publish-calendar-popover" role="dialog" aria-label="选择公开日期">
@@ -1292,12 +1294,12 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                       <button type="button" aria-label="上个月" disabled={scheduleMonth <= currentCalendarMonth} onClick={() => {
                         const previous = new Date(calendarYear, calendarMonthIndex - 1, 1);
                         setScheduleMonth(`${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`);
-                      }}><i className="fa-solid fa-chevron-left" /></button>
+                      }}><SiteIcon name="fa-chevron-left" variant="solid" /></button>
                       <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
                       <button type="button" aria-label="下个月" onClick={() => {
                         const next = new Date(calendarYear, calendarMonthIndex + 1, 1);
                         setScheduleMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
-                      }}><i className="fa-solid fa-chevron-right" /></button>
+                      }}><SiteIcon name="fa-chevron-right" variant="solid" /></button>
                     </span>
                     <span className="publish-calendar-weekdays">{["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day}>{day}</span>)}</span>
                     <span className="publish-calendar-grid">
@@ -1316,8 +1318,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               <span className="publish-time-picker">
                 <span className="publish-picker-label">公开时间</span>
                 <button type="button" className={`publish-time-trigger ${timePickerOpen ? "open" : ""}`} onClick={() => { setTimePickerOpen(!timePickerOpen); setSchedulePickerOpen(false); }} aria-expanded={timePickerOpen}>
-                  <span><i className="fa-regular fa-clock" /> {scheduleTime}</span>
-                  <i className={`fa-solid fa-chevron-down ${timePickerOpen ? "up" : ""}`} />
+                  <span><SiteIcon name="fa-clock" variant="outline" /> {scheduleTime}</span>
+                  <SiteIcon name="fa-chevron-down" variant="solid" className={timePickerOpen ? "up" : undefined} />
                 </button>
                 {timePickerOpen && (
                   <span className="publish-time-popover" role="dialog" aria-label="选择公开时间">
@@ -1516,7 +1518,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const renderChapterPublishModal = () => publishModal && (
     <div className="publish-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) setPublishModal(null); }}>
       <div className="publish-modal" role="dialog" aria-modal="true" aria-labelledby="chapter-publish-modal-title">
-        <div className="publish-modal-header"><div className={`publish-modal-icon publish-modal-icon-${publishModal}`}><i className={`fa-solid ${publishModal === "schedule" ? "fa-clock" : "fa-bookmark"}`} /></div><button type="button" className="publish-modal-close" aria-label="关闭弹窗" onClick={() => setPublishModal(null)}><i className="fa-solid fa-xmark" /></button></div>
+        <div className="publish-modal-header"><div className={`publish-modal-icon publish-modal-icon-${publishModal}`}><SiteIcon name={publishModal === "schedule" ? "fa-clock" : "fa-bookmark"} variant="solid" /></div><button type="button" className="publish-modal-close" aria-label="关闭弹窗" onClick={() => setPublishModal(null)}><SiteIcon name="fa-xmark" variant="solid" /></button></div>
         <div className="publish-modal-copy"><h2 id="chapter-publish-modal-title">{publishModal === "schedule" ? "定时发布" : "保存为草稿"}</h2><p>{publishModal === "schedule" ? "选择章节公开的日期和时间。" : "当前章节标题、正文和作者的话都会保留，之后可以继续编辑。"}</p></div>
         {publishModal === "schedule" && <div className="publish-modal-field"><span className="publish-schedule-label">公开日期和时间</span><input type="datetime-local" value={scheduleValue} min={toLocalDateTimeValue(new Date(Date.now() + 60_000).toISOString())} onChange={(event) => setScheduleValue(event.target.value)} /></div>}
         <div className="publish-modal-actions"><button type="button" className="publish-modal-button publish-modal-button-primary" disabled={submitting} onClick={() => {
@@ -1570,7 +1572,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const renderError = () =>
     errorMsg && (
       <div className="create-form-error" role="alert">
-        <span className="create-form-error-icon"><i className="fa-solid fa-circle-exclamation" /></span>
+        <span className="create-form-error-icon"><SiteIcon name="fa-circle-exclamation" variant="solid" /></span>
         <span className="create-form-error-copy">
           <strong>还不能发布</strong>
           <span>{errorMsg}</span>
@@ -1655,13 +1657,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     reviewRejectionReason && (
       <div className="review-rejection-banner" role="alert">
         <div className="review-rejection-head">
-          <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+          <SiteIcon name="fa-triangle-exclamation" variant="solid" aria-hidden="true" />
           <strong>作品未通过审核</strong>
         </div>
         <p className="review-rejection-reason">{reviewRejectionReason}</p>
         {publishedVersionNumber != null && (
           <p className="review-rejection-note">
-            <i className="fa-solid fa-circle-info" aria-hidden="true" />
+            <SiteIcon name="fa-circle-info" variant="solid" aria-hidden="true" />
             旧版本仍公开可见，不会受到影响；修改并重新提交后，通过审核的新版本才会替换旧版本。
           </p>
         )}
@@ -1682,7 +1684,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   {issue.quoted_text && <span className="review-issue-quote">「{issue.quoted_text}」</span>}
                   {issue.details && <span className="review-issue-details">{issue.details}</span>}
                   <button type="button" className="review-issue-locate" onClick={() => locateReviewIssue(issue)}>
-                    <i className="fa-solid fa-crosshairs" aria-hidden="true" /> 定位
+                    <SiteIcon name="fa-crosshairs" variant="solid" aria-hidden="true" /> 定位
                   </button>
                 </li>
               ))}
@@ -1695,7 +1697,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const renderPendingReviewBanner = () =>
     pendingReviewStatus === "pending" && (
       <div className="review-pending-banner" role="status">
-        <i className="fa-solid fa-hourglass-half" aria-hidden="true" />
+        <SiteIcon name="fa-hourglass-half" variant="solid" aria-hidden="true" />
         {publishedVersionNumber != null
           ? "修改已提交人工审核，旧版本继续公开；审核通过后新版本会自动替换。"
           : "作品已进入人工审核，审核通过后会公开。"}
@@ -1706,7 +1708,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   // ---- 类型选择 ----
   if (view === "select") {
-    const types = [
+    const types: Array<{ view: ViewType; icon: InklandIconName; label: string; desc: string }> = [
       { view: "text" as ViewType, icon: "fa-file-lines", label: "发布单篇", desc: "发布独立的文章，支持 Markdown 编辑，适合短篇故事、随笔、杂谈" },
       { view: "image" as ViewType, icon: "fa-image", label: "发布图片", desc: "上传插画、漫画或摄影作品，配以文字说明，展示你的视觉创作" },
       { view: "series-create" as ViewType, icon: "fa-book", label: "长篇连载", desc: "创建长篇连载作品，支持多章节管理，适合小说、长篇等持续创作" },
@@ -1735,7 +1737,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   }}
                 >
                   <div className="type-card-icon">
-                    <i className={`fa-solid ${t.icon}`} />
+                    <SiteIcon name={t.icon} variant="solid" />
                   </div>
                   <div className="type-card-title">{t.label}</div>
                   <div className="type-card-desc">{t.desc}</div>
@@ -1743,7 +1745,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               ))}
               <Link href="/studio/import" className="type-card">
                 <div className="type-card-icon">
-                  <i className="fa-solid fa-file-import" aria-hidden="true" />
+                  <SiteIcon name="fa-file-import" variant="solid" aria-hidden="true" />
                 </div>
                 <div className="type-card-title">批量导入作品</div>
                 <div className="type-card-desc">从本地文档、Notion 或飞书一次导入多篇内容，确认后统一编辑和发布</div>
@@ -1791,7 +1793,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   <span key={tag} className="tag-chip">
                     {tag}
                     <button type="button" className="tag-chip-remove" aria-label={`删除标签 ${tag}`} onClick={() => setTags(tags.filter((item) => item !== tag))}>
-                      <i className="fa-solid fa-xmark" />
+                      <SiteIcon name="fa-xmark" variant="solid" />
                     </button>
                   </span>
                 ))}
@@ -1850,7 +1852,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   <div className={`custom-select ${collectionSelectOpen ? "open" : ""}`}>
                   <button type="button" className="custom-select-trigger" onClick={() => setCollectionSelectOpen(!collectionSelectOpen)}>
                     <span className={`custom-select-value ${selectedCollection ? "selected" : ""}`}>{selectedCollection || "请选择合集..."}</span>
-                    <i className="fa-solid fa-chevron-down custom-select-arrow" />
+                    <SiteIcon name="fa-chevron-down" variant="solid" className="custom-select-arrow" />
                   </button>
                   {collectionSelectOpen && (
                     <div className="custom-select-dropdown">
@@ -1870,7 +1872,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   <input className="form-input" placeholder="合集名称" maxLength={50} value={collectionName} onChange={(e) => setCollectionName(e.target.value)} />
                   <input className="form-input" placeholder="合集简介（选填）" maxLength={200} value={collectionDesc} onChange={(e) => setCollectionDesc(e.target.value)} />
                   <button type="button" className="btn-collection-create" onClick={createCollection} disabled={submitting}>
-                    <i className="fa-solid fa-check" /> 创建合集
+                    <SiteIcon name="fa-check" variant="solid" /> 创建合集
                   </button>
                 </div>
               )}
@@ -1885,23 +1887,23 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             {errorMsg && !successMsg && renderError()}
 
             <div className="publish-footer">
-              <Link href="/guidelines" className="publish-guidelines"><i className="fa-solid fa-shield-halved" /> 社区公约与发布规范</Link>
+              <Link href="/guidelines" className="publish-guidelines"><SiteIcon name="fa-shield-halved" variant="solid" /> 社区公约与发布规范</Link>
               <div className="publish-actions">
                 {scheduleValue && visibility !== "private" && (
                   <div className="scheduled-summary" role="status">
-                    <i className="fa-regular fa-clock" />
+                    <SiteIcon name="fa-clock" variant="outline" />
                     <span>定时于 {new Date(scheduleValue).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 发布</span>
-                    <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><i className="fa-solid fa-xmark" /></button>
+                    <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><SiteIcon name="fa-xmark" variant="solid" /></button>
                   </div>
                 )}
                 <div className="publish-dropdown">
                   <div className="btn-publish-split">
                     <button type="button" className="btn-publish" onClick={() => submitText(scheduleValue && visibility !== "private" ? { scheduledAt: new Date(scheduleValue).toISOString() } : undefined)} disabled={submitting || uploadingImage}>
-                      <i className={`fa-solid ${submitting || uploadingImage ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                      <SiteIcon name={submitting || uploadingImage ? "fa-spinner" : "fa-paper-plane"} variant="solid" className={submitting || uploadingImage ? "animate-spin" : undefined} />
                       {submitting ? "发布中..." : uploadingImage ? "准备图片中..." : (editPostId ? "保存修改" : "发布作品")}
                     </button>
                     <button type="button" className="btn-publish-arrow" aria-label="更多发布选项" onClick={() => setPublishMenuOpen(!publishMenuOpen)}>
-                      <i className="fa-solid fa-chevron-down" />
+                      <SiteIcon name="fa-chevron-down" variant="solid" />
                     </button>
                   </div>
                   {publishMenuOpen && (
@@ -1915,9 +1917,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                           setPublishModal("schedule");
                         }}
                       >
-                        <i className="fa-solid fa-clock" /> 定时发布
+                        <SiteIcon name="fa-clock" variant="solid" /> 定时发布
                       </button>
-                      <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setPublishModal("draft"); }}><i className="fa-solid fa-bookmark" /> 保存为草稿</button>
+                      <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setPublishModal("draft"); }}><SiteIcon name="fa-bookmark" variant="solid" /> 保存为草稿</button>
                     </div>
                   )}
                 </div>
@@ -1930,10 +1932,10 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             <div className="publish-modal" role="dialog" aria-modal="true" aria-labelledby="publish-modal-title">
               <div className="publish-modal-header">
                 <div className={`publish-modal-icon publish-modal-icon-${publishModal}`}>
-                  <i className={`fa-solid ${publishModal === "schedule" ? "fa-clock" : "fa-bookmark"}`} />
+                  <SiteIcon name={publishModal === "schedule" ? "fa-clock" : "fa-bookmark"} variant="solid" />
                 </div>
                 <button type="button" className="publish-modal-close" aria-label="关闭弹窗" onClick={() => setPublishModal(null)} disabled={submitting}>
-                  <i className="fa-solid fa-xmark" />
+                  <SiteIcon name="fa-xmark" variant="solid" />
                 </button>
               </div>
               <div className="publish-modal-copy">
@@ -1951,8 +1953,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                     <span className="publish-datetime-picker">
                       <span className="publish-picker-label">公开日期</span>
                       <button type="button" className={`publish-datetime-trigger ${scheduleValue ? "selected" : ""}`} onClick={() => { setSchedulePickerOpen(!schedulePickerOpen); setTimePickerOpen(false); }} aria-expanded={schedulePickerOpen}>
-                        <span><i className="fa-regular fa-calendar-days" /> {scheduleDisplayValue}</span>
-                        <i className={`fa-solid fa-chevron-down ${schedulePickerOpen ? "up" : ""}`} />
+                        <span><SiteIcon name="fa-calendar-days" variant="outline" /> {scheduleDisplayValue}</span>
+                        <SiteIcon name="fa-chevron-down" variant="solid" className={schedulePickerOpen ? "up" : undefined} />
                       </button>
                       {schedulePickerOpen && (
                         <span className="publish-calendar-popover" role="dialog" aria-label="选择公开日期">
@@ -1960,12 +1962,12 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                           <button type="button" aria-label="上个月" disabled={scheduleMonth <= currentCalendarMonth} onClick={() => {
                             const previous = new Date(calendarYear, calendarMonthIndex - 1, 1);
                             setScheduleMonth(`${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`);
-                          }}><i className="fa-solid fa-chevron-left" /></button>
+                          }}><SiteIcon name="fa-chevron-left" variant="solid" /></button>
                           <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
                           <button type="button" aria-label="下个月" onClick={() => {
                             const next = new Date(calendarYear, calendarMonthIndex + 1, 1);
                             setScheduleMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
-                          }}><i className="fa-solid fa-chevron-right" /></button>
+                          }}><SiteIcon name="fa-chevron-right" variant="solid" /></button>
                         </span>
                         <span className="publish-calendar-weekdays">{["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day}>{day}</span>)}</span>
                         <span className="publish-calendar-grid">
@@ -1988,8 +1990,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                     <span className="publish-time-picker">
                       <span className="publish-picker-label">公开时间</span>
                       <button type="button" className={`publish-time-trigger ${timePickerOpen ? "open" : ""}`} onClick={() => { setTimePickerOpen(!timePickerOpen); setSchedulePickerOpen(false); }} aria-expanded={timePickerOpen}>
-                        <span><i className="fa-regular fa-clock" /> {scheduleTime}</span>
-                        <i className={`fa-solid fa-chevron-down ${timePickerOpen ? "up" : ""}`} />
+                        <span><SiteIcon name="fa-clock" variant="outline" /> {scheduleTime}</span>
+                        <SiteIcon name="fa-chevron-down" variant="solid" className={timePickerOpen ? "up" : undefined} />
                       </button>
                       {timePickerOpen && (
                         <span className="publish-time-popover" role="dialog" aria-label="选择公开时间">
@@ -2091,11 +2093,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 }}
                 aria-label="上传图片"
               >
-                <i className="fa-solid fa-cloud-arrow-up image-upload-icon"></i>
+                <SiteIcon name="fa-cloud-arrow-up" variant="solid" className="image-upload-icon" />
                 <div className="image-upload-title">点击或拖拽上传图片</div>
                 {uploadingImage && (
                   <div className="image-upload-progress">
-                    <i className="fa-solid fa-spinner fa-spin" aria-label="上传中" />
+                    <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" aria-label="上传中" />
                     <span>正在上传图片，请稍候...</span>
                   </div>
                 )}
@@ -2119,7 +2121,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                           onClick={() => setUploadedImages((prev) => prev.filter((_, j) => j !== i))}
                           title="删除图片"
                         >
-                          <i className="fa-solid fa-trash-can"></i>
+                          <SiteIcon name="fa-trash-can" variant="solid" />
                         </button>
                       </div>
                     </div>
@@ -2149,7 +2151,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   <span key={tag} className="tag-chip">
                     {tag}
                     <span className="tag-chip-remove" onClick={() => setTags(tags.filter((t) => t !== tag))}>
-                      <i className="fa-solid fa-xmark"></i>
+                      <SiteIcon name="fa-xmark" variant="solid" />
                     </span>
                   </span>
                 ))}
@@ -2215,7 +2217,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   <div className={`custom-select ${collectionSelectOpen ? "open" : ""}`}>
                     <button type="button" className="custom-select-trigger" onClick={() => setCollectionSelectOpen(!collectionSelectOpen)}>
                       <span className={`custom-select-value ${selectedCollection ? "selected" : ""}`}>{selectedCollection || "请选择合集..."}</span>
-                      <i className="fa-solid fa-chevron-down custom-select-arrow" />
+                      <SiteIcon name="fa-chevron-down" variant="solid" className="custom-select-arrow" />
                     </button>
                     {collectionSelectOpen && (
                       <div className="custom-select-dropdown">
@@ -2235,7 +2237,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   <input className="form-input" placeholder="合集名称" maxLength={50} value={collectionName} onChange={(e) => setCollectionName(e.target.value)} />
                   <input className="form-input" placeholder="合集简介（选填）" maxLength={200} value={collectionDesc} onChange={(e) => setCollectionDesc(e.target.value)} />
                   <button type="button" className="btn-collection-create" onClick={createCollection} disabled={submitting}>
-                    <i className="fa-solid fa-check" /> 创建合集
+                    <SiteIcon name="fa-check" variant="solid" /> 创建合集
                   </button>
                 </div>
               )}
@@ -2250,33 +2252,33 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             {/* Footer */}
             <div className="publish-footer">
               <Link href="/guidelines" className="publish-guidelines">
-                <i className="fa-solid fa-shield-halved"></i> 社区公约与发布规范
+                <SiteIcon name="fa-shield-halved" variant="solid" /> 社区公约与发布规范
               </Link>
               <div className="publish-actions">
                 {scheduleValue && visibility !== "private" && (
                   <div className="scheduled-summary" role="status">
-                    <i className="fa-regular fa-clock" />
+                    <SiteIcon name="fa-clock" variant="outline" />
                     <span>定时于 {new Date(scheduleValue).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 发布</span>
-                    <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><i className="fa-solid fa-xmark" /></button>
+                    <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><SiteIcon name="fa-xmark" variant="solid" /></button>
                   </div>
                 )}
                 <div className="publish-dropdown">
                   <div className="btn-publish-split">
                     <button type="button" className="btn-publish" onClick={() => submitImage(scheduleValue && visibility !== "private" ? { scheduledAt: new Date(scheduleValue).toISOString() } : undefined)} disabled={submitting || uploadingImage}>
-                      <i className={`fa-solid ${submitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                      <SiteIcon name={submitting ? "fa-spinner" : "fa-paper-plane"} variant="solid" className={submitting ? "animate-spin" : undefined} />
                       {submitting ? "发布中..." : (editPostId ? "保存修改" : "发布作品")}
                     </button>
                     <button type="button" className="btn-publish-arrow" aria-label="更多发布选项" onClick={() => setPublishMenuOpen(!publishMenuOpen)}>
-                      <i className="fa-solid fa-chevron-down" />
+                      <SiteIcon name="fa-chevron-down" variant="solid" />
                     </button>
                   </div>
                   {publishMenuOpen && (
                     <div className="publish-dropdown-menu show">
                       <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("schedule"); }}>
-                        <i className="fa-solid fa-clock" /> 定时发布
+                        <SiteIcon name="fa-clock" variant="solid" /> 定时发布
                       </button>
                       <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setPublishModal("draft"); }}>
-                        <i className="fa-solid fa-bookmark" /> 保存为草稿
+                        <SiteIcon name="fa-bookmark" variant="solid" /> 保存为草稿
                       </button>
                     </div>
                   )}
@@ -2351,7 +2353,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                       aria-label={`删除标签 ${tag}`}
                       onClick={() => setNewSeriesTags(newSeriesTags.filter((item) => item !== tag))}
                     >
-                      <i className="fa-solid fa-xmark" />
+                      <SiteIcon name="fa-xmark" variant="solid" />
                     </button>
                   </span>
                 ))}
@@ -2394,10 +2396,10 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
             <div className="publish-footer">
               <Link href="/settings" className="publish-guidelines">
-                <i className="fa-solid fa-shield-halved" /> 社区公约与发布规范
+                <SiteIcon name="fa-shield-halved" variant="solid" /> 社区公约与发布规范
               </Link>
               <button type="button" className="btn-publish" onClick={createSeries} disabled={submitting}>
-                <i className={`fa-solid ${submitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                <SiteIcon name={submitting ? "fa-spinner" : "fa-paper-plane"} variant="solid" className={submitting ? "animate-spin" : undefined} />
                 {submitting ? "发布中..." : (editingSeries ? "保存修改" : "发布长篇")}
               </button>
             </div>
@@ -2414,11 +2416,11 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
         <header className="sticky top-0 z-50 bg-card border-b border-rule">
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
             <button className="btn-ghost" onClick={() => router.push(`/studio/series/${encodeURIComponent(currentSeries.name)}`)}>
-              <i className="fa-solid fa-arrow-left mr-1" />返回
+              <SiteIcon name="fa-arrow-left" variant="solid" className="mr-1" />返回
             </button>
             <span className="text-sm font-medium text-warm">章节管理</span>
             <button className="submit-btn" onClick={() => { setTitle(""); editor.setContent(""); setTags([]); setUploadedImages([]); setSeriesNameFromUrl(null); setView("chapter-create"); }}>
-              <i className="fa-solid fa-plus mr-1" />新增章节
+              <SiteIcon name="fa-plus" variant="solid" className="mr-1" />新增章节
             </button>
           </div>
         </header>
@@ -2433,7 +2435,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             <div className="text-center py-12">
               <p className="text-muted mb-4">暂无章节</p>
               <button className="submit-btn" onClick={() => { setTitle(""); editor.setContent(""); setTags([]); setUploadedImages([]); setSeriesNameFromUrl(null); setView("chapter-create"); }}>
-                <i className="fa-solid fa-plus mr-1" />新增第一章
+                <SiteIcon name="fa-plus" variant="solid" className="mr-1" />新增第一章
               </button>
             </div>
           ) : (
@@ -2474,7 +2476,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 <div className="serial-info-meta">
                   <span className="serial-info-status"><span className="serial-info-status-label">连载中</span></span>
                   <span className="dot" />
-                  <span><i className="fa-solid fa-layer-group" /> {isEditingChapter ? `正在编辑第 ${displayChapterNum} 章` : `即将更新第 ${displayChapterNum} 章`}</span>
+                  <span><SiteIcon name="fa-layer-group" variant="solid" /> {isEditingChapter ? `正在编辑第 ${displayChapterNum} 章` : `即将更新第 ${displayChapterNum} 章`}</span>
                 </div>
               </div>
             </div>
@@ -2483,7 +2485,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               <div className="form-section-header chapter-title-header">
                 <label className="form-label" htmlFor="chapterTitle">章节标题</label>
                 <button type="button" className="chapter-title-mode-button" aria-pressed={chapterTitleMode === "free"} onClick={() => setChapterTitleMode((mode) => mode === "numbered" ? "free" : "numbered")}>
-                  <i className="fa-solid fa-repeat" aria-hidden="true" />
+                  <SiteIcon name="fa-repeat" variant="solid" aria-hidden="true" />
                   {chapterTitleMode === "numbered" ? "切换为无序号标题" : "切换为章节序号标题"}
                 </button>
               </div>
@@ -2521,21 +2523,21 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             <div className="publish-action-bar">
               <div className="publish-actions-right">
                 {scheduleValue && <div className="scheduled-summary" role="status">
-                  <i className="fa-regular fa-clock" />
+                  <SiteIcon name="fa-clock" variant="outline" />
                   <span>定时于 {new Date(scheduleValue).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 发布</span>
-                  <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><i className="fa-solid fa-xmark" /></button>
+                  <button type="button" aria-label="清除定时发布" onClick={() => setScheduleValue("")}><SiteIcon name="fa-xmark" variant="solid" /></button>
                 </div>}
                 <div className="publish-dropdown" ref={chapterPublishRef}>
                   <div className="btn-publish-split">
                   <button type="button" className="btn-publish" onClick={() => void submitChapter(scheduleValue ? { scheduledAt: new Date(scheduleValue).toISOString() } : undefined)} disabled={submitting}>
-                    <i className={`fa-solid ${submitting ? "fa-spinner fa-spin" : "fa-paper-plane"}`} />
+                    <SiteIcon name={submitting ? "fa-spinner" : "fa-paper-plane"} variant="solid" className={submitting ? "animate-spin" : undefined} />
                     {submitting ? "保存中..." : isEditingChapter ? "保存修改" : "立即发布"}
                   </button>
-                  <button type="button" className="btn-publish-arrow" aria-label="更多发布选项" aria-expanded={publishMenuOpen} onClick={() => setPublishMenuOpen((open) => !open)}><i className={`fa-solid fa-chevron-down ${publishMenuOpen ? "up" : ""}`} /></button>
+                  <button type="button" className="btn-publish-arrow" aria-label="更多发布选项" aria-expanded={publishMenuOpen} onClick={() => setPublishMenuOpen((open) => !open)}><SiteIcon name="fa-chevron-down" variant="solid" className={publishMenuOpen ? "up" : undefined} /></button>
                   </div>
                   {publishMenuOpen && <div className="publish-dropdown-menu show">
-                    <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("schedule"); }}><i className="fa-solid fa-clock" />定时发布</button>
-                    <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("draft"); }}><i className="fa-solid fa-bookmark" />保存为草稿</button>
+                    <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("schedule"); }}><SiteIcon name="fa-clock" variant="solid" />定时发布</button>
+                    <button type="button" className="publish-dropdown-item" onClick={() => { setPublishMenuOpen(false); setErrorMsg(""); setPublishModal("draft"); }}><SiteIcon name="fa-bookmark" variant="solid" />保存为草稿</button>
                   </div>}
                 </div>
               </div>

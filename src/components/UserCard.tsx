@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -102,14 +103,14 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
           {btnText}
         </button>
         <button className="btn-block" onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }} title="更多">
-          <i className="fa-solid fa-ellipsis-vertical"></i>
+          <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
         </button>
         <div className={`user-action-popup${moreOpen ? " show" : ""}`} ref={popupRef}>
           <button className="user-action-popup-item" onClick={handleBlock}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>屏蔽
+            <SiteIcon name="fa-ban" variant="solid" />屏蔽
           </button>
           <button className="user-action-popup-item" onClick={handleReport}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>举报
+            <SiteIcon name="fa-flag" variant="solid" />举报
           </button>
         </div>
       </div>

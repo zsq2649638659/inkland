@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
@@ -222,19 +223,19 @@ export default function Navbar() {
                   <button
                     className={`search-dropdown-tab${activeFilterTab === "tags" ? " active" : ""}`}
                     onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("tags"); }}
-                  ><i className="fa-solid fa-tag" /> 标签</button>
+                  ><SiteIcon name="fa-tag" variant="solid" /> 标签</button>
                   <button
                     className={`search-dropdown-tab${activeFilterTab === "users" ? " active" : ""}`}
                     onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("users"); }}
-                  ><i className="fa-solid fa-user" /> 用户</button>
+                  ><SiteIcon name="fa-user" variant="solid" /> 用户</button>
                   <button
                     className={`search-dropdown-tab${activeFilterTab === "works" ? " active" : ""}`}
                     onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("works"); }}
-                  ><i className="fa-solid fa-file-lines" /> 作品</button>
+                  ><SiteIcon name="fa-file-lines" variant="solid" /> 作品</button>
                   <button
                     className={`search-dropdown-tab${activeFilterTab === "content" ? " active" : ""}`}
                     onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("content"); }}
-                  ><i className="fa-solid fa-align-left" /> 正文</button>
+                  ><SiteIcon name="fa-align-left" variant="solid" /> 正文</button>
                 </div>
 
                 {/* Results */}
@@ -242,13 +243,13 @@ export default function Navbar() {
                   {/* Tags */}
                   {activeFilterTab === "tags" && (tagSuggestions.length > 0 ? tagSuggestions.map((s) => (
                     <button key={s.name} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
-                      <div className="search-dropdown-item-icon"><i className="fa-solid fa-tag" /></div>
+                      <div className="search-dropdown-item-icon"><SiteIcon name="fa-tag" variant="solid" /></div>
                       <div className="search-dropdown-item-body">
                         <span className="search-dropdown-item-title">{s.name}</span>
                       </div>
                       <span className="search-dropdown-item-meta">{s.subtitle}</span>
                     </button>
-                  )) : <div className="search-dropdown-empty"><i className="fa-solid fa-tag" />无匹配标签</div>)}
+                  )) : <div className="search-dropdown-empty"><SiteIcon name="fa-tag" variant="solid" />无匹配标签</div>)}
 
                   {/* Users */}
                   {activeFilterTab === "users" && (userSuggestions.length > 0 ? userSuggestions.map((s) => (
@@ -269,23 +270,23 @@ export default function Navbar() {
                   {/* Works (title) */}
                   {activeFilterTab === "works" && (postSuggestions.length > 0 ? postSuggestions.map((s) => (
                     <button key={s.id} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
-                      <div className="search-dropdown-item-icon work"><i className="fa-solid fa-file-lines" /></div>
+                      <div className="search-dropdown-item-icon work"><SiteIcon name="fa-file-lines" variant="solid" /></div>
                       <div className="search-dropdown-item-body">
                         <span className="search-dropdown-item-title">{s.name}</span>
                       </div>
                     </button>
-                  )) : <div className="search-dropdown-empty"><i className="fa-solid fa-file-lines" />无匹配作品</div>)}
+                  )) : <div className="search-dropdown-empty"><SiteIcon name="fa-file-lines" variant="solid" />无匹配作品</div>)}
 
                   {/* Content */}
                   {activeFilterTab === "content" && (contentSuggestions.length > 0 ? contentSuggestions.map((s) => (
                     <button key={s.id} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
-                      <div className="search-dropdown-item-icon content"><i className="fa-solid fa-align-left" /></div>
+                      <div className="search-dropdown-item-icon content"><SiteIcon name="fa-align-left" variant="solid" /></div>
                       <div className="search-dropdown-item-body">
                         <span className="search-dropdown-item-title">{s.name}</span>
                         {s.subtitle && <span className="search-dropdown-item-subtitle">{s.subtitle}</span>}
                       </div>
                     </button>
-                  )) : <div className="search-dropdown-empty"><i className="fa-solid fa-align-left" />无匹配正文</div>)}
+                  )) : <div className="search-dropdown-empty"><SiteIcon name="fa-align-left" variant="solid" />无匹配正文</div>)}
                 </div>
 
                 {/* Footer */}
@@ -293,7 +294,7 @@ export default function Navbar() {
                   <Link
                     href={`/search?q=${encodeURIComponent(searchQuery)}${activeFilterTab === "tags" ? "&type=tags" : activeFilterTab === "users" ? "&type=users" : activeFilterTab === "works" ? "&type=works" : "&type=posts"}`}
                     onMouseDown={(e) => e.preventDefault()}
-                  >查看全部结果 <i className="fa-solid fa-arrow-right" /></Link>
+                  >查看全部结果 <SiteIcon name="fa-arrow-right" variant="solid" /></Link>
                 </div>
               </div>
             )}
@@ -303,7 +304,7 @@ export default function Navbar() {
         {/* V2: navbar-right — only create button + mobile menu (avatar is in sidebar) */}
         <div className="navbar-right">
           <Link href={user || authLoading ? "/create" : "/login"} className="btn-create no-underline">
-            <i className="fa-solid fa-pen-to-square" /> 创作
+            <SiteIcon name="fa-pen-to-square" variant="solid" /> 创作
           </Link>
 
           {/* V2: mobile menu button */}
@@ -315,7 +316,7 @@ export default function Navbar() {
             aria-controls="mobile-drawer"
             onClick={openDrawer}
           >
-            <i className="fa-solid fa-bars" />
+            <SiteIcon name="fa-bars" variant="solid" />
           </button>
         </div>
       </div>

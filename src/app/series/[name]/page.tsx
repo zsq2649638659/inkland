@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -239,7 +240,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               <div className="hero-actions">
                 {chapters.length > 0 && (
                   <Link href={`/read/${chapters[0]?.id}`} className="hero-action-btn primary">
-                    <i className="fa-solid fa-book-open" /> 开始阅读
+                    <SiteIcon name="fa-book-open" variant="solid" /> 开始阅读
                   </Link>
                 )}
                 {user && !isOwner && (
@@ -248,7 +249,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                       className={`hero-action-btn ${isFollowing ? "bookmarked" : "primary"}`}
                       onClick={handleFollow}
                     >
-                      <i className="fa-solid fa-bookmark" />
+                      <SiteIcon name="fa-bookmark" variant="solid" />
                       {isFollowing ? "已收藏" : "收藏连载"}
                     </button>
                     <span className="series-follow-note">新章节会出现在首页“关注”内容中</span>
@@ -256,7 +257,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                 )}
                 {isOwner && (
                   <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="hero-action-btn">
-                    <i className="fa-solid fa-gear" /> 管理
+                    <SiteIcon name="fa-gear" variant="solid" /> 管理
                   </Link>
                 )}
               </div>
@@ -334,7 +335,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               </div>
               {chapters.length > 0 && (
                 <button className={`sort-toggle${sortOrder === "desc" ? " reversed" : ""}`} onClick={toggleSort}>
-                  <i className="fa-solid fa-arrow-down" /> {sortOrder === "desc" ? "正序" : "倒序"}
+                  <SiteIcon name="fa-arrow-down" variant="solid" /> {sortOrder === "desc" ? "正序" : "倒序"}
                 </button>
               )}
             </div>
@@ -352,7 +353,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                 </span>
                 {hasReadingProgress && continueChapter && (
                   <Link href={`/read/${continueChapter.id}`} className="banner-time reading-progress-action">
-                    继续阅读 <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                    继续阅读 <SiteIcon name="fa-arrow-right" variant="solid" aria-hidden="true" />
                   </Link>
                 )}
               </div>
@@ -365,7 +366,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                     <div className="chapter-empty-ring">
                       <div className="chapter-ring-outer"></div>
                       <div className="chapter-ring-inner">
-                        <i className="fa-solid fa-book-open"></i>
+                        <SiteIcon name="fa-book-open" variant="solid" />
                       </div>
                     </div>
                   </div>

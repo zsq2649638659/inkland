@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -221,15 +222,15 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
               </div>
               <div className="hero-actions">
                 <button className="hero-action-btn primary" onClick={() => setEditSeries(!editSeries)}>
-                  <i className="fa-solid fa-pencil" /> 编辑信息
+                  <SiteIcon name="fa-pencil" variant="solid" /> 编辑信息
                 </button>
                 {series?.status === "ongoing" ? (
                   <button className="hero-action-btn" onClick={() => handleSeriesStatus("completed")}>
-                    <i className="fa-solid fa-flag" /> 标记完结
+                    <SiteIcon name="fa-flag" variant="solid" /> 标记完结
                   </button>
                 ) : (
                   <button className="hero-action-btn" onClick={() => handleSeriesStatus("ongoing")}>
-                    <i className="fa-solid fa-play" /> 恢复连载
+                    <SiteIcon name="fa-play" variant="solid" /> 恢复连载
                   </button>
                 )}
               </div>
@@ -310,7 +311,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                       <span key={tag} className="tag-edit-pill">
                         <span className="tag-edit-text">{tag}</span>
                         <span className="tag-chip-remove" data-index={idx} onClick={() => removeTag(tag)}>
-                          <i className="fa-solid fa-xmark" />
+                          <SiteIcon name="fa-xmark" variant="solid" />
                         </span>
                       </span>
                     ))}
@@ -348,7 +349,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                 {/* 操作按钮 */}
                 <div className="edit-actions">
                   <button className="edit-save-btn" onClick={handleSaveSeries}>
-                    <i className="fa-solid fa-check" /> 保存修改
+                    <SiteIcon name="fa-check" variant="solid" /> 保存修改
                   </button>
                   <button
                     className="edit-cancel-btn"
@@ -375,11 +376,11 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
               <div className="chapter-header-actions">
                 {chapters.length > 0 && (
                   <button className="sort-toggle" onClick={toggleSort}>
-                    <i className="fa-solid fa-arrow-down" /> {sortOrder === "asc" ? "正序" : "倒序"}
+                    <SiteIcon name="fa-arrow-down" variant="solid" /> {sortOrder === "asc" ? "正序" : "倒序"}
                   </button>
                 )}
                 <Link href={`/create?seriesName=${encodeURIComponent(decodedName)}`} className="btn-new-chapter">
-                  <i className="fa-solid fa-plus"></i> 新建章节
+                  <SiteIcon name="fa-plus" variant="solid" /> 新建章节
                 </Link>
               </div>
             </div>
@@ -416,7 +417,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                             </span>
                             {ch.review_status === "rejected" && ch.review_reason && (
                               <p className="text-xs text-red-500 mt-0.5" style={{ margin: "2px 0 0" }}>
-                                <i className="fa-solid fa-circle-exclamation mr-1" />{normalizeModerationReason(ch.review_reason) || ch.review_reason}
+                                <SiteIcon name="fa-circle-exclamation" variant="solid" className="mr-1" />{normalizeModerationReason(ch.review_reason) || ch.review_reason}
                               </p>
                             )}
                           </td>
@@ -426,21 +427,13 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                           <td>
                             <div className="ch-actions">
                               <Link href={`/create?editPost=${ch.id}`} className="ch-action-btn" title="编辑">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                </svg>
+                                <SiteIcon name="fa-pencil" variant="solid" size={16} />
                               </Link>
                               <Link href={`/read/${ch.id}`} className="ch-action-btn" title="查看" target="_blank">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                  <circle cx="12" cy="12" r="3" />
-                                </svg>
+                                <SiteIcon name="fa-eye" variant="outline" size={16} />
                               </Link>
                               <button className="ch-action-btn" title="删除" onClick={() => handleDeleteChapter(ch.id)}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                </svg>
+                                <SiteIcon name="fa-trash-can" variant="solid" size={16} />
                               </button>
                             </div>
                           </td>

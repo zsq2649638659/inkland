@@ -1,5 +1,7 @@
 "use client";
 
+import SiteIcon from "@/components/SiteIcon";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -121,7 +123,7 @@ export default function DiscoverPage() {
             <div className="interest-discover-grid">
               {posts?.map((post) => (
                 <Link className="card interest-discover-item" href={`/read/${post.id}`} key={post.id}>
-                  <div className="interest-discover-item-icon"><i className={`fa-solid ${post.post_type === "serial" ? "fa-book-open" : "fa-file-lines"}`} aria-hidden="true" /></div>
+                  <div className="interest-discover-item-icon"><SiteIcon name={post.post_type === "serial" ? "fa-book-open" : "fa-file-lines"} variant="solid" aria-hidden="true" /></div>
                   <div className="interest-discover-item-body">
                     <h2>{post.title || "未命名作品"}</h2>
                     <div className="interest-discover-meta">

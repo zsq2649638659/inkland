@@ -1,4 +1,6 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
+import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -375,7 +377,7 @@ export default function StudioPage() {
     }
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: string): InklandIconName => {
     switch (type) {
       case "illustration":
       case "comic":
@@ -522,7 +524,7 @@ export default function StudioPage() {
                 <div className="feed-empty-tag-ring">
                   <div className="feed-empty-ring-outer"></div>
                   <div className="feed-empty-ring-inner">
-                    <i className="fa-solid fa-pen-to-square"></i>
+                    <SiteIcon name="fa-pen-to-square" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -556,28 +558,28 @@ export default function StudioPage() {
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-card-icon stat-card-icon--total">
-                <i className="fa-solid fa-layer-group"></i>
+                <SiteIcon name="fa-layer-group" variant="solid" />
               </div>
               <div className="stat-card-number">{works.length + seriesList.length}</div>
               <div className="stat-card-label">总作品数</div>
             </div>
             <div className="stat-card">
               <div className="stat-card-icon stat-card-icon--published">
-                <i className="fa-solid fa-circle-check"></i>
+                <SiteIcon name="fa-circle-check" variant="solid" />
               </div>
               <div className="stat-card-number">{publishedCount}</div>
               <div className="stat-card-label">已发布</div>
             </div>
             <div className="stat-card">
               <div className="stat-card-icon stat-card-icon--draft">
-                <i className="fa-solid fa-pencil"></i>
+                <SiteIcon name="fa-pencil" variant="solid" />
               </div>
               <div className="stat-card-number">{draftCount}</div>
               <div className="stat-card-label">草稿</div>
             </div>
             <div className="stat-card">
               <div className="stat-card-icon stat-card-icon--rejected">
-                <i className="fa-solid fa-circle-exclamation"></i>
+                <SiteIcon name="fa-circle-exclamation" variant="solid" />
               </div>
               <div className="stat-card-number">{rejectedCount}</div>
               <div className="stat-card-label">未过审</div>
@@ -611,7 +613,7 @@ export default function StudioPage() {
               </div>
             </div>
             <div className="search-wrap">
-              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+              <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
               <input
                 type="text"
                 placeholder="搜索作品标题..."
@@ -623,7 +625,7 @@ export default function StudioPage() {
             <div className="toolbar-row" style={{ justifyContent: "space-between" }}>
               <div className="sort-wrap">
                 <button className="btn-sort" onClick={() => setSortOpen(!sortOpen)}>
-                  <i className="fa-solid fa-arrow-down-wide-short"></i>
+                  <SiteIcon name="fa-arrow-down-wide-short" variant="solid" />
                   <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
                 </button>
                 {sortOpen && (
@@ -633,7 +635,7 @@ export default function StudioPage() {
                       <div className="sort-popup-header">
                         <span className="sort-popup-title">排序方式</span>
                         <button className="sort-popup-close" onClick={() => setSortOpen(false)}>
-                          <i className="fa-solid fa-xmark"></i>
+                          <SiteIcon name="fa-xmark" variant="solid" />
                         </button>
                       </div>
                       {sortOptions.map((opt) => (
@@ -643,7 +645,7 @@ export default function StudioPage() {
                           onClick={() => { setSortType(opt.key); setSortOpen(false); }}
                         >
                           <span>{opt.label}</span>
-                          <i className="fa-solid fa-check"></i>
+                          <SiteIcon name="fa-check" variant="solid" />
                         </button>
                       ))}
                     </div>
@@ -654,7 +656,7 @@ export default function StudioPage() {
                 className="btn-batch"
                 onClick={() => { setBatchMode(!batchMode); setSelectedIds(new Set()); }}
               >
-                <i className="fa-solid fa-list-check"></i> 批量操作
+                <SiteIcon name="fa-list-check" variant="solid" /> 批量操作
               </button>
             </div>
           </div>
@@ -689,7 +691,7 @@ export default function StudioPage() {
                 </div>
                 <div className="studio-toolbar-row2">
                   <div className="search-wrap">
-                    <i className="fa-solid fa-magnifying-glass search-icon"></i>
+                    <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
                     <input
                       type="text"
                       placeholder="搜索作品标题..."
@@ -706,7 +708,7 @@ export default function StudioPage() {
                         onClick={() => setSortOpen(!sortOpen)}
                       >
                         <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
-                        <i className="fa-solid fa-chevron-down sort-arrow"></i>
+                        <SiteIcon name="fa-chevron-down" variant="solid" className="sort-arrow" />
                       </button>
                       <div className={`sort-dropdown ${sortOpen ? "show" : ""}`}>
                         {sortOptions.map((opt) => (
@@ -715,13 +717,13 @@ export default function StudioPage() {
                             className={`sort-option ${sortType === opt.key ? "active" : ""}`}
                             onClick={() => { setSortType(opt.key); setSortOpen(false); }}
                           >
-                            <i className="fa-solid fa-check"></i> {opt.label}
+                            <SiteIcon name="fa-check" variant="solid" /> {opt.label}
                           </button>
                         ))}
                       </div>
                     </div>
                     <button className="btn-batch-toggle" onClick={() => setBatchMode(true)}>
-                      <i className="fa-solid fa-list-check"></i> 批量操作
+                      <SiteIcon name="fa-list-check" variant="solid" /> 批量操作
                     </button>
                   </div>
                 </div>
@@ -732,14 +734,14 @@ export default function StudioPage() {
                 <button className="batch-chip" onClick={selectAll}>全选</button>
                 <div className="toolbar-divider"></div>
                 <button className="batch-action" onClick={batchPublish}>
-                  <i className="fa-solid fa-cloud-arrow-up"></i> 批量发布
+                  <SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 批量发布
                 </button>
                 <button className="batch-action batch-action--danger" onClick={batchDelete}>
-                  <i className="fa-solid fa-trash-can"></i> 批量删除
+                  <SiteIcon name="fa-trash-can" variant="solid" /> 批量删除
                 </button>
                 <div className="toolbar-spacer"></div>
                 <button className="batch-action batch-action--cancel" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>
-                  <i className="fa-solid fa-xmark"></i> 取消选择
+                  <SiteIcon name="fa-xmark" variant="solid" /> 取消选择
                 </button>
               </div>
             )}
@@ -752,7 +754,7 @@ export default function StudioPage() {
                 <div className="empty-tag-ring">
                   <div className="tag-ring-outer"></div>
                   <div className="tag-ring-inner">
-                    <i className="fa-solid fa-feather-pointed"></i>
+                    <SiteIcon name="fa-feather-pointed" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -760,7 +762,7 @@ export default function StudioPage() {
               <p className="empty-desc">{searchQuery ? "换个关键词试试吧" : "创建你的第一个作品，开始创作之旅"}</p>
               {!searchQuery && (
                 <Link href="/create" className="empty-action">
-                  <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>创建作品
+                  <SiteIcon name="fa-plus" variant="solid" style={{ marginRight: 6 }} />创建作品
                 </Link>
               )}
             </div>
@@ -789,7 +791,7 @@ export default function StudioPage() {
                       return <>
                     <div className="card-meta">
                       <span className="card-type-label">
-                        <i className={`fa-solid ${getTypeIcon(w.post_type)}`}></i>
+                        <SiteIcon name={getTypeIcon(w.post_type)} variant="solid" />
                         {getTypeLabel(w.post_type)}
                       </span>
                       <span className={`card-status ${getStatusClass(w)}`}>
@@ -818,7 +820,7 @@ export default function StudioPage() {
                           className="card-btn card-btn-edit"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <i className="fa-solid fa-pen-to-square"></i> 管理
+                          <SiteIcon name="fa-pen-to-square" variant="solid" /> 管理
                         </Link>
                       ) : (
                         <Link
@@ -826,14 +828,14 @@ export default function StudioPage() {
                           className="card-btn card-btn-edit"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <i className="fa-solid fa-pen-to-square"></i> {w.review_status === "rejected" ? "查看问题并修改" : "编辑"}
+                          <SiteIcon name="fa-pen-to-square" variant="solid" /> {w.review_status === "rejected" ? "查看问题并修改" : "编辑"}
                         </Link>
                       )}
                       <button
                         className="card-btn card-btn-delete"
                         onClick={(e) => { e.stopPropagation(); handleDelete(w); }}
                       >
-                        <i className="fa-solid fa-trash-can"></i> 删除
+                        <SiteIcon name="fa-trash-can" variant="solid" /> 删除
                       </button>
                     </div>
                       </>;
@@ -847,7 +849,7 @@ export default function StudioPage() {
             <div className="card-load-more" ref={workLoadMoreRef}>
               {shownWorks < allWorks.length ? (
                 <button type="button" className="btn-load-more" onClick={() => setShownWorks((count) => count + 12)}>
-                  <i className="fa-solid fa-angles-down" aria-hidden="true" /> 加载更多
+                  <SiteIcon name="fa-angles-down" variant="solid" aria-hidden="true" /> 加载更多
                 </button>
               ) : (
                 <span className="load-more-end">已加载全部 {allWorks.length} 项作品</span>
@@ -866,13 +868,13 @@ export default function StudioPage() {
         <span className="batch-bar-count">已选 {selectedIds.size} 项</span>
         <div className="batch-bar-actions">
           <button className="batch-bar-btn batch-bar-btn--publish" onClick={batchPublish}>
-            <i className="fa-solid fa-cloud-arrow-up"></i> 发布
+            <SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 发布
           </button>
           <button className="batch-bar-btn batch-bar-btn--delete" onClick={batchDelete}>
-            <i className="fa-solid fa-trash-can"></i> 删除
+            <SiteIcon name="fa-trash-can" variant="solid" /> 删除
           </button>
           <button className="batch-bar-btn batch-bar-btn--cancel" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>
-            <i className="fa-solid fa-xmark"></i> 取消
+            <SiteIcon name="fa-xmark" variant="solid" /> 取消
           </button>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import SiteIcon from "@/components/SiteIcon";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { createNotification } from "@/lib/notifications";
 import { assertCanInteract } from "@/lib/userRestrictions";
@@ -86,14 +87,14 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
     if (plain) {
       return (
         <button className={`stat-item ${className || ""}`} title="收藏" onClick={toggle} disabled={loading || authLoading}>
-          <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
+          <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} style={bookmarked ? { color: "var(--color-primary, #F26B5B)" } : undefined} />
           <span>{count}</span>
         </button>
       );
     }
     return (
       <button className="rs-btn" title="收藏" onClick={toggle} disabled={loading || authLoading}>
-        <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} style={bookmarked ? { color: "#F26B5B" } : undefined} />
+        <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} style={bookmarked ? { color: "#F26B5B" } : undefined} />
       </button>
     );
   }
@@ -104,7 +105,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
       onClick={toggle}
       disabled={loading || authLoading}
     >
-      <i className={`${bookmarked ? "fa-solid" : "fa-regular"} fa-bookmark`} />
+      <SiteIcon name="fa-bookmark" variant={bookmarked ? "solid" : "outline"} />
       <span>{count}</span>
     </button>
   );

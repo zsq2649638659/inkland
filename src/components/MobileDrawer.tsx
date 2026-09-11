@@ -1,4 +1,6 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
+import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -75,7 +77,7 @@ export default function MobileDrawer() {
   const avatarChar = displayName[0] || "?";
   const bio = profile?.bio || "这个人很懒，什么都没写";
 
-  const menuItems = [
+  const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/" },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
     { page: "profile", icon: "fa-circle-user", label: "个人中心", href: "/profile" },
@@ -163,7 +165,7 @@ export default function MobileDrawer() {
             }}
             onClick={closeDrawer}
           >
-            <i className="fa-solid fa-xmark" aria-hidden="true" />
+            <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
           </button>
         </div>
 
@@ -173,7 +175,7 @@ export default function MobileDrawer() {
           {authLoading ? (
             <div className="sidebar-user" aria-busy="true">
               <div className="sidebar-user-avatar">
-                <i className="fa-solid fa-user text-white/60" />
+                <SiteIcon name="fa-user" variant="solid" className="text-white/60" />
               </div>
               <div className="sidebar-user-info">
                 <div className="sidebar-user-name">正在确认登录状态…</div>
@@ -197,7 +199,7 @@ export default function MobileDrawer() {
           ) : (
             <div className="sidebar-user sidebar-user-unauth">
               <div className="sidebar-user-avatar">
-                <i className="fa-solid fa-user" />
+                <SiteIcon name="fa-user" variant="solid" />
               </div>
               <div className="sidebar-user-info">
                 <div className="sidebar-user-name">欢迎来到 inkland</div>
@@ -223,7 +225,7 @@ export default function MobileDrawer() {
                 onClick={() => handleNav(item.href)}
               >
                 <span className="sidebar-menu-icon">
-                  <i className={`fa-solid ${item.icon}`} />
+                  <InklandIcon name={item.icon} variant={pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`)) ? "solid" : "outline"} />
                 </span>
                 <span className="sidebar-menu-label">{item.label}</span>
                 {"badge" in item && (item.badge as number) > 0 && (
@@ -245,7 +247,7 @@ export default function MobileDrawer() {
               }}
             >
               <span className="sidebar-menu-icon">
-                <i className="fa-solid fa-moon" />
+                <SiteIcon name="fa-moon" variant="solid" />
               </span>
               <span className="sidebar-menu-label">日夜模式</span>
             </button>
@@ -256,7 +258,7 @@ export default function MobileDrawer() {
               onClick={() => handleNav("/settings")}
             >
               <span className="sidebar-menu-icon">
-                <i className="fa-solid fa-gear" />
+                <SiteIcon name="fa-gear" variant="solid" />
               </span>
               <span className="sidebar-menu-label">设置</span>
             </button>
@@ -268,12 +270,7 @@ export default function MobileDrawer() {
             >
               <span className="sidebar-menu-icon">
                 <span className="sidebar-more-icon">
-                  <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="2" fill="none" />
-                    <circle cx="5.5" cy="9" r="1.2" fill="currentColor" />
-                    <circle cx="9" cy="9" r="1.2" fill="currentColor" />
-                    <circle cx="12.5" cy="9" r="1.2" fill="currentColor" />
-                  </svg>
+                  <SiteIcon name="fa-ellipsis-circle" />
                 </span>
               </span>
               <span className="sidebar-menu-label">更多</span>
@@ -286,7 +283,7 @@ export default function MobileDrawer() {
                   style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
                   onClick={() => { setMoreOpen(false); setShowLogout(true); }}
                 >
-                  <span className="sidebar-more-item-icon"><i className="fa-solid fa-right-from-bracket"></i></span>
+                  <span className="sidebar-more-item-icon"><SiteIcon name="fa-right-from-bracket" variant="solid" /></span>
                   退出账户
                 </button>
                 <button
@@ -294,7 +291,7 @@ export default function MobileDrawer() {
                   style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-primary)", display: "flex", alignItems: "center", gap: "10px" }}
                   onClick={() => { setMoreOpen(false); setShowDeleteAccount(true); }}
                 >
-                  <span className="sidebar-more-item-icon"><i className="fa-solid fa-trash-can"></i></span>
+                  <span className="sidebar-more-item-icon"><SiteIcon name="fa-trash-can" variant="solid" /></span>
                   注销账户
                 </button>
               </div>
@@ -311,7 +308,7 @@ export default function MobileDrawer() {
         <div className="sidebar-overlay" onClick={() => setShowLogout(false)}>
           <div className="sidebar-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="sidebar-dialog-icon" style={{ background: "var(--color-primary-bg)", color: "var(--color-primary)" }}>
-              <i className="fa-solid fa-right-from-bracket"></i>
+              <SiteIcon name="fa-right-from-bracket" variant="solid" />
             </div>
             <div className="sidebar-dialog-title">退出账户</div>
             <div className="sidebar-dialog-text">确定要退出当前账户吗？退出后需要重新登录。</div>
@@ -337,7 +334,7 @@ export default function MobileDrawer() {
         <div className="sidebar-overlay" onClick={() => setShowDeleteAccount(false)}>
           <div className="sidebar-dialog sidebar-dialog-danger" onClick={(e) => e.stopPropagation()}>
             <div className="sidebar-dialog-icon" style={{ background: "rgba(232,72,58,0.1)", color: "#E8483A" }}>
-              <i className="fa-solid fa-triangle-exclamation"></i>
+              <SiteIcon name="fa-triangle-exclamation" variant="solid" />
             </div>
             <div className="sidebar-dialog-title" style={{ color: "#E8483A" }}>注销账户</div>
             <div className="sidebar-dialog-text">
@@ -378,7 +375,7 @@ export default function MobileDrawer() {
                 disabled={deleteConfirmText !== "我确认注销账号，绝不反悔"}
                 onClick={() => { setShowDeleteAccount(false); setDeleteConfirmText(""); }}
               >
-                <i className="fa-regular fa-trash-can"></i> 永久注销账户
+                <SiteIcon name="fa-trash-can" variant="outline" /> 永久注销账户
               </button>
             </div>
           </div>

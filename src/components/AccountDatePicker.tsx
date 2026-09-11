@@ -1,4 +1,5 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -80,8 +81,8 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
         aria-haspopup="dialog"
         onClick={togglePicker}
       >
-        <span><i className="fa-regular fa-calendar-days" aria-hidden="true" /> {formatDate(value)}</span>
-        <i className={`fa-solid fa-chevron-down${open ? " up" : ""}`} aria-hidden="true" />
+        <span><SiteIcon name="fa-calendar-days" variant="outline" aria-hidden="true" /> {formatDate(value)}</span>
+        <SiteIcon name="fa-chevron-down" variant="solid" className={open ? "up" : undefined} aria-hidden="true" />
       </button>
 
       {open && (
@@ -93,7 +94,7 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
               disabled={calendarMonth <= MIN_DATE.slice(0, 7)}
               onClick={() => changeYear(-1)}
             >
-              <i className="fa-solid fa-angles-left" aria-hidden="true" />
+              <SiteIcon name="fa-angles-left" variant="solid" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -101,7 +102,7 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
               disabled={calendarMonth <= MIN_DATE.slice(0, 7)}
               onClick={() => changeMonth(-1)}
             >
-              <i className="fa-solid fa-chevron-left" aria-hidden="true" />
+              <SiteIcon name="fa-chevron-left" variant="solid" aria-hidden="true" />
             </button>
             <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
             <button
@@ -110,7 +111,7 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
               disabled={calendarMonth >= todayValue.slice(0, 7)}
               onClick={() => changeMonth(1)}
             >
-              <i className="fa-solid fa-chevron-right" aria-hidden="true" />
+              <SiteIcon name="fa-chevron-right" variant="solid" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -118,7 +119,7 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
               disabled={calendarMonth >= todayValue.slice(0, 7)}
               onClick={() => changeYear(1)}
             >
-              <i className="fa-solid fa-angles-right" aria-hidden="true" />
+              <SiteIcon name="fa-angles-right" variant="solid" aria-hidden="true" />
             </button>
           </div>
           <div className="account-calendar-weekdays" aria-hidden="true">

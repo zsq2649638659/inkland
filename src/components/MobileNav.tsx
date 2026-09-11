@@ -1,5 +1,7 @@
 "use client";
 
+import SiteIcon from "@/components/SiteIcon";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -57,9 +59,7 @@ export default function MobileNav() {
             }`}
           >
             <div className="relative">
-              <i
-                className={`${item.style || "fa-solid"} ${item.icon} text-lg`}
-              />
+              <SiteIcon name={item.icon as Parameters<typeof SiteIcon>[0]["name"]} variant={item.style === "far" ? "outline" : "solid"} className="text-lg" />
               {item.badge !== undefined && item.badge > 0 && (
                 <span className="absolute -top-1.5 -right-2.5 bg-primary text-white text-[10px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 leading-none">
                   {formatNotificationCount(item.badge)}

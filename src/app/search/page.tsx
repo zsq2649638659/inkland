@@ -1,4 +1,6 @@
 "use client";
+import SiteIcon from "@/components/SiteIcon";
+import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -70,7 +72,7 @@ const SERIES_STATUS_OPTIONS: Array<{ value: SeriesStatusFilter; label: string }>
   { value: "completed", label: "已完结" },
 ];
 
-function getPostVisual(postType?: string) {
+function getPostVisual(postType?: string): { icon: InklandIconName; kind: string; label: string } {
   switch (postType) {
     case "serial": return { label: "长篇连载", icon: "fa-book-open", kind: "series" };
     case "illustration":
@@ -422,7 +424,7 @@ function SearchContent() {
         <div className="search-palette" role="search" aria-label="搜索模块">
           <div className="search-header">
             <div className="search-input-wrapper">
-              <i className="fa-solid fa-magnifying-glass search-icon"></i>
+              <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
               <input
                 type="text"
                 className="search-page-input"
@@ -435,7 +437,7 @@ function SearchContent() {
               />
               <div className="search-actions">
                 <button type="button" className="search-clear-btn" aria-label="清除搜索">
-                  <i className="fa-solid fa-xmark"></i>
+                  <SiteIcon name="fa-xmark" variant="solid" />
                 </button>
               </div>
             </div>
@@ -460,7 +462,7 @@ function SearchContent() {
                 <div className="feed-empty-tag-ring">
                   <div className="feed-empty-ring-outer"></div>
                   <div className="feed-empty-ring-inner">
-                    <i className="fa-solid fa-magnifying-glass"></i>
+                    <SiteIcon name="fa-magnifying-glass" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -499,7 +501,7 @@ function SearchContent() {
       <div className="search-palette" role="search" aria-label="搜索模块">
         <div className="search-header">
           <div className="search-input-wrapper">
-            <i className="fa-solid fa-magnifying-glass search-icon"></i>
+            <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
             <input
               type="text"
               className="search-page-input"
@@ -516,7 +518,7 @@ function SearchContent() {
                 onClick={handleClear}
                 aria-label="清除搜索"
               >
-                <i className="fa-solid fa-xmark"></i>
+                <SiteIcon name="fa-xmark" variant="solid" />
               </button>
             </div>
           </div>
@@ -546,7 +548,7 @@ function SearchContent() {
               aria-controls="search-filter-mobile-modal"
               onClick={openMobileFilter}
             >
-              <i className="fa-solid fa-filter" aria-hidden="true"></i>
+              <SiteIcon name="fa-filter" variant="solid" aria-hidden="true" />
               <span>筛选</span>
             </button>
 
@@ -606,7 +608,7 @@ function SearchContent() {
                     onClick={() => setSortMenuOpen((open) => !open)}
                   >
                     <span>{SORT_OPTIONS.find((option) => option.value === sortBy)?.label}</span>
-                    <i className="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                    <SiteIcon name="fa-chevron-down" variant="solid" aria-hidden="true" />
                   </button>
                   {sortMenuOpen && (
                     <div id="search-sort-menu" className="search-refine-sort-menu" role="listbox" aria-label="排序方式">
@@ -722,7 +724,7 @@ function SearchContent() {
                 <div className="feed-empty-tag-ring">
                   <div className="feed-empty-ring-outer"></div>
                   <div className="feed-empty-ring-inner">
-                    <i className="fa-solid fa-magnifying-glass"></i>
+                    <SiteIcon name="fa-magnifying-glass" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -734,7 +736,7 @@ function SearchContent() {
 
         {!loading && hasSearched && !currentHasResults && (
           <div className="no-results visible">
-            <i className="fa-solid fa-magnifying-glass"></i>
+            <SiteIcon name="fa-magnifying-glass" variant="solid" />
             <p>{activeFilter === "works" && (workType !== "all" || seriesStatus !== "all" || sortBy !== "latest") ? "没有符合当前筛选条件的作品" : "没有找到相关结果"}</p>
           </div>
         )}
@@ -746,7 +748,7 @@ function SearchContent() {
                 <div className="tags-grid">
                   {tags.map((tag) => (
                     <Link key={tag.name} href={`/tag/${encodeURIComponent(tag.name)}`} className="tag-card">
-                      <span className="tag-icon"><i className="fa-solid fa-tag"></i></span>
+                      <span className="tag-icon"><SiteIcon name="fa-tag" variant="solid" /></span>
                       <span className="tag-name">{tag.name}</span>
                       <span className="tag-count">{tag.post_count} 篇作品</span>
                     </Link>
@@ -785,7 +787,7 @@ function SearchContent() {
                     const statLabel = sortBy === "hot" ? `热度 ${getPostHeat(post)}` : sortBy === "bookmarks" ? `收藏 ${post.bookmark_count || 0}` : "";
                     return (
                       <Link key={post.id} href={`/read/${post.id}`} className="work-item">
-                        <div className={`work-item-icon ${visual.kind}`}><i className={`fa-solid ${visual.icon}`}></i></div>
+                        <div className={`work-item-icon ${visual.kind}`}><SiteIcon name={visual.icon} variant="solid" /></div>
                         <div className="work-info">
                           <div className="work-title">{post.title}</div>
                           <div className="work-meta">
@@ -795,7 +797,7 @@ function SearchContent() {
                             <span>{post.word_count?.toLocaleString() || 0} 字</span>
                             <span className="meta-dot"></span>
                             <span>{author?.nickname || "匿名"}</span>
-                            {statLabel && <span className="work-sort-stat"><i className={`fa-solid ${sortBy === "hot" ? "fa-fire" : "fa-bookmark"}`}></i>{statLabel}</span>}
+                            {statLabel && <span className="work-sort-stat"><SiteIcon name={sortBy === "hot" ? "fa-fire" : "fa-bookmark"} variant="solid" />{statLabel}</span>}
                           </div>
                         </div>
                       </Link>
@@ -820,10 +822,10 @@ function SearchContent() {
                       .trim();
                     return (
                       <Link key={post.id} href={`/read/${post.id}`} className="post-item">
-                        <div className="post-item-icon"><i className="fa-solid fa-file-lines"></i></div>
+                        <div className="post-item-icon"><SiteIcon name="fa-file-lines" variant="solid" /></div>
                         <div className="post-item-content">
                           <div className="post-snippet">{plainText}</div>
-                          <div className="post-source"><i className="fa-solid fa-book"></i><span>{post.title}</span><span>— {author?.nickname || "匿名"}</span></div>
+                          <div className="post-source"><SiteIcon name="fa-book" variant="solid" /><span>{post.title}</span><span>— {author?.nickname || "匿名"}</span></div>
                         </div>
                       </Link>
                     );
