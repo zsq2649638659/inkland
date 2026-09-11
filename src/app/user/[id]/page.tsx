@@ -540,7 +540,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                 {(activeTab === "followers" ? followers : following).map((u) => (
                   <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-rule hover:border-accent transition-colors">
                     <Link href={`/user/${u.id}`} className="flex items-center gap-3 flex-1 min-w-0 no-underline">
-                      <span className="w-10 h-10 rounded-full overflow-hidden inline-flex flex-shrink-0">
+                      <span className="rounded-full overflow-hidden inline-flex flex-shrink-0" style={{ width: "var(--ink-avatar-size-md)", height: "var(--ink-avatar-size-md)" }}>
                         {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : <DefaultAvatar name={u.nickname || "?"} style={{ width:"100%", height:"100%" }} />}
                       </span>
                       <div className="flex-1 min-w-0">

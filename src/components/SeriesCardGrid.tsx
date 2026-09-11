@@ -76,7 +76,7 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
         {showAuthor && author && (
           <div className="flex items-center gap-1.5">
             <Link href={series.user_id ? `/user/${series.user_id}` : "#"} className="flex-shrink-0">
-              <span className="w-5 h-5 rounded-full overflow-hidden inline-flex hover:opacity-80 transition-opacity">
+              <span className="rounded-full overflow-hidden inline-flex hover:opacity-80 transition-opacity" style={{ width: "var(--ink-avatar-size-sm)", height: "var(--ink-avatar-size-sm)" }}>
                 {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <DefaultAvatar name={author.nickname || "?"} style={{ width:"100%", height:"100%" }} />}
               </span>
             </Link>

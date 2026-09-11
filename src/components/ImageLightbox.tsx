@@ -17,6 +17,7 @@ import { submitReportV1 } from "@/lib/reportContent";
 import { assertCanComment, assertCanInteract } from "@/lib/userRestrictions";
 import SiteDialog, { useSiteDialog } from "@/components/SiteDialog";
 import type { Comment, Post } from "@/lib/types";
+import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
 import "@/app/home-lightbox.css";
 
 interface ImageLightboxProps {
@@ -24,15 +25,6 @@ interface ImageLightboxProps {
   images: string[];
   initialIndex?: number;
   onClose: () => void;
-}
-
-function timeAgo(value?: string) {
-  if (!value) return "";
-  const minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}小时前`;
-  return `${Math.floor(minutes / 1440)}天前`;
 }
 
 export default function ImageLightbox({ post, images, initialIndex = 0, onClose }: ImageLightboxProps) {
@@ -46,6 +38,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
   const [loadingComments, setLoadingComments] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [following, setFollowing] = useState(false);
+  const [isMobilePreview, setIsMobilePreview] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const lightboxMenuRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState("");
@@ -105,6 +98,14 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
     })();
     return () => { active = false; };
   }, [post.id, user?.id, profile?.is_test_account]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 900px)");
+    const updatePreviewMode = () => setIsMobilePreview(mediaQuery.matches);
+    updatePreviewMode();
+    mediaQuery.addEventListener("change", updatePreviewMode);
+    return () => mediaQuery.removeEventListener("change", updatePreviewMode);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -228,19 +229,19 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
         </>}
         <span className="image-lightbox-counter">{index + 1} / {images.length}</span>
       </div>
-      <aside className="image-lightbox-info" onMouseDown={(event) => event.stopPropagation()}>
+      {!isMobilePreview && <aside className="image-lightbox-info" onMouseDown={(event) => event.stopPropagation()}>
         <div className="image-lightbox-author">
-          <Link href={`/user/${authorId}`}>
-            {post.author?.avatar_url ? <img src={post.author.avatar_url} alt={authorName} /> : <DefaultAvatar name={authorName} className="image-lightbox-avatar" />}
+          <Link href={`/user/${authorId}`} className="image-lightbox-avatar-link" aria-label={`查看${authorName}的作者主页`}>
+            {post.author?.avatar_url ? <img src={post.author.avatar_url} alt={authorName} /> : <span className="image-lightbox-avatar"><DefaultAvatar name={authorName} style={{ background: "var(--color-primary, #f26b5b)", color: "var(--color-on-primary, #fff)", fontSize: 13 }} /></span>}
           </Link>
-          <div><Link href={`/user/${authorId}`}>{authorName}</Link><Link className="image-lightbox-time" href={`/read/${post.id}`}>{timeAgo(date)}</Link></div>
+          <div><Link href={`/user/${authorId}`}>{authorName}</Link><Link className="image-lightbox-time" href={`/read/${post.id}`}>{formatHomeFeedTimestamp(date || "")}</Link></div>
           {user?.id !== authorId && <button type="button" className="image-lightbox-follow" onClick={toggleFollow}>{following ? "已关注" : "+ 关注"}</button>}
         <div className="image-lightbox-menu-wrap" ref={lightboxMenuRef}><button type="button" className="comment-more-btn inline-comment-more" onClick={() => setMenuOpen(!menuOpen)} aria-label="更多"><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>{menuOpen && <div className="comment-popup show"><button type="button" className="comment-popup-item" onClick={() => { setMenuOpen(false); setModeration({ mode: "block", targetId: authorId, targetType: "user" }); }}><SiteIcon name="fa-ban" variant="solid" /> 屏蔽</button><button type="button" className="comment-popup-item" onClick={() => { setMenuOpen(false); setModeration({ mode: "report", targetId: post.id, targetType: "post" }); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button></div>}</div>
         </div>
         <h2>{title}</h2><p className="image-lightbox-description">{description || "暂无说明"}</p>
-        <div className="image-lightbox-actions card-actions"><LikeButton postId={post.id} initialCount={post.like_count || 0} /><button type="button" className="card-action"><SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" /><span>{commentCount}</span></button><BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} /><button type="button" className="card-action" onClick={share}><SiteIcon name="fa-arrow-up-from-bracket" variant="solid" /><span>分享</span></button></div>
+        <div className="image-lightbox-actions card-actions"><LikeButton postId={post.id} initialCount={post.like_count || 0} /><button type="button" className="card-action"><SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" /><span>{commentCount}</span></button><BookmarkButton postId={post.id} initialCount={post.bookmark_count || 0} /><button type="button" className="card-action image-lightbox-share" onClick={share}><SiteIcon name="fa-share-from-square" variant="outline" hoverVariant="solid" /><span>分享</span></button></div>
         <InlineCommentPanel postId={post.id} user={user} authLoading={authLoading} displayName={profile?.nickname || user?.email?.split("@")[0] || "我"} avatarUrl={profile?.avatar_url} comments={comments} commentCount={commentCount} commentText={commentText} loadingComments={loadingComments} submitting={submitting} onCommentTextChange={setCommentText} onSubmit={submitComment} onReply={submitReply} onDelete={deleteComment} onClose={onClose} onReport={(commentId, commentUserId) => { void commentUserId; setModeration({ mode: "report", targetId: commentId, targetType: "comment" }); }} onBlock={(userId) => setModeration({ mode: "block", targetId: userId, targetType: "user" })} />
-      </aside>
+      </aside>}
       <ModerationReasonModal open={!!moderation && moderation.mode === "report"} mode="report" onClose={() => setModeration(null)} onSubmit={submitModeration} />
       <ModerationReasonModal open={!!moderation && moderation.mode === "block"} mode="block" onClose={() => setModeration(null)} onSubmit={submitModeration} />
       <SiteDialog state={siteDialog.dialog} onClose={siteDialog.close} />

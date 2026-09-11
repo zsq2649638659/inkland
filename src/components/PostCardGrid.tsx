@@ -98,7 +98,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
         {showAuthor && (
           <div className="flex items-center gap-1.5 min-w-0">
             <Link href={`/user/${post.user_id}`}>
-              <span className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity inline-flex">
+              <span className="rounded-full overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity inline-flex" style={{ width: "var(--ink-avatar-size-sm)", height: "var(--ink-avatar-size-sm)" }}>
                 {author?.avatar_url ? <img src={author.avatar_url} className="w-full h-full object-cover" alt="" /> : <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%" }} />}
               </span>
             </Link>

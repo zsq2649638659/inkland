@@ -274,7 +274,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
               {data.authorNickname || "匿名用户"}
             </strong>
           </Link>
-          <Link href={`/read/${data.chapterId}`} className="site-card__author-meta no-underline">
+          <Link href={`/read/${data.chapterId}`} className="site-card__author-meta no-underline" aria-label="打开章节详情" onClick={(event) => event.stopPropagation()}>
             {formatHomeFeedTimestamp(data.createdAt)}
           </Link>
         </div>
@@ -298,33 +298,40 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
 
         </div>
 
-      {/* V2: card-title — 章节标题 */}
-      <Link
-        href={`/read/${data.chapterId}`}
-        className="site-card__title-link"
-      >
+      {/* V2: card-content — 章节标题和正文共用章节详情入口 */}
+      <Link href={`/read/${data.chapterId}`} className="site-card__content-link">
         <h3 className="site-card__title">第{data.chapterNumber}章 {data.chapterTitle || "无标题"}</h3>
+        {plainExcerpt && <p className="site-card__excerpt site-card__serial-intro">{plainExcerpt}</p>}
       </Link>
 
-      {/* V2: card-excerpt */}
-      {plainExcerpt && (
-        <p className="site-card__excerpt site-card__serial-intro">
-          {plainExcerpt}
-        </p>
-      )}
-
       {/* V2: serial-inner — 连载信息内卡片 */}
-      <div className="site-card__serial-inner">
+      <div
+        className="site-card__serial-inner"
+        role="link"
+        tabIndex={0}
+        aria-label={`查看长篇作品：${data.seriesName}`}
+        onClick={(event) => {
+          const target = event.target as HTMLElement;
+          if (target.closest("a, button, .site-card__status, .site-card__tag")) return;
+          router.push(`/series/${encodeURIComponent(data.seriesName)}`);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            router.push(`/series/${encodeURIComponent(data.seriesName)}`);
+          }
+        }}
+      >
         <div className="site-card__serial-heading">
           <Link href={`/series/${encodeURIComponent(data.seriesName)}`} className="site-card__title-link">
             <strong>{data.seriesName}</strong>
           </Link>
-          <span className={`tag tag--status ${data.seriesStatus === "ongoing" ? "tag--status-active" : "tag--status-complete"} site-card__status`}>
+          <span className={`tag tag--status ${data.seriesStatus === "ongoing" ? "tag--status-active" : "tag--status-complete"} site-card__status`} onClick={(event) => event.stopPropagation()}>
             {data.seriesStatus === "ongoing" ? "连载中" : "已完结"}
           </span>
         </div>
         {data.seriesDescription && <p>{data.seriesDescription}</p>}
-        <div className="site-card__tags">
+        <div className="site-card__tags" onClick={(event) => event.stopPropagation()}>
           <span className="tag tag--site site-card__tag">第{data.chapterNumber}章</span>
           {data.seriesTags.map((tag) => <span key={tag} className="tag tag--site site-card__tag">{tag}</span>)}
         </div>
