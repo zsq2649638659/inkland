@@ -74,14 +74,55 @@ export function getLocalReadingHistory(userId: string) {
   return readLocal(userId);
 }
 
+function mergePostSnapshots(
+  primary: ReadingHistoryPostSnapshot | null | undefined,
+  fallback: ReadingHistoryPostSnapshot | null | undefined,
+): ReadingHistoryPostSnapshot | null {
+  if (!primary && !fallback) return null;
+  if (!primary) return fallback || null;
+  if (!fallback) return primary;
+
+  const merged: ReadingHistoryPostSnapshot = { ...fallback, ...primary };
+  const nullableFields: Array<keyof ReadingHistoryPostSnapshot> = [
+    "title",
+    "content",
+    "post_type",
+    "series_name",
+    "chapter_number",
+    "word_count",
+    "cover_url",
+    "user_id",
+    "status",
+    "series_description",
+    "series_status",
+    "like_count",
+  ];
+  for (const field of nullableFields) {
+    if (merged[field] == null) merged[field] = fallback[field] ?? null;
+  }
+  if (!merged.tags?.length && fallback.tags?.length) merged.tags = fallback.tags;
+  if (!merged.series_tags?.length && fallback.series_tags?.length) merged.series_tags = fallback.series_tags;
+  if (primary.author || fallback.author) {
+    merged.author = {
+      ...(fallback.author || {}),
+      ...(primary.author || {}),
+      nickname: primary.author?.nickname ?? fallback.author?.nickname ?? null,
+      avatar_url: primary.author?.avatar_url ?? fallback.author?.avatar_url ?? null,
+    };
+  }
+  return merged;
+}
+
 export function mergeReadingHistoryRecords(remote: ReadingHistoryRecord[], local: ReadingHistoryRecord[]) {
   const byPost = new Map<string, ReadingHistoryRecord>();
   for (const record of [...remote, ...local]) {
     const previous = byPost.get(record.post_id);
     if (!previous || new Date(record.last_read_at).getTime() >= new Date(previous.last_read_at).getTime()) {
-      byPost.set(record.post_id, { ...record, post: record.post || previous?.post || null });
+      byPost.set(record.post_id, { ...record, post: mergePostSnapshots(record.post, previous?.post) });
     } else if (!previous.post && record.post) {
-      byPost.set(record.post_id, { ...previous, post: record.post });
+      byPost.set(record.post_id, { ...previous, post: mergePostSnapshots(previous.post, record.post) });
+    } else if (record.post) {
+      byPost.set(record.post_id, { ...previous, post: mergePostSnapshots(previous.post, record.post) });
     }
   }
   return [...byPost.values()]
