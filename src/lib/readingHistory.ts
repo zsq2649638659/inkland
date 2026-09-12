@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { canViewTestData, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 export interface ReadingHistoryPostSnapshot {
   id: string;
@@ -129,48 +130,93 @@ export async function loadReadingHistory(
   const local = mergeReadingHistoryRecords(getLocalReadingHistory(userId), seedRecords);
 
   try {
-    const { data, error } = await withTimeout(
-      supabase
-        .from("reading_history")
-        .select("*")
-        .eq("user_id", userId)
-        .order("last_read_at", { ascending: false })
-        .limit(MAX_HISTORY_ITEMS),
-      HISTORY_QUERY_TIMEOUT_MS,
-    );
+    let includeTestData = false;
+    try {
+      includeTestData = await withTimeout(canViewTestData(supabase, userId), HISTORY_METADATA_TIMEOUT_MS);
+    } catch (visibilityError) {
+      console.error("[reading-history] test-data visibility query failed", visibilityError);
+    }
+
+    // 历史表可能因旧环境缺表、RLS 或跨区延迟而失败，但不能阻止随后
+    // 按作品 ID 补全卡片所需的作品、系列和作者资料。
+    let data: unknown[] = [];
+    let error: unknown = null;
+    try {
+      const historyResult = await withTimeout(
+        supabase
+          .from("reading_history")
+          .select("*")
+          .eq("user_id", userId)
+          .order("last_read_at", { ascending: false })
+          .limit(MAX_HISTORY_ITEMS),
+        HISTORY_QUERY_TIMEOUT_MS,
+      );
+      data = (historyResult.data || []) as unknown[];
+      error = historyResult.error;
+    } catch (historyError) {
+      error = historyError;
+      console.error("[reading-history] history query failed; hydrating by post IDs", historyError);
+    }
 
     if (error) {
       console.error("[reading-history] history query returned error", error);
     }
     const records = mergeReadingHistoryRecords(
-      (data || []) as unknown as ReadingHistoryRecord[],
+      data as unknown as ReadingHistoryRecord[],
       local,
     );
     const postIds = records.map((record) => record.post_id).filter(Boolean);
-    const postsResult = postIds.length
-      ? await withTimeout(
-        supabase
-          .from("posts")
-          .select("id,title,content,cover_url,post_type,created_at,published_at,user_id,series_name,post_tags(tags(name)),author:profiles!posts_user_id_fkey(nickname,avatar_url)")
-          .in("id", postIds)
-          .eq("status", "published"),
-        HISTORY_QUERY_TIMEOUT_MS,
-      ).catch((postError) => {
-        console.error("[reading-history] posts query failed", postError);
-        return { data: [] };
-      })
-      : { data: [] };
-    if ("error" in postsResult && postsResult.error) {
+    const [postsResult, postTagsResult] = postIds.length
+      ? await Promise.all([
+        withTimeout(
+          withTestDataVisibility(
+            supabase
+              .from("posts")
+              .select("id,title,content,cover_url,post_type,created_at,published_at,user_id,series_name,chapter_number,word_count,status")
+              .in("id", postIds)
+              .eq("status", "published"),
+            includeTestData,
+          ),
+          HISTORY_QUERY_TIMEOUT_MS,
+        ).catch((postError) => {
+          console.error("[reading-history] posts query failed", postError);
+          return { data: [], error: postError };
+        }),
+        withTimeout(
+          supabase.from("post_tags").select("post_id,tags(name)").in("post_id", postIds),
+          HISTORY_METADATA_TIMEOUT_MS,
+        ).catch((tagError) => {
+          console.error("[reading-history] post tags query failed", tagError);
+          return { data: [], error: tagError };
+        }),
+      ])
+      : [{ data: [], error: null }, { data: [], error: null }];
+    if (postsResult.error) {
       console.error("[reading-history] posts query returned error", postsResult.error);
     }
+    if (postTagsResult.error) {
+      console.error("[reading-history] post tags query returned error", postTagsResult.error);
+    }
     type PostQueryRow = ReadingHistoryPostSnapshot & {
-      post_tags?: Array<{ tags?: { name?: string | null } | null }>;
+      id: string;
     };
+    type PostTagQueryRow = { post_id?: string | null; tags?: { name?: string | null } | null };
     const posts = (postsResult.data || []) as unknown as PostQueryRow[];
+    const postTags = (postTagsResult.data || []) as unknown as PostTagQueryRow[];
+    const tagsByPost = new Map<string, string[]>();
+    for (const row of postTags) {
+      if (!row.post_id || !row.tags?.name) continue;
+      const tags = tagsByPost.get(row.post_id) || [];
+      tags.push(row.tags.name);
+      tagsByPost.set(row.post_id, tags);
+    }
     const seriesNames = [...new Set(posts
       .map((post) => post.series_name)
       .filter((name): name is string => Boolean(name)))];
-    const [statsResult, seriesResult] = await Promise.all([
+    const authorIds = [...new Set(posts
+      .map((post) => post.user_id)
+      .filter((id): id is string => Boolean(id)))];
+    const [statsResult, seriesResult, authorsResult] = await Promise.all([
       postIds.length
         ? withTimeout(supabase.from("post_stats").select("id,like_count").in("id", postIds), HISTORY_METADATA_TIMEOUT_MS)
           .catch((statsError) => {
@@ -179,9 +225,22 @@ export async function loadReadingHistory(
           })
         : Promise.resolve({ data: [] }),
       seriesNames.length
-        ? withTimeout(supabase.from("series").select("name,description,tags,status").in("name", seriesNames), HISTORY_METADATA_TIMEOUT_MS)
+        ? withTimeout(
+          withTestDataVisibility(
+            supabase.from("series").select("name,description,tags,status").in("name", seriesNames),
+            includeTestData,
+          ),
+          HISTORY_METADATA_TIMEOUT_MS,
+        )
           .catch((seriesError) => {
             console.error("[reading-history] series query failed", seriesError);
+            return { data: [] };
+          })
+        : Promise.resolve({ data: [] }),
+      authorIds.length
+        ? withTimeout(supabase.from("profiles").select("id,nickname,avatar_url").in("id", authorIds), HISTORY_METADATA_TIMEOUT_MS)
+          .catch((authorError) => {
+            console.error("[reading-history] author query failed", authorError);
             return { data: [] };
           })
         : Promise.resolve({ data: [] }),
@@ -192,18 +251,21 @@ export async function loadReadingHistory(
     if ("error" in seriesResult && seriesResult.error) {
       console.error("[reading-history] series query returned error", seriesResult.error);
     }
+    if ("error" in authorsResult && authorsResult.error) {
+      console.error("[reading-history] author query returned error", authorsResult.error);
+    }
     const likeCounts = new Map((statsResult.data || []).map((row) => [String(row.id), Number(row.like_count) || 0]));
     const seriesMetadata = new Map((seriesResult.data || []).map((row) => [String(row.name), row]));
+    const authors = new Map((authorsResult.data || []).map((row) => [String(row.id), row]));
     const postSnapshots = new Map(posts.map((post) => {
-      const tags = post.tags?.length
-        ? post.tags
-        : (post.post_tags || []).map((item) => item.tags?.name).filter((name): name is string => Boolean(name));
+      const existing = records.find((record) => record.post_id === post.id)?.post;
+      const tags = post.tags?.length ? post.tags : (tagsByPost.get(post.id) || existing?.tags || []);
       const snapshot = { ...post };
-      delete snapshot.post_tags;
       const series = post.series_name ? seriesMetadata.get(post.series_name) : undefined;
       return [post.id, {
         ...snapshot,
         tags,
+        author: authors.get(String(post.user_id)) || existing?.author || null,
         series_description: typeof series?.description === "string" ? series.description : null,
         series_tags: Array.isArray(series?.tags) ? series.tags.filter((tag): tag is string => typeof tag === "string") : null,
         series_status: typeof series?.status === "string" ? series.status : null,
