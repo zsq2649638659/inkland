@@ -48,7 +48,7 @@ function imagesFor(post: Post): string[] {
 }
 
 function tagLinks(tags: string[], mode: ProfileCardMode) {
-  if (!tags.length || mode !== "pc") return null;
+  if (!tags.length || mode === "mobile-square") return null;
   return (
     <div className="site-card__tags" aria-label="作品标签">
       {tags.map((tag) => (
@@ -101,25 +101,23 @@ function serialCard(series: ProfileSeriesCard, mode: ProfileCardMode) {
   const seriesHref = `/series/${encodeURIComponent(series.name)}`;
   const chapterHref = series.latestChapterId ? `/read/${series.latestChapterId}` : seriesHref;
   const statusClass = series.status === "completed" ? "tag--status-complete" : "tag--status-active";
-  const chapterTitle = series.latestChapterNumber === null
+  const chapterTitle = !series.latestChapterId
+    ? "章节待发布，敬请期待"
+    : series.latestChapterNumber === null
     ? (series.latestChapterTitle || "最新章节")
     : `第${series.latestChapterNumber}章${series.latestChapterTitle ? ` ${series.latestChapterTitle}` : ""}`;
   return (
     <article className={`site-card site-card--feed site-card--feed-serial site-card--profile-${mode}`} data-card-type="serial">
-      <div className="site-card__serial-inner">
-        <div className="site-card__serial-heading site-card__serial-heading--profile">
-          <Link href={seriesHref} className="site-card__title-link"><h3 className="site-card__title">{series.name}</h3></Link>
-          <span className={`tag tag--status site-card__status ${statusClass}`}>{series.status === "completed" ? "已完结" : "连载中"}</span>
-        </div>
-        <Link href={seriesHref} className="site-card__content-link"><p className="site-card__excerpt site-card__serial-intro">{series.description || "暂无简介"}</p></Link>
-        {tagLinks(series.tags || [], mode)}
-        {series.latestChapterId && (
-          <Link href={chapterHref} className="tag tag--type tag--type-link site-card__latest-chapter" aria-label={`打开${series.name}的${chapterTitle}`}>
-            <SiteIcon name="fa-long-serial" variant="outline" aria-hidden="true" />
-            <strong>{chapterTitle}</strong>
-          </Link>
-        )}
+      <div className="site-card__serial-heading site-card__serial-heading--profile">
+        <Link href={seriesHref} className="site-card__title-link"><h3 className="site-card__title">{series.name}</h3></Link>
+        <span className={`tag tag--status site-card__status ${statusClass}`}>{series.status === "completed" ? "已完结" : "连载中"}</span>
       </div>
+      <Link href={seriesHref} className="site-card__content-link"><p className="site-card__excerpt site-card__serial-intro">{series.description || "暂无简介"}</p></Link>
+      <Link href={chapterHref} className="tag tag--type tag--type-link site-card__latest-chapter" aria-label={`打开${series.name}的${chapterTitle}`}>
+        <SiteIcon name="fa-long-serial" variant="outline" aria-hidden="true" />
+        <strong>{chapterTitle}</strong>
+      </Link>
+      {tagLinks(series.tags || [], mode)}
     </article>
   );
 }

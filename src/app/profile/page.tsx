@@ -565,7 +565,9 @@ export default function ProfilePage() {
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) setShownProfileItems((count) => count + 12);
+        if (entries[0].isIntersecting) {
+          setShownProfileItems((count) => count < profilePageTotal ? Math.min(count + 12, profilePageTotal) : count);
+        }
       },
       { rootMargin: "240px" }
     );
@@ -673,18 +675,13 @@ export default function ProfilePage() {
 
           {showFilters && (
             <>
-              <div className="filter-system-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
-                <div className="filter-system-composition-row">
-                  <label className="filter-system-field filter-system-field--query">
-                    <span>搜索作品</span>
-                    <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
-                  </label>
-                  <ProfileFilterSelect label="作品类型" id="profile-filter-type-menu" value={activeProfileFilter} options={filterPills.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => updateActiveFilter(value as FilterType)} />
-                  <ProfileFilterSelect label="排序" id="profile-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最近更新" }, { value: "created", label: "最近创建" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as SortMode)} />
-                </div>
-                <button className="filter-system-reset" type="button" aria-label="重置筛选条件" title="重置筛选条件" onClick={() => { setProfileSearch(""); updateActiveFilter("all"); setStatusFilter("all"); setSortMode("latest"); }}>
-                  <SiteIcon name="fa-clear-compact" variant="default" aria-hidden="true" />
-                </button>
+              <div className="filter-system-composition-row" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+                <label className="filter-system-field filter-system-field--query">
+                  <span>搜索作品</span>
+                  <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                </label>
+                <ProfileFilterSelect label="作品类型" id="profile-filter-type-menu" value={activeProfileFilter} options={filterPills.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => updateActiveFilter(value as FilterType)} />
+                <ProfileFilterSelect label="排序" id="profile-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最近更新" }, { value: "created", label: "最近创建" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as SortMode)} />
               </div>
               <div className="profile-mobile-filter-bar">
                 <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(activeProfileFilter); setMobileDraftStatus(statusFilter); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" /></button>
@@ -1237,16 +1234,12 @@ export default function ProfilePage() {
             </>
           )}
         </div>
-          {profilePageTotal > 0 && (
-            <div className="card-load-more" ref={profileLoadMoreRef}>
-              {shownProfileItems < profilePageTotal ? (
-                <button type="button" className="btn-load-more" onClick={() => setShownProfileItems((count) => count + 12)}>
-                  <SiteIcon name="fa-angles-down" variant="solid" aria-hidden="true" /> 加载更多
-                </button>
-              ) : (
-                <span className="load-more-end">已加载全部 {profilePageTotal} 项内容</span>
-              )}
-            </div>
+          {shownProfileItems < profilePageTotal && (
+            <div
+              className="profile-load-more-sentinel"
+              ref={profileLoadMoreRef}
+              aria-hidden="true"
+            />
           )}
         </div>
       </div>
