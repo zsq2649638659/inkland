@@ -52,6 +52,236 @@ interface SeriesWorkItem {
   tags: string[];
 }
 
+const studioImageTypes = new Set(["illustration", "comic", "cosplay"]);
+
+const getImageUrls = (content?: string | null) => {
+  if (!content) return [];
+  return [...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]);
+};
+
+const getExcerpt = (content?: string | null) => {
+  if (!content) return "";
+  return content
+    .replace(/!\[[^\]]*\]\(([^)]+)\)/g, "")
+    .replace(/[#>*_`~-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const getStudioTypeLabel = (type: string) => {
+  switch (type) {
+    case "illustration":
+    case "comic":
+    case "cosplay": return "图片";
+    case "serial": return "长篇连载";
+    case "novel": return "单篇";
+    default: return type;
+  }
+};
+
+const getStudioTypeIcon = (type: string): InklandIconName => {
+  switch (type) {
+    case "illustration":
+    case "comic":
+    case "cosplay": return "fa-image";
+    case "serial": return "fa-long-serial";
+    default: return "fa-file-lines";
+  }
+};
+
+const formatStudioCount = (count: number) => {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(count >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(count >= 10_000 ? 0 : 1).replace(/\.0$/, "")}K`;
+  return String(count);
+};
+
+const formatStudioDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+function StudioInteractionButton({
+  icon,
+  label,
+  count,
+  toggleable = false,
+}: {
+  icon: InklandIconName;
+  label: string;
+  count: number;
+  toggleable?: boolean;
+}) {
+  const [pressed, setPressed] = useState(false);
+  const [displayCount, setDisplayCount] = useState(count);
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!toggleable) return;
+    setPressed((active) => {
+      setDisplayCount((current) => current + (active ? -1 : 1));
+      return !active;
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      className={`site-card__action studio-card-action${pressed ? " is-active" : ""}`}
+      data-card-action
+      data-card-action-label={`创作中心：${label}`}
+      aria-label={`作品：${label}`}
+      aria-pressed={toggleable ? pressed : undefined}
+      onClick={handleClick}
+    >
+      <SiteIcon name={icon} variant="outline" hoverVariant="solid" aria-hidden="true" />
+      <span>{formatStudioCount(displayCount)}</span>
+    </button>
+  );
+}
+
+function StudioWorkCard({
+  work,
+  imageUrls,
+  batchMode,
+  selected,
+  typeLabel,
+  typeIcon,
+  statusLabel,
+  statusClass,
+  onToggleSelect,
+  onDelete,
+}: {
+  work: WorkItem;
+  imageUrls: string[];
+  batchMode: boolean;
+  selected: boolean;
+  typeLabel: string;
+  typeIcon: InklandIconName;
+  statusLabel: string;
+  statusClass: string;
+  onToggleSelect: (id: string) => void;
+  onDelete: (work: WorkItem) => void;
+}) {
+  const isImage = studioImageTypes.has(work.post_type);
+  const isSeries = work.post_type === "serial";
+  const isPlaceholderTitle = isImage && ["图片分享", "Image Title"].includes(work.title?.trim());
+  const displayTitle = isPlaceholderTitle ? "" : work.title?.trim();
+  const excerpt = getExcerpt(work.content);
+  const mobileType = isImage ? (displayTitle ? "image" : "image-empty") : isSeries ? "serial" : "single";
+  const title = displayTitle || (isSeries ? work.series_name || "长篇连载" : "无标题");
+  const mobileTitle = isImage && !displayTitle ? "-" : title;
+  const mobileExcerpt = isImage ? (displayTitle ? excerpt || "-" : "-") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
+  const latestChapterTitle = work.series_chapter_count ? `第${work.series_chapter_count}章` : "章节待发布";
+  const workHref = isSeries && work.series_name
+    ? `/studio/series/${encodeURIComponent(work.series_name)}`
+    : `/read/${work.id}`;
+  const editHref = isSeries
+    ? workHref
+    : `/create?editPost=${work.id}`;
+  const editLabel = work.review_status === "rejected" && !isSeries ? "查看问题并修改" : "编辑";
+  const publishedValue = work.published_at || work.updated_at || work.created_at;
+
+  return (
+    <article
+      key={work.id}
+      className={`work-card site-card site-card--feed site-card--studio site-card--feed-${isImage ? "image" : isSeries ? "serial" : "single"} ${batchMode ? "batch-mode" : ""} ${selected ? "selected" : ""}`}
+      data-studio-type={isImage ? "image" : isSeries ? "serial" : "single"}
+      data-studio-mobile-type={mobileType}
+      data-studio-status={statusClass.replace("status-", "")}
+      onClick={() => batchMode && onToggleSelect(work.id)}
+    >
+      <input
+        type="checkbox"
+        className="card-check"
+        checked={selected}
+        aria-label={`选择作品：${title}`}
+        onChange={() => onToggleSelect(work.id)}
+        onClick={(event) => event.stopPropagation()}
+      />
+      <div className="card-body">
+        <div className="site-card__studio-meta">
+          <span className="tag tag--type site-card__type">
+            <SiteIcon name={typeIcon} variant="solid" aria-hidden="true" />
+            {typeLabel}
+          </span>
+          <span className={`tag tag--status site-card__status tag--${statusClass.replace("status-", "")}`}>
+            {statusLabel}
+          </span>
+        </div>
+
+        <div className="site-card__studio-mobile-main">
+          {isImage && (
+            <div className="site-card__feed-images-shell profile-square__image">
+              <div className="site-card__feed-images" aria-label={`共 ${imageUrls.length} 张图片`}>
+                <div className="site-card__feed-image" role={!imageUrls[0] ? "img" : undefined} aria-label={!imageUrls[0] ? "图片作品封面占位" : undefined}>
+                  {imageUrls[0] ? (
+                    <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
+                  ) : (
+                    <SiteIcon name="fa-image" variant="solid" aria-hidden="true" />
+                  )}
+                  {displayTitle && (
+                    <div className="site-card__feed-image-overlay">
+                      <Link className="site-card__title-link" href={`/read/${work.id}`} onClick={(event) => event.stopPropagation()}>
+                        <h3 className="site-card__title">{displayTitle}</h3>
+                      </Link>
+                      <p className="site-card__excerpt">{excerpt || "-"}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {imageUrls.length > 1 && <span className="site-card__feed-image-count" aria-hidden="true"><span>{imageUrls.length}</span></span>}
+            </div>
+          )}
+
+          <div className="site-card__studio-mobile-copy">
+            {isSeries ? (
+              <div className="site-card__serial-heading site-card__serial-heading--profile">
+                <Link className="site-card__title-link" href={workHref} onClick={(event) => event.stopPropagation()}>
+                  <h3 className="site-card__title">{title}</h3>
+                </Link>
+              </div>
+            ) : (
+              <Link className="site-card__title-link" href={isImage ? `/read/${work.id}` : editHref} onClick={(event) => event.stopPropagation()}>
+                <h3 className="site-card__title">{isImage ? mobileTitle : title}</h3>
+              </Link>
+            )}
+            {(!isImage || mobileType === "image") && (
+              <p className={`site-card__excerpt${isSeries ? " site-card__serial-intro" : ""}`}>{isImage ? mobileExcerpt : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要")}</p>
+            )}
+            {isImage && mobileType === "image-empty" && <p className="site-card__excerpt site-card__image-empty-excerpt">-</p>}
+            {isSeries && (
+              <Link className="tag tag--type tag--type-link site-card__latest-chapter" href={`${workHref}#chapter`} aria-label={`最新章节：${latestChapterTitle}`} onClick={(event) => event.stopPropagation()}>
+                <SiteIcon name="fa-long-serial" variant="solid" aria-hidden="true" />
+                <span className="site-card__latest-chapter-label">最新章节</span>
+                <span className="site-card__latest-chapter-title">{latestChapterTitle}</span>
+              </Link>
+            )}
+            <time className="site-card__published-at" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>
+          </div>
+        </div>
+
+        <div className="site-card__actions" aria-label={`${typeLabel}作品互动操作`}>
+          <StudioInteractionButton icon="fa-heart" label="点赞" count={work.like_count} toggleable />
+          <StudioInteractionButton icon="fa-comment" label="评论" count={work.comment_count} />
+          <StudioInteractionButton icon="fa-bookmark" label="收藏" count={work.bookmark_count} toggleable />
+        </div>
+
+        <div className="site-card__studio-actions" role="group" aria-label={`${typeLabel}作品管理操作`}>
+          <Link href={editHref} className="btn btn--small btn--theme-default btn--variant-base" onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
+          <button type="button" className="btn btn--small btn--theme-primary btn--variant-base" onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+        </div>
+
+        <div className="site-card__studio-mobile-management" role="group" aria-label={`${typeLabel}作品管理操作`}>
+          <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`编辑${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
+          <button type="button" className="btn btn--small btn--round btn--theme-primary btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 interface StudioWorksResponse {
   data: Record<string, unknown>[];
   stats: Array<Record<string, unknown>>;
@@ -395,72 +625,6 @@ export default function StudioPage() {
     </>
   );
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "illustration":
-      case "comic":
-      case "cosplay": return "图片";
-      case "serial": return "长篇连载";
-      case "novel": return "单篇";
-      default: return type;
-    }
-  };
-
-  const getTypeIcon = (type: string): InklandIconName => {
-    switch (type) {
-      case "illustration":
-      case "comic":
-      case "cosplay": return "fa-image";
-      case "serial": return "fa-book";
-      default: return "fa-feather-pointed";
-    }
-  };
-
-  const getImageUrls = (content?: string | null) => {
-    if (!content) return [];
-    return [...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1]);
-  };
-
-  const getExcerpt = (content?: string | null) => {
-    if (!content) return "";
-    return content
-      .replace(/!\[[^\]]*\]\(([^)]+)\)/g, "")
-      .replace(/[#>*_`~-]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  };
-
-  const handleTagDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
-    const element = event.currentTarget;
-    const startX = event.clientX;
-    const startScrollLeft = element.scrollLeft;
-    const handleMove = (moveEvent: MouseEvent) => {
-      element.scrollLeft = startScrollLeft - (moveEvent.clientX - startX);
-    };
-    const handleUp = () => {
-      element.classList.remove("is-dragging");
-      document.removeEventListener("mousemove", handleMove);
-      document.removeEventListener("mouseup", handleUp);
-    };
-    element.classList.add("is-dragging");
-    document.addEventListener("mousemove", handleMove);
-    document.addEventListener("mouseup", handleUp);
-  };
-
-  useEffect(() => {
-    const tagRows = Array.from(document.querySelectorAll<HTMLElement>(".studio-card-tags"));
-    const updateOverflow = (element: HTMLElement) => {
-      element.classList.toggle("has-overflow", element.scrollWidth > element.clientWidth + 1);
-    };
-    const observers = tagRows.map((element) => {
-      updateOverflow(element);
-      const observer = new ResizeObserver(() => updateOverflow(element));
-      observer.observe(element);
-      return observer;
-    });
-    return () => observers.forEach((observer) => observer.disconnect());
-  }, [allWorks.length, filter, statusFilter, searchQuery]);
-
   const getStatusClass = (w: WorkItem) => {
     if (w.review_status === "rejected") return "status-rejected";
     if (w.status === "published") return "status-published";
@@ -726,79 +890,19 @@ export default function StudioPage() {
           ) : (
             <div className="works-card-grid">
               {allWorks.slice(0, shownWorks).map((w) => (
-                <div
+                <StudioWorkCard
                   key={w.id}
-                  className={`work-card ${batchMode ? "batch-mode" : ""} ${selectedIds.has(w.id) ? "selected" : ""}`}
-                  onClick={() => batchMode && toggleSelect(w.id)}
-                >
-                  <input
-                    type="checkbox"
-                    className="card-check"
-                    checked={selectedIds.has(w.id)}
-                    onChange={() => toggleSelect(w.id)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <div className="card-body">
-                    {(() => {
-                      const imageUrls = resolvedImageUrls[w.id] || getImageUrls(w.content);
-                      const isImage = ["illustration", "comic", "cosplay"].includes(w.post_type);
-                      const isSeries = w.post_type === "serial";
-                      const isPlaceholderTitle = isImage && ["图片分享", "Image Title"].includes(w.title?.trim());
-                      const displayTitle = isPlaceholderTitle ? "" : w.title?.trim();
-                      return <>
-                    <div className="card-meta">
-                      <span className="card-type-label">
-                        <SiteIcon name={getTypeIcon(w.post_type)} variant="solid" />
-                        {getTypeLabel(w.post_type)}
-                      </span>
-                      <span className={`card-status ${getStatusClass(w)}`}>
-                        {getStatusLabel(w)}
-                      </span>
-                    </div>
-                    {isImage && imageUrls[0] && (
-                      <div className="studio-work-preview">
-                        <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
-                        <span className="studio-image-count">{imageUrls.length} 张图片</span>
-                      </div>
-                    )}
-                    {!isImage && displayTitle ? <div className="card-title">{displayTitle}</div> : (
-                      !isImage && <div className="card-title card-title-placeholder">{getExcerpt(w.content) || "无标题"}</div>
-                    )}
-                    {!isImage && <div className="studio-card-description">{getExcerpt(w.content) || (isSeries ? "暂无系列简介，进入管理页面查看章节内容" : "暂无正文摘要")}</div>}
-                    {(w.tags || []).length > 0 && (
-                      <div className="studio-card-tags" onMouseDown={handleTagDragStart} title="拖动查看全部标签">
-                        {(w.tags || []).map((tag) => <span key={tag} className="studio-card-tag">{tag}</span>)}
-                      </div>
-                    )}
-                    <div className="card-actions">
-                      {w.post_type === "serial" && w.series_name ? (
-                        <Link
-                          href={`/studio/series/${encodeURIComponent(w.series_name)}`}
-                          className="card-btn card-btn-edit"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <SiteIcon name="fa-pen-to-square" variant="solid" /> 管理
-                        </Link>
-                      ) : (
-                        <Link
-                          href={`/create?editPost=${w.id}`}
-                          className="card-btn card-btn-edit"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <SiteIcon name="fa-pen-to-square" variant="solid" /> {w.review_status === "rejected" ? "查看问题并修改" : "编辑"}
-                        </Link>
-                      )}
-                      <button
-                        className="card-btn card-btn-delete"
-                        onClick={(e) => { e.stopPropagation(); handleDelete(w); }}
-                      >
-                        <SiteIcon name="fa-trash-can" variant="solid" /> 删除
-                      </button>
-                    </div>
-                      </>;
-                    })()}
-                  </div>
-                </div>
+                  work={w}
+                  imageUrls={resolvedImageUrls[w.id] || getImageUrls(w.content)}
+                  batchMode={batchMode}
+                  selected={selectedIds.has(w.id)}
+                  typeLabel={getStudioTypeLabel(w.post_type)}
+                  typeIcon={getStudioTypeIcon(w.post_type)}
+                  statusLabel={getStatusLabel(w)}
+                  statusClass={getStatusClass(w)}
+                  onToggleSelect={toggleSelect}
+                  onDelete={handleDelete}
+                />
               ))}
             </div>
           )}
