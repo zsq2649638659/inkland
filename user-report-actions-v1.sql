@@ -990,9 +990,15 @@ DECLARE
   v_status TEXT;
   v_label TEXT;
 BEGIN
-  v_user_id := CASE TG_TABLE_NAME
-    WHEN 'follows' THEN NEW.follower_id
-    ELSE NEW.user_id END;
+  -- 这个函数同时挂在 follows、bookmarks、likes 三张表上。
+  -- 不能直接引用 NEW.follower_id：在 likes/bookmarks 触发器上下文中，
+  -- NEW 没有这个字段，即使 CASE 分支最终不走到 follows，也会报 42703。
+  -- 先转成 JSONB，再按表名读取字段，避免跨表记录类型解析错误。
+  IF TG_TABLE_NAME = 'follows' THEN
+    v_user_id := NULLIF(to_jsonb(NEW) ->> 'follower_id', '')::UUID;
+  ELSE
+    v_user_id := NULLIF(to_jsonb(NEW) ->> 'user_id', '')::UUID;
+  END IF;
   IF auth.uid() IS NULL OR v_user_id IS NULL OR v_user_id <> auth.uid() THEN
     RETURN NEW;
   END IF;
