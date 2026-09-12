@@ -1,89 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import HomeSidebar from "@/components/HomeSidebar";
 import EmptyState from "@/components/EmptyState";
+import HistoryWorkCard from "@/components/HistoryWorkCard";
 import { useAuth } from "@/components/AuthProvider";
-import { createClient } from "@/lib/supabase/browser";
-import { loadReadingHistory, type ReadingHistoryRecord } from "@/lib/readingHistory";
-import styles from "./history.module.css";
-
-type HistoryFilter = "all" | "single" | "image" | "serial";
-
-const filters: Array<[HistoryFilter, string]> = [
-  ["all", "全部"],
-  ["single", "单篇"],
-  ["image", "图片"],
-  ["serial", "长篇连载"],
-];
-
-function historyKind(record: ReadingHistoryRecord): HistoryFilter {
-  const type = record.post?.post_type;
-  if (type === "serial") return "serial";
-  if (["illustration", "comic", "cosplay", "art"].includes(type || "")) return "image";
-  return "single";
-}
-
-function formatLastRead(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "最近阅读";
-  return date.toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function positionLabel(record: ReadingHistoryRecord) {
-  if (record.position_label) return record.position_label;
-  if (record.post?.post_type === "serial" && (record.chapter_number || record.post.chapter_number)) {
-    return `第${record.chapter_number || record.post.chapter_number}章`;
-  }
-  return `已读 ${Math.round(record.progress_ratio * 100)}%`;
-}
+import {
+  getLocalReadingHistory,
+  mergeReadingHistoryRecords,
+  type ReadingHistoryRecord,
+} from "@/lib/readingHistory";
 
 function HistoryCards({ records }: { records: ReadingHistoryRecord[] }) {
   if (records.length === 0) {
-    return <div className={styles.filterEmpty}>还没有这类阅读记录。打开一篇作品后，Inkland 会自动记录最近阅读位置。</div>;
+    return <div className="history-card-empty">还没有阅读记录。打开一篇作品后，Inkland 会自动记录最近阅读位置。</div>;
   }
 
   return (
-    <div className={styles.list}>
-      {records.map((record) => {
-        const post = record.post;
-        const title = post?.title || "已删除或暂不可见的作品";
-        return (
-          <article className={styles.card} key={record.id || record.post_id}>
-            <div className={styles.copy}>
-              <strong className={styles.title}>{title}</strong>
-              <div className={styles.meta}>
-                {post?.series_name && <span>{post.series_name}</span>}
-                <span>{positionLabel(record)}</span>
-                <span>最后阅读于 {formatLastRead(record.last_read_at)}</span>
-              </div>
-            </div>
-            {post ? (
-              <Link className={styles.action} href={`/read/${record.post_id}`}>
-                继续阅读 <span aria-hidden="true">→</span>
-              </Link>
-            ) : (
-              <span className={styles.unavailable}>记录暂不可用</span>
-            )}
-          </article>
-        );
-      })}
-    </div>
+    <>
+      <div className="history-card-device history-card-device--pc card-device-grid" data-card-variant="search-work">
+        <div className="card-device-frame card-device card-device--pc">
+          <div className="card-device__cards">
+            {records.map((record) => <HistoryWorkCard key={record.id || record.post_id} record={record} mode="pc" />)}
+          </div>
+        </div>
+      </div>
+      <div className="history-card-device history-card-device--mobile card-device-grid" data-card-variant="search-work">
+        <div className="card-device-frame card-device card-device--mobile card-device--profile-square card-device--search-work-mobile">
+          <div className="card-device__cards">
+            {records.map((record) => <HistoryWorkCard key={record.id || record.post_id} record={record} mode="mobile" />)}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
 export default function HistoryPage() {
-  const supabase = useMemo(() => createClient(), []);
   const { user, loading: authLoading } = useAuth();
   const [records, setRecords] = useState<ReadingHistoryRecord[]>([]);
-  const [filter, setFilter] = useState<HistoryFilter>("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -91,18 +46,38 @@ export default function HistoryPage() {
       return;
     }
     let active = true;
+    const controller = new AbortController();
     void Promise.resolve().then(() => {
       if (active) setLoading(true);
     });
-    void loadReadingHistory(supabase, user.id).then(({ records: next }) => {
-      if (!active) return;
-      setRecords(next.filter((record) => record.post_id));
-      setLoading(false);
-    });
+    const local = getLocalReadingHistory(user.id);
+    void fetch("/api/reading-history", {
+      method: "POST",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postIds: local.map((record) => record.post_id) }),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`reading-history-${response.status}`);
+        return response.json() as Promise<{ records?: ReadingHistoryRecord[] }>;
+      })
+      .then(({ records: remote = [] }) => {
+        if (!active) return;
+        const next = mergeReadingHistoryRecords(remote, local);
+        setRecords(next.filter((record) => record.post_id));
+      })
+      .catch(() => {
+        if (active) setRecords(local);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [supabase, user]);
+  }, [user]);
 
   if (authLoading || (user && loading)) {
     return (
@@ -137,7 +112,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-paper pb-20 lg:pb-0 ${styles.page}`} id="page-history">
+    <div className="min-h-screen bg-paper pb-20 lg:pb-0 history-page" id="page-history">
       <div className="main-container">
         <HomeSidebar />
         <main className="content-area">
@@ -146,46 +121,15 @@ export default function HistoryPage() {
             <p className="page-subtitle">记录你最近读过的作品和位置，随时继续阅读。</p>
           </div>
 
-          <div className="type-filters-row" role="tablist" aria-label="阅读历史分类">
-            <div className="type-filters">
-              {filters.map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={filter === key}
-                  className={`type-filter-pill${filter === key ? " active" : ""}`}
-                  onClick={() => setFilter(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {filters.map(([key]) => {
-            const visible = records.filter((record) => key === "all" || historyKind(record) === key);
-            return (
-              <div
-                key={key}
-                className={`tab-content${filter === key ? " active" : ""}`}
-                role="tabpanel"
-                aria-hidden={filter !== key}
-              >
-                {records.length === 0 && key === "all" ? (
-                  <EmptyState
-                    icon="fa-clock-rotate-left"
-                    title="还没有阅读记录"
-                    description="打开一篇作品后，Inkland 会自动记录最近阅读的位置。"
-                    actionLabel="去发现作品"
-                    actionHref="/search"
-                  />
-                ) : (
-                  <HistoryCards records={visible} />
-                )}
-              </div>
-            );
-          })}
+          {records.length === 0 ? (
+            <EmptyState
+              icon="fa-clock-rotate-left"
+              title="还没有阅读记录"
+              description="打开一篇作品后，Inkland 会自动记录最近阅读的位置。"
+              actionLabel="去发现作品"
+              actionHref="/search"
+            />
+          ) : <HistoryCards records={records} />}
         </main>
       </div>
     </div>
