@@ -5,6 +5,7 @@ import type { InklandIconName } from "@/components/inkland/iconRegistry";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import HomeSidebar from "@/components/HomeSidebar";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
@@ -68,7 +69,10 @@ export default function StudioPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortType, setSortType] = useState<SortType>("updated");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortOpen, setSortOpen] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileDraftFilter, setMobileDraftFilter] = useState<FilterType>("all");
+  const [mobileDraftStatus, setMobileDraftStatus] = useState<StatusFilter>("all");
+  const [mobileDraftSort, setMobileDraftSort] = useState<SortType>("updated");
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shownWorks, setShownWorks] = useState(12);
@@ -347,7 +351,7 @@ export default function StudioPage() {
   const rejectedCount = allPostsForStats.filter((w) => w.review_status === "rejected").length;
 
   const typeFilters: { key: FilterType; label: string }[] = [
-    { key: "all", label: "全部" },
+    { key: "all", label: "全部作品" },
     { key: "novel", label: "单篇" },
     { key: "illustration", label: "图片" },
     { key: "serial", label: "长篇连载" },
@@ -365,6 +369,31 @@ export default function StudioPage() {
     { key: "created", label: "最近创建" },
     { key: "popular", label: "热度最高" },
   ];
+
+  const openMobileFilter = () => {
+    setMobileDraftFilter(filter);
+    setMobileDraftStatus(statusFilter);
+    setMobileDraftSort(sortType);
+    setMobileFilterOpen(true);
+  };
+
+  const applyMobileFilter = () => {
+    setFilter(mobileDraftFilter);
+    setStatusFilter(mobileDraftStatus);
+    setSortType(mobileDraftSort);
+    setMobileFilterOpen(false);
+  };
+
+  const typeFilterOptions = typeFilters.map((item) => ({ value: item.key, label: item.label }));
+  const statusFilterOptions = statusFilters.map((item) => ({ value: item.key, label: item.label }));
+  const sortFilterOptions = sortOptions.map((item) => ({ value: item.key, label: item.label }));
+  const renderFilterSelectors = (prefix: string) => (
+    <>
+      <ProfileFilterSelect label="作品类型" id={`${prefix}-type-menu`} value={filter} options={typeFilterOptions} onChange={(value) => setFilter(value as FilterType)} />
+      <ProfileFilterSelect label="发布状态" id={`${prefix}-status-menu`} value={statusFilter} options={statusFilterOptions} onChange={(value) => setStatusFilter(value as StatusFilter)} />
+      <ProfileFilterSelect label="排序" id={`${prefix}-sort-menu`} value={sortType} options={sortFilterOptions} onChange={(value) => setSortType(value as SortType)} />
+    </>
+  );
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -540,7 +569,7 @@ export default function StudioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-paper pb-20 lg:pb-0">
+    <div className="min-h-screen bg-paper pb-20 lg:pb-0" id="page-studio">
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
@@ -588,163 +617,91 @@ export default function StudioPage() {
 
           {/* 移动端工具栏 */}
           <div className="toolbar toolbar-mobile">
-            <div className="segmented-tabs">
-              <div className="segmented-tabs-left">
-                {typeFilters.map((f) => (
-                  <button
-                    key={f.key}
-                    className={`segmented-tab ${filter === f.key ? "active" : ""}`}
-                    onClick={() => setFilter(f.key)}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <div className="segmented-tabs-right">
-                {statusFilters.map((f) => (
-                  <button
-                    key={f.key}
-                    className={`segmented-tab ${statusFilter === f.key ? "active" : ""}`}
-                    onClick={() => setStatusFilter(f.key)}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="search-wrap">
-              <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
-              <input
-                type="text"
-                placeholder="搜索作品标题..."
-                aria-label="创作中心搜索"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="toolbar-row" style={{ justifyContent: "space-between" }}>
-              <div className="sort-wrap">
-                <button className="btn-sort" onClick={() => setSortOpen(!sortOpen)}>
-                  <SiteIcon name="fa-arrow-down-wide-short" variant="solid" />
-                  <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
-                </button>
-                {sortOpen && (
-                  <>
-                    <div className="sort-overlay show" onClick={() => setSortOpen(false)}></div>
-                    <div className="sort-popup show">
-                      <div className="sort-popup-header">
-                        <span className="sort-popup-title">排序方式</span>
-                        <button className="sort-popup-close" onClick={() => setSortOpen(false)}>
-                          <SiteIcon name="fa-xmark" variant="solid" />
-                        </button>
-                      </div>
-                      {sortOptions.map((opt) => (
-                        <button
-                          key={opt.key}
-                          className={`sort-option ${sortType === opt.key ? "active" : ""}`}
-                          onClick={() => { setSortType(opt.key); setSortOpen(false); }}
-                        >
-                          <span>{opt.label}</span>
-                          <SiteIcon name="fa-check" variant="solid" />
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              <button
-                className="btn-batch"
-                onClick={() => { setBatchMode(!batchMode); setSelectedIds(new Set()); }}
-              >
-                <SiteIcon name="fa-list-check" variant="solid" /> 批量操作
+            <div className="studio-mobile-filter-bar">
+              <button type="button" className="studio-mobile-filter-button" onClick={openMobileFilter} aria-label="打开筛选">
+                <SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" />
+                <span>筛选</span>
               </button>
+              <button
+                type="button"
+                className="studio-mobile-filter-button"
+                onClick={() => { setBatchMode((current) => !current); setSelectedIds(new Set()); }}
+                aria-pressed={batchMode}
+              >
+                <SiteIcon name="fa-list-check" variant="solid" aria-hidden="true" />
+                <span>批量操作</span>
+              </button>
+            </div>
+            {mobileFilterOpen && (
+              <div className="studio-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
+                <section className="studio-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选作品" onClick={(event) => event.stopPropagation()}>
+                  <h2>筛选作品</h2>
+                  <div className="studio-filter-drawer-section"><strong>作品类型</strong><div>{typeFilterOptions.map((item) => <button key={item.value} type="button" className={`studio-filter-control${mobileDraftFilter === item.value ? " is-active" : ""}`} onClick={() => setMobileDraftFilter(item.value as FilterType)}>{item.label}</button>)}</div></div>
+                  <div className="studio-filter-drawer-section"><strong>发布状态</strong><div>{statusFilterOptions.map((item) => <button key={item.value} type="button" className={`studio-filter-control${mobileDraftStatus === item.value ? " is-active" : ""}`} onClick={() => setMobileDraftStatus(item.value as StatusFilter)}>{item.label}</button>)}</div></div>
+                  <div className="studio-filter-drawer-section"><strong>排序</strong><div>{sortFilterOptions.map((item) => <button key={item.value} type="button" className={`studio-filter-control${mobileDraftSort === item.value ? " is-active" : ""}`} onClick={() => setMobileDraftSort(item.value as SortType)}>{item.label}</button>)}</div></div>
+                  <div className="studio-filter-drawer-actions">
+                    <button type="button" onClick={() => { setMobileDraftFilter("all"); setMobileDraftStatus("all"); setMobileDraftSort("updated"); }}>重置</button>
+                    <button type="button" className="is-primary" onClick={applyMobileFilter}>应用筛选</button>
+                  </div>
+                </section>
+              </div>
+            )}
+            <div className="studio-mobile-content">
+              {!batchMode && (
+                <div className="filter-system-field filter-system-field--query">
+                  <div className="profile-filter-search-shell">
+                    <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                    <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="创作中心搜索" />
+                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                      <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {batchMode && (
+                <div className="studio-batch-row studio-batch-row--mobile">
+                  <span className="studio-batch-count">已选 {selectedIds.size} 项</span>
+                  <button type="button" className="studio-toolbar-action" onClick={selectAll}>全选</button>
+                  <button type="button" className="studio-toolbar-action" onClick={batchPublish}><SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 发布</button>
+                  <button type="button" className="studio-toolbar-action" onClick={batchDelete}><SiteIcon name="fa-trash-can" variant="solid" /> 删除</button>
+                  <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}><SiteIcon name="fa-xmark" variant="solid" /> 取消</button>
+                </div>
+              )}
             </div>
           </div>
 
           {/* PC 工具栏 */}
           <div className="toolbar toolbar-pc">
-            {!batchMode ? (
-              <div className="toolbar-pc-normal">
-                <div className="segmented-tabs">
-                  <div className="segmented-tabs-left">
-                    {typeFilters.map((f) => (
-                      <button
-                        key={f.key}
-                        className={`segmented-tab ${filter === f.key ? "active" : ""}`}
-                        onClick={() => setFilter(f.key)}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="segmented-tabs-right">
-                    {statusFilters.map((f) => (
-                      <button
-                        key={f.key}
-                        className={`segmented-tab ${statusFilter === f.key ? "active" : ""}`}
-                        onClick={() => setStatusFilter(f.key)}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="studio-toolbar-row2">
-                  <div className="search-wrap">
-                    <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
-                    <input
-                      type="text"
-                      placeholder="搜索作品标题..."
-                      aria-label="创作中心搜索"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <div className="toolbar-spacer"></div>
-                  <div className="toolbar-pc-right">
-                    <div className="sort-wrap">
-                      <button
-                        className={`sort-select ${sortOpen ? "open" : ""}`}
-                        onClick={() => setSortOpen(!sortOpen)}
-                      >
-                        <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
-                        <SiteIcon name="fa-chevron-down" variant="solid" className="sort-arrow" />
-                      </button>
-                      <div className={`sort-dropdown ${sortOpen ? "show" : ""}`}>
-                        {sortOptions.map((opt) => (
-                          <button
-                            key={opt.key}
-                            className={`sort-option ${sortType === opt.key ? "active" : ""}`}
-                            onClick={() => { setSortType(opt.key); setSortOpen(false); }}
-                          >
-                            <SiteIcon name="fa-check" variant="solid" /> {opt.label}
-                          </button>
-                        ))}
+            <div className="toolbar-pc-normal">
+              <div className="studio-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+                <div className="filter-system-composition-row">{renderFilterSelectors("studio")}</div>
+                {!batchMode ? (
+                  <div className="studio-filter-search-row">
+                    <div className="filter-system-field filter-system-field--query">
+                      <div className="profile-filter-search-shell">
+                        <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="创作中心搜索" />
+                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                          <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+                        </button>
                       </div>
                     </div>
-                    <button className="btn-batch-toggle" onClick={() => setBatchMode(true)}>
+                    <div className="toolbar-spacer"></div>
+                    <button type="button" className="studio-toolbar-action studio-toolbar-action--batch-toggle" onClick={() => { setBatchMode(true); setSelectedIds(new Set()); }}>
                       <SiteIcon name="fa-list-check" variant="solid" /> 批量操作
                     </button>
                   </div>
-                </div>
+                ) : (
+                  <div className="studio-batch-row">
+                    <span className="studio-batch-count">已选 {selectedIds.size} 项</span>
+                    <button type="button" className="studio-toolbar-action" onClick={selectAll}>全选</button>
+                    <button type="button" className="studio-toolbar-action" onClick={batchPublish}><SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 批量发布</button>
+                    <button type="button" className="studio-toolbar-action" onClick={batchDelete}><SiteIcon name="fa-trash-can" variant="solid" /> 批量删除</button>
+                    <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}><SiteIcon name="fa-xmark" variant="solid" /> 取消选择</button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="toolbar-pc-batch active">
-                <span className="batch-count">已选 {selectedIds.size} 项</span>
-                <button className="batch-chip" onClick={selectAll}>全选</button>
-                <div className="toolbar-divider"></div>
-                <button className="batch-action" onClick={batchPublish}>
-                  <SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 批量发布
-                </button>
-                <button className="batch-action batch-action--danger" onClick={batchDelete}>
-                  <SiteIcon name="fa-trash-can" variant="solid" /> 批量删除
-                </button>
-                <div className="toolbar-spacer"></div>
-                <button className="batch-action batch-action--cancel" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>
-                  <SiteIcon name="fa-xmark" variant="solid" /> 取消选择
-                </button>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* 作品列表 */}
@@ -863,21 +820,6 @@ export default function StudioPage() {
         </div>
       </div>
 
-      {/* 批量操作底部栏（移动端） */}
-      <div className={`batch-bar ${batchMode ? "show" : ""}`}>
-        <span className="batch-bar-count">已选 {selectedIds.size} 项</span>
-        <div className="batch-bar-actions">
-          <button className="batch-bar-btn batch-bar-btn--publish" onClick={batchPublish}>
-            <SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 发布
-          </button>
-          <button className="batch-bar-btn batch-bar-btn--delete" onClick={batchDelete}>
-            <SiteIcon name="fa-trash-can" variant="solid" /> 删除
-          </button>
-          <button className="batch-bar-btn batch-bar-btn--cancel" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>
-            <SiteIcon name="fa-xmark" variant="solid" /> 取消
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
