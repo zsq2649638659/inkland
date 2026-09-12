@@ -82,24 +82,22 @@ function mergePostSnapshots(
   if (!primary) return fallback || null;
   if (!fallback) return primary;
 
-  const merged: ReadingHistoryPostSnapshot = { ...fallback, ...primary };
-  const nullableFields: Array<keyof ReadingHistoryPostSnapshot> = [
-    "title",
-    "content",
-    "post_type",
-    "series_name",
-    "chapter_number",
-    "word_count",
-    "cover_url",
-    "user_id",
-    "status",
-    "series_description",
-    "series_status",
-    "like_count",
-  ];
-  for (const field of nullableFields) {
-    if (merged[field] == null) merged[field] = fallback[field] ?? null;
-  }
+  const merged: ReadingHistoryPostSnapshot = {
+    ...fallback,
+    ...primary,
+    title: primary.title ?? fallback.title ?? null,
+    content: primary.content ?? fallback.content ?? null,
+    post_type: primary.post_type ?? fallback.post_type ?? null,
+    series_name: primary.series_name ?? fallback.series_name ?? null,
+    chapter_number: primary.chapter_number ?? fallback.chapter_number ?? null,
+    word_count: primary.word_count ?? fallback.word_count ?? null,
+    cover_url: primary.cover_url ?? fallback.cover_url ?? null,
+    user_id: primary.user_id ?? fallback.user_id ?? null,
+    status: primary.status ?? fallback.status ?? null,
+    series_description: primary.series_description ?? fallback.series_description ?? null,
+    series_status: primary.series_status ?? fallback.series_status ?? null,
+    like_count: primary.like_count ?? fallback.like_count ?? null,
+  };
   if (!merged.tags?.length && fallback.tags?.length) merged.tags = fallback.tags;
   if (!merged.series_tags?.length && fallback.series_tags?.length) merged.series_tags = fallback.series_tags;
   if (primary.author || fallback.author) {
