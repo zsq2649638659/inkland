@@ -7969,6 +7969,16 @@ p {
 #page-profile .filter-system-field { display: grid; min-width: 0; gap: var(--ink-gap-compact); color: var(--ink-text-secondary); font: var(--ink-font-control); }
 #page-profile .filter-system-field--query { min-width: 0; }
 #page-profile .filter-system-select-wrap { position: relative; display: block; }
+#page-profile .profile-filter-search-shell { position: relative; }
+#page-profile .profile-filter-search-shell > svg { position: absolute; top: 50%; left: var(--ink-input-leading-offset); z-index: 1; width: var(--ink-input-icon-size); height: var(--ink-input-icon-size); color: var(--ink-text-secondary); pointer-events: none; transform: translateY(-50%); }
+#page-profile .profile-filter-search-shell .form-control { padding-left: var(--ink-input-padding-leading); padding-right: var(--ink-input-padding-action); }
+#page-profile .profile-filter-search-shell input[type="search"]::-webkit-search-decoration,
+#page-profile .profile-filter-search-shell input[type="search"]::-webkit-search-cancel-button { appearance: none; display: none; width: 0; height: 0; }
+#page-profile .profile-filter-search-clear { position: absolute; top: 50%; right: var(--ink-size-4); display: grid; width: var(--ink-input-action-size); height: var(--ink-input-action-size); place-items: center; padding: var(--ink-space-0); border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: transparent; cursor: pointer; transform: translateY(-50%); }
+#page-profile .profile-filter-search-clear:hover,
+#page-profile .profile-filter-search-clear:focus-visible { color: var(--ink-primary); background: transparent; }
+#page-profile .profile-filter-search-clear:focus-visible { outline: var(--ink-outline-focus); outline-offset: calc(-1 * var(--ink-outline-offset-focus)); }
+#page-profile .profile-filter-search-clear svg { width: var(--ink-input-icon-size); height: var(--ink-input-icon-size); }
 #page-profile .filter-system-field .form-control {
   width: 100%;
   min-height: var(--ink-input-height-md);

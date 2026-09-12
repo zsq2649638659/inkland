@@ -677,7 +677,13 @@ export default function ProfilePage() {
             <>
               <div className="filter-system-composition-row" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
                 <div className="filter-system-field filter-system-field--query">
-                  <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                  <div className="profile-filter-search-shell">
+                    <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                    <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setProfileSearch("")}>
+                      <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
                 <ProfileFilterSelect label="作品类型" id="profile-filter-type-menu" value={activeProfileFilter} options={filterPills.map((item) => ({ value: item.key, label: item.key === "all" ? "所有作品" : item.label }))} onChange={(value) => updateActiveFilter(value as FilterType)} />
                 <ProfileFilterSelect label="排序" id="profile-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最近更新" }, { value: "created", label: "最近创建" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as SortMode)} />
