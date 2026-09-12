@@ -5,6 +5,7 @@ import type { InklandIconName } from "@/components/inkland/iconRegistry";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import HomeSidebar from "@/components/HomeSidebar";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { getThumbnailUrl } from "@/lib/image";
@@ -68,7 +69,6 @@ export default function StudioPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortType, setSortType] = useState<SortType>("updated");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortOpen, setSortOpen] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shownWorks, setShownWorks] = useState(12);
@@ -540,7 +540,7 @@ export default function StudioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-paper pb-20 lg:pb-0">
+    <div className="min-h-screen bg-paper pb-20 lg:pb-0" id="page-studio">
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
@@ -588,70 +588,23 @@ export default function StudioPage() {
 
           {/* 移动端工具栏 */}
           <div className="toolbar toolbar-mobile">
-            <div className="segmented-tabs">
-              <div className="segmented-tabs-left">
-                {typeFilters.map((f) => (
-                  <button
-                    key={f.key}
-                    className={`segmented-tab ${filter === f.key ? "active" : ""}`}
-                    onClick={() => setFilter(f.key)}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+            <div className="studio-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+              <div className="filter-system-composition-row">
+                <ProfileFilterSelect label="作品类型" id="studio-mobile-filter-type-menu" value={filter} options={typeFilters.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => setFilter(value as FilterType)} />
+                <ProfileFilterSelect label="发布状态" id="studio-mobile-filter-status-menu" value={statusFilter} options={statusFilters.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => setStatusFilter(value as StatusFilter)} />
+                <ProfileFilterSelect label="排序" id="studio-mobile-filter-sort-menu" value={sortType} options={sortOptions.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => setSortType(value as SortType)} />
               </div>
-              <div className="segmented-tabs-right">
-                {statusFilters.map((f) => (
-                  <button
-                    key={f.key}
-                    className={`segmented-tab ${statusFilter === f.key ? "active" : ""}`}
-                    onClick={() => setStatusFilter(f.key)}
-                  >
-                    {f.label}
+              <div className="filter-system-field filter-system-field--query">
+                <div className="profile-filter-search-shell">
+                  <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                  <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="创作中心搜索" />
+                  <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                    <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                   </button>
-                ))}
+                </div>
               </div>
             </div>
-            <div className="search-wrap">
-              <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
-              <input
-                type="text"
-                placeholder="搜索作品标题..."
-                aria-label="创作中心搜索"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="toolbar-row" style={{ justifyContent: "space-between" }}>
-              <div className="sort-wrap">
-                <button className="btn-sort" onClick={() => setSortOpen(!sortOpen)}>
-                  <SiteIcon name="fa-arrow-down-wide-short" variant="solid" />
-                  <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
-                </button>
-                {sortOpen && (
-                  <>
-                    <div className="sort-overlay show" onClick={() => setSortOpen(false)}></div>
-                    <div className="sort-popup show">
-                      <div className="sort-popup-header">
-                        <span className="sort-popup-title">排序方式</span>
-                        <button className="sort-popup-close" onClick={() => setSortOpen(false)}>
-                          <SiteIcon name="fa-xmark" variant="solid" />
-                        </button>
-                      </div>
-                      {sortOptions.map((opt) => (
-                        <button
-                          key={opt.key}
-                          className={`sort-option ${sortType === opt.key ? "active" : ""}`}
-                          onClick={() => { setSortType(opt.key); setSortOpen(false); }}
-                        >
-                          <span>{opt.label}</span>
-                          <SiteIcon name="fa-check" variant="solid" />
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
+            <div className="toolbar-row" style={{ justifyContent: "flex-end" }}>
               <button
                 className="btn-batch"
                 onClick={() => { setBatchMode(!batchMode); setSelectedIds(new Set()); }}
@@ -665,63 +618,23 @@ export default function StudioPage() {
           <div className="toolbar toolbar-pc">
             {!batchMode ? (
               <div className="toolbar-pc-normal">
-                <div className="segmented-tabs">
-                  <div className="segmented-tabs-left">
-                    {typeFilters.map((f) => (
-                      <button
-                        key={f.key}
-                        className={`segmented-tab ${filter === f.key ? "active" : ""}`}
-                        onClick={() => setFilter(f.key)}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
+                <div className="studio-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+                  <div className="filter-system-composition-row">
+                    <ProfileFilterSelect label="作品类型" id="studio-filter-type-menu" value={filter} options={typeFilters.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => setFilter(value as FilterType)} />
+                    <ProfileFilterSelect label="发布状态" id="studio-filter-status-menu" value={statusFilter} options={statusFilters.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => setStatusFilter(value as StatusFilter)} />
+                    <ProfileFilterSelect label="排序" id="studio-filter-sort-menu" value={sortType} options={sortOptions.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => setSortType(value as SortType)} />
                   </div>
-                  <div className="segmented-tabs-right">
-                    {statusFilters.map((f) => (
-                      <button
-                        key={f.key}
-                        className={`segmented-tab ${statusFilter === f.key ? "active" : ""}`}
-                        onClick={() => setStatusFilter(f.key)}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="studio-toolbar-row2">
-                  <div className="search-wrap">
-                    <SiteIcon name="fa-magnifying-glass" variant="solid" className="search-icon" />
-                    <input
-                      type="text"
-                      placeholder="搜索作品标题..."
-                      aria-label="创作中心搜索"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <div className="toolbar-spacer"></div>
-                  <div className="toolbar-pc-right">
-                    <div className="sort-wrap">
-                      <button
-                        className={`sort-select ${sortOpen ? "open" : ""}`}
-                        onClick={() => setSortOpen(!sortOpen)}
-                      >
-                        <span>{sortOptions.find((s) => s.key === sortType)?.label || "最近更新"}</span>
-                        <SiteIcon name="fa-chevron-down" variant="solid" className="sort-arrow" />
-                      </button>
-                      <div className={`sort-dropdown ${sortOpen ? "show" : ""}`}>
-                        {sortOptions.map((opt) => (
-                          <button
-                            key={opt.key}
-                            className={`sort-option ${sortType === opt.key ? "active" : ""}`}
-                            onClick={() => { setSortType(opt.key); setSortOpen(false); }}
-                          >
-                            <SiteIcon name="fa-check" variant="solid" /> {opt.label}
-                          </button>
-                        ))}
+                  <div className="studio-filter-search-row">
+                    <div className="filter-system-field filter-system-field--query">
+                      <div className="profile-filter-search-shell">
+                        <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="创作中心搜索" />
+                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                          <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+                        </button>
                       </div>
                     </div>
+                    <div className="toolbar-spacer"></div>
                     <button className="btn-batch-toggle" onClick={() => setBatchMode(true)}>
                       <SiteIcon name="fa-list-check" variant="solid" /> 批量操作
                     </button>
