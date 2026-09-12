@@ -29,8 +29,7 @@ export default function ProfileFilterSelect({
   }, []);
 
   return (
-    <label className="filter-system-field">
-      <span>{label}</span>
+    <div className="filter-system-field">
       <span className="filter-system-select-wrap">
         <div className="custom-select" data-select ref={rootRef}>
           <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={id} aria-label={label} onClick={() => setOpen((current) => !current)}>
@@ -46,6 +45,6 @@ export default function ProfileFilterSelect({
           </div>
         </div>
       </span>
-    </label>
+    </div>
   );
 }
