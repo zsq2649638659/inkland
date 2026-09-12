@@ -8046,10 +8046,61 @@ p {
 #page-studio .filter-system-field .select-option[aria-selected="true"] { color: var(--ink-primary); background: var(--ink-primary-bg); }
 #page-studio .studio-filter-search-row { display: flex; align-items: center; gap: var(--ink-gap-sm); width: 100%; }
 #page-studio .studio-filter-search-row .filter-system-field { flex: 1 1 auto; }
+#page-studio .studio-toolbar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ink-gap-compact);
+  min-height: var(--ink-input-height-md);
+  padding: 0 var(--ink-input-padding-inline);
+  border: var(--ink-border-none);
+  border-radius: var(--ink-input-border-radius);
+  color: var(--ink-text);
+  background: var(--ink-surface);
+  font: var(--ink-font-control);
+  white-space: nowrap;
+  cursor: pointer;
+}
+#page-studio .studio-toolbar-action:hover,
+#page-studio .studio-toolbar-action:focus-visible { color: var(--ink-primary); background: var(--ink-surface); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-none); }
+#page-studio .studio-toolbar-action:focus-visible { outline: var(--ink-outline-focus); outline-offset: calc(-1 * var(--ink-outline-offset-focus)); }
+#page-studio .studio-toolbar-action svg { width: var(--ink-input-search-icon-size); height: var(--ink-input-search-icon-size); flex: 0 0 var(--ink-input-search-icon-size); }
+#page-studio .studio-batch-row { display: flex; align-items: center; gap: var(--ink-gap-sm); width: 100%; flex-wrap: wrap; }
+#page-studio .studio-batch-count { margin-right: auto; color: var(--ink-text-secondary); font: var(--ink-font-control); white-space: nowrap; }
+#page-studio .studio-mobile-filter-bar { display: none; }
+#page-studio .studio-mobile-filter-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--ink-gap-compact); min-height: var(--ink-input-height-md); flex: 1; padding: 0 var(--ink-input-padding-inline); border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); font: var(--ink-font-control); cursor: pointer; }
+#page-studio .studio-mobile-filter-button:hover,
+#page-studio .studio-mobile-filter-button:focus-visible { color: var(--ink-primary); background: var(--ink-surface); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-none); }
+#page-studio .studio-mobile-filter-button:focus-visible { outline: var(--ink-outline-focus); outline-offset: calc(-1 * var(--ink-outline-offset-focus)); }
+#page-studio .studio-mobile-filter-button svg { width: var(--ink-input-search-icon-size); height: var(--ink-input-search-icon-size); flex: 0 0 var(--ink-input-search-icon-size); }
+#page-studio .studio-filter-drawer-backdrop { display: none; }
+#page-studio .studio-filter-drawer-section { display: grid; gap: var(--ink-space-2); margin-top: var(--ink-space-4); }
+#page-studio .studio-filter-drawer-section + .studio-filter-drawer-section { margin-top: var(--ink-space-2); }
+#page-studio .studio-filter-drawer-section > strong { font: var(--ink-font-control-label); }
+#page-studio .studio-filter-drawer-section > div { display: flex; flex-wrap: wrap; gap: var(--ink-gap-tight); }
+#page-studio .studio-filter-control { min-height: var(--ink-button-medium-height); padding: 0 var(--ink-button-medium-padding-horizontal); border: var(--ink-button-border-width) solid var(--ink-button-default-border); border-radius: var(--ink-button-border-radius); color: var(--ink-button-default-color); background: transparent; font: var(--ink-button-medium-font); cursor: pointer; }
+#page-studio .studio-filter-control.is-active { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); }
+#page-studio .studio-filter-control:hover:not(.is-active) { border-color: var(--ink-button-default-border); color: var(--ink-button-default-color); background: transparent; }
+#page-studio .studio-filter-control:active { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-active-bg); }
+#page-studio .studio-filter-drawer { width: 100%; padding: var(--ink-space-5); border-radius: var(--ink-radius-lg) var(--ink-radius-lg) 0 0; color: var(--ink-text); background: var(--ink-surface); box-shadow: var(--ink-shadow-lg); }
+#page-studio .studio-filter-drawer h2 { margin: var(--ink-space-0); font: var(--ink-font-title-sm); }
+#page-studio .studio-filter-drawer-actions { display: flex; justify-content: flex-end; gap: var(--ink-space-2); margin-top: var(--ink-space-5); }
+#page-studio .studio-filter-drawer-actions button { width: 50%; flex: 1 1 50%; min-height: var(--ink-button-medium-height); padding: 0 var(--ink-button-medium-padding-horizontal); border: var(--ink-button-border-width) solid var(--ink-button-default-border); border-radius: var(--ink-button-border-radius); color: var(--ink-button-default-color); background: transparent; font: var(--ink-button-medium-font); cursor: pointer; }
+#page-studio .studio-filter-drawer-actions button:hover,
+#page-studio .studio-filter-drawer-actions button:focus-visible { border-color: var(--ink-button-default-border); background: transparent; outline: var(--ink-outline-none); }
+#page-studio .studio-filter-drawer-actions .is-primary { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); }
+#page-studio .studio-filter-drawer-actions .is-primary:hover,
+#page-studio .studio-filter-drawer-actions .is-primary:focus-visible { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-active-bg); }
 
 @media (max-width: 1024px) {
   #page-studio .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #page-studio .studio-filter-search-row { display: block; }
+  #page-studio .studio-filter-composition { display: none; }
+  #page-studio .studio-mobile-filter-bar { display: flex; gap: var(--ink-gap-compact); width: 100%; }
+  #page-studio .studio-mobile-content { display: grid; gap: var(--ink-gap-sm); width: 100%; }
+  #page-studio .studio-filter-drawer-backdrop { position: fixed; inset: 0; z-index: var(--ink-z-modal); display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
+  #page-studio .studio-batch-row--mobile { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #page-studio .studio-batch-row--mobile .studio-batch-count { grid-column: 1 / -1; margin-right: 0; }
 }
 @media (max-width: 860px) and (min-width: 769px) {
   #page-profile .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
