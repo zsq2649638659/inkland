@@ -18,6 +18,7 @@ export interface ReadingHistoryPostSnapshot {
   series_tags?: string[] | null;
   series_status?: string | null;
   like_count?: number | null;
+  liked_by_me?: boolean;
 }
 
 export interface ReadingHistoryRecord {
@@ -97,6 +98,7 @@ function mergePostSnapshots(
     series_description: primary.series_description ?? fallback.series_description ?? null,
     series_status: primary.series_status ?? fallback.series_status ?? null,
     like_count: primary.like_count ?? fallback.like_count ?? null,
+    liked_by_me: primary.liked_by_me ?? fallback.liked_by_me,
   };
   if (!merged.tags?.length && fallback.tags?.length) merged.tags = fallback.tags;
   if (!merged.series_tags?.length && fallback.series_tags?.length) merged.series_tags = fallback.series_tags;
@@ -255,7 +257,7 @@ export async function loadReadingHistory(
     const authorIds = [...new Set(posts
       .map((post) => post.user_id)
       .filter((id): id is string => Boolean(id)))];
-    const [statsResult, seriesResult, authorsResult] = await Promise.all([
+    const [statsResult, seriesResult, authorsResult, likesResult] = await Promise.all([
       postIds.length
         ? withTimeout(supabase.from("post_stats").select("id,like_count").in("id", postIds), HISTORY_METADATA_TIMEOUT_MS)
           .catch((statsError) => {
@@ -283,6 +285,13 @@ export async function loadReadingHistory(
             return { data: [] };
           })
         : Promise.resolve({ data: [] }),
+      postIds.length
+        ? withTimeout(supabase.from("likes").select("post_id").eq("user_id", userId).in("post_id", postIds), HISTORY_METADATA_TIMEOUT_MS)
+          .catch((likesError) => {
+            console.error("[reading-history] likes query failed", likesError);
+            return { data: [], error: likesError };
+          })
+        : Promise.resolve({ data: [] }),
     ]);
     if ("error" in statsResult && statsResult.error) {
       console.error("[reading-history] stats query returned error", statsResult.error);
@@ -293,9 +302,14 @@ export async function loadReadingHistory(
     if ("error" in authorsResult && authorsResult.error) {
       console.error("[reading-history] author query returned error", authorsResult.error);
     }
+    if ("error" in likesResult && likesResult.error) {
+      console.error("[reading-history] likes query returned error", likesResult.error);
+    }
     const likeCounts = new Map((statsResult.data || []).map((row) => [String(row.id), Number(row.like_count) || 0]));
     const seriesMetadata = new Map((seriesResult.data || []).map((row) => [String(row.name), row]));
     const authors = new Map((authorsResult.data || []).map((row) => [String(row.id), row]));
+    const likedPostIds = new Set((likesResult.data || []).map((row) => String(row.post_id)));
+    const likesLookupSucceeded = !("error" in likesResult && likesResult.error);
     const postSnapshots = new Map(posts.map((post) => {
       const existing = records.find((record) => record.post_id === post.id)?.post;
       const tags = post.tags?.length ? post.tags : (tagsByPost.get(post.id) || existing?.tags || []);
@@ -309,6 +323,7 @@ export async function loadReadingHistory(
         series_tags: Array.isArray(series?.tags) ? series.tags.filter((tag): tag is string => typeof tag === "string") : null,
         series_status: typeof series?.status === "string" ? series.status : null,
         like_count: likeCounts.get(post.id) || 0,
+        liked_by_me: likesLookupSucceeded ? likedPostIds.has(post.id) : existing?.liked_by_me,
       } satisfies ReadingHistoryPostSnapshot] as const;
     }));
     const normalized = records.map((record) => ({
