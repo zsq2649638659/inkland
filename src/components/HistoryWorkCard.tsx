@@ -80,6 +80,7 @@ function searchMeta(record: ReadingHistoryRecord, mode: CardMode) {
         postId={record.post?.id || record.post_id}
         initialCount={likeCount}
         initialActive={record.post?.liked_by_me}
+        optimistic
         className="site-card__action site-card__search-like"
       />
     </div>

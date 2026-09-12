@@ -16,11 +16,13 @@ interface LikeButtonProps {
   iconOnly?: boolean;
   plain?: boolean;
   className?: string;
+  /** 阅读历史等延迟加载卡片需要先反馈点击，再在写入失败时回滚。 */
+  optimistic?: boolean;
   // 父组件已算好的点赞状态；传入时跳过挂载时的独立查询（消除信息流 N+1）
   initialActive?: boolean;
 }
 
-export default function LikeButton({ postId, initialCount, onLogin, iconOnly, plain, className, initialActive }: LikeButtonProps) {
+export default function LikeButton({ postId, initialCount, onLogin, iconOnly, plain, className, initialActive, optimistic = false }: LikeButtonProps) {
   const supabase = createClient();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -49,38 +51,79 @@ export default function LikeButton({ postId, initialCount, onLogin, iconOnly, pl
     }
     if (loading) return;
     setLoading(true);
+    const wasLiked = liked;
+    const applyOptimistic = (value: boolean) => {
+      if (!optimistic) return;
+      setLiked(value);
+      setCount((current) => Math.max(0, current + (value ? 1 : -1)));
+    };
+    const rollbackOptimistic = () => {
+      if (!optimistic) return;
+      setLiked(wasLiked);
+      setCount((current) => Math.max(0, current + (wasLiked ? 1 : -1)));
+    };
 
-    if (liked) {
-      const { error } = await supabase
-        .from("likes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("user_id", user.id);
-      if (!error) {
-        setLiked(false);
-        setCount((c) => Math.max(0, c - 1));
+    try {
+      if (liked) {
+        applyOptimistic(false);
+        const { error } = await supabase
+          .from("likes")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", user.id);
+        if (error) {
+          rollbackOptimistic();
+          console.error("[like-button] unlike failed", error);
+          dialog.toast("取消喜欢失败，请稍后重试。", "danger");
+        } else if (!optimistic) {
+          setLiked(false);
+          setCount((c) => Math.max(0, c - 1));
+        }
+      } else {
+        applyOptimistic(true);
+        let blocked: string | null = null;
+        try {
+          // 权限查询只是体验层提示；超时或异常时交由数据库触发器做最终校验。
+          blocked = await Promise.race([
+            assertCanInteract(),
+            new Promise<null>((resolve) => globalThis.setTimeout(() => resolve(null), 3000)),
+          ]);
+        } catch (restrictionError) {
+          console.warn("[like-button] interaction check failed; database will enforce", restrictionError);
+        }
+        if (blocked) {
+          rollbackOptimistic();
+          dialog.toast(blocked, "danger");
+          return;
+        }
+        const { error } = await supabase
+          .from("likes")
+          .insert({ post_id: postId, user_id: user.id });
+        if (error) {
+          rollbackOptimistic();
+          console.error("[like-button] like failed", error);
+          dialog.toast("喜欢失败，请稍后重试。", "danger");
+        } else if (!optimistic) {
+          setLiked(true);
+          setCount((c) => c + 1);
+        }
+        if (!error) {
+          void createNotification({
+            type: "like",
+            actor_id: user.id,
+            post_id: postId,
+          }).catch((notificationError) => {
+            console.warn("[like-button] notification failed", notificationError);
+          });
+        }
       }
-    } else {
-      const blocked = await assertCanInteract();
-      if (blocked) {
-        setLoading(false);
-        dialog.toast(blocked, "danger");
-        return;
-      }
-      const { error } = await supabase
-        .from("likes")
-        .insert({ post_id: postId, user_id: user.id });
-      if (!error) {
-        setLiked(true);
-        setCount((c) => c + 1);
-        createNotification({
-          type: "like",
-          actor_id: user.id,
-          post_id: postId,
-        });
-      }
+    } catch (error) {
+      rollbackOptimistic();
+      console.error("[like-button] toggle failed", error);
+      dialog.toast("喜欢操作失败，请稍后重试。", "danger");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (iconOnly) {
