@@ -402,11 +402,20 @@ export default function ReaderClient({ post }: ReaderClientProps) {
       post: {
         id: post.id,
         title: post.title ?? null,
+        content: post.content ?? null,
         post_type: post.post_type ?? null,
         series_name: post.series_name ?? null,
         chapter_number: post.chapter_number ?? null,
         word_count: post.word_count ?? null,
         cover_url: post.cover_url ?? null,
+        user_id: post.user_id ?? null,
+        author: post.author
+          ? { nickname: post.author.nickname ?? null, avatar_url: post.author.avatar_url ?? null }
+          : null,
+        tags: Array.isArray(post.tags)
+          ? post.tags.map((tag) => typeof tag === "string" ? tag : tag.name).filter(Boolean)
+          : [],
+        status: post.status ?? null,
       },
     }).catch(() => {
       // 本地记录已经保存；数据库不可用时不打断阅读。

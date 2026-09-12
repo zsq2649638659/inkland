@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import SiteIcon from "@/components/SiteIcon";
+import LikeButton from "@/components/LikeButton";
 import { getThumbnailUrl } from "@/lib/image";
 import type { ReadingHistoryPostSnapshot, ReadingHistoryRecord } from "@/lib/readingHistory";
 
@@ -63,28 +64,25 @@ function tagLinks(tags: string[], mobile = false) {
   );
 }
 
-function formatCount(value: number) {
-  if (value >= 1_000_000) return `${Number((value / 1_000_000).toFixed(1))}M`;
-  if (value >= 1_000) return `${Number((value / 1_000).toFixed(1))}K`;
-  return String(value);
-}
-
 function searchMeta(record: ReadingHistoryRecord, mode: CardMode) {
   const author = record.post?.author;
   const nickname = author?.nickname?.trim() || "Inkland 作者";
-  const avatar = author?.avatar_url;
   const likeCount = record.post?.like_count || 0;
+  const avatarChar = Array.from(nickname)[0] || "?";
   return (
     <div className={`site-card__search-meta${mode === "mobile" ? " site-card__search-meta--mobile" : ""}`} role="group" aria-label={`阅读历史：${positionLabel(record)}，${formatLastRead(record.last_read_at)}`}>
       <Link className="site-card__avatar-link" href={record.post?.user_id ? `/user/${record.post.user_id}` : "#"} aria-label={`查看${nickname}的作者主页`}>
         <span className="site-card__avatar" aria-hidden="true">
-          {avatar ? <img src={avatar} alt="" /> : nickname.slice(0, 1)}
+          <span>{avatarChar}</span>
         </span>
       </Link>
-      <button className="site-card__action site-card__search-like" type="button" aria-label={`喜欢${record.post?.title || "作品"}`} aria-pressed="false">
-        <SiteIcon name="fa-heart" variant="outline" hoverVariant="solid" aria-hidden="true" />
-        <span>{formatCount(likeCount)}</span>
-      </button>
+      <LikeButton
+        postId={record.post?.id || record.post_id}
+        initialCount={likeCount}
+        initialActive={record.post?.liked_by_me}
+        optimistic
+        className="site-card__action site-card__search-like"
+      />
     </div>
   );
 }
