@@ -7973,21 +7973,20 @@ p {
   width: 100%;
   min-height: var(--ink-input-height-md);
   padding: 0 var(--ink-input-padding-inline);
-  border: var(--ink-input-border-width) solid var(--ink-border);
+  border: var(--ink-border-none);
   border-radius: var(--ink-input-border-radius);
   color: var(--ink-text);
-  background: var(--ink-page);
+  background: var(--ink-surface);
   font: var(--ink-font-control);
   outline: var(--ink-outline-none);
 }
 #page-profile .filter-system-field .form-control:hover,
-#page-profile .filter-system-field .form-control:focus { border-color: var(--ink-primary); }
-#page-profile .filter-system-field .form-control:focus { box-shadow: var(--ink-shadow-focus); }
+#page-profile .filter-system-field .form-control:focus { border: var(--ink-border-none); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
 #page-profile .filter-system-field .custom-select { position: relative; min-width: 0; }
-#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-input-border-width) solid var(--ink-border); border-radius: var(--ink-radius-md); color: var(--ink-text); background: var(--ink-page); font: var(--ink-font-control); text-align: left; cursor: pointer; }
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-border-none); border-radius: var(--ink-radius-md); color: var(--ink-text); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
-#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible { border-color: var(--ink-primary); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-focus); }
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible { border: var(--ink-border-none); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-none); background: var(--ink-surface); }
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] svg { width: var(--ink-input-search-icon-size); height: var(--ink-input-search-icon-size); flex: 0 0 var(--ink-input-search-icon-size); }
 #page-profile .filter-system-field .select-menu { position: absolute; top: calc(100% + var(--ink-input-menu-offset)); right: 0; left: 0; z-index: var(--ink-input-menu-z-index); display: grid; max-height: min(var(--ink-input-menu-max-height), 60vh); gap: var(--ink-gap-tight); overflow: auto; padding: var(--ink-input-menu-padding); border: var(--ink-border-width-thin) solid var(--ink-border); border-radius: var(--ink-radius-sm); background: var(--ink-surface); box-shadow: var(--ink-input-menu-shadow); }
