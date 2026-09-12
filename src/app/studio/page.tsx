@@ -270,12 +270,12 @@ function StudioWorkCard({
 
         <div className="site-card__studio-actions" role="group" aria-label={`${typeLabel}作品管理操作`}>
           <Link href={editHref} className="btn btn--small btn--theme-default btn--variant-base" onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
-          <button type="button" className="btn btn--small btn--theme-danger btn--variant-base" onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+          <button type="button" className="btn btn--small btn--theme-primary btn--variant-base" onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
         </div>
 
         <div className="site-card__studio-mobile-management" role="group" aria-label={`${typeLabel}作品管理操作`}>
           <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`编辑${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
-          <button type="button" className="btn btn--small btn--round btn--theme-danger btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+          <button type="button" className="btn btn--small btn--round btn--theme-primary btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
         </div>
       </div>
     </article>
