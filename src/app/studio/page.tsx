@@ -619,7 +619,7 @@ export default function StudioPage() {
           <div className="toolbar toolbar-mobile">
             <div className="studio-mobile-filter-bar">
               <button type="button" className="studio-mobile-filter-button" onClick={openMobileFilter} aria-label="打开筛选">
-                <SiteIcon name="fa-filter" variant="solid" aria-hidden="true" />
+                <SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" />
                 <span>筛选</span>
               </button>
               <button
@@ -662,9 +662,9 @@ export default function StudioPage() {
                 <div className="studio-batch-row studio-batch-row--mobile">
                   <span className="studio-batch-count">已选 {selectedIds.size} 项</span>
                   <button type="button" className="studio-toolbar-action" onClick={selectAll}>全选</button>
-                  <button type="button" className="studio-toolbar-action" onClick={batchPublish}><SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 批量发布</button>
-                  <button type="button" className="studio-toolbar-action" onClick={batchDelete}><SiteIcon name="fa-trash-can" variant="solid" /> 批量删除</button>
-                  <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}><SiteIcon name="fa-xmark" variant="solid" /> 取消选择</button>
+                  <button type="button" className="studio-toolbar-action" onClick={batchPublish}><SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 发布</button>
+                  <button type="button" className="studio-toolbar-action" onClick={batchDelete}><SiteIcon name="fa-trash-can" variant="solid" /> 删除</button>
+                  <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}><SiteIcon name="fa-xmark" variant="solid" /> 取消</button>
                 </div>
               )}
             </div>
@@ -820,21 +820,6 @@ export default function StudioPage() {
         </div>
       </div>
 
-      {/* 批量操作底部栏（移动端） */}
-      <div className={`batch-bar ${batchMode ? "show" : ""}`}>
-        <span className="batch-bar-count">已选 {selectedIds.size} 项</span>
-        <div className="batch-bar-actions">
-          <button className="batch-bar-btn batch-bar-btn--publish" onClick={batchPublish}>
-            <SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 发布
-          </button>
-          <button className="batch-bar-btn batch-bar-btn--delete" onClick={batchDelete}>
-            <SiteIcon name="fa-trash-can" variant="solid" /> 删除
-          </button>
-          <button className="batch-bar-btn batch-bar-btn--cancel" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>
-            <SiteIcon name="fa-xmark" variant="solid" /> 取消
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
