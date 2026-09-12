@@ -3114,7 +3114,7 @@ p {
 .stat-card { background: var(--color-card); border-radius: var(--radius-lg); padding: 16px; position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.3s ease, box-shadow 0.3s ease; }
 .stat-card:active { transform: scale(0.97); }
 .stat-card-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 10px; }
-#page-studio .stat-card-icon--total { background: var(--ink-surface-subtle); color: var(--ink-muted); }
+#page-studio .stat-card-icon--total { background: var(--ink-primary-bg); color: var(--ink-primary); }
 #page-studio .stat-card-icon--published { background: var(--ink-success-bg); color: var(--ink-success); }
 #page-studio .stat-card-icon--draft { background: var(--ink-warning-bg); color: var(--ink-warning); }
 #page-studio .stat-card-icon--rejected { background: var(--ink-danger-bg); color: var(--ink-danger); }
@@ -8077,6 +8077,37 @@ p {
 #page-studio .studio-filter-drawer-actions .is-primary { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); }
 #page-studio .studio-filter-drawer-actions .is-primary:hover,
 #page-studio .studio-filter-drawer-actions .is-primary:focus-visible { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-active-bg); }
+
+/* 创作中心与个人中心共享筛选工具的 hover 反馈，也与批量操作按钮保持一致。 */
+#page-profile .profile-filter-search-shell .form-control,
+#page-studio .profile-filter-search-shell .form-control,
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"],
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"],
+#page-studio .studio-toolbar-action {
+  transition: color var(--ink-motion-base) var(--ink-ease-standard), background var(--ink-motion-base) var(--ink-ease-standard), box-shadow var(--ink-motion-base) var(--ink-ease-standard);
+}
+
+#page-profile .profile-filter-search-shell .form-control:hover,
+#page-profile .profile-filter-search-shell .form-control:focus,
+#page-studio .profile-filter-search-shell .form-control:hover,
+#page-studio .profile-filter-search-shell .form-control:focus,
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible,
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible,
+#page-studio .studio-toolbar-action:hover,
+#page-studio .studio-toolbar-action:focus-visible {
+  color: var(--ink-primary);
+  background: var(--ink-primary-bg);
+  box-shadow: var(--ink-shadow-sm);
+}
+
+#page-profile .profile-filter-search-shell .form-control:hover ~ .profile-filter-search-clear,
+#page-profile .profile-filter-search-shell:hover > svg,
+#page-studio .profile-filter-search-shell .form-control:hover ~ .profile-filter-search-clear,
+#page-studio .profile-filter-search-shell:hover > svg { color: var(--ink-primary); }
 
 @media (max-width: 1024px) {
   #page-studio .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -13285,12 +13316,15 @@ p {
 .card,
 .tag-card,
 .post-card,
-.work-card,
 .stat-card,
 .collection-card,
-.user-card,
-.works-card-grid > * {
+.user-card {
   border-radius: var(--radius-card) !important;
+}
+
+.work-card,
+.works-card-grid > * {
+  border-radius: var(--radius-card);
 }
 
 /* 弹层、下拉统一中圆角 */
