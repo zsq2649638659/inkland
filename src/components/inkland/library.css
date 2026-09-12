@@ -577,7 +577,7 @@
   flex-direction: column;
   overflow: hidden;
   padding: 0;
-  border: var(--ink-border-width-thin) solid var(--ink-border);
+  border: var(--ink-border-width-thin) solid var(--ink-color-component-border);
   border-radius: var(--ink-radius-md);
   background: var(--ink-surface);
   box-shadow: var(--ink-shadow-none);
@@ -609,10 +609,14 @@
 #page-studio .site-card__studio-meta .site-card__type {
   display: inline-flex;
   min-width: 0;
+  min-height: var(--ink-height-tag);
   align-items: center;
   gap: var(--ink-gap-tight);
   overflow: hidden;
-  color: var(--ink-primary-hover);
+  padding: 0 var(--ink-space-3);
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-muted);
+  background: var(--ink-surface-subtle);
   font: var(--ink-font-type-tag);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -786,8 +790,8 @@
   transition: color var(--ink-motion-base) var(--ink-ease-standard), background var(--ink-motion-base) var(--ink-ease-standard), border-color var(--ink-motion-base) var(--ink-ease-standard), transform var(--ink-motion-base) var(--ink-ease-standard);
 }
 #page-studio .studio-card-action:hover,
-#page-studio .studio-card-action:focus-visible,
-#page-studio .studio-card-action.is-active { color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); border-color: var(--ink-button-primary-border); outline: var(--ink-outline-none); }
+#page-studio .studio-card-action:focus-visible { color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); border-color: var(--ink-button-primary-border); outline: var(--ink-outline-none); }
+#page-studio .studio-card-action.is-active { color: var(--ink-primary); background: var(--ink-primary-bg); border-color: var(--ink-primary); outline: var(--ink-outline-none); }
 #page-studio .studio-card-action:hover { transform: translateY(-1px); }
 #page-studio .studio-card-action svg { width: 16px; height: 16px; flex: 0 0 16px; }
 #page-studio .studio-card-action .site-icon-hover { display: inline-flex; }
@@ -825,13 +829,14 @@
 }
 #page-studio .site-card__studio-actions .btn { width: 100%; min-height: var(--ink-button-small-height); padding: 0 var(--ink-button-small-padding-horizontal); border-radius: var(--ink-button-border-radius); }
 #page-studio .site-card__studio-actions .btn--theme-default.btn--variant-base { color: var(--ink-button-default-color); background: var(--ink-button-default-bg); }
-#page-studio .site-card__studio-actions .btn--theme-primary.btn--variant-base { color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); }
+#page-studio .site-card__studio-actions .btn--theme-danger.btn--variant-base { color: var(--ink-button-danger-color); background: var(--ink-button-danger-bg); }
 #page-studio .site-card__studio-actions .btn--variant-base:hover,
 #page-studio .site-card__studio-actions .btn--variant-base:focus-visible { transform: translateY(-1px); outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
 #page-studio .site-card__studio-actions .btn--theme-default.btn--variant-base:hover,
-#page-studio .site-card__studio-actions .btn--theme-default.btn--variant-base:focus-visible { background: var(--ink-button-default-active-bg); }
-#page-studio .site-card__studio-actions .btn--theme-primary.btn--variant-base:hover,
-#page-studio .site-card__studio-actions .btn--theme-primary.btn--variant-base:focus-visible { background: var(--ink-button-primary-active-bg); }
+#page-studio .site-card__studio-actions .btn--theme-default.btn--variant-base:focus-visible,
+#page-studio .site-card__studio-actions .btn--theme-default.btn--variant-base:hover { background: var(--ink-button-default-active-bg); border-color: var(--ink-color-border-strong); }
+#page-studio .site-card__studio-actions .btn--theme-danger.btn--variant-base:hover,
+#page-studio .site-card__studio-actions .btn--theme-danger.btn--variant-base:focus-visible { background: var(--ink-button-danger-active-bg); border-color: var(--ink-button-danger-active-bg); }
 #page-studio .site-card__studio-mobile-management { display: none; }
 
 @media (max-width: 768px) {
@@ -858,17 +863,17 @@
     justify-self: start;
     aspect-ratio: 1 / 1;
     margin: 0;
-    border-radius: var(--ink-radius-xs);
+    border-radius: var(--ink-radius-sm);
   }
   #page-studio .site-card__feed-images { height: 100%; min-height: 0; }
-  #page-studio .site-card__feed-image { width: 100%; height: 100%; min-width: 100%; min-height: 0; aspect-ratio: auto; border-radius: var(--ink-radius-xs); }
+  #page-studio .site-card__feed-image { width: 100%; height: 100%; min-width: 100%; min-height: 0; aspect-ratio: auto; border-radius: var(--ink-radius-sm); }
   #page-studio .site-card__feed-image-overlay,
   #page-studio .site-card__feed-image-count { display: none; }
   #page-studio .site-card--feed-image .site-card__studio-mobile-copy { display: flex; }
   #page-studio .site-card__studio-mobile-copy { min-width: 0; min-height: 100%; justify-content: center; gap: var(--ink-space-2); }
   #page-studio .site-card__title { font: var(--ink-font-card-title-mobile-square); -webkit-line-clamp: 1; }
   #page-studio .site-card__excerpt { margin: 0; font: var(--ink-font-card-body-mobile-square); -webkit-line-clamp: 1; }
-  #page-studio .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 5; }
+  #page-studio .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 1; }
   #page-studio .site-card--feed-serial .site-card__serial-heading { margin: 0; }
   #page-studio .site-card--feed-serial .site-card__serial-intro { display: none; }
   #page-studio .site-card__latest-chapter { width: max-content; max-width: 100%; min-height: var(--ink-height-card-meta); align-self: flex-start; margin: 0; padding: var(--ink-space-1); font: var(--ink-font-tag-meta); }
@@ -880,13 +885,13 @@
   #page-studio .site-card__studio-mobile-management { grid-column: 2; grid-row: 1; display: flex; width: max-content; flex-direction: column; align-items: flex-start; gap: var(--ink-space-3); }
   #page-studio .site-card__studio-mobile-management .btn { width: max-content; min-width: 0; min-height: var(--ink-button-extra-small-height); padding-inline: var(--ink-space-5); border-radius: var(--ink-radius-full); }
   #page-studio .site-card__studio-mobile-management .btn--theme-default.btn--variant-outline { color: var(--ink-button-default-color); background: var(--ink-surface); border-color: var(--ink-button-default-border); }
-  #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline { color: var(--ink-button-primary-border); background: var(--ink-surface); border-color: var(--ink-button-primary-border); }
+  #page-studio .site-card__studio-mobile-management .btn--theme-danger.btn--variant-outline { color: var(--ink-button-danger-border); background: var(--ink-surface); border-color: var(--ink-button-danger-border); }
   #page-studio .site-card__studio-mobile-management .btn--variant-outline:hover,
   #page-studio .site-card__studio-mobile-management .btn--variant-outline:focus-visible { transform: translateY(-1px); outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
   #page-studio .site-card__studio-mobile-management .btn--theme-default.btn--variant-outline:hover,
   #page-studio .site-card__studio-mobile-management .btn--theme-default.btn--variant-outline:focus-visible { color: var(--ink-button-default-color); background: var(--ink-button-default-bg); border-color: var(--ink-color-border-strong); }
-  #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline:hover,
-  #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline:focus-visible { color: var(--ink-button-primary-active-bg); background: var(--ink-primary-bg); border-color: var(--ink-button-primary-active-bg); }
+  #page-studio .site-card__studio-mobile-management .btn--theme-danger.btn--variant-outline:hover,
+  #page-studio .site-card__studio-mobile-management .btn--theme-danger.btn--variant-outline:focus-visible { color: var(--ink-button-danger-active-bg); background: var(--ink-button-outline-active-bg); border-color: var(--ink-button-danger-active-bg); }
 }
 
 /* 个人中心复用卡片库 Card Device Grid / Profile Mobile 契约。 */
