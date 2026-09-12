@@ -7966,7 +7966,7 @@ p {
   width: 100%;
   min-height: var(--ink-input-height-md);
   padding: 0 var(--ink-input-padding-inline);
-  border: var(--ink-border-none);
+  border: var(--ink-button-border-width) solid transparent;
   border-radius: var(--ink-input-border-radius);
   color: var(--ink-text);
   background: var(--ink-surface);
@@ -7974,11 +7974,11 @@ p {
   outline: var(--ink-outline-none);
 }
 #page-profile .filter-system-field .form-control:hover,
-#page-profile .filter-system-field .form-control:focus { border: var(--ink-border-none); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
+#page-profile .filter-system-field .form-control:focus { border: var(--ink-button-border-width) solid var(--ink-button-primary-border); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
 #page-profile .profile-filter-search-shell .form-control { padding-left: var(--ink-input-padding-leading); padding-right: var(--ink-input-padding-action); }
 #page-profile .profile-filter-search-clear svg { width: var(--ink-size-10); height: var(--ink-size-10); }
 #page-profile .filter-system-field .custom-select { position: relative; min-width: 0; }
-#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-border-none); border-radius: var(--ink-radius-md); color: var(--ink-text); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-button-border-width) solid transparent; border-radius: var(--ink-radius-md); color: var(--ink-text); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible { border: var(--ink-border-none); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-none); background: var(--ink-surface); }
@@ -8007,7 +8007,7 @@ p {
   width: 100%;
   min-height: var(--ink-input-height-md);
   padding: 0 var(--ink-input-padding-inline);
-  border: var(--ink-border-none);
+  border: var(--ink-button-border-width) solid transparent;
   border-radius: var(--ink-input-border-radius);
   color: var(--ink-text-secondary);
   background: var(--ink-surface);
@@ -8016,11 +8016,11 @@ p {
 }
 #page-studio .filter-system-field .form-control::placeholder { color: var(--ink-text-secondary); opacity: 1; }
 #page-studio .filter-system-field .form-control:hover,
-#page-studio .filter-system-field .form-control:focus { border: var(--ink-border-none); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
+#page-studio .filter-system-field .form-control:focus { border: var(--ink-button-border-width) solid var(--ink-button-primary-border); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
 #page-studio .profile-filter-search-shell .form-control { padding-left: var(--ink-input-padding-leading); padding-right: var(--ink-input-padding-action); }
 #page-studio .profile-filter-search-clear svg { width: var(--ink-size-10); height: var(--ink-size-10); }
 #page-studio .filter-system-field .custom-select { position: relative; min-width: 0; }
-#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-border-none); border-radius: var(--ink-radius-md); color: var(--ink-text-secondary); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-button-border-width) solid transparent; border-radius: var(--ink-radius-md); color: var(--ink-text-secondary); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible { border: var(--ink-border-none); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-none); background: var(--ink-surface); }
@@ -8039,7 +8039,7 @@ p {
   gap: var(--ink-gap-compact);
   min-height: var(--ink-input-height-md);
   padding: 0 var(--ink-input-padding-inline);
-  border: var(--ink-border-none);
+  border: var(--ink-button-border-width) solid transparent;
   border-radius: var(--ink-input-border-radius);
   color: var(--ink-text-secondary);
   background: var(--ink-surface);
@@ -8084,7 +8084,7 @@ p {
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"],
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"],
 #page-studio .studio-toolbar-action {
-  transition: color var(--ink-motion-base) var(--ink-ease-standard), background var(--ink-motion-base) var(--ink-ease-standard), box-shadow var(--ink-motion-base) var(--ink-ease-standard);
+  transition: color var(--ink-motion-base) var(--ink-ease-standard), background var(--ink-motion-base) var(--ink-ease-standard), border-color var(--ink-motion-base) var(--ink-ease-standard);
 }
 
 #page-profile .profile-filter-search-shell .form-control:hover,
@@ -8099,15 +8099,8 @@ p {
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible,
 #page-studio .studio-toolbar-action:hover,
 #page-studio .studio-toolbar-action:focus-visible {
-  color: var(--ink-primary);
-  background: var(--ink-primary-bg);
-  box-shadow: var(--ink-shadow-sm);
+  border: var(--ink-button-border-width) solid var(--ink-button-primary-border);
 }
-
-#page-profile .profile-filter-search-shell .form-control:hover ~ .profile-filter-search-clear,
-#page-profile .profile-filter-search-shell:hover > svg,
-#page-studio .profile-filter-search-shell .form-control:hover ~ .profile-filter-search-clear,
-#page-studio .profile-filter-search-shell:hover > svg { color: var(--ink-primary); }
 
 @media (max-width: 1024px) {
   #page-studio .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
