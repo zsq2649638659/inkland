@@ -1008,7 +1008,7 @@
 }
 
 #page-history .history-card-device--pc .site-card--feed-single .site-card__excerpt {
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 5;
 }
 
 #page-history .history-card-device--pc .site-card__tags {
@@ -1209,7 +1209,10 @@
   align-self: stretch;
   justify-content: space-between;
   gap: var(--ink-gap-inline);
-  margin: var(--ink-space-0);
+  margin-top: auto;
+  margin-right: var(--ink-space-0);
+  margin-bottom: var(--ink-space-0);
+  margin-left: var(--ink-space-0);
 }
 
 #page-history .site-card__avatar-link,
