@@ -7005,7 +7005,20 @@ p {
     box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
   }
 
+  .detail-mobile-floating-actions .detail-mobile-backtop:hover {
+    background: var(--color-card, #FFFFFF);
+    color: var(--color-text-light, #999999);
+    transform: none;
+    box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
+  }
+
   [data-theme="dark"] .detail-mobile-floating-actions .floating-btn {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
+  }
+
+  [data-theme="dark"] .detail-mobile-floating-actions .detail-mobile-backtop:hover {
+    background: var(--color-card, #252525);
+    color: var(--color-text-light, #777777);
     box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
   }
 
