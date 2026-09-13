@@ -31,22 +31,11 @@ interface NotificationItem {
   link_url?: string | null;
   report_post_id?: string | null;
   series_name?: string | null;
-  metadata?: NotificationMetadata & { issues?: ReviewIssueMeta[] } | null;
+  metadata?: NotificationMetadata | null;
   // joined fields
   actor_nickname?: string | null;
   actor_avatar_url?: string | null;
   post_title?: string | null;
-}
-
-interface ReviewIssueMeta {
-  id?: string;
-  category?: string | null;
-  field_name?: string | null;
-  location_type?: string | null;
-  paragraph_index?: number | null;
-  image_index?: number | null;
-  quoted_text?: string | null;
-  details?: string | null;
 }
 
 export default function NotificationsPage() {
@@ -254,14 +243,6 @@ export default function NotificationsPage() {
     if (href) router.push(href);
   };
 
-  const reviewIssueLabel = (issue: ReviewIssueMeta): string => {
-    const field = issue.field_name || (issue.location_type === "image" || issue.location_type === "image_ocr" ? "image_ocr" : "content");
-    const fieldName = field === "title" ? "标题" : field === "content" ? "正文" : field === "author_note" ? "作者的话" : field === "image_ocr" ? "图片文字" : "图片";
-    const location = issue.image_index != null ? `第${issue.image_index + 1}张图` : issue.paragraph_index != null ? `第${issue.paragraph_index}段` : "";
-    const quote = issue.quoted_text ? `「${issue.quoted_text}」` : "";
-    return [fieldName, location, quote].filter(Boolean).join(" · ");
-  };
-
   if (authLoading) {
     return <div className="min-h-screen bg-paper pb-20 lg:pb-0"><div className="main-container"><HomeSidebar /><div className="content-area"><SkeletonNotification /></div></div></div>;
   }
@@ -405,22 +386,6 @@ export default function NotificationsPage() {
     // 系统通知类型
     if (notification.type === "system") {
       const description = renderSystemDescription(notification);
-      const issues = notification.metadata?.issues;
-      if (notification.template_key === "post_review_rejected" && issues && issues.length > 0) {
-        return (
-          <div className="notification-review-issues">
-            <div className="notification-desc">{description}</div>
-            <div className="notification-issues-row">
-              {issues.slice(0, 3).map((issue, index) => (
-                <span key={issue.id || index} className="notification-issue-chip">
-                  {reviewIssueLabel(issue)}
-                </span>
-              ))}
-              {issues.length > 3 && <span className="notification-issues-more">等 {issues.length} 项</span>}
-            </div>
-          </div>
-        );
-      }
       return description;
     }
 
