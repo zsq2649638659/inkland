@@ -2,7 +2,7 @@
 import SiteIcon from "@/components/SiteIcon";
 import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegistry";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -47,7 +47,7 @@ function saveCachedStats(userId: string, stats: SidebarStats) {
   } catch { /* ignore unavailable session storage */ }
 }
 
-export default function HomeSidebar() {
+function HomeSidebarContent() {
   const supabase = useMemo(() => createClient(), []);
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -481,5 +481,13 @@ export default function HomeSidebar() {
         document.body
       )}
     </>
+  );
+}
+
+export default function HomeSidebar() {
+  return (
+    <Suspense fallback={null}>
+      <HomeSidebarContent />
+    </Suspense>
   );
 }

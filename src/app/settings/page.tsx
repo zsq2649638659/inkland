@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
@@ -42,7 +42,7 @@ const siteContactEmail = "inkland@163.com";
 type BlockedUserRow = { id: string; blocked_user_id: string; created_at: string };
 type BlockedProfileRow = { id: string; nickname: string | null; bio: string | null };
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -544,5 +544,13 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="feed-empty-state" role="status">正在加载设置…</div>}>
+      <SettingsPageContent />
+    </Suspense>
   );
 }

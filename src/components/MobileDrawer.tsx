@@ -2,7 +2,7 @@
 import SiteIcon from "@/components/SiteIcon";
 import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegistry";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -15,7 +15,7 @@ import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
-export default function MobileDrawer() {
+function MobileDrawerContent() {
   const { open, closeDrawer } = useMobileDrawer();
   const { user, profile, loading: authLoading } = useAuth();
   const pathname = usePathname();
@@ -417,5 +417,13 @@ export default function MobileDrawer() {
       {createPortal(drawerContent, document.body)}
       {createPortal(popupContent, document.body)}
     </>
+  );
+}
+
+export default function MobileDrawer() {
+  return (
+    <Suspense fallback={null}>
+      <MobileDrawerContent />
+    </Suspense>
   );
 }
