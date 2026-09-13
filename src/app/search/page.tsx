@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import HomeSidebar from "@/components/HomeSidebar";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { SkeletonSearchResults } from "@/components/Skeleton";
@@ -56,15 +57,15 @@ function parseSort(value: string | null): SortFilter {
 }
 
 const SORT_OPTIONS: Array<{ value: SortFilter; label: string }> = [
-  { value: "latest", label: "按时间" },
-  { value: "hot", label: "按热度" },
-  { value: "bookmarks", label: "按收藏量" },
+  { value: "latest", label: "最近更新" },
+  { value: "hot", label: "热度最高" },
+  { value: "bookmarks", label: "收藏最高" },
 ];
 const WORK_TYPE_OPTIONS: Array<{ value: WorkTypeFilter; label: string }> = [
-  { value: "all", label: "全部" },
+  { value: "all", label: "全部作品" },
   { value: "single", label: "单篇" },
   { value: "image", label: "图片" },
-  { value: "serial", label: "连载" },
+  { value: "serial", label: "长篇连载" },
 ];
 const SERIES_STATUS_OPTIONS: Array<{ value: SeriesStatusFilter; label: string }> = [
   { value: "all", label: "全部" },
@@ -117,7 +118,6 @@ function SearchContent() {
   const [workType, setWorkType] = useState<WorkTypeFilter>(parseWorkType(searchParams.get("workType")));
   const [seriesStatus, setSeriesStatus] = useState<SeriesStatusFilter>(parseSeriesStatus(searchParams.get("seriesStatus")));
   const [sortBy, setSortBy] = useState<SortFilter>(parseSort(searchParams.get("sort")));
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [draftWorkType, setDraftWorkType] = useState<WorkTypeFilter>(workType);
   const [draftSeriesStatus, setDraftSeriesStatus] = useState<SeriesStatusFilter>(seriesStatus);
@@ -133,7 +133,6 @@ function SearchContent() {
   // 防抖 + 请求序列号，避免竞态
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
-  const sortMenuRef = useRef<HTMLDivElement | null>(null);
 
   const filters: { key: SearchFilter; label: string }[] = [
     { key: "tags", label: "标签" },
@@ -308,26 +307,6 @@ function SearchContent() {
   }, [activeFilter, profile, seriesStatus, sortBy, supabase, user, workType]);
 
   useEffect(() => {
-    if (!sortMenuOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
-        setSortMenuOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSortMenuOpen(false);
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [sortMenuOpen]);
-
-  useEffect(() => {
     if (!mobileFilterOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -412,6 +391,35 @@ function SearchContent() {
     setSortBy(draftSortBy);
     setMobileFilterOpen(false);
   };
+
+  const typeFilterOptions = WORK_TYPE_OPTIONS;
+  const seriesStatusFilterOptions = SERIES_STATUS_OPTIONS;
+  const sortFilterOptions = SORT_OPTIONS;
+  const renderSearchFilterSelectors = (prefix: string) => (
+    <>
+      <ProfileFilterSelect
+        label="作品类型"
+        id={`${prefix}-type-menu`}
+        value={workType}
+        options={typeFilterOptions}
+        onChange={(value) => handleWorkTypeChange(value as WorkTypeFilter)}
+      />
+      <ProfileFilterSelect
+        label="连载状态"
+        id={`${prefix}-series-status-menu`}
+        value={seriesStatus}
+        options={seriesStatusFilterOptions}
+        onChange={(value) => setSeriesStatus(value as SeriesStatusFilter)}
+      />
+      <ProfileFilterSelect
+        label="排序"
+        id={`${prefix}-sort-menu`}
+        value={sortBy}
+        options={sortFilterOptions}
+        onChange={(value) => setSortBy(value as SortFilter)}
+      />
+    </>
+  );
 
   if (authLoading) {
     return <SkeletonSearchResults variant={activeFilter} />;
@@ -541,173 +549,95 @@ function SearchContent() {
 
         {activeFilter === "works" && (
           <>
-            <button
-              type="button"
-              className="search-filter-mobile-trigger"
-              aria-expanded={mobileFilterOpen}
-              aria-controls="search-filter-mobile-modal"
-              onClick={openMobileFilter}
-            >
-              <SiteIcon name="fa-filter" variant="solid" aria-hidden="true" />
-              <span>筛选</span>
-            </button>
-
-            <section className="search-refine-panel" aria-label="作品筛选条件">
-            <div className="search-refine-grid">
-              <fieldset className="search-refine-group">
-                <legend>作品类型</legend>
-                <div className="search-refine-options" role="radiogroup" aria-label="作品类型">
-                  {(["all", "single", "image", "serial"] as WorkTypeFilter[]).map((type) => {
-                    const labels: Record<WorkTypeFilter, string> = { all: "全部", single: "单篇", image: "图片", serial: "连载" };
-                    return (
-                      <button
-                        type="button"
-                        key={type}
-                        className={`search-refine-chip${workType === type ? " active" : ""}`}
-                        role="radio"
-                        aria-checked={workType === type}
-                        onClick={() => handleWorkTypeChange(type)}
-                      >
-                        {labels[type]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              <fieldset className="search-refine-group" disabled={workType === "single" || workType === "image"}>
-                <legend>连载状态 <span className="search-refine-legend-note">仅连载</span></legend>
-                <div className="search-refine-options" role="radiogroup" aria-label="连载状态">
-                  {(["all", "ongoing", "completed"] as SeriesStatusFilter[]).map((status) => {
-                    const labels: Record<SeriesStatusFilter, string> = { all: "全部", ongoing: "连载中", completed: "已完结" };
-                    return (
-                      <button
-                        type="button"
-                        key={status}
-                        className={`search-refine-chip${seriesStatus === status ? " active" : ""}`}
-                        role="radio"
-                        aria-checked={seriesStatus === status}
-                        onClick={() => setSeriesStatus(status)}
-                      >
-                        {labels[status]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              <div className="search-refine-control">
-                <span className="search-refine-label">排序方式</span>
-                <div className={`search-refine-sort${sortMenuOpen ? " open" : ""}`} ref={sortMenuRef}>
-                  <button
-                    type="button"
-                    className="search-refine-sort-trigger"
-                    aria-haspopup="listbox"
-                    aria-expanded={sortMenuOpen}
-                    aria-controls="search-sort-menu"
-                    onClick={() => setSortMenuOpen((open) => !open)}
-                  >
-                    <span>{SORT_OPTIONS.find((option) => option.value === sortBy)?.label}</span>
-                    <SiteIcon name="fa-chevron-down" variant="solid" aria-hidden="true" />
-                  </button>
-                  {sortMenuOpen && (
-                    <div id="search-sort-menu" className="search-refine-sort-menu" role="listbox" aria-label="排序方式">
-                      {SORT_OPTIONS.map((option) => (
-                        <button
-                          type="button"
-                          key={option.value}
-                          className="search-refine-sort-option"
-                          role="option"
-                          aria-selected={sortBy === option.value}
-                          onClick={() => {
-                            setSortBy(option.value);
-                            setSortMenuOpen(false);
-                          }}
-                        >
-                          <span>{option.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="search-mobile-filter-bar">
+              <button
+                type="button"
+                className="studio-mobile-filter-button"
+                aria-expanded={mobileFilterOpen}
+                aria-controls="search-filter-mobile-modal"
+                onClick={openMobileFilter}
+              >
+                <SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" />
+                <span>筛选</span>
+              </button>
             </div>
+
+            <section
+              className="search-refine-panel studio-filter-composition"
+              aria-label="作品筛选条件"
+              data-composition-contract="filter.toolbar@0.1"
+              data-composition-dependencies="Input Select"
+            >
+              <div className="filter-system-composition-row">
+                {renderSearchFilterSelectors("search")}
+              </div>
             </section>
 
             {mobileFilterOpen && (
               <div
                 id="search-filter-mobile-modal"
-                className="modal-overlay search-filter-modal-overlay active"
+                className="search-filter-drawer-backdrop"
+                role="presentation"
                 onMouseDown={(event) => {
                   if (event.target === event.currentTarget) setMobileFilterOpen(false);
                 }}
               >
                 <div
-                  className="modal search-filter-modal"
+                  className="search-filter-drawer"
                   role="dialog"
                   aria-modal="true"
-                  aria-labelledby="search-filter-mobile-title"
+                  aria-label="筛选作品"
                   onMouseDown={(event) => event.stopPropagation()}
                 >
-                  <div className="modal-title" id="search-filter-mobile-title">筛选</div>
-                  <div className="modal-body search-filter-modal-body">
-                    <fieldset className="search-filter-modal-group">
-                      <legend>作品类型</legend>
-                      <div className="search-refine-options" role="radiogroup" aria-label="作品类型">
-                        {WORK_TYPE_OPTIONS.map((option) => (
-                          <button
-                            type="button"
-                            key={option.value}
-                            className={`search-refine-chip${draftWorkType === option.value ? " active" : ""}`}
-                            role="radio"
-                            aria-checked={draftWorkType === option.value}
-                            onClick={() => handleDraftWorkTypeChange(option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </fieldset>
-
-                    <fieldset className="search-filter-modal-group" disabled={draftWorkType === "single" || draftWorkType === "image"}>
-                      <legend>连载状态 <span className="search-refine-legend-note">仅连载</span></legend>
-                      <div className="search-refine-options" role="radiogroup" aria-label="连载状态">
-                        {SERIES_STATUS_OPTIONS.map((option) => (
-                          <button
-                            type="button"
-                            key={option.value}
-                            className={`search-refine-chip${draftSeriesStatus === option.value ? " active" : ""}`}
-                            role="radio"
-                            aria-checked={draftSeriesStatus === option.value}
-                            onClick={() => setDraftSeriesStatus(option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </fieldset>
-
-                    <fieldset className="search-filter-modal-group">
-                      <legend>排序方式</legend>
-                      <div className="search-refine-options" role="radiogroup" aria-label="排序方式">
-                        {SORT_OPTIONS.map((option) => (
-                          <button
-                            type="button"
-                            key={option.value}
-                            className={`search-refine-chip${draftSortBy === option.value ? " active" : ""}`}
-                            role="radio"
-                            aria-checked={draftSortBy === option.value}
-                            onClick={() => setDraftSortBy(option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </fieldset>
+                  <h2>筛选作品</h2>
+                  <div className="studio-filter-drawer-section">
+                    <strong>作品类型</strong>
+                    <div>
+                      {typeFilterOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`studio-filter-control${draftWorkType === option.value ? " is-active" : ""}`}
+                          onClick={() => handleDraftWorkTypeChange(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="modal-actions search-filter-modal-actions">
-                    <button type="button" className="btn-modal btn-modal-cancel" onClick={() => setMobileFilterOpen(false)}>取消</button>
-                    <button type="button" className="btn-modal btn-modal-primary" onClick={applyMobileFilter}>确定</button>
+                  <div className="studio-filter-drawer-section">
+                    <strong>连载状态</strong>
+                    <div>
+                      {seriesStatusFilterOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`studio-filter-control${draftSeriesStatus === option.value ? " is-active" : ""}`}
+                          onClick={() => setDraftSeriesStatus(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="studio-filter-drawer-section">
+                    <strong>排序</strong>
+                    <div>
+                      {sortFilterOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`studio-filter-control${draftSortBy === option.value ? " is-active" : ""}`}
+                          onClick={() => setDraftSortBy(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="studio-filter-drawer-actions">
+                    <button type="button" onClick={() => { setDraftWorkType("all"); setDraftSeriesStatus("all"); setDraftSortBy("latest"); }}>重置</button>
+                    <button type="button" className="is-primary" onClick={applyMobileFilter}>应用筛选</button>
                   </div>
                 </div>
               </div>
