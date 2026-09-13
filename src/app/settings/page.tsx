@@ -29,11 +29,6 @@ function parseSettingsTab(value: string | null): SettingsTab | null {
     : null;
 }
 
-function initialSettingsTab(): SettingsTab {
-  if (typeof window === "undefined") return "blocked";
-  return parseSettingsTab(new URLSearchParams(window.location.search).get("tab")) || "blocked";
-}
-
 const profileSettingsTabKeys: SettingsTab[] = ["account", "profile", "password"];
 const moreSettingsTabKeys: SettingsTab[] = ["about", "contact"];
 
@@ -47,7 +42,6 @@ function SettingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialSettingsTab);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
@@ -69,11 +63,7 @@ function SettingsPageContent() {
   const [notificationSaving, setNotificationSaving] = useState(false);
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
-
-  useEffect(() => {
-    const requested = parseSettingsTab(searchParams.get("tab"));
-    void Promise.resolve().then(() => setActiveTab(requested || "blocked"));
-  }, [searchParams]);
+  const activeTab = parseSettingsTab(searchParams.get("tab")) || "blocked";
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -142,7 +132,6 @@ function SettingsPageContent() {
       ];
 
   const handleTabChange = (tab: SettingsTab) => {
-    setActiveTab(tab);
     router.replace(`/settings?tab=${tab}`, { scroll: false });
   };
 

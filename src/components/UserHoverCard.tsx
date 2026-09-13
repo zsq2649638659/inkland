@@ -172,7 +172,7 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
           onClick={() => setOpen(false)}
         >
           <SiteIcon name="fa-user" variant="solid" className="text-accent text-xs w-4 text-center" />
-          <span>个人中心</span>
+          <span>我的空间</span>
           <SiteIcon name="fa-chevron-right" variant="solid" className="text-[0.6rem] text-muted ml-auto" />
         </Link>
         <Link
@@ -181,7 +181,7 @@ export default function UserHoverCard({ userId, profile, displayName, avatarChar
           onClick={() => setOpen(false)}
         >
           <SiteIcon name="fa-pen-to-square" variant="solid" className="text-accent text-xs w-4 text-center" />
-          <span>创作中心</span>
+          <span>作品管理</span>
           <SiteIcon name="fa-chevron-right" variant="solid" className="text-[0.6rem] text-muted ml-auto" />
         </Link>
         <Link

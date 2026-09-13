@@ -398,12 +398,12 @@ export function SkeletonCollectionDetail() {
   );
 }
 
-/* ================= 创作中心 ================= */
+/* ================= 作品管理 ================= */
 
-/** 创作中心骨架 —— 标题 + 统计卡 + 工具栏 + 作品网格 */
+/** 作品管理骨架 —— 标题 + 统计卡 + 工具栏 + 作品网格 */
 export function SkeletonStudio() {
   return (
-    <div role="status" aria-label="创作中心加载中，请稍候" aria-busy="true">
+    <div role="status" aria-label="作品管理加载中，请稍候" aria-busy="true">
       <div className="page-header">
         <div className="page-title">
           <SB style={{ width: 144, height: 28 }} />

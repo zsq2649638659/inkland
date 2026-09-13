@@ -3,6 +3,7 @@ import SiteIcon from "@/components/SiteIcon";
 import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -81,11 +82,11 @@ function MobileDrawerContent() {
   const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/" },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-    { page: "profile", icon: "fa-profile-center", label: "个人中心", href: "/profile" },
+    { page: "profile", icon: "fa-profile-center", label: "我的空间", href: "/profile" },
     { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
-    { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
+    { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
-    { page: "profile-settings", icon: "fa-circle-user", label: "个人资料", href: "/settings?tab=account" },
+    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/settings?tab=account" },
     { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
   ];
 
@@ -288,22 +289,24 @@ function MobileDrawerContent() {
 
             {moreOpen && (
               <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                <button
-                  className="sidebar-more-item"
+                <Link
+                  href="/settings?tab=about"
+                  className="sidebar-more-item no-underline"
                   style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
-                  onClick={() => handleNav("/settings?tab=about")}
+                  onClick={() => { setMoreOpen(false); closeDrawer(); }}
                 >
                   <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
                   关于我们
-                </button>
-                <button
-                  className="sidebar-more-item"
+                </Link>
+                <Link
+                  href="/settings?tab=contact"
+                  className="sidebar-more-item no-underline"
                   style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
-                  onClick={() => handleNav("/settings?tab=contact")}
+                  onClick={() => { setMoreOpen(false); closeDrawer(); }}
                 >
                   <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
                   联系我们
-                </button>
+                </Link>
                 <button
                   className="sidebar-more-item"
                   style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}

@@ -130,7 +130,7 @@ function StudioInteractionButton({
       type="button"
       className={`site-card__action studio-card-action${pressed ? " is-active" : ""}`}
       data-card-action
-      data-card-action-label={`创作中心：${label}`}
+      data-card-action-label={`作品管理：${label}`}
       aria-label={`作品：${label}`}
       aria-pressed={toggleable ? pressed : undefined}
       onClick={handleClick}
@@ -743,7 +743,7 @@ export default function StudioPage() {
             <>
           {/* 页面头部 */}
           <div className="page-header">
-            <h1 className="page-title">创作中心</h1>
+                    <h1 className="page-title">作品管理</h1>
             <p className="page-subtitle">管理你的所有作品，追踪创作进度与互动数据</p>
           </div>
 
@@ -815,7 +815,7 @@ export default function StudioPage() {
                 <div className="filter-system-field filter-system-field--query">
                   <div className="profile-filter-search-shell">
                     <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                    <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="创作中心搜索" />
+                    <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
                     <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
                       <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                     </button>
@@ -844,7 +844,7 @@ export default function StudioPage() {
                     <div className="filter-system-field filter-system-field--query">
                       <div className="profile-filter-search-shell">
                         <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="创作中心搜索" />
+                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
                         <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
                           <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                         </button>

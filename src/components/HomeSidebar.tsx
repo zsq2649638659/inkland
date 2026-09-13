@@ -177,11 +177,11 @@ function HomeSidebarContent() {
   const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/", badge: newWorksCount },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-    { page: "profile", icon: "fa-profile-center", label: "个人中心", href: "/profile" },
+    { page: "profile", icon: "fa-profile-center", label: "我的空间", href: "/profile" },
     { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
-    { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
+    { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
-    { page: "profile-settings", icon: "fa-circle-user", label: "个人资料", href: "/settings?tab=account" },
+    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/settings?tab=account" },
     { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
   ];
 
@@ -191,11 +191,11 @@ function HomeSidebarContent() {
     const loadingMenuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string }> = [
       { page: "home", icon: "fa-house", label: "首页", href: "/" },
       { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-      { page: "profile", icon: "fa-profile-center", label: "个人中心", href: "/profile" },
+      { page: "profile", icon: "fa-profile-center", label: "我的空间", href: "/profile" },
       { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
-      { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
+      { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
       { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications" },
-      { page: "profile-settings", icon: "fa-circle-user", label: "个人资料", href: "/settings?tab=account" },
+      { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/settings?tab=account" },
       { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
     ];
     return (
@@ -374,20 +374,22 @@ function HomeSidebarContent() {
       {/* More dropdown */}
       {moreOpen && (
         <div className="sidebar-more-dropdown">
-          <button
-            className="sidebar-more-item"
-            onClick={() => { setMoreOpen(false); router.push("/settings?tab=about"); }}
+          <Link
+            href="/settings?tab=about"
+            className="sidebar-more-item no-underline"
+            onClick={() => setMoreOpen(false)}
           >
             <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
             关于我们
-          </button>
-          <button
-            className="sidebar-more-item"
-            onClick={() => { setMoreOpen(false); router.push("/settings?tab=contact"); }}
+          </Link>
+          <Link
+            href="/settings?tab=contact"
+            className="sidebar-more-item no-underline"
+            onClick={() => setMoreOpen(false)}
           >
             <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
             联系我们
-          </button>
+          </Link>
           <button
             className="sidebar-more-item"
             onClick={() => { setMoreOpen(false); setShowLogout(true); }}
