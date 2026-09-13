@@ -16,6 +16,13 @@ import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-da
 
 type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark" | "reply";
 
+const readNotificationTab = (): NotificationType => {
+  if (typeof window === "undefined") return "all";
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  if (tab === "all" || tab === "comment" || tab === "like" || tab === "follow" || tab === "system" || tab === "bookmark" || tab === "reply") return tab;
+  return "all";
+};
+
 interface NotificationItem {
   id: string;
   user_id: string;
@@ -48,6 +55,20 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadByType, setUnreadByType] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncTabFromUrl = () => setFilterType(readNotificationTab());
+    syncTabFromUrl();
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, []);
+
+  const handleFilterChange = (next: NotificationType) => {
+    setFilterType(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", next);
+    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -528,7 +549,7 @@ export default function NotificationsPage() {
                 <button
                   key={tab.key}
                   className={`segmented-tab ${filterType === tab.key ? "active" : ""}`}
-                  onClick={() => setFilterType(tab.key)}
+                  onClick={() => handleFilterChange(tab.key)}
                   data-filter={tab.key}
                 >
                   {tab.label}

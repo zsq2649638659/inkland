@@ -3,6 +3,7 @@ import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PostCard from "@/components/PostCard";
 import SerialPostCard from "@/components/SerialPostCard";
 import type { SerialPostCardData } from "@/components/SerialPostCard";
@@ -18,6 +19,13 @@ import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-da
 import { loadReadingHistory, type ReadingHistoryRecord } from "@/lib/readingHistory";
 
 type TabType = "following" | "myTags" | "hot24";
+
+const readHomeTab = (): TabType => {
+  if (typeof window === "undefined") return "following";
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  if (tab === "myTags" || tab === "hot24" || tab === "following") return tab;
+  return "following";
+};
 
 interface TagItem {
   name: string;
@@ -59,6 +67,7 @@ function writeFeedCache(key: string, result: FeedResult) {
 export default function HomePage() {
   const supabase = useMemo(() => createClient(), []);
   const { user, profile, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [tab, setTab] = useState<TabType>("following");
   const [posts, setPosts] = useState<Post[]>([]);
   const [serialCards, setSerialCards] = useState<SerialPostCardData[]>([]);
@@ -71,6 +80,20 @@ export default function HomePage() {
   const [latestReading, setLatestReading] = useState<ReadingHistoryRecord | null>(null);
   const latestPostTimeRef = useRef<string>("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const syncTabFromUrl = () => setTab(readHomeTab());
+    syncTabFromUrl();
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, []);
+
+  const handleTabChange = (next: TabType) => {
+    setTab(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", next);
+    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const updateLatestPostTime = (result: Pick<FeedCacheEntry, "posts" | "serialCards">) => {
     const times: string[] = [];
@@ -331,7 +354,7 @@ export default function HomePage() {
                 <button
                   key={t.key}
                   className={`tab-btn ${tab === t.key ? "active" : ""}`}
-                  onClick={() => setTab(t.key)}
+                  onClick={() => handleTabChange(t.key)}
                 >
                   {t.label}
                 </button>

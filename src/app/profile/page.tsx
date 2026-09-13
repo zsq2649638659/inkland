@@ -5,6 +5,7 @@ import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
@@ -21,6 +22,13 @@ type FilterType = "all" | "single" | "image" | "series";
 type TabType = "works" | "likes" | "bookmarks" | "following" | "followers";
 type StatusFilter = "all" | "published" | "draft" | "rejected";
 type SortMode = "latest" | "created" | "hot";
+
+const readProfileTab = (fallback: TabType): TabType => {
+  if (typeof window === "undefined") return fallback;
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  if (tab === "works" || tab === "likes" || tab === "bookmarks" || tab === "following" || tab === "followers") return tab;
+  return fallback;
+};
 
 interface SeriesInfo {
   id: string;
@@ -169,6 +177,7 @@ const assembleSeriesInfo = async (
 
 export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: TabType }) {
   const supabase = createClient();
+  const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
   const [displayPosts, setDisplayPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,14 +206,18 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   const profileLoadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get("tab");
-    if (t === "likes") setTab("likes");
-    else if (t === "bookmarks") setTab("bookmarks");
-    else if (t === "following") setTab("following");
-    else if (t === "followers") setTab("followers");
-    else setTab(defaultTab);
+    const syncTabFromUrl = () => setTab(readProfileTab(defaultTab));
+    syncTabFromUrl();
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
   }, [defaultTab]);
+
+  const handleProfileTabChange = (next: TabType) => {
+    setTab(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", next);
+    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+  };
 
   // 列表数据优先走服务端聚合路由（机房内拉取并瘦身，客户端只下载轻量数据）；
   // 本地 dev 或路由异常时返回 null，调用方回落客户端直连。
@@ -659,7 +672,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
             <div className="segmented-tabs segmented-tabs--profile-primary">
               <div className="segmented-tabs-left">
                 {(["works", "likes", "bookmarks"] as const).map((key) => (
-                  <button key={key} className={`segmented-tab${tab === key ? " active" : ""}`} onClick={() => setTab(key)}>
+                  <button key={key} className={`segmented-tab${tab === key ? " active" : ""}`} onClick={() => handleProfileTabChange(key)}>
                     <span className="my-prefix">我的</span>{key === "works" ? "作品" : key === "likes" ? "喜欢" : "收藏"}
                   </button>
                 ))}
@@ -723,15 +736,15 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
           <div className="segmented-tabs-left">
             <button
               className={`segmented-tab${tab === "works" ? " active" : ""}`}
-              onClick={() => setTab("works")}
+              onClick={() => handleProfileTabChange("works")}
             ><span className="my-prefix">我的</span>作品</button>
             <button
               className={`segmented-tab${tab === "likes" ? " active" : ""}`}
-              onClick={() => setTab("likes")}
+              onClick={() => handleProfileTabChange("likes")}
             ><span className="my-prefix">我的</span>喜欢</button>
             <button
               className={`segmented-tab${tab === "bookmarks" ? " active" : ""}`}
-              onClick={() => setTab("bookmarks")}
+              onClick={() => handleProfileTabChange("bookmarks")}
             ><span className="my-prefix">我的</span>收藏</button>
           </div>
           <div className="segmented-tabs-right">
