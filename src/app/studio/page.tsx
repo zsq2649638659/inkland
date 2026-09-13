@@ -741,12 +741,6 @@ export default function StudioPage() {
             <SkeletonStudio />
           ) : (
             <>
-          {/* 页面头部 */}
-          <div className="page-header">
-                    <h1 className="page-title">作品管理</h1>
-            <p className="page-subtitle">管理你的所有作品，追踪创作进度与互动数据</p>
-          </div>
-
           {/* 统计卡片（使用未筛选数据，不受 type/status 筛选影响） */}
           <div className="stats-grid">
             <div className="stat-card">

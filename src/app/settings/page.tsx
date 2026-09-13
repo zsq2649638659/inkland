@@ -151,14 +151,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
     return `${basePath}?tab=${tab}`;
   };
 
-  const pageTitle = profileSettings
-    ? "个人资料"
-    : section === "about"
-      ? "关于我们"
-      : section === "contact"
-        ? "联系我们"
-        : "设置和隐私";
-
   if (authLoading) {
     return (
       <div id="page-settings" className="min-h-screen bg-paper pb-20 lg:pb-0">
@@ -283,11 +275,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
         <HomeSidebar />
 
         <div className="content-area">
-          {/* Page Header */}
-          <div className="page-header">
-            <h1 className="page-title">{pageTitle}</h1>
-          </div>
-
           {/* Tab Bar */}
           {tabs.length > 0 && (
             <div className="tabs-wrapper">

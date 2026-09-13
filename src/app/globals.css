@@ -2096,6 +2096,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  margin-bottom: 12px;
 }
 
 #page-notifications .page-title {

@@ -116,11 +116,6 @@ export default function HistoryPage() {
       <div className="main-container">
         <HomeSidebar />
         <main className="content-area">
-          <div className="page-header">
-            <h1 className="page-title">阅读历史</h1>
-            <p className="page-subtitle">记录你最近读过的作品和位置，随时继续阅读。</p>
-          </div>
-
           {records.length === 0 ? (
             <EmptyState
               icon="fa-clock-rotate-left"

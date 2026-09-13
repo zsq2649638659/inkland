@@ -81,12 +81,12 @@ function MobileDrawerContent() {
   const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/" },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
+    { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
     { page: "profile", icon: "fa-profile-center", label: "我的空间", href: "/profile" },
     { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
     { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
-    { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
     { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
-    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
   ];
 
   const isActive = (page: string) => {
