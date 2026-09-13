@@ -8101,7 +8101,6 @@ p {
 #page-studio .studio-toolbar-action:focus-visible {
   border: var(--ink-button-border-width) solid var(--ink-button-primary-border);
 }
-
 @media (max-width: 1024px) {
   #page-studio .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #page-studio .studio-filter-search-row { display: block; }
