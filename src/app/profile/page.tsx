@@ -167,13 +167,13 @@ const assembleSeriesInfo = async (
   });
 };
 
-export default function ProfilePage() {
+export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: TabType }) {
   const supabase = createClient();
   const { user, profile, loading: authLoading } = useAuth();
   const [displayPosts, setDisplayPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<TabType>("works");
+  const [tab, setTab] = useState<TabType>(defaultTab);
   const [filter, setFilter] = useState<FilterType>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("latest");
@@ -203,8 +203,8 @@ export default function ProfilePage() {
     else if (t === "bookmarks") setTab("bookmarks");
     else if (t === "following") setTab("following");
     else if (t === "followers") setTab("followers");
-    else setTab("works");
-  }, []);
+    else setTab(defaultTab);
+  }, [defaultTab]);
 
   // 列表数据优先走服务端聚合路由（机房内拉取并瘦身，客户端只下载轻量数据）；
   // 本地 dev 或路由异常时返回 null，调用方回落客户端直连。

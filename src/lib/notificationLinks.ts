@@ -109,16 +109,16 @@ export function getNotificationLink(notification: NotificationLinkInput): string
   }
 
   if (notification.type === "system") {
-    if (template === "profile_revision_request") return "/settings?tab=profile";
-    if (template === "feedback_resolved") return "/settings?tab=contact";
+    if (template === "profile_revision_request") return "/profile-settings?tab=profile";
+    if (template === "feedback_resolved") return "/contact";
     if (template === "comment_deleted" || template === "post_deleted") {
-      return "/settings?tab=contact";
+      return "/contact";
     }
     if (template === "comment_civility_reminder" || template === "content_civility_reminder" || template === "report_rule_reminder") {
       return "/guidelines";
     }
     if (["account_warning", "account_restored", "restriction_comment", "restriction_publish", "restriction_report", "restriction_lifted", "account_suspended", "account_banned"].includes(template)) {
-      return "/settings?tab=account";
+      return "/profile-settings";
     }
   }
 

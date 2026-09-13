@@ -4,7 +4,7 @@ import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegi
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/browser";
@@ -20,7 +20,6 @@ function MobileDrawerContent() {
   const { open, closeDrawer } = useMobileDrawer();
   const { user, profile, loading: authLoading } = useAuth();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -86,19 +85,17 @@ function MobileDrawerContent() {
     { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
     { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
-    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/settings?tab=account" },
-    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
+    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships?tab=following" },
   ];
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
-    const settingsTab = searchParams.get("tab");
-    const profileSettingsTabs = ["account", "profile", "password"];
-    const relationshipTabs = ["following", "followers"];
-    if (page === "profile-settings") return pathname === "/settings" && profileSettingsTabs.includes(settingsTab || "");
-    if (page === "relationships") return pathname === "/profile" && relationshipTabs.includes(settingsTab || "");
-    if (page === "profile") return pathname === "/profile" && !relationshipTabs.includes(settingsTab || "");
-    if (page === "settings") return pathname.startsWith("/settings") && !profileSettingsTabs.includes(settingsTab || "");
+    if (page === "profile-settings") return pathname === "/profile-settings";
+    if (page === "relationships") return pathname === "/relationships";
+    if (page === "profile") return pathname === "/profile";
+    if (page === "settings") return pathname === "/settings";
+    if (page === "more") return pathname === "/about" || pathname === "/contact";
     return pathname.startsWith(`/${page}`);
   };
 
@@ -276,7 +273,7 @@ function MobileDrawerContent() {
 
             {/* More actions */}
             <button
-              className="sidebar-menu-item text-left"
+              className={`sidebar-menu-item text-left ${isActive("more") ? "active" : ""}`}
               onClick={() => setMoreOpen(!moreOpen)}
             >
               <span className="sidebar-menu-icon">
@@ -287,10 +284,10 @@ function MobileDrawerContent() {
               <span className="sidebar-menu-label">更多</span>
             </button>
 
-            {moreOpen && (
+            {(moreOpen || isActive("more")) && (
               <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "4px" }}>
                 <Link
-                  href="/settings?tab=about"
+                  href="/about"
                   className="sidebar-more-item no-underline"
                   style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
                   onClick={() => { setMoreOpen(false); closeDrawer(); }}
@@ -299,7 +296,7 @@ function MobileDrawerContent() {
                   关于我们
                 </Link>
                 <Link
-                  href="/settings?tab=contact"
+                  href="/contact"
                   className="sidebar-more-item no-underline"
                   style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
                   onClick={() => { setMoreOpen(false); closeDrawer(); }}

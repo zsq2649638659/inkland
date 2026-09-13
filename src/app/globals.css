@@ -1298,10 +1298,7 @@ p {
   max-width: var(--main-content-width);
 }
 
-/* 首页按阶段 4 基线使用更窄的侧栏；其他页面继续使用共享侧栏宽度。 */
-#page-home {
-  --sidebar-width: 220px;
-}
+/* 首页与其他页面共用同一套侧栏宽度，避免从搜索返回首页时布局跳变。 */
 #page-home > .main-container {
   justify-content: center;
   padding: var(--spacing-lg) 0;
@@ -10677,6 +10674,7 @@ p {
 .sidebar-more-icon { display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;position:relative }
 .sidebar-more-icon svg { width:18px;height:18px;fill:var(--color-text-muted);transition:fill .15s ease }
 .sidebar-menu-item:hover .sidebar-more-icon svg { fill:var(--color-primary) }
+.sidebar-menu-item.active .sidebar-more-icon svg { fill:#fff }
 
 .sidebar-more-dropdown { margin:0;padding:4px 0;background:var(--color-card);border-radius:12px;display:flex;flex-direction:column;width:calc(100% - 48px);align-self:flex-end;margin-right:8px }
 .sidebar-more-item { display:flex;align-items:center;padding:10px 14px;font-size:14px;font-weight:500;color:var(--color-text);cursor:pointer;transition:all .15s ease;border-radius:8px;margin:2px 6px;border:none;background:transparent;font-family:var(--font-family);text-align:left;gap:14px }

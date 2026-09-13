@@ -22,6 +22,7 @@ import {
 } from "@/lib/notificationPreferences";
 
 type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+export type SettingsSection = "privacy" | "profile" | "about" | "contact";
 
 function parseSettingsTab(value: string | null): SettingsTab | null {
   return value === "account" || value === "profile" || value === "password" || value === "blocked" || value === "notifications" || value === "about" || value === "contact"
@@ -30,14 +31,27 @@ function parseSettingsTab(value: string | null): SettingsTab | null {
 }
 
 const profileSettingsTabKeys: SettingsTab[] = ["account", "profile", "password"];
-const moreSettingsTabKeys: SettingsTab[] = ["about", "contact"];
 
 const siteContactEmail = "inkland@163.com";
 
 type BlockedUserRow = { id: string; blocked_user_id: string; created_at: string };
 type BlockedProfileRow = { id: string; nickname: string | null; bio: string | null };
 
-function SettingsPageContent() {
+function isTabForSection(tab: SettingsTab | null, section: SettingsSection): tab is SettingsTab {
+  if (!tab) return false;
+  if (section === "profile") return profileSettingsTabKeys.includes(tab);
+  if (section === "privacy") return tab === "blocked" || tab === "notifications";
+  return tab === section;
+}
+
+function defaultTabForSection(section: SettingsSection): SettingsTab {
+  if (section === "profile") return "account";
+  if (section === "about") return "about";
+  if (section === "contact") return "contact";
+  return "blocked";
+}
+
+function SettingsPageContent({ section }: { section: SettingsSection }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,7 +77,8 @@ function SettingsPageContent() {
   const [notificationSaving, setNotificationSaving] = useState(false);
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
-  const activeTab = parseSettingsTab(searchParams.get("tab")) || "blocked";
+  const requestedTab = parseSettingsTab(searchParams.get("tab"));
+  const activeTab = isTabForSection(requestedTab, section) ? requestedTab : defaultTabForSection(section);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -82,7 +97,7 @@ function SettingsPageContent() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || activeTab !== "blocked") return;
+    if (!user || section !== "privacy" || activeTab !== "blocked") return;
     let active = true;
     void Promise.resolve().then(() => {
       if (active) setBlockedLoading(true);
@@ -114,10 +129,10 @@ function SettingsPageContent() {
       setBlockedLoading(false);
     })();
     return () => { active = false; };
-  }, [activeTab, supabase, user]);
+  }, [activeTab, section, supabase, user]);
 
-  const profileSettings = profileSettingsTabKeys.includes(activeTab);
-  const moreSettings = moreSettingsTabKeys.includes(activeTab);
+  const profileSettings = section === "profile";
+  const moreSettings = section === "about" || section === "contact";
   const tabs: { key: SettingsTab; label: string }[] = profileSettings
     ? [
       { key: "account", label: "账号设置" },
@@ -132,14 +147,15 @@ function SettingsPageContent() {
       ];
 
   const handleTabChange = (tab: SettingsTab) => {
-    router.replace(`/settings?tab=${tab}`, { scroll: false });
+    const basePath = section === "profile" ? "/profile-settings" : "/settings";
+    router.replace(`${basePath}?tab=${tab}`, { scroll: false });
   };
 
   const pageTitle = profileSettings
     ? "个人资料"
-    : activeTab === "about"
+    : section === "about"
       ? "关于我们"
-      : activeTab === "contact"
+      : section === "contact"
         ? "联系我们"
         : "设置和隐私";
 
@@ -536,10 +552,14 @@ function SettingsPageContent() {
   );
 }
 
-export default function SettingsPage() {
+export function SettingsSectionPage({ section }: { section: SettingsSection }) {
   return (
     <Suspense fallback={<div className="feed-empty-state" role="status">正在加载设置…</div>}>
-      <SettingsPageContent />
+      <SettingsPageContent section={section} />
     </Suspense>
   );
+}
+
+export default function SettingsPage() {
+  return <SettingsSectionPage section="privacy" />;
 }

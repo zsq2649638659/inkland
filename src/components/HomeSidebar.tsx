@@ -5,7 +5,7 @@ import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegi
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
@@ -52,7 +52,6 @@ function HomeSidebarContent() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [userStats, setUserStats] = useState<SidebarStats>(() => user ? getCachedStats(user.id) : emptyStats);
   const [notificationCount, setNotificationCount] = useState(0);
   const [newWorksCount, setNewWorksCount] = useState(0);
@@ -157,13 +156,11 @@ function HomeSidebarContent() {
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
-    const settingsTab = searchParams.get("tab");
-    const profileSettingsTabs = ["account", "profile", "password"];
-    const relationshipTabs = ["following", "followers"];
-    if (page === "profile-settings") return pathname === "/settings" && profileSettingsTabs.includes(settingsTab || "");
-    if (page === "relationships") return pathname === "/profile" && relationshipTabs.includes(settingsTab || "");
-    if (page === "profile") return pathname === "/profile" && !relationshipTabs.includes(settingsTab || "");
-    if (page === "settings") return pathname.startsWith("/settings") && !profileSettingsTabs.includes(settingsTab || "");
+    if (page === "profile-settings") return pathname === "/profile-settings";
+    if (page === "relationships") return pathname === "/relationships";
+    if (page === "profile") return pathname === "/profile";
+    if (page === "settings") return pathname === "/settings";
+    if (page === "more") return pathname === "/about" || pathname === "/contact";
     return pathname.startsWith(`/${page}`);
   };
 
@@ -181,8 +178,8 @@ function HomeSidebarContent() {
     { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
     { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
-    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/settings?tab=account" },
-    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
+    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships?tab=following" },
   ];
 
   // 只有首次鉴权还没完成时才替换成骨架。
@@ -195,8 +192,8 @@ function HomeSidebarContent() {
       { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
       { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
       { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications" },
-      { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/settings?tab=account" },
-      { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
+      { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
+      { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships?tab=following" },
     ];
     return (
       <aside className="sidebar" aria-label="侧边导航加载中" aria-busy="true">
@@ -301,11 +298,11 @@ function HomeSidebarContent() {
           </Link>
           <div className="sidebar-user-bio">{bio}</div>
           <div className="sidebar-user-stats">
-            <Link href="/profile?tab=following" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
+            <Link href="/relationships?tab=following" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
               <div className="sidebar-stat-value">{userStats.following ?? "—"}</div>
               <div className="sidebar-stat-label">关注</div>
             </Link>
-            <Link href="/profile?tab=followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
+            <Link href="/relationships?tab=followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
               <div className="sidebar-stat-value">{userStats.followers ?? "—"}</div>
               <div className="sidebar-stat-label">粉丝</div>
             </Link>
@@ -360,7 +357,7 @@ function HomeSidebarContent() {
 
       {/* More actions */}
       <button
-        className="sidebar-menu-item text-left"
+        className={`sidebar-menu-item text-left ${isActive("more") ? "active" : ""}`}
         onClick={() => setMoreOpen(!moreOpen)}
       >
         <span className="sidebar-menu-icon">
@@ -372,10 +369,10 @@ function HomeSidebarContent() {
       </button>
 
       {/* More dropdown */}
-      {moreOpen && (
+      {(moreOpen || isActive("more")) && (
         <div className="sidebar-more-dropdown">
           <Link
-            href="/settings?tab=about"
+            href="/about"
             className="sidebar-more-item no-underline"
             onClick={() => setMoreOpen(false)}
           >
@@ -383,7 +380,7 @@ function HomeSidebarContent() {
             关于我们
           </Link>
           <Link
-            href="/settings?tab=contact"
+            href="/contact"
             className="sidebar-more-item no-underline"
             onClick={() => setMoreOpen(false)}
           >
