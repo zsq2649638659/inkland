@@ -37,6 +37,14 @@ export type InklandAdditionalIconName =
   | "fa-compass"
   | "fa-compress"
   | "fa-crosshairs"
+  | "fa-detail-back-to-top"
+  | "fa-detail-font-adjust"
+  | "fa-detail-line-height"
+  | "fa-detail-more"
+  | "fa-detail-night-mode"
+  | "fa-detail-paragraph-spacing"
+  | "fa-detail-page-width"
+  | "fa-detail-report"
   | "fa-droplet"
   | "fa-ellipsis-vertical"
   | "fa-ellipsis-circle"
@@ -204,6 +212,36 @@ export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, In
   ], supportsVariants: false },
   "fa-crosshairs": { viewBox: "0 0 576 512", paths: [
     {"d":"M288-16c17.7 0 32 14.3 32 32l0 18.3c98.1 14 175.7 91.6 189.7 189.7l18.3 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-18.3 0c-14 98.1-91.6 175.7-189.7 189.7l0 18.3c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-18.3C157.9 463.7 80.3 386.1 66.3 288L48 288c-17.7 0-32-14.3-32-32s14.3-32 32-32l18.3 0C80.3 125.9 157.9 48.3 256 34.3L256 16c0-17.7 14.3-32 32-32zM131.2 288c12.7 62.7 62.1 112.1 124.8 124.8l0-12.8c0-17.7 14.3-32 32-32s32 14.3 32 32l0 12.8c62.7-12.7 112.1-62.1 124.8-124.8L432 288c-17.7 0-32-14.3-32-32s14.3-32 32-32l12.8 0C432.1 161.3 382.7 111.9 320 99.2l0 12.8c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-12.8C193.3 111.9 143.9 161.3 131.2 224l12.8 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-12.8 0zM288 208a48 48 0 1 1 0 96 48 48 0 1 1 0-96z","variant":"default","fill":"currentColor"},
+  ], supportsVariants: false },
+  "fa-detail-back-to-top": { viewBox: "0 0 24 24", paths: [
+    {"d":"M12.0039 7.05078V21.0005M6 13L12 7L18 13M6 3H18", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"2", "strokeLinecap":"round", "strokeLinejoin":"round"},
+  ], supportsVariants: false },
+  "fa-detail-font-adjust": { viewBox: "0 0 24 24", paths: [
+    {"d":"M16 3H21V8M8.5 16L9.59375 13.5M9.59375 13.5L12 8L14.4062 13.5M9.59375 13.5H14.4062M15.5 16L14.4062 13.5M8 3H3V8M16 21H21V16M8 21H3V16", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"2", "strokeLinecap":"round", "strokeLinejoin":"round"},
+  ], supportsVariants: false },
+  "fa-detail-line-height": { viewBox: "0 0 48 48", paths: [
+    {"d":"M6 7H42", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"4", "strokeLinecap":"round"},
+    {"d":"M6 41H42", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"4", "strokeLinecap":"round"},
+    {"d":"M24 13L14 35M18 28L30 28M24 13L34 35", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"4", "strokeLinecap":"round", "strokeLinejoin":"round"},
+  ], supportsVariants: false },
+  "fa-detail-more": { viewBox: "0 0 24 24", paths: [
+    {"d":"M9 3H4C3.44771 3 3 3.44771 3 4V9C3 9.5523 3.44771 10 4 10H9C9.5523 10 10 9.5523 10 9V4C10 3.44771 9.5523 3 9 3ZM9 14H4C3.44771 14 3 14.4477 3 15V20C3 20.5523 3.44771 21 4 21H9C9.5523 21 10 20.5523 10 20V15C10 14.4477 9.5523 14 9 14ZM20 3H15C14.4477 3 14 3.44771 14 4V9C14 9.5523 14.4477 10 15 10H20C20.5523 10 21 9.5523 21 9V4C21 3.44771 20.5523 3 20 3ZM20 14H15C14.4477 14 14 14.4477 14 15V20C14 20.5523 14.4477 21 15 21H20C20.5523 21 21 20.5523 21 20V15C21 14.4477 20.5523 14 20 14Z", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"2", "strokeLinejoin":"round"},
+  ], supportsVariants: false },
+  "fa-detail-night-mode": { viewBox: "0 0 24 24", paths: [
+    {"d":"M14.0264 2.20543C11.2914 2.91848 9.27275 5.4053 9.27275 8.36365C9.27275 11.8782 12.1218 14.7273 15.6363 14.7273C18.5947 14.7273 21.0815 12.7086 21.7945 9.97365C21.9292 10.628 22 11.3058 22 12C22 17.5229 17.5229 22 12 22C6.47715 22 2 17.5229 2 12C2 6.47715 6.47715 2 12 2C12.6942 2 13.372 2.07075 14.0264 2.20543Z", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"2", "strokeLinejoin":"round"},
+  ], supportsVariants: false },
+  "fa-detail-paragraph-spacing": { viewBox: "0 0 48 48", paths: [
+    {"d":"M8 6V12H40V6", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"4", "strokeLinecap":"round", "strokeLinejoin":"round"},
+    {"d":"M14 24H34", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"4", "strokeLinecap":"round"},
+    {"d":"M8 42V36H40V42", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"4", "strokeLinecap":"round", "strokeLinejoin":"round"},
+  ], supportsVariants: false },
+  "fa-detail-page-width": { viewBox: "0 0 24 24", paths: [
+    {"d":"M3 3.5H21M4 12H20M6.99535 15L4 12.0023L7 9M17.0047 9L20 11.9977L17 15M3 20.5H21", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"2", "strokeLinecap":"round", "strokeLinejoin":"round"},
+  ], supportsVariants: false },
+  "fa-detail-report": { viewBox: "0 0 24 24", paths: [
+    {"d":"M12 22C14.7614 22 17.2614 20.8807 19.0711 19.0711C20.8807 17.2614 22 14.7614 22 12C22 9.2386 20.8807 6.7386 19.0711 4.92893C17.2614 3.11929 14.7614 2 12 2C9.2386 2 6.7386 3.11929 4.92893 4.92893C3.11929 6.7386 2 9.2386 2 12C2 14.7614 3.11929 19.0711 4.92893 19.0711C6.7386 20.8807 9.2386 22 12 22Z", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"2", "strokeLinejoin":"round"},
+    {"d":"M12 18.5C12.6903 18.5 13.25 17.9403 13.25 17.25C13.25 16.5597 12.6903 16 12 16C11.3097 16 10.75 16.5597 10.75 17.25C10.75 17.9403 11.3097 18.5 12 18.5Z", "variant":"default", "fill":"currentColor", "fillRule":"evenodd", "clipRule":"evenodd"},
+    {"d":"M12 6V14", "variant":"default", "fill":"none", "stroke":"currentColor", "strokeWidth":"2", "strokeLinecap":"round", "strokeLinejoin":"round"},
   ], supportsVariants: false },
   "fa-droplet": { viewBox: "0 0 384 512", paths: [
     {"d":"M192 512C86 512 0 426 0 320 0 228.8 130.2 45.9 166.6-3.5 172.5-11.5 181.8-16 191.8-16l.4 0c10 0 19.3 4.5 25.2 12.5 36.4 49.4 166.6 232.3 166.6 323.5 0 106-86 192-192 192zM112 312c0-13.3-10.7-24-24-24s-24 10.7-24 24c0 75.1 60.9 136 136 136 13.3 0 24-10.7 24-24s-10.7-24-24-24c-48.6 0-88-39.4-88-88z","variant":"default","fill":"currentColor"},

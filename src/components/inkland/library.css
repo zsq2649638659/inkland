@@ -394,9 +394,13 @@
 }
 
 #page-home .site-card--feed-serial .site-card__serial-inner p {
+  display: -webkit-box;
   margin: var(--ink-space-2) 0 0;
+  overflow: hidden;
   color: var(--ink-muted);
   font: var(--ink-font-card-body-mobile);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 #page-home .site-card--feed-serial .site-card__serial-inner .site-card__tags {
