@@ -1236,7 +1236,7 @@ p {
   text-decoration: none;
 }
 .sidebar-menu-item:hover {
-  background: rgba(242, 107, 91, 0.05);
+  background: var(--color-bg-secondary, #E8E4E0);
   color: var(--color-text, #1A1A1A);
 }
 .sidebar-menu-item.active {
@@ -1298,10 +1298,7 @@ p {
   max-width: var(--main-content-width);
 }
 
-/* 首页按阶段 4 基线使用更窄的侧栏；其他页面继续使用共享侧栏宽度。 */
-#page-home {
-  --sidebar-width: 220px;
-}
+/* 首页与其他页面共用同一套侧栏宽度，避免从搜索返回首页时布局跳变。 */
 #page-home > .main-container {
   justify-content: center;
   padding: var(--spacing-lg) 0;
@@ -2099,6 +2096,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  margin-bottom: 12px;
 }
 
 #page-notifications .page-title {
@@ -10676,17 +10674,94 @@ p {
 /* More icon — circle with three dots */
 .sidebar-more-icon { display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;position:relative }
 .sidebar-more-icon svg { width:18px;height:18px;fill:var(--color-text-muted);transition:fill .15s ease }
-.sidebar-menu-item:hover .sidebar-more-icon svg { fill:var(--color-primary) }
+.sidebar-menu-item:hover .sidebar-more-icon svg { fill:var(--color-text-muted) }
 
-.sidebar-more-dropdown { margin:0;padding:4px 0;background:var(--color-card);border-radius:12px;display:flex;flex-direction:column;width:calc(100% - 48px);align-self:flex-end;margin-right:8px }
-.sidebar-more-item { display:flex;align-items:center;padding:10px 14px;font-size:14px;font-weight:500;color:var(--color-text);cursor:pointer;transition:all .15s ease;border-radius:8px;margin:2px 6px;border:none;background:transparent;font-family:var(--font-family);text-align:left;gap:14px }
-.sidebar-more-item:hover { background:rgba(242,107,91,0.06);color:var(--color-primary) }
+.sidebar-more-dropdown { margin:0 8px 0 32px;padding:0;background:transparent;border-radius:0;display:flex;flex-direction:column;width:calc(100% - 40px);align-self:stretch }
+.sidebar-more-item { display:flex;align-items:center;padding:10px 16px;font-size:14px;font-weight:500;color:var(--color-text);cursor:pointer;transition:all .15s ease;border-radius:10px;margin:6px 0;border:none;background:transparent;font-family:var(--font-family);text-align:left;gap:14px }
+.sidebar-more-item:hover { background:var(--color-bg-secondary, #E8E4E0);color:var(--color-text) }
+.sidebar-more-item.active { background:var(--color-primary);color:#fff;font-weight:600 }
+.sidebar-more-item.active:hover { background:var(--color-primary-hover, #E85A4A);color:#fff }
 .sidebar-more-item .sidebar-more-item-icon { font-size:15px;width:18px;text-align:center;flex-shrink:0;color:var(--color-text-muted) }
-.sidebar-more-item:hover .sidebar-more-item-icon { color:var(--color-primary) }
+.sidebar-more-item:hover .sidebar-more-item-icon { color:var(--color-text-muted) }
+.sidebar-more-item.active .sidebar-more-item-icon,
+.sidebar-more-item.active:hover .sidebar-more-item-icon { color:#fff }
 .sidebar-more-item-danger { color:var(--color-primary) }
-.sidebar-more-item-danger:hover { background:rgba(242,107,91,0.06);color:var(--color-primary) }
+.sidebar-more-item-danger:hover { background:var(--color-bg-secondary, #E8E4E0);color:var(--color-text) }
 .sidebar-more-item-danger .sidebar-more-item-icon { color:var(--color-primary) }
-.sidebar-more-dropdown .sidebar-more-item:last-child { margin-bottom:20px }
+.sidebar-more-item-danger:hover .sidebar-more-item-icon { color:var(--color-text-muted) }
+
+/* Tablet sidebar: keep navigation visible until the mobile drawer breakpoint. */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --sidebar-width: 60px;
+  }
+
+  .sidebar {
+    display: block;
+    width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    overflow: visible;
+  }
+
+  .sidebar-card {
+    overflow: visible;
+  }
+
+  .sidebar .sidebar-user {
+    display: none;
+  }
+
+  .sidebar .sidebar-menu-item {
+    width: 44px;
+    justify-content: center;
+    gap: 0;
+    padding: 10px;
+    margin: 6px 8px;
+  }
+
+  .sidebar .sidebar-menu-label,
+  .sidebar .sidebar-menu-badge {
+    display: none;
+  }
+
+  .sidebar .sidebar-menu-icon {
+    margin: 0;
+  }
+
+  .sidebar-more-container {
+    position: relative;
+  }
+
+  .sidebar .sidebar-more-dropdown {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 8px);
+    width: 160px;
+    margin: 0;
+    padding: 4px 0;
+    background: var(--color-card, #FFFFFF);
+    border: 1px solid var(--color-border, #E5E5E5);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-hover);
+    z-index: 10;
+  }
+
+  .sidebar .sidebar-more-item {
+    width: 100%;
+    margin: 0;
+    padding: 10px 12px;
+  }
+
+  .btn-mobile-menu {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .btn-mobile-menu {
+    display: flex;
+  }
+}
 
 /* Sidebar overlay + dialog */
 .sidebar-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;animation:overlayFadeIn 0.2s ease }
@@ -10710,7 +10785,6 @@ p {
 /* Dark mode dialogs */
 [data-theme="dark"] .sidebar-dialog { background:#242424 }
 [data-theme="dark"] .sidebar-dialog-input { background:#1A1A1A;border-color:#333;color:#E8E8E8 }
-[data-theme="dark"] .sidebar-more-dropdown { background:#242424 }
 [data-theme="dark"] #page-user .more-dropdown { background:#242424;box-shadow:0 8px 30px rgba(0,0,0,0.3) }
 
 /* Settings page responsive */

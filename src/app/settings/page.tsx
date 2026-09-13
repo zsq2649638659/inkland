@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/notificationPreferences";
 
 type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+export type SettingsSection = "privacy" | "profile" | "about" | "contact";
 
 function parseSettingsTab(value: string | null): SettingsTab | null {
   return value === "account" || value === "profile" || value === "password" || value === "blocked" || value === "notifications" || value === "about" || value === "contact"
@@ -29,22 +30,32 @@ function parseSettingsTab(value: string | null): SettingsTab | null {
     : null;
 }
 
-function initialSettingsTab(): SettingsTab {
-  if (typeof window === "undefined") return "account";
-  return parseSettingsTab(new URLSearchParams(window.location.search).get("tab")) || "account";
-}
+const profileSettingsTabKeys: SettingsTab[] = ["account", "profile", "password"];
 
 const siteContactEmail = "inkland@163.com";
 
 type BlockedUserRow = { id: string; blocked_user_id: string; created_at: string };
 type BlockedProfileRow = { id: string; nickname: string | null; bio: string | null };
 
-export default function SettingsPage() {
+function isTabForSection(tab: SettingsTab | null, section: SettingsSection): tab is SettingsTab {
+  if (!tab) return false;
+  if (section === "profile") return profileSettingsTabKeys.includes(tab);
+  if (section === "privacy") return tab === "blocked" || tab === "notifications";
+  return tab === section;
+}
+
+function defaultTabForSection(section: SettingsSection): SettingsTab {
+  if (section === "profile") return "account";
+  if (section === "about") return "about";
+  if (section === "contact") return "contact";
+  return "blocked";
+}
+
+function SettingsPageContent({ section }: { section: SettingsSection }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialSettingsTab);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
@@ -66,12 +77,8 @@ export default function SettingsPage() {
   const [notificationSaving, setNotificationSaving] = useState(false);
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
-
-  useEffect(() => {
-    const requested = parseSettingsTab(searchParams.get("tab"));
-    if (!requested) return;
-    void Promise.resolve().then(() => setActiveTab(requested));
-  }, [searchParams]);
+  const requestedTab = parseSettingsTab(searchParams.get("tab"));
+  const activeTab = isTabForSection(requestedTab, section) ? requestedTab : defaultTabForSection(section);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -90,7 +97,7 @@ export default function SettingsPage() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || activeTab !== "blocked") return;
+    if (!user || section !== "privacy" || activeTab !== "blocked") return;
     let active = true;
     void Promise.resolve().then(() => {
       if (active) setBlockedLoading(true);
@@ -122,17 +129,27 @@ export default function SettingsPage() {
       setBlockedLoading(false);
     })();
     return () => { active = false; };
-  }, [activeTab, supabase, user]);
+  }, [activeTab, section, supabase, user]);
 
-  const tabs: { key: SettingsTab; label: string }[] = [
-    { key: "account", label: "账号设置" },
-    { key: "profile", label: "编辑资料" },
-    { key: "password", label: "修改密码" },
-    { key: "blocked", label: "屏蔽管理" },
-    { key: "notifications", label: "通知设置" },
-    { key: "about", label: "关于我们" },
-    { key: "contact", label: "联系我们" },
-  ];
+  const profileSettings = section === "profile";
+  const moreSettings = section === "about" || section === "contact";
+  const tabs: { key: SettingsTab; label: string }[] = profileSettings
+    ? [
+      { key: "account", label: "账号设置" },
+      { key: "profile", label: "编辑资料" },
+      { key: "password", label: "修改密码" },
+    ]
+    : moreSettings
+      ? []
+      : [
+        { key: "blocked", label: "屏蔽管理" },
+        { key: "notifications", label: "通知设置" },
+      ];
+
+  const getTabHref = (tab: SettingsTab) => {
+    const basePath = section === "profile" ? "/profile-settings" : "/settings";
+    return `${basePath}?tab=${tab}`;
+  };
 
   if (authLoading) {
     return (
@@ -258,33 +275,31 @@ export default function SettingsPage() {
         <HomeSidebar />
 
         <div className="content-area">
-          {/* Page Header */}
-          <div className="page-header">
-            <h1 className="page-title">我的设置</h1>
-          </div>
-
           {/* Tab Bar */}
-          <div className="tabs-wrapper">
-            <div className="tabs-inner">
-              {tabs.map((t) => (
-                <button
-                  key={t.key}
-                  className={`tab-btn${activeTab === t.key ? " active" : ""}`}
-                  onClick={() => setActiveTab(t.key)}
-                >
-                  {t.label}
-                </button>
-              ))}
+          {tabs.length > 0 && (
+            <div className="tabs-wrapper">
+              <div className="tabs-inner">
+                {tabs.map((t) => (
+                  <Link
+                    key={t.key}
+                    href={getTabHref(t.key)}
+                    scroll={false}
+                    className={`tab-btn${activeTab === t.key ? " active" : ""}`}
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ---- Panel: 账号设置 ---- */}
-          <div style={{ display: activeTab === "account" ? "block" : "none" }}>
+          <div style={{ display: profileSettings && activeTab === "account" ? "block" : "none" }}>
             <AccountSettingsPanel />
           </div>
 
           {/* ---- Panel: 编辑资料 ---- */}
-          <section className="settings-panel" style={{ display: activeTab === "profile" ? "block" : "none" }}>
+          <section className="settings-panel" style={{ display: profileSettings && activeTab === "profile" ? "block" : "none" }}>
             <h2 className="settings-panel-title">编辑资料</h2>
             <p className="settings-panel-desc">修改你在 Inkland 展示的头像、昵称和个人简介。</p>
             <div id="page-profile-edit" className="profile-edit-content">
@@ -297,7 +312,7 @@ export default function SettingsPage() {
             className="settings-panel"
             autoComplete="off"
             onSubmit={(event) => { event.preventDefault(); void handlePasswordChange(); }}
-            style={{ display: activeTab === "password" ? "block" : "none" }}
+            style={{ display: profileSettings && activeTab === "password" ? "block" : "none" }}
           >
             <h2 className="settings-panel-title">修改密码</h2>
             <p className="settings-panel-desc">请设置一个强密码，建议包含大小写字母、数字和特殊字符。</p>
@@ -329,7 +344,7 @@ export default function SettingsPage() {
           </form>
 
           {/* ---- Panel: 屏蔽管理 (user card grid, 2 columns) ---- */}
-          <div className="settings-panel" style={{ display: activeTab === "blocked" ? "block" : "none" }}>
+          <div className="settings-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "blocked" ? "block" : "none" }}>
             <div className="user-cards-grid">
               {blockedLoading ? <p className="text-sm text-muted">正在加载…</p> : blockedUsers.map((u) => (
                 <div className="user-card" key={u.id}>
@@ -359,7 +374,7 @@ export default function SettingsPage() {
           </div>
 
           {/* ---- Panel: 通知设置 ---- */}
-          <div className="settings-panel" style={{ display: activeTab === "notifications" ? "block" : "none" }}>
+          <div className="settings-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "notifications" ? "block" : "none" }}>
             <h2 className="settings-panel-title">通知设置</h2>
             <p className="settings-panel-desc">只显示你希望接收的站内消息；设置会同步到当前账号。</p>
 
@@ -394,7 +409,7 @@ export default function SettingsPage() {
           </div>
 
           {/* ---- Panel: 关于我们 ---- */}
-          <div className="settings-panel" style={{ display: activeTab === "about" ? "block" : "none" }}>
+          <div className="settings-panel" style={{ display: moreSettings && activeTab === "about" ? "block" : "none" }}>
             {/* Logo + description — left-right layout */}
             <div className="settings-about-header">
               <div className="settings-about-logo-icon" />
@@ -448,7 +463,7 @@ export default function SettingsPage() {
           </div>
 
           {/* ---- Panel: 联系我们 ---- */}
-          <div className="settings-panel" style={{ display: activeTab === "contact" ? "block" : "none" }}>
+          <div className="settings-panel" style={{ display: moreSettings && activeTab === "contact" ? "block" : "none" }}>
             <h2 className="settings-panel-title">联系我们</h2>
             <p className="settings-panel-desc">有任何问题或建议？欢迎通过反馈表联系我们，也可以直接发送邮件。</p>
 
@@ -523,4 +538,16 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
+
+export function SettingsSectionPage({ section }: { section: SettingsSection }) {
+  return (
+    <Suspense fallback={<div className="feed-empty-state" role="status">正在加载设置…</div>}>
+      <SettingsPageContent section={section} />
+    </Suspense>
+  );
+}
+
+export default function SettingsPage() {
+  return <SettingsSectionPage section="privacy" />;
 }

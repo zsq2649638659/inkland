@@ -101,7 +101,7 @@ export default function DiscoverPage() {
               <h1 className="page-title">兴趣发现</h1>
               <p className="settings-panel-desc">内容来自你主动选择的兴趣，不会替换首页的关注流。</p>
             </div>
-            <Link className="btn-ghost" href="/settings?tab=account">修改兴趣</Link>
+            <Link className="btn-ghost" href="/profile-settings">修改兴趣</Link>
           </div>
 
           {preferences && (preferences.domains.length > 0 || preferences.original_works.length > 0 || preferences.dimensions.length > 0) && (
@@ -116,9 +116,9 @@ export default function DiscoverPage() {
           {(terms.length > 0 || domains.length > 0) && posts === null ? (
             <div className="feed-empty-state" role="status">正在匹配内容…</div>
           ) : !preferences || (preferences.domains.length === 0 && preferences.original_works.length === 0 && preferences.dimensions.length === 0) ? (
-            <EmptyState icon="fa-compass" title="还没有选择兴趣" description="选择感兴趣的内容后，这里会展示对应发现。" actionLabel="设置兴趣" actionHref="/settings?tab=account" />
+            <EmptyState icon="fa-compass" title="还没有选择兴趣" description="选择感兴趣的内容后，这里会展示对应发现。" actionLabel="设置兴趣" actionHref="/profile-settings" />
           ) : posts?.length === 0 ? (
-            <EmptyState icon="fa-compass" title="暂时没有匹配内容" description="可以修改兴趣选择，或稍后再来看看。" actionLabel="修改兴趣" actionHref="/settings?tab=account" />
+            <EmptyState icon="fa-compass" title="暂时没有匹配内容" description="可以修改兴趣选择，或稍后再来看看。" actionLabel="修改兴趣" actionHref="/profile-settings" />
           ) : (
             <div className="interest-discover-grid">
               {posts?.map((post) => (

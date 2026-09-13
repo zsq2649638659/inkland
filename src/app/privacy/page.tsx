@@ -9,7 +9,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://inkland-navy.vercel
 export default function PrivacyPage() {
   return (
     <main className="legal-page-shell">
-      <Link href="/settings" className="legal-back-link">← 返回设置</Link>
+      <Link href="/settings" className="legal-back-link">← 返回设置和隐私</Link>
       <article className="legal-document">
         <p className="legal-kicker">INKLAND 隐私说明</p>
         <h1>inkland 隐私政策</h1>
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
         <p>本平台使用 Supabase 提供身份认证、数据库和文件存储基础设施，Supabase 项目主要部署区域为{dataRegion}。相关信息可能由该服务商在其实际运营的数据中心及必要的内容分发节点处理。我们会通过访问控制、权限策略、传输加密、最小化权限和安全日志等措施降低未经授权访问、泄露、篡改或丢失的风险。</p>
         <p>由于 Supabase 项目主要部署在日本东京，您在本平台提交的账号、作品、评论、图片及相关日志信息，可能被传输、存储或在中华人民共和国境外处理。我们会按照适用法律履行相应的告知、授权同意、安全保障和个人信息跨境提供义务；如法律要求取得单独同意，我们会在相关功能或流程中另行向您说明并取得同意。</p>
         <p>我们仅在实现服务、保障安全、处理争议和履行法定义务所必需的期限内保存信息。账号注销或您删除内容后，在线展示会按产品功能处理；由于备份、审计、争议处理或法律要求，部分副本可能在合理期限内保留，期满后删除或匿名化。</p>
-        <p>批量导入页面不会另建搬家草稿箱。选择保存到草稿箱后，内容会直接进入创作中心的普通草稿，并适用普通作品的保存与删除规则；选择立即发布或定时发布时，内容会进入现有审核和发布流程。</p>
+        <p>批量导入页面不会另建搬家草稿箱。选择保存到草稿箱后，内容会直接进入作品管理的普通草稿，并适用普通作品的保存与删除规则；选择立即发布或定时发布时，内容会进入现有审核和发布流程。</p>
         <p>请注意，任何互联网传输和存储都不能保证绝对安全。若发生可能影响您权益的个人信息安全事件，我们会依法采取补救措施，并按要求向您告知。</p>
 
         <h2>五、信息共享、委托处理与公开</h2>

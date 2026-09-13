@@ -2,7 +2,8 @@
 import SiteIcon from "@/components/SiteIcon";
 import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegistry";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -15,7 +16,7 @@ import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { getOrCreateClientCache, readClientCache } from "@/lib/client-cache";
 
-export default function MobileDrawer() {
+function MobileDrawerContent() {
   const { open, closeDrawer } = useMobileDrawer();
   const { user, profile, loading: authLoading } = useAuth();
   const pathname = usePathname();
@@ -80,14 +81,21 @@ export default function MobileDrawer() {
   const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/" },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-    { page: "profile", icon: "fa-circle-user", label: "个人中心", href: "/profile" },
-    { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
-    { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
+    { page: "profile", icon: "fa-profile-center", label: "我的空间", href: "/profile" },
+    { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
+    { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
+    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
   ];
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
+    if (page === "profile-settings") return pathname === "/profile-settings";
+    if (page === "relationships") return pathname === "/relationships" || pathname.startsWith("/relationships/");
+    if (page === "profile") return pathname === "/profile";
+    if (page === "settings") return pathname === "/settings";
+    if (page === "more") return pathname === "/about" || pathname === "/contact";
     return pathname.startsWith(`/${page}`);
   };
 
@@ -225,7 +233,7 @@ export default function MobileDrawer() {
                 onClick={() => handleNav(item.href)}
               >
                 <span className="sidebar-menu-icon">
-                  <InklandIcon name={item.icon} variant={pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`)) ? "solid" : "outline"} />
+                  <InklandIcon name={item.icon} variant={isActive(item.page) ? "solid" : "outline"} />
                 </span>
                 <span className="sidebar-menu-label">{item.label}</span>
                 {"badge" in item && (item.badge as number) > 0 && (
@@ -236,31 +244,15 @@ export default function MobileDrawer() {
               </button>
             ))}
 
-            {/* Theme toggle */}
-            <button
-              className="sidebar-menu-item text-left"
-              onClick={() => {
-                const current = document.documentElement.getAttribute("data-theme");
-                const next = current === "dark" ? "light" : "dark";
-                document.documentElement.setAttribute("data-theme", next);
-                localStorage.setItem("theme", next);
-              }}
-            >
-              <span className="sidebar-menu-icon">
-                <SiteIcon name="fa-moon" variant="solid" />
-              </span>
-              <span className="sidebar-menu-label">日夜模式</span>
-            </button>
-
             {/* Settings link */}
             <button
-              className={`sidebar-menu-item text-left ${pathname.startsWith("/settings") ? "active" : ""}`}
+              className={`sidebar-menu-item text-left ${isActive("settings") ? "active" : ""}`}
               onClick={() => handleNav("/settings")}
             >
               <span className="sidebar-menu-icon">
                 <SiteIcon name="fa-gear" variant="solid" />
               </span>
-              <span className="sidebar-menu-label">设置</span>
+              <span className="sidebar-menu-label">设置和隐私</span>
             </button>
 
             {/* More actions */}
@@ -276,11 +268,38 @@ export default function MobileDrawer() {
               <span className="sidebar-menu-label">更多</span>
             </button>
 
-            {moreOpen && (
-              <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "4px" }}>
+            {(moreOpen || isActive("more")) && (
+              <div className="sidebar-more-dropdown">
+                <Link
+                  href="/about"
+                  className={`sidebar-more-item no-underline ${pathname === "/about" ? "active" : ""}`}
+                  onClick={() => { setMoreOpen(false); closeDrawer(); }}
+                >
+                  <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
+                  关于我们
+                </Link>
+                <Link
+                  href="/contact"
+                  className={`sidebar-more-item no-underline ${pathname === "/contact" ? "active" : ""}`}
+                  onClick={() => { setMoreOpen(false); closeDrawer(); }}
+                >
+                  <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
+                  联系我们
+                </Link>
                 <button
                   className="sidebar-more-item"
-                  style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
+                  onClick={() => {
+                    const current = document.documentElement.getAttribute("data-theme");
+                    const next = current === "dark" ? "light" : "dark";
+                    document.documentElement.setAttribute("data-theme", next);
+                    localStorage.setItem("theme", next);
+                  }}
+                >
+                  <span className="sidebar-more-item-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
+                  日夜模式
+                </button>
+                <button
+                  className="sidebar-more-item"
                   onClick={() => { setMoreOpen(false); setShowLogout(true); }}
                 >
                   <span className="sidebar-more-item-icon"><SiteIcon name="fa-right-from-bracket" variant="solid" /></span>
@@ -288,7 +307,6 @@ export default function MobileDrawer() {
                 </button>
                 <button
                   className="sidebar-more-item sidebar-more-item-danger"
-                  style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-primary)", display: "flex", alignItems: "center", gap: "10px" }}
                   onClick={() => { setMoreOpen(false); setShowDeleteAccount(true); }}
                 >
                   <span className="sidebar-more-item-icon"><SiteIcon name="fa-trash-can" variant="solid" /></span>
@@ -391,5 +409,13 @@ export default function MobileDrawer() {
       {createPortal(drawerContent, document.body)}
       {createPortal(popupContent, document.body)}
     </>
+  );
+}
+
+export default function MobileDrawer() {
+  return (
+    <Suspense fallback={null}>
+      <MobileDrawerContent />
+    </Suspense>
   );
 }

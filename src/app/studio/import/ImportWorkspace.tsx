@@ -1791,7 +1791,7 @@ export default function ImportWorkspace() {
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>立即发布</strong></span><span className="collection-option-desc">提交审核，审核通过后公开</span></span>
                     </button>
                     <button type="button" className={`collection-option ${publishMode === "draft" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "draft"} disabled={busy || publishComplete} onClick={() => setPublishMode("draft")}>
-                      <span className="collection-option-copy"><span className="collection-option-text"><strong>保存到草稿箱</strong></span><span className="collection-option-desc">稍后在创作中心继续编辑</span></span>
+                      <span className="collection-option-copy"><span className="collection-option-text"><strong>保存到草稿箱</strong></span><span className="collection-option-desc">稍后在作品管理中继续编辑</span></span>
                     </button>
                     <button type="button" className={`collection-option ${publishMode === "schedule" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "schedule"} disabled={busy || publishComplete} onClick={() => setPublishMode("schedule")}>
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>定时发布</strong></span><span className="collection-option-desc">提交审核，通过后按设定时间公开</span></span>
@@ -1828,7 +1828,7 @@ export default function ImportWorkspace() {
                       <p className={styles.workMsg}>{result.message}</p>
                     </li>)}
                   </ul>
-                  {publishComplete && <div className={styles.resultActions}>{publishFailedCount > 0 && <button type="button" className={styles.secondaryButton} onClick={() => void publishSelectedWorks({ retryFailedOnly: true })}>重试失败内容</button>}<button type="button" className={styles.secondaryButton} onClick={resetImport}>继续导入</button><Link href="/studio" className={styles.primaryButton}>查看创作中心</Link></div>}
+                  {publishComplete && <div className={styles.resultActions}>{publishFailedCount > 0 && <button type="button" className={styles.secondaryButton} onClick={() => void publishSelectedWorks({ retryFailedOnly: true })}>重试失败内容</button>}<button type="button" className={styles.secondaryButton} onClick={resetImport}>继续导入</button><Link href="/studio" className={styles.primaryButton}>查看作品管理</Link></div>}
                 </section>
               </div>}
           </section>

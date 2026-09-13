@@ -2,7 +2,7 @@
 import SiteIcon from "@/components/SiteIcon";
 import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegistry";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -47,7 +47,7 @@ function saveCachedStats(userId: string, stats: SidebarStats) {
   } catch { /* ignore unavailable session storage */ }
 }
 
-export default function HomeSidebar() {
+function HomeSidebarContent() {
   const supabase = useMemo(() => createClient(), []);
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -156,6 +156,11 @@ export default function HomeSidebar() {
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
+    if (page === "profile-settings") return pathname === "/profile-settings";
+    if (page === "relationships") return pathname === "/relationships" || pathname.startsWith("/relationships/");
+    if (page === "profile") return pathname === "/profile";
+    if (page === "settings") return pathname === "/settings";
+    if (page === "more") return pathname === "/about" || pathname === "/contact";
     return pathname.startsWith(`/${page}`);
   };
 
@@ -169,22 +174,26 @@ export default function HomeSidebar() {
   const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/", badge: newWorksCount },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-    { page: "profile", icon: "fa-circle-user", label: "个人中心", href: "/profile" },
-    { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
-    { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
+    { page: "profile", icon: "fa-profile-center", label: "我的空间", href: "/profile" },
+    { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
+    { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
+    { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
   ];
 
   // 只有首次鉴权还没完成时才替换成骨架。
   // 页面之间切换时，侧栏会重新挂载，但用户信息应立即保留，统计数据在后台更新即可。
   if (authLoading) {
-    const loadingMenuItems: Array<{ icon: InklandIconName; label: string; href: string }> = [
-      { icon: "fa-house", label: "首页", href: "/" },
-      { icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-      { icon: "fa-circle-user", label: "个人中心", href: "/profile" },
-      { icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
-      { icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
-      { icon: "fa-bell", label: "我的消息", href: "/notifications" },
+    const loadingMenuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string }> = [
+      { page: "home", icon: "fa-house", label: "首页", href: "/" },
+      { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
+      { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications" },
+      { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
+      { page: "profile", icon: "fa-profile-center", label: "我的空间", href: "/profile" },
+      { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
+      { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
+      { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
     ];
     return (
       <aside className="sidebar" aria-label="侧边导航加载中" aria-busy="true">
@@ -207,20 +216,16 @@ export default function HomeSidebar() {
             </div>
           </div>
           {loadingMenuItems.map((item) => (
-            <Link key={item.label} href={item.href} className={`sidebar-menu-item ${isActive(item.label === "首页" ? "home" : item.href.slice(1)) ? "active" : ""}`}>
-              <span className="sidebar-menu-icon"><InklandIcon name={item.icon} variant={isActive(item.label === "首页" ? "home" : item.href.slice(1)) ? "solid" : "outline"} aria-hidden="true" /></span>
+            <Link key={item.page} href={item.href} title={item.label} className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}>
+              <span className="sidebar-menu-icon"><InklandIcon name={item.icon} variant={isActive(item.page) ? "solid" : "outline"} aria-hidden="true" /></span>
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
-          <button className="sidebar-menu-item text-left" onClick={toggleTheme}>
-            <span className="sidebar-menu-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
-            <span className="sidebar-menu-label">日夜模式</span>
-          </button>
-          <Link href="/settings" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
+          <Link href="/settings" title="设置和隐私" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
             <span className="sidebar-menu-icon"><SiteIcon name="fa-gear" variant="solid" /></span>
-            <span className="sidebar-menu-label">设置</span>
+            <span className="sidebar-menu-label">设置和隐私</span>
           </Link>
-          <button className="sidebar-menu-item text-left" onClick={() => setMoreOpen(!moreOpen)}>
+          <button className="sidebar-menu-item text-left" title="更多" onClick={() => setMoreOpen(!moreOpen)}>
             <span className="sidebar-menu-icon"><SiteIcon name="fa-ellipsis-circle" /></span>
             <span className="sidebar-menu-label">更多</span>
           </button>
@@ -251,6 +256,7 @@ export default function HomeSidebar() {
             <Link
               key={item.page}
               href={item.href}
+              title={item.label}
               className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}
             >
               <span className="sidebar-menu-icon">
@@ -259,10 +265,42 @@ export default function HomeSidebar() {
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
-          <button className="sidebar-menu-item text-left" onClick={toggleTheme}>
-            <span className="sidebar-menu-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
-            <span className="sidebar-menu-label">日夜模式</span>
+          <button
+            className="sidebar-menu-item text-left"
+            title="更多"
+            onClick={() => setMoreOpen(!moreOpen)}
+          >
+            <span className="sidebar-menu-icon">
+              <span className="sidebar-more-icon">
+                <SiteIcon name="fa-ellipsis-circle" />
+              </span>
+            </span>
+            <span className="sidebar-menu-label">更多</span>
           </button>
+          {(moreOpen || isActive("more")) && (
+            <div className="sidebar-more-dropdown">
+              <Link
+                href="/about"
+                className={`sidebar-more-item no-underline ${pathname === "/about" ? "active" : ""}`}
+                onClick={() => setMoreOpen(false)}
+              >
+                <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
+                关于我们
+              </Link>
+              <Link
+                href="/contact"
+                className={`sidebar-more-item no-underline ${pathname === "/contact" ? "active" : ""}`}
+                onClick={() => setMoreOpen(false)}
+              >
+                <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
+                联系我们
+              </Link>
+              <button className="sidebar-more-item" onClick={toggleTheme}>
+                <span className="sidebar-more-item-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
+                日夜模式
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     );
@@ -289,11 +327,11 @@ export default function HomeSidebar() {
           </Link>
           <div className="sidebar-user-bio">{bio}</div>
           <div className="sidebar-user-stats">
-            <Link href="/profile?tab=following" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
+            <Link href="/relationships" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
               <div className="sidebar-stat-value">{userStats.following ?? "—"}</div>
               <div className="sidebar-stat-label">关注</div>
             </Link>
-            <Link href="/profile?tab=followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
+            <Link href="/relationships/followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
               <div className="sidebar-stat-value">{userStats.followers ?? "—"}</div>
               <div className="sidebar-stat-label">粉丝</div>
             </Link>
@@ -324,17 +362,6 @@ export default function HomeSidebar() {
         </Link>
       ))}
 
-      {/* Theme toggle */}
-      <button
-        className="sidebar-menu-item text-left"
-        onClick={toggleTheme}
-      >
-        <span className="sidebar-menu-icon">
-          <SiteIcon name="fa-moon" variant="solid" />
-        </span>
-        <span className="sidebar-menu-label">日夜模式</span>
-      </button>
-
       {/* Settings link */}
       <Link
         href="/settings"
@@ -343,25 +370,50 @@ export default function HomeSidebar() {
         <span className="sidebar-menu-icon">
           <SiteIcon name="fa-gear" variant="solid" />
         </span>
-        <span className="sidebar-menu-label">设置</span>
+        <span className="sidebar-menu-label">设置和隐私</span>
       </Link>
 
       {/* More actions */}
-      <button
-        className="sidebar-menu-item text-left"
-        onClick={() => setMoreOpen(!moreOpen)}
-      >
-        <span className="sidebar-menu-icon">
-          <span className="sidebar-more-icon">
-            <SiteIcon name="fa-ellipsis-circle" />
+      <div className="sidebar-more-container">
+        <button
+          className="sidebar-menu-item text-left"
+          title="更多"
+          onClick={() => setMoreOpen(!moreOpen)}
+        >
+          <span className="sidebar-menu-icon">
+            <span className="sidebar-more-icon">
+              <SiteIcon name="fa-ellipsis-circle" />
+            </span>
           </span>
-        </span>
-        <span className="sidebar-menu-label">更多</span>
-      </button>
+          <span className="sidebar-menu-label">更多</span>
+        </button>
 
-      {/* More dropdown */}
-      {moreOpen && (
-        <div className="sidebar-more-dropdown">
+        {/* More dropdown */}
+        {(moreOpen || isActive("more")) && (
+          <div className="sidebar-more-dropdown">
+          <Link
+            href="/about"
+            className={`sidebar-more-item no-underline ${pathname === "/about" ? "active" : ""}`}
+            onClick={() => setMoreOpen(false)}
+          >
+            <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
+            关于我们
+          </Link>
+          <Link
+            href="/contact"
+            className={`sidebar-more-item no-underline ${pathname === "/contact" ? "active" : ""}`}
+            onClick={() => setMoreOpen(false)}
+          >
+            <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
+            联系我们
+          </Link>
+          <button
+            className="sidebar-more-item"
+            onClick={toggleTheme}
+          >
+            <span className="sidebar-more-item-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
+            日夜模式
+          </button>
           <button
             className="sidebar-more-item"
             onClick={() => { setMoreOpen(false); setShowLogout(true); }}
@@ -376,8 +428,9 @@ export default function HomeSidebar() {
             <span className="sidebar-more-item-icon"><SiteIcon name="fa-trash-can" variant="solid" /></span>
             注销账户
           </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
       </div>
     </aside>
 
@@ -455,5 +508,13 @@ export default function HomeSidebar() {
         document.body
       )}
     </>
+  );
+}
+
+export default function HomeSidebar() {
+  return (
+    <Suspense fallback={null}>
+      <HomeSidebarContent />
+    </Suspense>
   );
 }

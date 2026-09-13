@@ -12,7 +12,7 @@ export const metadata = {
 export default function CopyrightPage() {
   return (
     <main className="legal-page-shell">
-      <Link href="/settings?tab=account" className="legal-back-link">← 返回账号设置</Link>
+      <Link href="/profile-settings" className="legal-back-link">← 返回个人资料</Link>
       <article className="legal-document">
         <p className="legal-kicker">INKLAND 作品说明</p>
         <h1>作品版权说明</h1>

@@ -1010,7 +1010,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           <div className="create-success-dialog">
             <span className="create-success-icon"><SiteIcon name="fa-check" variant="solid" /></span>
             <strong>操作成功</strong>
-            <p>{successMsg}{successAction === "publish" && <><br />即将返回{editPostId ? "创作中心" : "首页"}</>}</p>
+            <p>{successMsg}{successAction === "publish" && <><br />即将返回{editPostId ? "作品管理" : "首页"}</>}</p>
             {successAction !== "publish" && (
               <button type="button" onClick={() => {
                 setSuccessMsg("");
