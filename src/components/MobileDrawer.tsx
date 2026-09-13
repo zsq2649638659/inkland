@@ -86,13 +86,13 @@ function MobileDrawerContent() {
     { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
     { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
-    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships?tab=following" },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
   ];
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
     if (page === "profile-settings") return pathname === "/profile-settings";
-    if (page === "relationships") return pathname === "/relationships";
+    if (page === "relationships") return pathname === "/relationships" || pathname.startsWith("/relationships/");
     if (page === "profile") return pathname === "/profile";
     if (page === "settings") return pathname === "/settings";
     if (page === "more") return pathname === "/about" || pathname === "/contact";

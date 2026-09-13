@@ -157,7 +157,7 @@ function HomeSidebarContent() {
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
     if (page === "profile-settings") return pathname === "/profile-settings";
-    if (page === "relationships") return pathname === "/relationships";
+    if (page === "relationships") return pathname === "/relationships" || pathname.startsWith("/relationships/");
     if (page === "profile") return pathname === "/profile";
     if (page === "settings") return pathname === "/settings";
     if (page === "more") return pathname === "/about" || pathname === "/contact";
@@ -179,7 +179,7 @@ function HomeSidebarContent() {
     { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
     { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
-    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships?tab=following" },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
   ];
 
   // 只有首次鉴权还没完成时才替换成骨架。
@@ -193,7 +193,7 @@ function HomeSidebarContent() {
       { page: "studio", icon: "fa-pen-to-square", label: "作品管理", href: "/studio" },
       { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications" },
       { page: "profile-settings", icon: "fa-profile-settings", label: "个人资料", href: "/profile-settings" },
-      { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships?tab=following" },
+      { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/relationships" },
     ];
     return (
       <aside className="sidebar" aria-label="侧边导航加载中" aria-busy="true">
@@ -298,11 +298,11 @@ function HomeSidebarContent() {
           </Link>
           <div className="sidebar-user-bio">{bio}</div>
           <div className="sidebar-user-stats">
-            <Link href="/relationships?tab=following" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
+            <Link href="/relationships" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
               <div className="sidebar-stat-value">{userStats.following ?? "—"}</div>
               <div className="sidebar-stat-label">关注</div>
             </Link>
-            <Link href="/relationships?tab=followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
+            <Link href="/relationships/followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
               <div className="sidebar-stat-value">{userStats.followers ?? "—"}</div>
               <div className="sidebar-stat-label">粉丝</div>
             </Link>

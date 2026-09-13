@@ -146,9 +146,9 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
         { key: "notifications", label: "通知设置" },
       ];
 
-  const handleTabChange = (tab: SettingsTab) => {
+  const getTabHref = (tab: SettingsTab) => {
     const basePath = section === "profile" ? "/profile-settings" : "/settings";
-    router.replace(`${basePath}?tab=${tab}`, { scroll: false });
+    return `${basePath}?tab=${tab}`;
   };
 
   const pageTitle = profileSettings
@@ -293,13 +293,14 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
             <div className="tabs-wrapper">
               <div className="tabs-inner">
                 {tabs.map((t) => (
-                  <button
+                  <Link
                     key={t.key}
+                    href={getTabHref(t.key)}
+                    scroll={false}
                     className={`tab-btn${activeTab === t.key ? " active" : ""}`}
-                    onClick={() => handleTabChange(t.key)}
                   >
                     {t.label}
-                  </button>
+                  </Link>
                 ))}
               </div>
             </div>

@@ -525,6 +525,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   ];
 
   const showFilters = tab === "works" || tab === "likes" || tab === "bookmarks";
+  const relationshipPage = defaultTab === "following" || defaultTab === "followers";
 
   // “全部”需要把长篇、单篇和图片放进同一个时间序列，而不是按卡片类型分组。
   const profilePageTotal = (() => {
@@ -667,8 +668,16 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
           ) : (
             <div className="segmented-tabs segmented-tabs--relations">
               <div className="segmented-tabs-left">
-                <button className={`segmented-tab${tab === "following" ? " active" : ""}`} onClick={() => setTab("following")}><span className="my-prefix">我的</span>关注</button>
-                <button className={`segmented-tab${tab === "followers" ? " active" : ""}`} onClick={() => setTab("followers")}><span className="my-prefix">我的</span>粉丝</button>
+                {relationshipPage ? (
+                  <Link href="/relationships" className={`segmented-tab${tab === "following" ? " active" : ""}`}><span className="my-prefix">我的</span>关注</Link>
+                ) : (
+                  <button className={`segmented-tab${tab === "following" ? " active" : ""}`} onClick={() => setTab("following")}><span className="my-prefix">我的</span>关注</button>
+                )}
+                {relationshipPage ? (
+                  <Link href="/relationships/followers" className={`segmented-tab${tab === "followers" ? " active" : ""}`}><span className="my-prefix">我的</span>粉丝</Link>
+                ) : (
+                  <button className={`segmented-tab${tab === "followers" ? " active" : ""}`} onClick={() => setTab("followers")}><span className="my-prefix">我的</span>粉丝</button>
+                )}
               </div>
             </div>
           )}
