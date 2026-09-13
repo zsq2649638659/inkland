@@ -2240,14 +2240,8 @@ p {
   list-style: none;
 }
 
-#page-notifications .notification-list-entry:not(:last-child)::after {
-  position: absolute;
-  right: var(--ink-notification-divider-trailing);
-  bottom: 0;
-  left: var(--ink-notification-divider-leading);
-  height: var(--ink-border-width-thin);
-  background: var(--ink-notification-divider);
-  content: "";
+#page-notifications .notification-list-entry::after {
+  display: none;
 }
 
 #page-notifications .notification-list-item {
@@ -2373,11 +2367,6 @@ p {
     padding: var(--ink-notification-tablet-row-padding-block) var(--ink-notification-tablet-row-padding-inline);
   }
 
-  #page-notifications .notification-list-entry:not(:last-child)::after {
-    left: var(--ink-notification-tablet-divider-leading);
-    right: var(--ink-notification-tablet-row-padding-inline);
-  }
-
   #page-notifications .notification-list-icon {
     width: var(--ink-notification-tablet-icon-size);
     height: var(--ink-notification-tablet-icon-size);
@@ -2402,11 +2391,6 @@ p {
   #page-notifications .notification-list-item {
     gap: var(--ink-notification-mobile-row-gap);
     padding: var(--ink-notification-mobile-row-padding-block) var(--ink-notification-mobile-row-padding-inline);
-  }
-
-  #page-notifications .notification-list-entry:not(:last-child)::after {
-    left: var(--ink-notification-mobile-divider-leading);
-    right: var(--ink-notification-mobile-divider-trailing);
   }
 
   #page-notifications .notification-list-icon {

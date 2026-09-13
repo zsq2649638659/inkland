@@ -490,11 +490,12 @@ export default function NotificationsPage() {
 
   const interactionNotifications = notifications.filter((notification) => notification.type !== "system");
   const systemNotifications = notifications.filter((notification) => notification.type === "system");
-  const renderNotificationGroup = (label: string, items: NotificationItem[], ariaLabel: string) => {
+  const renderNotificationGroup = (items: NotificationItem[], ariaLabel: string, label?: string) => {
     if (items.length === 0) return null;
+    const headingId = label ? "notification-group-system" : undefined;
     return (
-      <section className="notification-list-group" aria-labelledby={`notification-group-${label === "互动通知" ? "interaction" : "system"}`}>
-        <h2 id={`notification-group-${label === "互动通知" ? "interaction" : "system"}`} className="notification-list-label">{label}</h2>
+      <section className="notification-list-group" aria-labelledby={headingId}>
+        {label && <h2 id={headingId} className="notification-list-label">{label}</h2>}
         <ul className="notification-list" aria-label={ariaLabel} data-composition-contract="notification.list@0.1">
           {items.map(renderNotificationRow)}
         </ul>
@@ -558,8 +559,8 @@ export default function NotificationsPage() {
               </div>
             ) : (
               <div className="notification-list-stack" data-composition-contract="notification.list@0.1" data-composition-dependencies="List Icon Link Typography">
-                {renderNotificationGroup("互动通知", interactionNotifications, "通知中心互动消息")}
-                {renderNotificationGroup("系统通知", systemNotifications, "通知中心系统消息")}
+                {renderNotificationGroup(interactionNotifications, "通知中心互动消息")}
+                {renderNotificationGroup(systemNotifications, "通知中心系统消息", "系统通知")}
               </div>
             )}
           </div>
