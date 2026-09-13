@@ -152,7 +152,7 @@ function MobileDrawerContent() {
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
-            padding: "16px 20px",
+            padding: "16px 20px 0 0",
           }}
         >
           <button
@@ -178,7 +178,7 @@ function MobileDrawerContent() {
         </div>
 
         {/* Body */}
-        <div className="mobile-drawer-body" style={{ flex: 1, padding: "12px 0" }}>
+        <div className="mobile-drawer-body" style={{ flex: 1 }}>
           {/* User section — 与参考设计保持一致的 sidebar-user 垂直居中布局 */}
           {authLoading ? (
             <div className="sidebar-user" aria-busy="true">

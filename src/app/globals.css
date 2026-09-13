@@ -6897,9 +6897,9 @@ p {
 
 /* ===== Mobile Drawer Body ===== */
 .mobile-drawer-body .sidebar-user {
-  padding: 16px 20px 20px;
-  border-bottom: 1px solid var(--color-border, #E5E5E5);
-  margin-bottom: 8px;
+  padding: 0 20px 10px;
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
 /* ===== Responsive ===== */
