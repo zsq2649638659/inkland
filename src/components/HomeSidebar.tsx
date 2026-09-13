@@ -216,16 +216,16 @@ function HomeSidebarContent() {
             </div>
           </div>
           {loadingMenuItems.map((item) => (
-            <Link key={item.page} href={item.href} className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}>
+            <Link key={item.page} href={item.href} title={item.label} className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}>
               <span className="sidebar-menu-icon"><InklandIcon name={item.icon} variant={isActive(item.page) ? "solid" : "outline"} aria-hidden="true" /></span>
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
-          <Link href="/settings" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
+          <Link href="/settings" title="设置和隐私" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
             <span className="sidebar-menu-icon"><SiteIcon name="fa-gear" variant="solid" /></span>
             <span className="sidebar-menu-label">设置和隐私</span>
           </Link>
-          <button className="sidebar-menu-item text-left" onClick={() => setMoreOpen(!moreOpen)}>
+          <button className="sidebar-menu-item text-left" title="更多" onClick={() => setMoreOpen(!moreOpen)}>
             <span className="sidebar-menu-icon"><SiteIcon name="fa-ellipsis-circle" /></span>
             <span className="sidebar-menu-label">更多</span>
           </button>
@@ -256,6 +256,7 @@ function HomeSidebarContent() {
             <Link
               key={item.page}
               href={item.href}
+              title={item.label}
               className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}
             >
               <span className="sidebar-menu-icon">
@@ -266,6 +267,7 @@ function HomeSidebarContent() {
           ))}
           <button
             className="sidebar-menu-item text-left"
+            title="更多"
             onClick={() => setMoreOpen(!moreOpen)}
           >
             <span className="sidebar-menu-icon">
@@ -372,21 +374,23 @@ function HomeSidebarContent() {
       </Link>
 
       {/* More actions */}
-      <button
-        className="sidebar-menu-item text-left"
-        onClick={() => setMoreOpen(!moreOpen)}
-      >
-        <span className="sidebar-menu-icon">
-          <span className="sidebar-more-icon">
-            <SiteIcon name="fa-ellipsis-circle" />
+      <div className="sidebar-more-container">
+        <button
+          className="sidebar-menu-item text-left"
+          title="更多"
+          onClick={() => setMoreOpen(!moreOpen)}
+        >
+          <span className="sidebar-menu-icon">
+            <span className="sidebar-more-icon">
+              <SiteIcon name="fa-ellipsis-circle" />
+            </span>
           </span>
-        </span>
-        <span className="sidebar-menu-label">更多</span>
-      </button>
+          <span className="sidebar-menu-label">更多</span>
+        </button>
 
-      {/* More dropdown */}
-      {(moreOpen || isActive("more")) && (
-        <div className="sidebar-more-dropdown">
+        {/* More dropdown */}
+        {(moreOpen || isActive("more")) && (
+          <div className="sidebar-more-dropdown">
           <Link
             href="/about"
             className={`sidebar-more-item no-underline ${pathname === "/about" ? "active" : ""}`}
@@ -424,8 +428,9 @@ function HomeSidebarContent() {
             <span className="sidebar-more-item-icon"><SiteIcon name="fa-trash-can" variant="solid" /></span>
             注销账户
           </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
       </div>
     </aside>
 
