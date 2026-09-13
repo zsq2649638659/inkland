@@ -5,7 +5,7 @@ import { InklandIcon, type InklandIconName } from "@/components/inkland/iconRegi
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
@@ -52,6 +52,7 @@ export default function HomeSidebar() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [userStats, setUserStats] = useState<SidebarStats>(() => user ? getCachedStats(user.id) : emptyStats);
   const [notificationCount, setNotificationCount] = useState(0);
   const [newWorksCount, setNewWorksCount] = useState(0);
@@ -156,6 +157,13 @@ export default function HomeSidebar() {
 
   const isActive = (page: string) => {
     if (page === "home") return pathname === "/";
+    const settingsTab = searchParams.get("tab");
+    const profileSettingsTabs = ["account", "profile", "password"];
+    const relationshipTabs = ["following", "followers"];
+    if (page === "profile-settings") return pathname === "/settings" && profileSettingsTabs.includes(settingsTab || "");
+    if (page === "relationships") return pathname === "/profile" && relationshipTabs.includes(settingsTab || "");
+    if (page === "profile") return pathname === "/profile" && !relationshipTabs.includes(settingsTab || "");
+    if (page === "settings") return pathname.startsWith("/settings") && !profileSettingsTabs.includes(settingsTab || "");
     return pathname.startsWith(`/${page}`);
   };
 
@@ -169,22 +177,26 @@ export default function HomeSidebar() {
   const menuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string; badge?: number }> = [
     { page: "home", icon: "fa-house", label: "首页", href: "/", badge: newWorksCount },
     { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-    { page: "profile", icon: "fa-circle-user", label: "个人中心", href: "/profile" },
+    { page: "profile", icon: "fa-profile-center", label: "个人中心", href: "/profile" },
     { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
     { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
     { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications", badge: notificationCount },
+    { page: "profile-settings", icon: "fa-circle-user", label: "个人资料", href: "/settings?tab=account" },
+    { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
   ];
 
   // 只有首次鉴权还没完成时才替换成骨架。
   // 页面之间切换时，侧栏会重新挂载，但用户信息应立即保留，统计数据在后台更新即可。
   if (authLoading) {
-    const loadingMenuItems: Array<{ icon: InklandIconName; label: string; href: string }> = [
-      { icon: "fa-house", label: "首页", href: "/" },
-      { icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
-      { icon: "fa-circle-user", label: "个人中心", href: "/profile" },
-      { icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
-      { icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
-      { icon: "fa-bell", label: "我的消息", href: "/notifications" },
+    const loadingMenuItems: Array<{ page: string; icon: InklandIconName; label: string; href: string }> = [
+      { page: "home", icon: "fa-house", label: "首页", href: "/" },
+      { page: "search", icon: "fa-magnifying-glass", label: "搜索", href: "/search" },
+      { page: "profile", icon: "fa-profile-center", label: "个人中心", href: "/profile" },
+      { page: "history", icon: "fa-clock-rotate-left", label: "阅读历史", href: "/history" },
+      { page: "studio", icon: "fa-pen-to-square", label: "创作中心", href: "/studio" },
+      { page: "notifications", icon: "fa-bell", label: "我的消息", href: "/notifications" },
+      { page: "profile-settings", icon: "fa-circle-user", label: "个人资料", href: "/settings?tab=account" },
+      { page: "relationships", icon: "fa-followers", label: "关注粉丝", href: "/profile?tab=following" },
     ];
     return (
       <aside className="sidebar" aria-label="侧边导航加载中" aria-busy="true">
@@ -207,8 +219,8 @@ export default function HomeSidebar() {
             </div>
           </div>
           {loadingMenuItems.map((item) => (
-            <Link key={item.label} href={item.href} className={`sidebar-menu-item ${isActive(item.label === "首页" ? "home" : item.href.slice(1)) ? "active" : ""}`}>
-              <span className="sidebar-menu-icon"><InklandIcon name={item.icon} variant={isActive(item.label === "首页" ? "home" : item.href.slice(1)) ? "solid" : "outline"} aria-hidden="true" /></span>
+            <Link key={item.page} href={item.href} className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}>
+              <span className="sidebar-menu-icon"><InklandIcon name={item.icon} variant={isActive(item.page) ? "solid" : "outline"} aria-hidden="true" /></span>
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
@@ -218,7 +230,7 @@ export default function HomeSidebar() {
           </button>
           <Link href="/settings" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
             <span className="sidebar-menu-icon"><SiteIcon name="fa-gear" variant="solid" /></span>
-            <span className="sidebar-menu-label">设置</span>
+            <span className="sidebar-menu-label">设置和隐私</span>
           </Link>
           <button className="sidebar-menu-item text-left" onClick={() => setMoreOpen(!moreOpen)}>
             <span className="sidebar-menu-icon"><SiteIcon name="fa-ellipsis-circle" /></span>
@@ -343,7 +355,7 @@ export default function HomeSidebar() {
         <span className="sidebar-menu-icon">
           <SiteIcon name="fa-gear" variant="solid" />
         </span>
-        <span className="sidebar-menu-label">设置</span>
+        <span className="sidebar-menu-label">设置和隐私</span>
       </Link>
 
       {/* More actions */}
@@ -362,6 +374,20 @@ export default function HomeSidebar() {
       {/* More dropdown */}
       {moreOpen && (
         <div className="sidebar-more-dropdown">
+          <button
+            className="sidebar-more-item"
+            onClick={() => { setMoreOpen(false); router.push("/settings?tab=about"); }}
+          >
+            <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
+            关于我们
+          </button>
+          <button
+            className="sidebar-more-item"
+            onClick={() => { setMoreOpen(false); router.push("/settings?tab=contact"); }}
+          >
+            <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
+            联系我们
+          </button>
           <button
             className="sidebar-more-item"
             onClick={() => { setMoreOpen(false); setShowLogout(true); }}

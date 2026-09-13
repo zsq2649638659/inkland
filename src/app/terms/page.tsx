@@ -8,7 +8,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://inkland-navy.vercel
 export default function TermsPage() {
   return (
     <main className="legal-page-shell">
-      <Link href="/settings" className="legal-back-link">← 返回设置</Link>
+      <Link href="/settings" className="legal-back-link">← 返回设置和隐私</Link>
       <article className="legal-document">
         <p className="legal-kicker">INKLAND 服务条款</p>
         <h1>inkland 用户服务协议</h1>
