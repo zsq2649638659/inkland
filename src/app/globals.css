@@ -3114,10 +3114,10 @@ p {
 .stat-card { background: var(--color-card); border-radius: var(--radius-lg); padding: 16px; position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.3s ease, box-shadow 0.3s ease; }
 .stat-card:active { transform: scale(0.97); }
 .stat-card-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 10px; }
-.stat-card-icon--total { background: var(--color-primary-light); color: var(--color-primary); }
-.stat-card-icon--published { background: #D8F0E8; color: #3B9B7B; }
-.stat-card-icon--draft { background: #F0E8D8; color: #C49B3B; }
-.stat-card-icon--rejected { background: #F0D8E0; color: #C46B7B; }
+#page-studio .stat-card-icon--total { background: var(--ink-primary-bg); color: var(--ink-primary); }
+#page-studio .stat-card-icon--published { background: var(--ink-success-bg); color: var(--ink-success); }
+#page-studio .stat-card-icon--draft { background: var(--ink-warning-bg); color: var(--ink-warning); }
+#page-studio .stat-card-icon--rejected { background: var(--ink-danger-bg); color: var(--ink-danger); }
 .stat-card-number { font-size: 32px; font-weight: 700; letter-spacing: -0.04em; color: var(--color-text); line-height: 1; }
 .stat-card-label { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
 
@@ -7966,7 +7966,7 @@ p {
   width: 100%;
   min-height: var(--ink-input-height-md);
   padding: 0 var(--ink-input-padding-inline);
-  border: var(--ink-border-none);
+  border: var(--ink-button-border-width) solid transparent;
   border-radius: var(--ink-input-border-radius);
   color: var(--ink-text);
   background: var(--ink-surface);
@@ -7974,11 +7974,11 @@ p {
   outline: var(--ink-outline-none);
 }
 #page-profile .filter-system-field .form-control:hover,
-#page-profile .filter-system-field .form-control:focus { border: var(--ink-border-none); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
+#page-profile .filter-system-field .form-control:focus { border: var(--ink-button-border-width) solid var(--ink-button-primary-border); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
 #page-profile .profile-filter-search-shell .form-control { padding-left: var(--ink-input-padding-leading); padding-right: var(--ink-input-padding-action); }
 #page-profile .profile-filter-search-clear svg { width: var(--ink-size-10); height: var(--ink-size-10); }
 #page-profile .filter-system-field .custom-select { position: relative; min-width: 0; }
-#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-border-none); border-radius: var(--ink-radius-md); color: var(--ink-text); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-button-border-width) solid transparent; border-radius: var(--ink-radius-md); color: var(--ink-text); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
 #page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible { border: var(--ink-border-none); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-none); background: var(--ink-surface); }
@@ -8007,7 +8007,7 @@ p {
   width: 100%;
   min-height: var(--ink-input-height-md);
   padding: 0 var(--ink-input-padding-inline);
-  border: var(--ink-border-none);
+  border: var(--ink-button-border-width) solid transparent;
   border-radius: var(--ink-input-border-radius);
   color: var(--ink-text-secondary);
   background: var(--ink-surface);
@@ -8016,11 +8016,11 @@ p {
 }
 #page-studio .filter-system-field .form-control::placeholder { color: var(--ink-text-secondary); opacity: 1; }
 #page-studio .filter-system-field .form-control:hover,
-#page-studio .filter-system-field .form-control:focus { border: var(--ink-border-none); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
+#page-studio .filter-system-field .form-control:focus { border: var(--ink-button-border-width) solid var(--ink-button-primary-border); background: var(--ink-surface); box-shadow: var(--ink-shadow-none); }
 #page-studio .profile-filter-search-shell .form-control { padding-left: var(--ink-input-padding-leading); padding-right: var(--ink-input-padding-action); }
 #page-studio .profile-filter-search-clear svg { width: var(--ink-size-10); height: var(--ink-size-10); }
 #page-studio .filter-system-field .custom-select { position: relative; min-width: 0; }
-#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-border-none); border-radius: var(--ink-radius-md); color: var(--ink-text-secondary); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"] { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--ink-input-height-md); gap: var(--ink-gap-compact); padding: 0 var(--ink-input-padding-inline); border: var(--ink-button-border-width) solid transparent; border-radius: var(--ink-radius-md); color: var(--ink-text-secondary); background: var(--ink-surface); font: var(--ink-font-control); text-align: left; cursor: pointer; }
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
 #page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible { border: var(--ink-border-none); outline: var(--ink-outline-none); box-shadow: var(--ink-shadow-none); background: var(--ink-surface); }
@@ -8039,7 +8039,7 @@ p {
   gap: var(--ink-gap-compact);
   min-height: var(--ink-input-height-md);
   padding: 0 var(--ink-input-padding-inline);
-  border: var(--ink-border-none);
+  border: var(--ink-button-border-width) solid transparent;
   border-radius: var(--ink-input-border-radius);
   color: var(--ink-text-secondary);
   background: var(--ink-surface);
@@ -8078,6 +8078,29 @@ p {
 #page-studio .studio-filter-drawer-actions .is-primary:hover,
 #page-studio .studio-filter-drawer-actions .is-primary:focus-visible { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-active-bg); }
 
+/* 创作中心与个人中心共享筛选工具的 hover 反馈，也与批量操作按钮保持一致。 */
+#page-profile .profile-filter-search-shell .form-control,
+#page-studio .profile-filter-search-shell .form-control,
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"],
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"],
+#page-studio .studio-toolbar-action {
+  transition: color var(--ink-motion-base) var(--ink-ease-standard), background var(--ink-motion-base) var(--ink-ease-standard), border-color var(--ink-motion-base) var(--ink-ease-standard);
+}
+
+#page-profile .profile-filter-search-shell .form-control:hover,
+#page-profile .profile-filter-search-shell .form-control:focus,
+#page-studio .profile-filter-search-shell .form-control:hover,
+#page-studio .profile-filter-search-shell .form-control:focus,
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
+#page-profile .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible,
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:hover,
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
+#page-studio .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible,
+#page-studio .studio-toolbar-action:hover,
+#page-studio .studio-toolbar-action:focus-visible {
+  border: var(--ink-button-border-width) solid var(--ink-button-primary-border);
+}
 @media (max-width: 1024px) {
   #page-studio .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #page-studio .studio-filter-search-row { display: block; }
@@ -13285,12 +13308,15 @@ p {
 .card,
 .tag-card,
 .post-card,
-.work-card,
 .stat-card,
 .collection-card,
-.user-card,
-.works-card-grid > * {
+.user-card {
   border-radius: var(--radius-card) !important;
+}
+
+.work-card,
+.works-card-grid > * {
+  border-radius: var(--radius-card);
 }
 
 /* 弹层、下拉统一中圆角 */
