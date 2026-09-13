@@ -221,10 +221,6 @@ function HomeSidebarContent() {
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
-          <button className="sidebar-menu-item text-left" onClick={toggleTheme}>
-            <span className="sidebar-menu-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
-            <span className="sidebar-menu-label">日夜模式</span>
-          </button>
           <Link href="/settings" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
             <span className="sidebar-menu-icon"><SiteIcon name="fa-gear" variant="solid" /></span>
             <span className="sidebar-menu-label">设置和隐私</span>
@@ -268,10 +264,41 @@ function HomeSidebarContent() {
               <span className="sidebar-menu-label">{item.label}</span>
             </Link>
           ))}
-          <button className="sidebar-menu-item text-left" onClick={toggleTheme}>
-            <span className="sidebar-menu-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
-            <span className="sidebar-menu-label">日夜模式</span>
+          <button
+            className="sidebar-menu-item text-left"
+            onClick={() => setMoreOpen(!moreOpen)}
+          >
+            <span className="sidebar-menu-icon">
+              <span className="sidebar-more-icon">
+                <SiteIcon name="fa-ellipsis-circle" />
+              </span>
+            </span>
+            <span className="sidebar-menu-label">更多</span>
           </button>
+          {(moreOpen || isActive("more")) && (
+            <div className="sidebar-more-dropdown">
+              <Link
+                href="/about"
+                className={`sidebar-more-item no-underline ${pathname === "/about" ? "active" : ""}`}
+                onClick={() => setMoreOpen(false)}
+              >
+                <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
+                关于我们
+              </Link>
+              <Link
+                href="/contact"
+                className={`sidebar-more-item no-underline ${pathname === "/contact" ? "active" : ""}`}
+                onClick={() => setMoreOpen(false)}
+              >
+                <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
+                联系我们
+              </Link>
+              <button className="sidebar-more-item" onClick={toggleTheme}>
+                <span className="sidebar-more-item-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
+                日夜模式
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     );
@@ -333,17 +360,6 @@ function HomeSidebarContent() {
         </Link>
       ))}
 
-      {/* Theme toggle */}
-      <button
-        className="sidebar-menu-item text-left"
-        onClick={toggleTheme}
-      >
-        <span className="sidebar-menu-icon">
-          <SiteIcon name="fa-moon" variant="solid" />
-        </span>
-        <span className="sidebar-menu-label">日夜模式</span>
-      </button>
-
       {/* Settings link */}
       <Link
         href="/settings"
@@ -387,6 +403,13 @@ function HomeSidebarContent() {
             <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
             联系我们
           </Link>
+          <button
+            className="sidebar-more-item"
+            onClick={toggleTheme}
+          >
+            <span className="sidebar-more-item-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
+            日夜模式
+          </button>
           <button
             className="sidebar-more-item"
             onClick={() => { setMoreOpen(false); setShowLogout(true); }}

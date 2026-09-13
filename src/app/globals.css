@@ -10673,21 +10673,21 @@ p {
 /* More icon — circle with three dots */
 .sidebar-more-icon { display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;position:relative }
 .sidebar-more-icon svg { width:18px;height:18px;fill:var(--color-text-muted);transition:fill .15s ease }
-.sidebar-menu-item:hover .sidebar-more-icon svg { fill:var(--color-primary) }
-.sidebar-menu-item.active .sidebar-more-icon svg { fill:#fff }
+.sidebar-menu-item:hover .sidebar-more-icon svg { fill:var(--color-text-muted) }
 
-.sidebar-more-dropdown { margin:0;padding:0;background:var(--color-card);border-radius:12px;display:flex;flex-direction:column;width:100%;align-self:stretch }
-.sidebar-more-item { display:flex;align-items:center;padding:10px 16px;font-size:14px;font-weight:500;color:var(--color-text);cursor:pointer;transition:all .15s ease;border-radius:10px;margin:6px 8px;border:none;background:transparent;font-family:var(--font-family);text-align:left;gap:14px }
+.sidebar-more-dropdown { margin:0 8px 0 32px;padding:0;background:transparent;border-radius:0;display:flex;flex-direction:column;width:calc(100% - 40px);align-self:stretch }
+.sidebar-more-item { display:flex;align-items:center;padding:10px 16px;font-size:14px;font-weight:500;color:var(--color-text);cursor:pointer;transition:all .15s ease;border-radius:10px;margin:6px 0;border:none;background:transparent;font-family:var(--font-family);text-align:left;gap:14px }
 .sidebar-more-item:hover { background:var(--color-bg-secondary, #E8E4E0);color:var(--color-text) }
 .sidebar-more-item.active { background:var(--color-primary);color:#fff;font-weight:600 }
 .sidebar-more-item.active:hover { background:var(--color-primary-hover, #E85A4A);color:#fff }
 .sidebar-more-item .sidebar-more-item-icon { font-size:15px;width:18px;text-align:center;flex-shrink:0;color:var(--color-text-muted) }
-.sidebar-more-item:hover .sidebar-more-item-icon { color:var(--color-primary) }
+.sidebar-more-item:hover .sidebar-more-item-icon { color:var(--color-text-muted) }
 .sidebar-more-item.active .sidebar-more-item-icon,
 .sidebar-more-item.active:hover .sidebar-more-item-icon { color:#fff }
 .sidebar-more-item-danger { color:var(--color-primary) }
 .sidebar-more-item-danger:hover { background:var(--color-bg-secondary, #E8E4E0);color:var(--color-text) }
 .sidebar-more-item-danger .sidebar-more-item-icon { color:var(--color-primary) }
+.sidebar-more-item-danger:hover .sidebar-more-item-icon { color:var(--color-text-muted) }
 
 /* Sidebar overlay + dialog */
 .sidebar-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;animation:overlayFadeIn 0.2s ease }
@@ -10711,7 +10711,6 @@ p {
 /* Dark mode dialogs */
 [data-theme="dark"] .sidebar-dialog { background:#242424 }
 [data-theme="dark"] .sidebar-dialog-input { background:#1A1A1A;border-color:#333;color:#E8E8E8 }
-[data-theme="dark"] .sidebar-more-dropdown { background:#242424 }
 [data-theme="dark"] #page-user .more-dropdown { background:#242424;box-shadow:0 8px 30px rgba(0,0,0,0.3) }
 
 /* Settings page responsive */

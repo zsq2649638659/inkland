@@ -244,22 +244,6 @@ function MobileDrawerContent() {
               </button>
             ))}
 
-            {/* Theme toggle */}
-            <button
-              className="sidebar-menu-item text-left"
-              onClick={() => {
-                const current = document.documentElement.getAttribute("data-theme");
-                const next = current === "dark" ? "light" : "dark";
-                document.documentElement.setAttribute("data-theme", next);
-                localStorage.setItem("theme", next);
-              }}
-            >
-              <span className="sidebar-menu-icon">
-                <SiteIcon name="fa-moon" variant="solid" />
-              </span>
-              <span className="sidebar-menu-label">日夜模式</span>
-            </button>
-
             {/* Settings link */}
             <button
               className={`sidebar-menu-item text-left ${isActive("settings") ? "active" : ""}`}
@@ -302,6 +286,18 @@ function MobileDrawerContent() {
                   <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
                   联系我们
                 </Link>
+                <button
+                  className="sidebar-more-item"
+                  onClick={() => {
+                    const current = document.documentElement.getAttribute("data-theme");
+                    const next = current === "dark" ? "light" : "dark";
+                    document.documentElement.setAttribute("data-theme", next);
+                    localStorage.setItem("theme", next);
+                  }}
+                >
+                  <span className="sidebar-more-item-icon"><SiteIcon name="fa-moon" variant="solid" /></span>
+                  日夜模式
+                </button>
                 <button
                   className="sidebar-more-item"
                   onClick={() => { setMoreOpen(false); setShowLogout(true); }}
