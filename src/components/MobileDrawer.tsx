@@ -273,7 +273,7 @@ function MobileDrawerContent() {
 
             {/* More actions */}
             <button
-              className={`sidebar-menu-item text-left ${isActive("more") ? "active" : ""}`}
+              className="sidebar-menu-item text-left"
               onClick={() => setMoreOpen(!moreOpen)}
             >
               <span className="sidebar-menu-icon">
@@ -285,11 +285,10 @@ function MobileDrawerContent() {
             </button>
 
             {(moreOpen || isActive("more")) && (
-              <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div className="sidebar-more-dropdown">
                 <Link
                   href="/about"
-                  className="sidebar-more-item no-underline"
-                  style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
+                  className={`sidebar-more-item no-underline ${pathname === "/about" ? "active" : ""}`}
                   onClick={() => { setMoreOpen(false); closeDrawer(); }}
                 >
                   <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
@@ -297,8 +296,7 @@ function MobileDrawerContent() {
                 </Link>
                 <Link
                   href="/contact"
-                  className="sidebar-more-item no-underline"
-                  style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
+                  className={`sidebar-more-item no-underline ${pathname === "/contact" ? "active" : ""}`}
                   onClick={() => { setMoreOpen(false); closeDrawer(); }}
                 >
                   <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
@@ -306,7 +304,6 @@ function MobileDrawerContent() {
                 </Link>
                 <button
                   className="sidebar-more-item"
-                  style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-text)", display: "flex", alignItems: "center", gap: "10px" }}
                   onClick={() => { setMoreOpen(false); setShowLogout(true); }}
                 >
                   <span className="sidebar-more-item-icon"><SiteIcon name="fa-right-from-bracket" variant="solid" /></span>
@@ -314,7 +311,6 @@ function MobileDrawerContent() {
                 </button>
                 <button
                   className="sidebar-more-item sidebar-more-item-danger"
-                  style={{ width: "100%", textAlign: "left", padding: "10px 16px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", color: "var(--color-primary)", display: "flex", alignItems: "center", gap: "10px" }}
                   onClick={() => { setMoreOpen(false); setShowDeleteAccount(true); }}
                 >
                   <span className="sidebar-more-item-icon"><SiteIcon name="fa-trash-can" variant="solid" /></span>

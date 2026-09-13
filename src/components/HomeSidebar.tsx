@@ -357,7 +357,7 @@ function HomeSidebarContent() {
 
       {/* More actions */}
       <button
-        className={`sidebar-menu-item text-left ${isActive("more") ? "active" : ""}`}
+        className="sidebar-menu-item text-left"
         onClick={() => setMoreOpen(!moreOpen)}
       >
         <span className="sidebar-menu-icon">
@@ -373,7 +373,7 @@ function HomeSidebarContent() {
         <div className="sidebar-more-dropdown">
           <Link
             href="/about"
-            className="sidebar-more-item no-underline"
+            className={`sidebar-more-item no-underline ${pathname === "/about" ? "active" : ""}`}
             onClick={() => setMoreOpen(false)}
           >
             <span className="sidebar-more-item-icon"><InklandIcon name="fa-about-us" /></span>
@@ -381,7 +381,7 @@ function HomeSidebarContent() {
           </Link>
           <Link
             href="/contact"
-            className="sidebar-more-item no-underline"
+            className={`sidebar-more-item no-underline ${pathname === "/contact" ? "active" : ""}`}
             onClick={() => setMoreOpen(false)}
           >
             <span className="sidebar-more-item-icon"><InklandIcon name="fa-contact-us" /></span>
