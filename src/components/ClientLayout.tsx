@@ -2,6 +2,7 @@
 import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/components/AuthProvider";
 import { MobileDrawerProvider } from "@/components/MobileDrawerContext";
 import Navbar from "@/components/Navbar";
@@ -10,6 +11,7 @@ import { AppDialogProvider } from "@/components/AppDialogProvider";
 
 function BackToTop() {
   const [visible, setVisible] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 600);
@@ -17,6 +19,8 @@ function BackToTop() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  if (pathname.startsWith("/read/")) return null;
 
   return (
     <button

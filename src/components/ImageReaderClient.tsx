@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { type CSSProperties, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -16,26 +16,52 @@ import { MODERATION_REASON_OPTIONS } from "@shared/moderationReasons";
 import { assertCanComment } from "@/lib/userRestrictions";
 import type { Post, Comment } from "@/lib/types";
 import { useAppDialog } from "@/components/AppDialogProvider";
-import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
+import { includeTestDataForProfile } from "@/lib/test-data-visibility";
+import DetailFloatingActions from "@/components/DetailFloatingActions";
+import ChapterNav from "@/components/ChapterNav";
 import { loadReadingHistory, saveReadingHistory } from "@/lib/readingHistory";
+
+const READER_DEFAULT_FONT_SIZE = 16;
+
+function getReaderLineHeightRange(fontSize: number) {
+  const min = Math.max(18, Math.ceil((fontSize * 1.5) / 2) * 2);
+  let max = Math.max(min + 8, Math.ceil((fontSize * 2) / 2) * 2);
+  if ((max - min) % 4 !== 0) max += 2;
+  const defaultValue = (min + max) / 2;
+
+  return { min, max, defaultValue };
+}
+
+function getReaderLineHeightValue(range: ReturnType<typeof getReaderLineHeightRange>, position: number | null) {
+  if (position === null) return range.defaultValue;
+  return range.min + Math.round((position * (range.max - range.min)) / 2) * 2;
+}
 
 interface ImageItem {
   url: string;
   caption?: string;
 }
 
+interface AdjacentChapter {
+  id: string;
+  title: string;
+}
+
 interface ImageReaderClientProps {
   post: Post;
   images?: ImageItem[];
+  initialAdjacent?: { previous: AdjacentChapter | null; next: AdjacentChapter | null };
 }
 
-export default function ImageReaderClient({ post, images: initialImages }: ImageReaderClientProps) {
+export default function ImageReaderClient({ post, images: initialImages, initialAdjacent }: ImageReaderClientProps) {
   const supabase = createClient();
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
   const dialog = useAppDialog();
   const [darkMode, setDarkMode] = useState(false);
-  const [fontSize, setFontSize] = useState(18);
+  const [fontSize, setFontSize] = useState<number | null>(null);
+  const [lineHeightPosition, setLineHeightPosition] = useState<number | null>(null);
+  const [paragraphSpacing, setParagraphSpacing] = useState<number | null>(null);
   const [readerWidth, setReaderWidth] = useState("800");
   const [fontFamily, setFontFamily] = useState("sans");
   const [showSettings, setShowSettings] = useState(false);
@@ -60,8 +86,8 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   // 评论操作菜单
   const [commentMenuId, setCommentMenuId] = useState<string | null>(null);
   // 上一章/下一章
-  const [prevChapter, setPrevChapter] = useState<{ id: string; title: string } | null>(null);
-  const [nextChapter, setNextChapter] = useState<{ id: string; title: string } | null>(null);
+  const prevChapter = initialAdjacent?.previous || null;
+  const nextChapter = initialAdjacent?.next || null;
   // 浮动面板状态
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -172,45 +198,12 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
   useEffect(() => {
     loadComments();
     fetchStats();
-    loadAdjacentChapters();
     // 读取 localStorage 中保存的主题
     try {
       const savedTheme = localStorage.getItem("theme");
       if (savedTheme === "dark") applyTheme("dark");
     } catch { /* ignore */ }
   }, [post.id, profile?.is_test_account]);
-
-  const loadAdjacentChapters = async () => {
-    setPrevChapter(null);
-    setNextChapter(null);
-    const sn = post.series_name;
-    if (!sn) return;
-
-    const { data: allPosts } = await withTestDataVisibility(
-      supabase
-        .from("posts")
-        .select("id, title, chapter_number, created_at")
-        .eq("series_name", sn)
-        .eq("status", "published"),
-      includeTestDataForProfile(profile),
-    ).order("created_at", { ascending: true });
-
-    if (!allPosts || allPosts.length === 0) return;
-
-    const allArr = allPosts as Array<Record<string, unknown>>;
-    const currentIndex = allArr.findIndex((p) => p.id === post.id);
-    if (currentIndex === -1) return;
-
-    if (currentIndex > 0) {
-      const prev = allArr[currentIndex - 1];
-      setPrevChapter({ id: prev.id as string, title: (prev.title as string) || "" });
-    }
-
-    if (currentIndex < allArr.length - 1) {
-      const next = allArr[currentIndex + 1];
-      setNextChapter({ id: next.id as string, title: (next.title as string) || "" });
-    }
-  };
 
   const fetchStats = async () => {
     const { data } = await supabase
@@ -328,6 +321,16 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
     serif: '"Noto Serif SC","Songti SC","SimSun",serif',
     kai: '"KaiTi","STKaiti","Noto Serif SC",serif',
   };
+
+  const readerLineHeightRange = getReaderLineHeightRange(fontSize ?? READER_DEFAULT_FONT_SIZE);
+  const readerLineHeight = getReaderLineHeightValue(readerLineHeightRange, lineHeightPosition);
+
+  const readerTextStyle: CSSProperties = {
+    fontFamily: fontMap[fontFamily],
+    ...(fontSize !== null ? { "--reader-font-size": `${fontSize}px` } : {}),
+    ...(fontSize !== null || lineHeightPosition !== null ? { "--reader-line-height": `${readerLineHeight}px` } : {}),
+    ...(paragraphSpacing !== null ? { "--reader-paragraph-spacing": `${paragraphSpacing}px` } : {}),
+  } as CSSProperties;
 
   const themeColors: Record<string, { bg: string; text: string }> = {
     white: { bg: "#ffffff", text: "#1a1a1a" },
@@ -534,33 +537,22 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
 
   return (
     <>
-      {/* Floating Sidebar - 在 content-wrapper 右侧外侧 */}
-      <div className="floating-sidebar" style={{ left: `${contentRight + 48}px`, right: "auto" }}>
-        <button
-          className="floating-btn"
-          title={darkMode ? "切换日间模式" : "切换夜间模式"}
-          onClick={() => {
-            if (darkMode) applyTheme("warm");
-            else applyTheme("dark");
-          }}
-        >
-          <SiteIcon name="fa-moon" variant="solid" size={22} />
-        </button>
-        <button className="floating-btn" title="字体设置" onClick={() => togglePanel("font")}>
-          <SiteIcon name="fa-font" variant="solid" size={22} />
-        </button>
-        <button className="floating-btn" title="页面宽度" onClick={() => togglePanel("width")}>
-          <SiteIcon name="fa-expand" variant="solid" size={22} />
-        </button>
-        <button className="floating-btn" title="举报作品" onClick={handlePostReport}>
-          <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
-        </button>
-      </div>
+      <DetailFloatingActions
+        contentRight={contentRight}
+        hasChapterNav={Boolean(post.series_name)}
+        darkMode={darkMode}
+        onToggleTheme={() => {
+          if (darkMode) applyTheme("warm");
+          else applyTheme("dark");
+        }}
+        onOpenPanel={togglePanel}
+        onReport={handlePostReport}
+      />
 
       {/* Content Wrapper - 居中显示 */}
       <div
         ref={contentRef}
-        className="content-wrapper image-reader-page"
+        className={`content-wrapper image-reader-page detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
         style={{
           maxWidth: readerWidth === "auto" ? "var(--content-width, 800px)" : `${readerWidth}px`,
           color: darkMode ? "#b8a090" : themeColors[currentTheme].text,
@@ -615,12 +607,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
         {cleanContent && (
           <div
             className="work-content"
-            style={{
-              fontFamily: fontMap[fontFamily],
-              fontSize: `${fontSize}px`,
-              lineHeight: 1.85,
-              wordBreak: "break-word",
-            }}
+            style={{ ...readerTextStyle, wordBreak: "break-word" }}
           >
             <p>{cleanContent}</p>
           </div>
@@ -651,29 +638,12 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
 
         {/* Chapter Navigation (合集作品) */}
         {post.series_name && (
-          <div className="chapter-nav">
-            {prevChapter ? (
-              <Link href={`/read/${prevChapter.id}`} className="chapter-nav-btn prev">
-                <span className="chapter-nav-label"><SiteIcon name="fa-chevron-left" variant="solid" /> 上一篇</span>
-              </Link>
-            ) : (
-              <span className="chapter-nav-btn prev disabled">
-                <span className="chapter-nav-label"><SiteIcon name="fa-chevron-left" variant="solid" /> 上一篇</span>
-              </span>
-            )}
-            <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(post.series_name)}`} className="chapter-nav-btn back">
-              <span className="chapter-nav-label">{post.post_type === "serial" ? "返回目录" : "返回合集"}</span>
-            </Link>
-            {nextChapter ? (
-              <Link href={`/read/${nextChapter.id}`} className="chapter-nav-btn next">
-                <span className="chapter-nav-label">下一篇 <SiteIcon name="fa-chevron-right" variant="solid" /></span>
-              </Link>
-            ) : (
-              <span className="chapter-nav-btn next disabled">
-                <span className="chapter-nav-label">下一篇 <SiteIcon name="fa-chevron-right" variant="solid" /></span>
-              </span>
-            )}
-          </div>
+          <ChapterNav
+            postType={post.post_type}
+            seriesName={post.series_name}
+            previous={prevChapter}
+            next={nextChapter}
+          />
         )}
 
         {/* Stats Bar */}
@@ -715,13 +685,6 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
             </div>
           ) : user ? (
             <div className="comment-input-area">
-              <div className="comment-input-avatar">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt={displayName} />
-                ) : (
-                  <DefaultAvatar name={displayName} className="avatar" style={{ width: "var(--ink-avatar-size-md)", height: "var(--ink-avatar-size-md)" }} />
-                )}
-              </div>
               <div className="comment-input-main">
                 <textarea
                   placeholder="写下你的想法..."
@@ -1048,11 +1011,50 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
                 className="font-size-slider"
                 min="12"
                 max="40"
-                value={fontSize}
+                value={fontSize ?? 16}
                 step="2"
                 onChange={(e) => setFontSize(parseInt(e.target.value))}
               />
               <span className="font-size-label font-size-label-large">A</span>
+            </div>
+          </div>
+
+          <div className="panel-section">
+            <div className="panel-section-title">行高</div>
+            <div className="font-size-slider-row reader-setting-slider-row">
+              <SiteIcon name="fa-detail-line-height" className="reader-setting-slider-icon reader-setting-slider-icon-small" size={16} />
+              <input
+                type="range"
+                className="font-size-slider"
+                min={readerLineHeightRange.min}
+                max={readerLineHeightRange.max}
+                step="2"
+                value={readerLineHeight}
+                aria-label="行高"
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10);
+                  setLineHeightPosition((value - readerLineHeightRange.min) / (readerLineHeightRange.max - readerLineHeightRange.min));
+                }}
+              />
+              <SiteIcon name="fa-detail-line-height" className="reader-setting-slider-icon" size={20} />
+            </div>
+          </div>
+
+          <div className="panel-section">
+            <div className="panel-section-title">段间距</div>
+            <div className="font-size-slider-row reader-setting-slider-row">
+              <SiteIcon name="fa-detail-paragraph-spacing" className="reader-setting-slider-icon reader-setting-slider-icon-small" size={16} />
+              <input
+                type="range"
+                className="font-size-slider"
+                min="0"
+                max="32"
+                step="2"
+                value={paragraphSpacing ?? 12}
+                aria-label="段间距"
+                onChange={(e) => setParagraphSpacing(parseInt(e.target.value, 10))}
+              />
+              <SiteIcon name="fa-detail-paragraph-spacing" className="reader-setting-slider-icon" size={20} />
             </div>
           </div>
 
@@ -1094,7 +1096,7 @@ export default function ImageReaderClient({ post, images: initialImages }: Image
       </div>
 
       {/* 举报弹窗 */}
-      <div className={`modal-overlay moderation-modal-overlay${reportModal?.open ? " active" : ""}`} onClick={() => setReportModal(null)}>
+      <div className={`modal-overlay moderation-modal-overlay detail-reader-modal-overlay${reportModal?.open ? " active" : ""}`} onClick={() => setReportModal(null)}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">举报原因</div>
           <div className="modal-body">

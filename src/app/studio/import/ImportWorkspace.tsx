@@ -1840,7 +1840,7 @@ export default function ImportWorkspace() {
                   <p className={styles.importNoticeWorkTitle}>《{metadataCandidateModalPlan.groupName.trim() || "未命名作品"}》</p>
                   <p>{metadataCandidateModalPlan.descriptionCandidate}</p>
                 </div>
-                <div className="modal-actions importNoticeActions metadataCandidateModalActions">
+                <div className={`modal-actions ${styles.importNoticeActions} metadataCandidateModalActions`}>
                   <button type="button" className="btn-modal btn-modal-cancel" onClick={() => setMetadataCandidateModalPlanId(null)}>取消</button>
                   <button type="button" className="btn-modal btn-modal-primary" onClick={() => adoptDescriptionCandidate(metadataCandidateModalPlan.id)}>采用</button>
                 </div>
@@ -1857,7 +1857,7 @@ export default function ImportWorkspace() {
                   {noticeModalWork.warning && <p>{noticeModalWork.warning}</p>}
                   {noticeModalWork.duplicateMatch && <p>{noticeModalWork.duplicateMatch.message}</p>}
                 </div>
-                <div className="modal-actions importNoticeActions">
+                <div className={`modal-actions ${styles.importNoticeActions}`}>
                   {noticeModalWork.duplicateMatch
                     ? <>
                       <button type="button" className="btn-modal btn-modal-cancel" onClick={closeImportNotices}>取消</button>

@@ -95,8 +95,8 @@
 .groupInfoCard input, .groupInfoCard textarea { width: 100%; box-sizing: border-box; border: 1px solid #cfc5bf; background: #fff; padding: 9px 10px; font: inherit; }
 .groupInfoCard textarea { min-height: 100px; resize: vertical; line-height: 1.6; }
 .importNoticeWorkTitle { margin-top: 0 !important; color: var(--color-text) !important; font-weight: 700; }
-:global(.importNoticeActions) { flex-wrap: nowrap; gap: 6px; }
-:global(.importNoticeActions .btn-modal) { min-width: 0; min-height: 44px; padding: 11px 24px; font-size: 13px; white-space: nowrap; }
+.importNoticeActions { flex-wrap: nowrap; gap: 6px; }
+.importNoticeActions :global(.btn-modal) { min-width: 0; min-height: 44px; padding: 11px 24px; font-size: 13px; white-space: nowrap; }
 .publishSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0 0 16px; padding: 0; list-style: none; }
 .publishSummary li { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid #ddd5d0; }
 .publishSummary strong, .publishSummary span { overflow-wrap: anywhere; }
@@ -1101,8 +1101,8 @@
   .previewListSingle { grid-template-columns: minmax(0, 1fr); }
   .previewListDouble { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-  :global(.importNoticeActions) { width: 100%; gap: 8px; }
-  :global(.importNoticeActions .btn-modal) {
+  .importNoticeActions { width: 100%; gap: 8px; }
+  .importNoticeActions :global(.btn-modal) {
     flex: 1 1 0;
     box-sizing: border-box;
     padding: 11px 6px;

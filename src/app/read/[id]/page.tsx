@@ -10,6 +10,16 @@ interface ImageItem {
   caption?: string;
 }
 
+interface AdjacentChapter {
+  id: string;
+  title: string;
+}
+
+interface AdjacentChapters {
+  previous: AdjacentChapter | null;
+  next: AdjacentChapter | null;
+}
+
 async function resolvePrivateImages(supabase: Awaited<ReturnType<typeof createClient>>, content: string) {
   const marker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
   const matches = [...content.matchAll(marker)];
@@ -24,6 +34,57 @@ async function resolvePrivateImages(supabase: Awaited<ReturnType<typeof createCl
     if (signedUrl) resolved = resolved.split(original).join(signedUrl);
   }
   return resolved;
+}
+
+async function loadAdjacentChapters(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  post: {
+    id: string;
+    user_id?: string;
+    series_name?: string | null;
+    post_type?: string;
+    chapter_number?: number | null;
+    created_at?: string | null;
+  },
+  includeTestData: boolean,
+): Promise<AdjacentChapters> {
+  if (!post.series_name || !post.user_id) return { previous: null, next: null };
+
+  const isSerial = post.post_type === "serial";
+  const orderColumn = isSerial ? "chapter_number" : "created_at";
+  const orderValue = isSerial ? post.chapter_number : post.created_at;
+  if (orderValue === null || orderValue === undefined) return { previous: null, next: null };
+
+  const buildVisibleQuery = () => {
+    const postsQuery = supabase
+      .from("posts")
+      .select("id, title")
+      .eq("series_name", post.series_name)
+      .eq("user_id", post.user_id)
+      .eq("status", "published");
+    const scopedQuery = isSerial
+      ? postsQuery.eq("post_type", "serial").gt("chapter_number", 0)
+      : postsQuery.neq("post_type", "serial");
+    return withTestDataVisibility(scopedQuery, includeTestData);
+  };
+
+  const [{ data: previousRows, error: previousError }, { data: nextRows, error: nextError }] = await Promise.all([
+    buildVisibleQuery().lt(orderColumn, orderValue).order(orderColumn, { ascending: false }).limit(1),
+    buildVisibleQuery().gt(orderColumn, orderValue).order(orderColumn, { ascending: true }).limit(1),
+  ]);
+
+  if (previousError || nextError) {
+    const error = previousError || nextError;
+    if (error) console.error(`Supabase fetch failed: ${error.message} for adjacent chapters`);
+    return { previous: null, next: null };
+  }
+
+  const previous = previousRows?.[0] || null;
+  const next = nextRows?.[0] || null;
+  return {
+    previous: previous ? { id: previous.id as string, title: (previous.title as string) || "" } : null,
+    next: next ? { id: next.id as string, title: (next.title as string) || "" } : null,
+  };
 }
 
 export default async function ReadPage({
@@ -56,12 +117,25 @@ export default async function ReadPage({
   }
 
   const p = posts[0] as Record<string, unknown>;
-  const [resolvedContent, resolvedCover] = await Promise.all([
-    resolvePrivateImages(supabase, (p.content as string) || ""),
-    p.cover_url ? resolvePrivateImages(supabase, p.cover_url as string) : Promise.resolve(null),
-  ]);
   const postType = p.post_type as string;
   const isImagePost = postType === "illustration" || postType === "comic" || postType === "cosplay" || postType === "art";
+  const initialAdjacentPromise = loadAdjacentChapters(
+    supabase,
+    {
+      id: p.id as string,
+      user_id: p.user_id as string | undefined,
+      series_name: p.series_name as string | null,
+      post_type: postType,
+      chapter_number: p.chapter_number as number | null,
+      created_at: p.created_at as string | null,
+    },
+    includeTestData,
+  );
+  const [resolvedContent, resolvedCover, initialAdjacent] = await Promise.all([
+    resolvePrivateImages(supabase, (p.content as string) || ""),
+    p.cover_url ? resolvePrivateImages(supabase, p.cover_url as string) : Promise.resolve(null),
+    initialAdjacentPromise,
+  ]);
 
   const author = p.author as { nickname: string; avatar_url: string | null; bio: string | null } | null;
   const tags = Array.isArray(p.post_tags)
@@ -88,6 +162,7 @@ export default async function ReadPage({
     title: p.title as string,
     content: resolvedContent,
     post_type: p.post_type as Post["post_type"],
+    user_id: p.user_id as string,
     cover_url: resolvedCover,
     visibility: p.visibility === "followers_only" || p.visibility === "private" ? p.visibility : "public",
     word_count: p.word_count as number,
@@ -107,8 +182,8 @@ export default async function ReadPage({
   };
 
   if (isImagePost) {
-    return <ImageReaderClient post={post} images={images} />;
+    return <ImageReaderClient post={post} images={images} initialAdjacent={initialAdjacent} />;
   }
 
-  return <ReaderClient post={post} />;
+  return <ReaderClient post={post} initialAdjacent={initialAdjacent} />;
 }
