@@ -2388,6 +2388,10 @@ p {
 }
 
 @media (max-width: 600px) {
+  #page-notifications .notification-list {
+    gap: var(--ink-space-3);
+  }
+
   #page-notifications .notification-list-item {
     gap: var(--ink-notification-mobile-row-gap);
     padding: var(--ink-notification-mobile-row-padding-block) var(--ink-notification-mobile-row-padding-inline);
