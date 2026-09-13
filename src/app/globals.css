@@ -2235,6 +2235,250 @@ p {
   }
 }
 
+/* ===== Notification List composition: mirrors inkland-ui-library / List ===== */
+#page-notifications .notification-panel {
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+}
+
+#page-notifications .notification-list-stack {
+  display: grid;
+  gap: var(--ink-gap-section);
+  min-width: 0;
+}
+
+#page-notifications .notification-list-group {
+  min-width: 0;
+}
+
+#page-notifications .notification-list-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ink-gap-md);
+  margin: 0 0 var(--ink-space-2);
+  color: var(--ink-color-text-primary);
+  font: var(--ink-font-title-sm);
+}
+
+#page-notifications .notification-list {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--ink-notification-panel-radius);
+  background: var(--ink-notification-panel-bg);
+  list-style: none;
+}
+
+#page-notifications .notification-list-entry {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#page-notifications .notification-list-entry:not(:last-child)::after {
+  position: absolute;
+  right: var(--ink-notification-divider-trailing);
+  bottom: 0;
+  left: var(--ink-notification-divider-leading);
+  height: var(--ink-border-width-thin);
+  background: var(--ink-notification-divider);
+  content: "";
+}
+
+#page-notifications .notification-list-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--ink-notification-row-gap);
+  padding: var(--ink-notification-row-padding-block) var(--ink-notification-row-padding-inline);
+  border: 0;
+  color: inherit;
+  background: var(--ink-notification-panel-bg);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--ink-notification-motion);
+}
+
+#page-notifications .notification-list-item:hover {
+  background: var(--ink-notification-row-hover);
+}
+
+#page-notifications .notification-list-item:focus-visible {
+  position: relative;
+  z-index: 1;
+  border-radius: var(--ink-notification-panel-radius);
+  outline: var(--ink-outline-focus);
+  outline-offset: calc(var(--ink-outline-offset-focus) * -1);
+}
+
+#page-notifications .notification-list-icon {
+  display: grid;
+  width: var(--ink-notification-icon-size);
+  height: var(--ink-notification-icon-size);
+  flex: 0 0 var(--ink-notification-icon-size);
+  place-items: center;
+  margin-top: var(--ink-notification-icon-offset-block);
+  border-radius: var(--ink-radius-circle);
+  color: var(--notification-type-color, var(--ink-notification-system));
+  background: color-mix(in srgb, var(--notification-type-color, var(--ink-notification-system)) var(--ink-notification-type-bg-mix), var(--ink-color-transparent));
+  transition: transform var(--ink-notification-motion);
+}
+
+#page-notifications .notification-list-item:hover .notification-list-icon {
+  transform: scale(var(--ink-notification-icon-hover-scale));
+}
+
+#page-notifications .notification-list-icon svg {
+  width: var(--ink-notification-icon-glyph-size);
+  height: var(--ink-notification-icon-glyph-size);
+}
+
+#page-notifications .notification-list-item[data-notification-type="like"] { --notification-type-color: var(--ink-notification-like); }
+#page-notifications .notification-list-item[data-notification-type="comment"] { --notification-type-color: var(--ink-notification-comment); }
+#page-notifications .notification-list-item[data-notification-type="bookmark"] { --notification-type-color: var(--ink-notification-bookmark); }
+#page-notifications .notification-list-item[data-notification-type="reply"] { --notification-type-color: var(--ink-notification-reply); }
+#page-notifications .notification-list-item[data-notification-type="follow"] { --notification-type-color: var(--ink-notification-follow); }
+#page-notifications .notification-list-item[data-notification-type="system"] { --notification-type-color: var(--ink-notification-system); }
+
+#page-notifications .notification-list-content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--ink-notification-content-gap);
+}
+
+#page-notifications .notification-list-heading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ink-notification-title-row-gap);
+  flex-wrap: wrap;
+}
+
+#page-notifications .notification-list-title {
+  min-width: 0;
+  color: var(--ink-color-text-primary);
+  font: var(--ink-notification-title-font);
+  letter-spacing: var(--ink-notification-title-letter-spacing);
+}
+
+#page-notifications .notification-list-description {
+  color: var(--ink-color-text-secondary);
+  font: var(--ink-notification-description-font);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+#page-notifications .notification-list-description strong {
+  color: var(--ink-color-brand);
+  font-weight: var(--ink-font-weight-medium);
+}
+
+#page-notifications .notification-list-time {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--ink-color-text-tertiary);
+  font: var(--ink-notification-time-font);
+  white-space: nowrap;
+}
+
+#page-notifications .notification-list-time::after {
+  display: block;
+  width: var(--ink-notification-unread-dot-size);
+  height: var(--ink-notification-unread-dot-size);
+  margin-top: var(--ink-notification-unread-dot-gap);
+  border-radius: var(--ink-radius-circle);
+  background: var(--ink-color-transparent);
+  content: "";
+}
+
+#page-notifications .notification-list-item[data-notification-state="unread"] .notification-list-time::after {
+  background: var(--ink-color-brand);
+}
+
+@media (min-width: 601px) and (max-width: 980px) {
+  #page-notifications .notification-list-item {
+    padding: var(--ink-notification-tablet-row-padding-block) var(--ink-notification-tablet-row-padding-inline);
+  }
+
+  #page-notifications .notification-list-entry:not(:last-child)::after {
+    left: var(--ink-notification-tablet-divider-leading);
+    right: var(--ink-notification-tablet-row-padding-inline);
+  }
+
+  #page-notifications .notification-list-icon {
+    width: var(--ink-notification-tablet-icon-size);
+    height: var(--ink-notification-tablet-icon-size);
+    flex-basis: var(--ink-notification-tablet-icon-size);
+  }
+
+  #page-notifications .notification-list-icon svg {
+    width: var(--ink-notification-tablet-icon-glyph-size);
+    height: var(--ink-notification-tablet-icon-glyph-size);
+  }
+
+  #page-notifications .notification-list-title {
+    font: var(--ink-notification-tablet-title-font);
+  }
+
+  #page-notifications .notification-list-description {
+    font: var(--ink-notification-tablet-description-font);
+  }
+}
+
+@media (max-width: 600px) {
+  #page-notifications .notification-list-item {
+    gap: var(--ink-notification-mobile-row-gap);
+    padding: var(--ink-notification-mobile-row-padding-block) var(--ink-notification-mobile-row-padding-inline);
+  }
+
+  #page-notifications .notification-list-entry:not(:last-child)::after {
+    left: var(--ink-notification-mobile-divider-leading);
+    right: var(--ink-notification-mobile-divider-trailing);
+  }
+
+  #page-notifications .notification-list-icon {
+    width: var(--ink-notification-mobile-icon-size);
+    height: var(--ink-notification-mobile-icon-size);
+    flex-basis: var(--ink-notification-mobile-icon-size);
+  }
+
+  #page-notifications .notification-list-icon svg {
+    width: var(--ink-notification-mobile-icon-glyph-size);
+    height: var(--ink-notification-mobile-icon-glyph-size);
+  }
+
+  #page-notifications .notification-list-title {
+    font: var(--ink-notification-mobile-title-font);
+  }
+
+  #page-notifications .notification-list-description {
+    font: var(--ink-notification-mobile-description-font);
+  }
+
+  #page-notifications .notification-list-time {
+    font: var(--ink-notification-mobile-time-font);
+  }
+
+  #page-notifications .notification-list-item[data-notification-type="comment"] .notification-message-quote,
+  #page-notifications .notification-list-item[data-notification-type="reply"] .notification-message-quote {
+    display: none;
+  }
+}
+
 /* ===== V2 publish article page ===== */
 .publish-article-page {
   min-height: calc(100vh - var(--navbar-height, 64px));

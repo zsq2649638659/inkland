@@ -303,18 +303,6 @@ export default function NotificationsPage() {
     { key: "system", label: "系统", icon: "fa-circle-info" },
   ];
 
-  const getIconClass = (type: string): string => {
-    switch (type) {
-      case "like": return "icon-like";
-      case "comment": return "icon-comment";
-      case "bookmark": return "icon-bookmark";
-      case "reply": return "icon-reply";
-      case "system": return "icon-system";
-      case "follow": return "icon-follow";
-      default: return "icon-system";
-    }
-  };
-
   const getIconSvg = (type: string): InklandIconName => {
     switch (type) {
       case "like": return "fa-heart";
@@ -342,20 +330,42 @@ export default function NotificationsPage() {
     return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
   };
 
-  const getNotificationTitle = (notification: NotificationItem): ReactNode => {
+  const getNotificationTitle = (notification: NotificationItem): string => {
+    const content = notification.content || "";
     if (notification.type === "system") {
-      if (notification.template_key === "series_review_rejected") return "连载未通过审核";
-      if (notification.template_key === "post_review_rejected" || notification.content.includes("未通过本次审核")) return "作品未通过审核";
-      if (notification.template_key === "post_review_approved") return "作品已通过审核";
-      if (notification.template_key === "feedback_resolved") return "反馈已处理";
-      if (notification.template_key === "profile_revision_request") return "个人资料需要修改";
-      if (notification.template_key === "report_received") return "举报已受理";
-      if (notification.template_key === "report_handled") return "举报已有处理结果";
-      const activity = notification.content.match(/「([^」]+)」/);
-      if (notification.content.includes("活动") && activity) {
-        return <>活动提醒：<span className="highlight"><a href={`/search?q=${encodeURIComponent(activity[1])}`} onClick={(event) => event.stopPropagation()}>「{activity[1]}」</a></span> 投稿即将截止</>;
+      const systemTitles: Record<string, string> = {
+        activity_reminder: "活动提醒",
+        report_received: "举报受理中",
+        report_handled: "举报已处理",
+        comment_civility_reminder: "评论文明提醒",
+        content_civility_reminder: "内容文明提醒",
+        report_rule_reminder: "举报规范提醒",
+        comment_deleted: "评论违规",
+        post_deleted: "作品违规",
+        post_review_rejected: "作品需要修改",
+        post_review_approved: "作品审核通过",
+        account_warning: "账号警告",
+        restriction_comment: "评论功能限制",
+        restriction_publish: "发布功能限制",
+        restriction_report: "举报功能限制",
+        account_suspended: "账号暂停",
+        account_banned: "账号封禁",
+        account_restored: "账号恢复",
+        restriction_lifted: "限制解除",
+        series_review_rejected: "连载需要修改",
+        feedback_resolved: "反馈已处理",
+        profile_revision_request: "个人资料需要修改",
+      };
+      const mappedTitle = notification.template_key ? systemTitles[notification.template_key] : null;
+      if (mappedTitle) {
+        if (notification.template_key === "activity_reminder") {
+          const activity = content.match(/「([^」]+)」/);
+          if (activity) return `活动提醒：${activity[0]}投稿即将截止`;
+        }
+        return mappedTitle;
       }
-      const headline = notification.content.split(/\r?\n/, 1)[0]?.trim();
+      if (content.includes("未通过本次审核")) return "作品需要修改";
+      const headline = content.split(/\r?\n/, 1)[0]?.trim();
       if (headline && headline.length <= 30) return headline;
     }
     switch (notification.type) {
@@ -369,43 +379,24 @@ export default function NotificationsPage() {
     }
   };
 
-  const renderActor = (notification: NotificationItem) => {
-    const actor = notification.actor_nickname || "用户";
-    return notification.actor_id ? (
-      <a href={`/user/${notification.actor_id}`} onClick={(event) => event.stopPropagation()}>{actor}</a>
-    ) : <span className="highlight">{actor}</span>;
-  };
+  // 列表行本身是主链接，实体使用组件库的 strong + 品牌色契约，避免嵌套链接破坏整行入口。
+  const renderActor = (notification: NotificationItem) => (
+    <strong>{notification.actor_nickname || "用户"}</strong>
+  );
 
-  const renderWork = (notification: NotificationItem) => {
-    const work = notification.post_title ? `《${notification.post_title}》` : "你的作品";
-    return notification.post_id ? (
-      <a
-        href={`/read/${notification.post_id}${notification.type === "comment" || notification.type === "reply" ? "#comments" : ""}`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {work}
-      </a>
-    ) : <span className="highlight">{work}</span>;
-  };
+  const renderWork = (notification: NotificationItem) => (
+    <strong>{notification.post_title ? `《${notification.post_title}》` : "这部作品"}</strong>
+  );
 
   const renderSystemDescription = (notification: NotificationItem) => {
-    const { content } = notification;
+    const content = notification.content || "";
     const activity = content.match(/「([^」]+)」/);
-    const guideline = content.match(/《([^》]+)》/);
-    const match = activity || guideline;
+    const work = content.match(/《([^》]+)》/);
+    const match = activity || work;
     if (!match) return content;
-    const href = getNotificationLink(notification) || (activity ? `/search?q=${encodeURIComponent(match[1])}` : null);
-    if (!href) return content;
     const start = match.index || 0;
     const label = match[0];
-    return <>{content.slice(0, start)}<Link href={href} onClick={async (event) => {
-      event.stopPropagation();
-      if (!notification.read) {
-        event.preventDefault();
-        await markAsRead(notification.id);
-        window.location.assign(href);
-      }
-    }}>{label}</Link>{content.slice(start + label.length)}</>;
+    return <>{content.slice(0, start)}<strong>{label}</strong>{content.slice(start + label.length)}</>;
   };
 
   const getNotificationDescription = (notification: NotificationItem): ReactNode => {
@@ -453,42 +444,97 @@ export default function NotificationsPage() {
       </>
     );
 
-    // 评论和回复类型：显示具体内容
+    // 桌面端显示评论/回复正文；移动端由列表样式隐藏这段，保留消息类型和作品信息。
     if (notification.content && (notification.type === "comment" || notification.type === "reply")) {
-      return <>{base}：「{notification.content}」</>;
+      return <>{base}<span className="notification-message-quote">：「{notification.content}」</span></>;
     }
 
     return base;
   };
 
-  const getNotificationAction = (notification: NotificationItem): string | null => {
-    if (!getNotificationLink(notification)) return null;
-    if (notification.type === "like" || notification.type === "bookmark") return "查看作品";
-    if (notification.type === "comment" || notification.type === "reply") return "查看评论";
-    if (notification.type === "follow") return "查看主页";
-    switch (notification.template_key) {
-      case "post_review_rejected": return "去修改作品";
-      case "post_review_approved": return "查看作品";
-      case "series_review_rejected": return "去修改连载";
-      case "report_received": return "查看举报对象";
-      case "report_handled": return "查看处理状态";
-      case "feedback_resolved": return "查看反馈";
-      case "profile_revision_request": return "去修改资料";
-      case "account_warning":
-      case "account_restored":
-      case "restriction_comment":
-      case "restriction_publish":
-      case "restriction_report":
-      case "restriction_lifted":
-      case "account_suspended":
-      case "account_banned": return "查看账号状态";
-      case "comment_civility_reminder":
-      case "content_civility_reminder":
-      case "report_rule_reminder": return "查看社区规范";
-      case "comment_deleted":
-      case "post_deleted": return "提交复核或反馈";
-      default: return "查看详情";
+  const renderNotificationRow = (notification: NotificationItem) => {
+    const href = getNotificationLink(notification) || (
+      notification.type === "system"
+        ? (() => {
+            const activity = (notification.content || "").match(/「([^」]+)」/);
+            return activity ? `/search?q=${encodeURIComponent(activity[1])}` : null;
+          })()
+        : null
+    );
+    const rowClassName = `notification-list-item ${!notification.read ? "unread" : ""}`;
+    const rowContent = (
+      <>
+        <span className="notification-list-icon" aria-hidden="true">
+          <SiteIcon name={getIconSvg(notification.type)} variant="solid" size="var(--ink-notification-icon-glyph-size)" />
+        </span>
+        <span className="notification-list-content">
+          <span className="notification-list-heading">
+            <strong className="notification-list-title">{getNotificationTitle(notification)}</strong>
+            <time className="notification-list-time" dateTime={notification.created_at}>{formatTime(notification.created_at)}</time>
+          </span>
+          <span className="notification-list-description">{getNotificationDescription(notification)}</span>
+          {!notification.read && <span className="sr-only">未读</span>}
+        </span>
+      </>
+    );
+
+    if (!href) {
+      return (
+        <li key={notification.id} className="notification-list-entry">
+          <div
+            className={`${rowClassName} notification-list-item--static`}
+            data-notification-type={notification.type}
+            data-notification-template={notification.template_key || undefined}
+            data-notification-state={notification.read ? "read" : "unread"}
+            role="button"
+            tabIndex={0}
+            onClick={() => void handleNotificationClick(notification)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                void handleNotificationClick(notification);
+              }
+            }}
+          >
+            {rowContent}
+          </div>
+        </li>
+      );
     }
+
+    return (
+      <li key={notification.id} className="notification-list-entry">
+        <Link
+          href={href}
+          className={rowClassName}
+          data-notification-type={notification.type}
+          data-notification-template={notification.template_key || undefined}
+          data-notification-state={notification.read ? "read" : "unread"}
+          onClick={async (event) => {
+            if (notification.read) return;
+            event.preventDefault();
+            await markAsRead(notification.id);
+            router.push(href);
+          }}
+        >
+          {rowContent}
+        </Link>
+      </li>
+    );
+  };
+
+  const interactionNotifications = notifications.filter((notification) => notification.type !== "system");
+  const systemNotifications = notifications.filter((notification) => notification.type === "system");
+  const renderNotificationGroup = (label: string, items: NotificationItem[], ariaLabel: string) => {
+    if (items.length === 0) return null;
+    return (
+      <section className="notification-list-group" aria-labelledby={`notification-group-${label === "互动通知" ? "interaction" : "system"}`}>
+        <h2 id={`notification-group-${label === "互动通知" ? "interaction" : "system"}`} className="notification-list-label">{label}</h2>
+        <ul className="notification-list" aria-label={ariaLabel} data-composition-contract="notification.list@0.1">
+          {items.map(renderNotificationRow)}
+        </ul>
+      </section>
+    );
   };
 
   return (
@@ -546,51 +592,9 @@ export default function NotificationsPage() {
                 <div className="empty-desc">当你有新的通知时，会在这里显示</div>
               </div>
             ) : (
-              <div className="notification-list">
-                {notifications.map((n) => {
-                  const actionHref = getNotificationLink(n);
-                  const actionLabel = getNotificationAction(n);
-                  return (
-                  <div
-                    key={n.id}
-                    className={`notification-item ${!n.read ? "unread" : ""}`}
-                    data-type={n.type}
-                    onClick={() => handleNotificationClick(n)}
-                  >
-                    {/* 图标 */}
-                    <div className={`icon-wrapper ${getIconClass(n.type)}`}>
-                      <SiteIcon name={getIconSvg(n.type)} variant="solid" />
-                    </div>
-
-                    {/* 内容 */}
-                    <div className="notification-content">
-                      <div className="notification-title-row">
-                        <span className="notification-title">{getNotificationTitle(n)}</span>
-                        <span className="notification-timestamp">{formatTime(n.created_at)}</span>
-                      </div>
-                      <div className="notification-desc">{getNotificationDescription(n)}</div>
-                      {actionHref && actionLabel && (
-                        <div className="notification-action-row">
-                          <Link
-                            href={actionHref}
-                            className="notification-action"
-                            onClick={async (event) => {
-                              event.stopPropagation();
-                              if (!n.read) {
-                                event.preventDefault();
-                                await markAsRead(n.id);
-                                window.location.assign(actionHref);
-                              }
-                            }}
-                          >
-                            {actionLabel}<SiteIcon name="fa-arrow-right" variant="solid" aria-hidden="true" />
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  );
-                })}
+              <div className="notification-list-stack" data-composition-contract="notification.list@0.1" data-composition-dependencies="List Icon Link Typography">
+                {renderNotificationGroup("互动通知", interactionNotifications, "通知中心互动消息")}
+                {renderNotificationGroup("系统通知", systemNotifications, "通知中心系统消息")}
               </div>
             )}
           </div>
