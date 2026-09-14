@@ -1,6 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 import type { InklandIconName } from "@/components/inkland/iconRegistry";
+import Checkbox from "@/components/inkland/Checkbox";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -412,18 +413,16 @@ export default function LoginPage() {
             {/* Terms checkbox (register only) */}
             {mode === "register" && (
               <div className="auth-checkbox-row">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="agreeTerms"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                />
-                <label htmlFor="agreeTerms">
+                >
                   已阅读并同意{" "}
                   <Link href="/terms">用户协议</Link>{" "}
                   和{" "}
                   <Link href="/privacy">隐私政策</Link>
-                </label>
+                </Checkbox>
               </div>
             )}
 

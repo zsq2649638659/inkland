@@ -1,5 +1,6 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
+import Checkbox from "@/components/inkland/Checkbox";
 import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useRef, useState } from "react";
@@ -192,8 +193,8 @@ function StudioWorkCard({
       data-studio-status={statusClass.replace("status-", "")}
       onClick={() => batchMode && onToggleSelect(work.id)}
     >
-      <input
-        type="checkbox"
+      <Checkbox
+        as="span"
         className="card-check"
         checked={selected}
         aria-label={`选择作品：${title}`}

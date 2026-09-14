@@ -1,5 +1,6 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
+import Radio from "@/components/inkland/Radio";
 
 import { type CSSProperties, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
@@ -1066,13 +1067,17 @@ export default function ImageReaderClient({ post, images: initialImages, initial
                 { key: "serif", label: "思源宋体" },
                 { key: "kai", label: "霞鹜文楷" },
               ].map((f) => (
-                <button
+                <Radio
+                  name="reader-font"
+                  value={f.key}
+                  variant="card"
                   key={f.key}
                   className={`font-option ${fontFamily === f.key ? "active" : ""}`}
-                  onClick={() => setFontFamily(f.key)}
+                  checked={fontFamily === f.key}
+                  onChange={() => setFontFamily(f.key)}
                 >
                   {f.label}
-                </button>
+                </Radio>
               ))}
             </div>
           </div>
@@ -1100,16 +1105,16 @@ export default function ImageReaderClient({ post, images: initialImages, initial
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <div className="modal-title">举报原因</div>
           <div className="modal-body">
-            <ul className="report-reason-list">
+            <ul className="report-reason-list" role="radiogroup" aria-label="举报原因">
               {MODERATION_REASON_OPTIONS.map((reason) => (
                 <li
                   key={reason}
                   className={`report-reason-item${reportReason === reason ? " selected" : ""}`}
                   data-reason={reason}
-                  onClick={() => setReportReason(reason)}
                 >
-                  <span className="report-reason-radio"></span>
-                  {reason}
+                  <Radio name="reader-report-reason" value={reason} variant="control" className="report-reason-control" checked={reportReason === reason} onChange={() => setReportReason(reason)}>
+                    {reason}
+                  </Radio>
                 </li>
               ))}
             </ul>

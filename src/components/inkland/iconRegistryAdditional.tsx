@@ -96,6 +96,7 @@ export type InklandAdditionalIconName =
   | "fa-contact-us"
   | "fa-wand-magic-sparkles"
   | "fa-xmark"
+  | "fa-tag-remove"
   | "fa-sun"
   | "fa-arrow-down-wide-short"
   | "fa-ellipsis"
@@ -391,6 +392,9 @@ export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, In
   ], supportsVariants: false },
   "fa-xmark": { viewBox: "0 0 384 512", paths: [
     {"d":"M55.1 73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L147.2 256 9.9 393.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192.5 301.3 329.9 438.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.8 256 375.1 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192.5 210.7 55.1 73.4z","variant":"default","fill":"currentColor"},
+  ], supportsVariants: false },
+  "fa-tag-remove": { viewBox: "0 0 24 24", paths: [
+    {"d":"m7 7 10 10M17 7 7 17","variant":"default","fill":"none","stroke":"currentColor","strokeLinecap":"round","strokeWidth":"1.8"},
   ], supportsVariants: false },
   "fa-arrow-down": { viewBox: "0 0 384 512", paths: [
     {"d":"M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l144-144c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.7V32c0-17.7-14.3-32-32-32s-32 14.3-32 32v338.7L70.6 281.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l144 144z","variant":"default","fill":"currentColor"},

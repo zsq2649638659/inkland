@@ -1,5 +1,6 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
+import Radio from "@/components/inkland/Radio";
 
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
@@ -291,17 +292,18 @@ export default function ProfileEditForm() {
               <div className="profile-personal-fields">
                 <div className="field-group">
                   <span className="field-label">性别</span>
-                  <div className="profile-choice-group" role="group" aria-label="选择性别">
+                  <div className="profile-choice-group" role="radiogroup" aria-label="选择性别">
                     {genderOptions.map((option) => (
-                      <button
-                        type="button"
+                      <Radio
+                        name="profile-gender"
+                        value={option.value}
                         key={option.value}
                         className={`profile-choice-button${gender === option.value ? " selected" : ""}`}
-                        aria-pressed={gender === option.value}
-                        onClick={() => setGender(option.value)}
+                        checked={gender === option.value}
+                        onChange={() => setGender(option.value)}
                       >
                         {option.label}
-                      </button>
+                      </Radio>
                     ))}
                   </div>
                 </div>

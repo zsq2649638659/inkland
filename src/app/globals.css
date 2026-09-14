@@ -106,6 +106,198 @@
   --shadow-hover: 0 4px 20px rgba(0,0,0,0.3);
 }
 
+/* Shared Checkbox: mirrors the component-library four-state control while
+   keeping each page's surrounding layout and native input semantics intact. */
+.ink-checkbox {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--ink-space-2);
+  color: var(--ink-color-text-primary);
+  cursor: pointer;
+}
+
+.ink-checkbox__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  opacity: 0;
+}
+
+.ink-checkbox--standalone .ink-checkbox__input {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.ink-checkbox__control {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  border: var(--ink-border-width-medium) solid var(--ink-color-border-strong);
+  border-radius: 5px;
+  color: var(--ink-color-text-anti);
+  background: var(--ink-color-bg-surface);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.ink-checkbox__input:checked + .ink-checkbox__control,
+.ink-checkbox__input:indeterminate + .ink-checkbox__control {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-brand);
+}
+
+.ink-checkbox__input:checked + .ink-checkbox__control::after {
+  width: 10px;
+  height: 6px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
+  content: "";
+}
+
+.ink-checkbox__input:indeterminate + .ink-checkbox__control::after {
+  width: 10px;
+  height: 2px;
+  border: 0;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.ink-checkbox__input:focus-visible + .ink-checkbox__control {
+  outline: var(--ink-outline-focus);
+  outline-offset: 3px;
+}
+
+.ink-checkbox--disabled {
+  color: var(--ink-color-text-disabled);
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+.ink-checkbox--disabled .ink-checkbox__input,
+.ink-checkbox--disabled .ink-checkbox__input + .ink-checkbox__control {
+  cursor: not-allowed;
+}
+
+.ink-checkbox__label {
+  min-width: 0;
+}
+
+/* Shared Radio: native radio semantics with the component-library card and
+   control variants. Page-specific classes can keep their existing layout. */
+.ink-radio {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  color: var(--ink-color-text-primary);
+  cursor: pointer;
+}
+
+.ink-radio--card {
+  align-items: center;
+  justify-content: center;
+  gap: var(--ink-gap-tight);
+  padding: 14px;
+  border: var(--ink-border-width-thin) solid var(--ink-color-border);
+  border-radius: var(--ink-radius-sm);
+  background: var(--ink-color-bg-surface);
+  text-align: center;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ink-radio--control {
+  align-items: center;
+  gap: var(--ink-space-2);
+}
+
+.ink-radio__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  opacity: 0;
+}
+
+.ink-radio--card .ink-radio__control {
+  display: none;
+}
+
+.ink-radio--control .ink-radio__control {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  border: var(--ink-border-width-medium) solid var(--ink-color-border-strong);
+  border-radius: 50%;
+  color: var(--ink-color-text-anti);
+  background: var(--ink-color-bg-surface);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.ink-radio--card:hover,
+.ink-radio--card:focus-within {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-brand-light);
+}
+
+.ink-radio--card:has(.ink-radio__input:checked) {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-brand-light);
+}
+
+.ink-radio__input:checked + .ink-radio__control {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-brand);
+}
+
+.ink-radio__input:checked + .ink-radio__control::after {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.ink-radio__input:focus-visible + .ink-radio__control {
+  outline: var(--ink-outline-focus);
+  outline-offset: 3px;
+}
+
+.ink-radio--card:has(.ink-radio__input:focus-visible) {
+  outline: var(--ink-outline-focus);
+  outline-offset: 3px;
+}
+
+.ink-radio--disabled {
+  color: var(--ink-color-text-disabled);
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+.ink-radio--disabled .ink-radio__input,
+.ink-radio--disabled .ink-radio__control {
+  cursor: not-allowed;
+}
+
+.ink-radio__content {
+  min-width: 0;
+}
+
 /* ===== Base Styles ===== */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -363,6 +555,175 @@ p {
     transition: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Inkland form primitives
+   These are the production React counterparts of the library Input,
+   Textarea, Tag and TagInput specimens. Keep them token-driven so the
+   publish flows share the same states and geometry.
+   -------------------------------------------------------------------------- */
+.ink-field { display: block; min-width: 0; }
+.ink-field__label { display: block; margin: 0 0 var(--ink-space-2); color: var(--ink-text); font: var(--ink-font-control-label); }
+.ink-field__control { position: relative; min-width: 0; }
+.ink-input,
+.ink-textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: var(--ink-input-border-width) solid var(--ink-border);
+  border-radius: var(--ink-input-border-radius);
+  color: var(--ink-text);
+  background: var(--ink-page);
+  font: var(--ink-font-control);
+  outline: none;
+  transition: border-color var(--ink-motion-fast) ease, box-shadow var(--ink-motion-fast) ease, background-color var(--ink-motion-fast) ease;
+}
+.ink-input { min-height: var(--ink-input-height-md); height: var(--ink-input-height-md); padding: 0 var(--ink-input-padding-inline); }
+.ink-textarea { min-height: var(--ink-height-textarea); padding: var(--ink-space-3) var(--ink-input-padding-inline); line-height: var(--ink-input-textarea-line-height); resize: vertical; }
+.ink-textarea--height-fixed { height: var(--ink-height-textarea); resize: none; }
+.ink-textarea--height-autosize,
+.ink-textarea--height-minmax,
+.ink-textarea--autosize { min-height: 0; resize: none; overflow-y: hidden; }
+.ink-input::placeholder,
+.ink-textarea::placeholder { color: var(--ink-light); }
+.ink-input:focus,
+.ink-textarea:focus { border-color: var(--ink-primary); box-shadow: var(--ink-focus); }
+.ink-field--success .ink-input,
+.ink-field--success .ink-textarea { border-color: var(--ink-success); }
+.ink-field--warning .ink-input,
+.ink-field--warning .ink-textarea { border-color: var(--ink-warning); }
+.ink-field--error .ink-input,
+.ink-field--error .ink-textarea { border-color: var(--ink-danger); }
+.ink-field--readonly .ink-input,
+.ink-field--readonly .ink-textarea,
+.ink-input[readonly],
+.ink-textarea[readonly] { color: var(--ink-muted); background: var(--ink-surface-subtle); }
+.ink-field--disabled,
+.ink-input:disabled,
+.ink-textarea:disabled { cursor: not-allowed; opacity: var(--ink-input-disabled-opacity); }
+.ink-input:disabled,
+.ink-textarea:disabled { background: var(--ink-color-bg-component-disabled); }
+.ink-input--with-counter { padding-right: var(--ink-input-padding-counter); }
+.ink-textarea--with-counter { padding-right: var(--ink-input-counter-textarea-padding); padding-bottom: var(--ink-input-counter-padding-bottom); }
+.ink-input__counter,
+.ink-textarea__counter {
+  position: absolute;
+  right: var(--ink-input-counter-offset-right);
+  bottom: var(--ink-input-counter-offset-bottom);
+  color: var(--ink-light);
+  font: var(--ink-font-input-counter);
+  pointer-events: none;
+}
+.ink-input__counter--over,
+.ink-textarea__counter--over { color: var(--ink-danger); }
+.ink-field__hint,
+.ink-field__feedback { margin: var(--ink-gap-control) 0 0; font: var(--ink-font-input-helper); }
+.ink-field__hint { color: var(--ink-muted); }
+.ink-field__feedback--success { color: var(--ink-success); }
+.ink-field__feedback--warning { color: var(--ink-warning); }
+.ink-field__feedback--error { color: var(--ink-danger); }
+
+.ink-tag-input { display: block; min-width: 0; }
+.ink-tag-input__list {
+  display: flex;
+  min-height: var(--ink-input-height-md);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ink-gap-inline);
+  box-sizing: border-box;
+  padding: var(--ink-size-4) var(--ink-space-3);
+  border: var(--ink-input-border-width) solid var(--ink-border);
+  border-radius: var(--ink-radius-sm);
+  background: var(--ink-page);
+  transition: border-color var(--ink-motion-fast) ease, box-shadow var(--ink-motion-fast) ease, background-color var(--ink-motion-fast) ease;
+}
+.ink-tag-input__list:focus-within { border-color: var(--ink-primary); box-shadow: var(--ink-focus); }
+.ink-tag-input__field {
+  min-width: 120px;
+  min-height: var(--ink-height-compact);
+  flex: 1 1 120px;
+  border: 0;
+  outline: 0;
+  color: var(--ink-text);
+  background: transparent;
+  font: var(--ink-font-tag-input);
+}
+.ink-tag-input__field::placeholder { color: var(--ink-light); }
+.ink-tag-input__field:disabled { cursor: not-allowed; }
+.ink-tag {
+  display: inline-flex;
+  min-height: var(--ink-height-tag);
+  align-items: center;
+  padding: 0 var(--ink-space-3);
+  border: 0;
+  border-radius: var(--ink-radius-pill);
+  color: var(--ink-muted);
+  background: var(--ink-surface-subtle);
+  font: var(--ink-font-site-tag);
+}
+.ink-tag--removable { gap: var(--ink-gap-4); padding-right: var(--ink-size-6); color: var(--ink-primary); background: var(--ink-primary-bg); cursor: pointer; }
+.ink-tag--removable:hover { background: var(--ink-primary-bg); }
+.ink-tag--removable:disabled { cursor: not-allowed; opacity: var(--ink-opacity-disabled); }
+.ink-tag__remove { font: var(--ink-font-tag-remove); }
+.ink-tag--status-active,
+.ink-tag--status-complete { min-height: var(--ink-height-tag); padding-inline: var(--ink-space-3); border-radius: var(--ink-radius-xs); font: var(--ink-font-site-tag); }
+.ink-tag--status-active { color: var(--ink-primary); background: var(--ink-primary-bg); }
+.ink-tag--status-complete { color: var(--ink-success); background: var(--ink-success-bg); }
+
+#page-create .ink-field__label { color: var(--color-text-muted); }
+#page-create .ink-input,
+#page-create .ink-textarea { font-family: var(--font-family); }
+#page-create .ink-textarea--autosize { min-height: 0; }
+#page-create.chapter-create-page .chapter-name-field { min-width: 120px; flex: 1 1 auto; }
+#page-create.chapter-create-page .chapter-name-field .ink-field__control { min-width: 0; }
+#page-create.chapter-create-page .chapter-name-field .ink-input.chapter-name-input { width: 100%; padding-right: var(--ink-input-padding-counter); }
+#page-create.chapter-create-page .chapter-author-note-field .ink-textarea.author-note-input { min-height: 0; padding: var(--ink-space-3) var(--ink-input-padding-inline); border-radius: var(--ink-radius-sm); background: var(--ink-page); }
+#page-create.chapter-create-page .chapter-author-note-field .ink-textarea.author-note-input:focus { border-color: var(--ink-primary); box-shadow: var(--ink-focus); }
+#page-create.chapter-create-page .serial-info-meta .ink-tag { flex: 0 0 auto; }
+#page-create.chapter-create-page .serial-info-meta .ink-tag.serial-info-status { min-height: var(--ink-height-tag); padding: 0 var(--ink-space-3); border-radius: var(--ink-radius-xs); font: var(--ink-font-site-tag); }
+#page-create.chapter-create-page .serial-info-meta .ink-tag.serial-info-status.ink-tag--status-active { color: var(--ink-primary); background: var(--ink-primary-bg); }
+#page-create.chapter-create-page .serial-info-meta .ink-tag.serial-info-status.ink-tag--status-complete { color: var(--ink-success); background: var(--ink-success-bg); }
+#page-create.chapter-create-page .serial-info-chapter { display: inline-flex; align-items: center; gap: var(--ink-gap-4); }
+#page-create.chapter-create-page .serial-info-chapter svg { flex: 0 0 auto; }
+#page-create .editor-wrap-expanded .editor-body { min-height: 0; }
+#page-create .editor-wrap-expanded .editor-content { height: 100%; box-sizing: border-box; min-height: 100%; max-height: none; }
+#page-create.chapter-create-page .editor-content p,
+#page-create.publish-article-page .editor-content p { margin-bottom: var(--ink-space-3); }
+
+#page-series { background: var(--ink-color-bg-page); }
+#page-series .ink-field__label { color: var(--color-text); }
+#page-series .series-edit-panel .ink-tag-input__list { background: var(--ink-page); }
+#page-series .series-edit-panel .ink-textarea.desc-edit-input { min-height: 0; padding: var(--ink-space-3) var(--ink-input-padding-inline); border-radius: var(--ink-radius-sm); background: var(--ink-page); resize: none; }
+#page-series .series-edit-panel .ink-textarea.desc-edit-input:focus { border-color: var(--ink-primary); box-shadow: var(--ink-focus); }
+#page-series .serial-badge.ink-tag { flex: 0 0 auto; }
+#page-series .serial-badge.ink-tag--status-active,
+#page-series .serial-badge.ink-tag--status-complete { min-height: var(--ink-height-tag); padding: 0 var(--ink-space-3); border-radius: var(--ink-radius-xs); font: var(--ink-font-site-tag); }
+#page-series .serial-badge.ink-tag--status-active { color: var(--ink-primary); background: var(--ink-primary-bg); }
+#page-series .serial-badge.ink-tag--status-complete { color: var(--ink-success); background: var(--ink-success-bg); }
+
+/* Publish menus are text-only across article, image and chapter flows. */
+#page-create.publish-article-page .publish-dropdown-menu .publish-dropdown-item,
+#page-create.chapter-create-page .publish-dropdown-menu .publish-dropdown-item {
+  display: flex;
+  min-height: var(--ink-height-touch);
+  align-items: center;
+  gap: 0;
+  box-sizing: border-box;
+  padding: 0 var(--ink-space-3);
+  border: 0;
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-text);
+  background: transparent;
+  font: var(--ink-font-button-secondary);
+  text-align: left;
+}
+#page-create.publish-article-page .publish-dropdown-menu .publish-dropdown-item:hover,
+#page-create.chapter-create-page .publish-dropdown-menu .publish-dropdown-item:hover { color: var(--ink-primary); background: var(--ink-primary-bg); }
+#page-create.publish-article-page .publish-dropdown-menu .publish-dropdown-item svg,
+#page-create.chapter-create-page .publish-dropdown-menu .publish-dropdown-item svg { display: none; }
+#page-create.publish-article-page .btn-publish,
+#page-create.publish-series-page .btn-publish,
+#page-create.chapter-create-page .btn-publish { gap: 0; }
 
 /* Chapter publishing layout: keep the form close to the reference prototype. */
 .chapter-create-page .chapter-create-shell {
@@ -2661,7 +3022,6 @@ p {
 
 .publish-article-page .collection-option {
   display: flex;
-  min-height: 132px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -2801,7 +3161,7 @@ p {
 @media (max-width: 640px) {
   .publish-article-page .publish-container { padding: 32px 16px 96px; }
   .publish-article-page .collection-options { grid-template-columns: 1fr; }
-  .publish-article-page .collection-option { min-height: 84px; flex-direction: row; justify-content: flex-start; padding: 16px; text-align: left; }
+  .publish-article-page .collection-option { flex-direction: row; justify-content: flex-start; padding: 16px; text-align: left; }
   .publish-article-page .publish-footer { align-items: stretch; flex-direction: column; }
   .publish-article-page .article-publish-actions { flex-direction: column; }
   .publish-article-page .btn-publish, .publish-article-page .article-draft-button { width: 100%; }
@@ -3410,8 +3770,9 @@ p {
 .work-card .card-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 0; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; font-family: var(--font-noto-sans), sans-serif; letter-spacing: -0.01em; transition: all 0.15s ease; text-decoration: none; }
 .work-card .card-btn-edit, .work-card .card-btn-delete { background: var(--color-bg-page); color: var(--color-text-muted); border: none; }
 .work-card .card-btn-edit:hover, .work-card .card-btn-delete:hover { background: var(--color-bg-secondary); color: var(--color-text); }
-.work-card .card-check { position: absolute; top: 10px; right: 10px; width: 18px; height: 18px; accent-color: var(--color-primary); cursor: pointer; display: none; z-index: 2; }
+.work-card .card-check { position: absolute; top: 10px; right: 10px; width: 20px; height: 20px; display: none; z-index: 2; }
 .work-card.batch-mode .card-check { display: block; }
+.work-card .card-check .ink-checkbox__control { width: 20px; height: 20px; }
 .work-card.batch-mode { cursor: pointer; }
 .select-all-wrap { display: flex; align-items: center; gap: 8px; padding: 0 0 12px 0; }
 .select-all-wrap .select-all-checkbox { width: 18px; height: 18px; accent-color: var(--color-primary); cursor: pointer; }
@@ -4040,13 +4401,6 @@ p {
   align-items: center;
   gap: 8px;
   margin-bottom: 20px;
-}
-.auth-checkbox-row input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-primary, #F26B5B);
-  border-radius: 4px;
-  cursor: pointer;
 }
 .auth-checkbox-row label {
   font-size: 12px;
@@ -6566,6 +6920,10 @@ p {
 }
 
 .font-option {
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
   padding: 10px 8px;
   border-radius: var(--radius-sm, 8px);
   font-size: 13px;
@@ -6729,11 +7087,9 @@ p {
 
 .report-reason-item {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  min-width: 0;
   padding: 12px 16px;
   border-radius: var(--radius-md, 12px);
-  cursor: pointer;
   font-size: 14px;
   color: var(--color-text, #1A1A1A);
   transition: all 0.15s ease;
@@ -6750,29 +7106,69 @@ p {
   color: var(--color-primary, #F26B5B);
 }
 
-.report-reason-radio {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid var(--color-border, #E5E5E5);
-  display: flex;
+.report-reason-control {
+  width: 100%;
+  min-height: 20px;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
+  gap: 12px;
+  color: inherit;
+  font: inherit;
 }
 
-.report-reason-item.selected .report-reason-radio {
+.report-reason-control .ink-radio__control {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+  border-width: 2px;
+  border-color: var(--color-border, #E5E5E5);
+}
+
+.report-reason-control .ink-radio__content {
+  overflow-wrap: anywhere;
+}
+
+.report-reason-item.selected .report-reason-control .ink-radio__control {
   border-color: var(--color-primary, #F26B5B);
   background: var(--color-primary, #F26B5B);
 }
 
-.report-reason-item.selected .report-reason-radio::after {
-  content: '';
+.report-reason-control .ink-radio__input:focus-visible + .ink-radio__control {
+  outline: 2px solid var(--color-primary, #F26B5B);
+  outline-offset: 2px;
+}
+
+.report-reason-control .ink-radio__input:checked + .ink-radio__control::after {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #fff;
+}
+
+.report-reason-control .ink-radio__input:checked + .ink-radio__control {
+  border-color: var(--color-primary, #F26B5B);
+  background: var(--color-primary, #F26B5B);
+}
+
+.report-reason-control .ink-radio__input:disabled + .ink-radio__control {
+  cursor: not-allowed;
+}
+
+.report-reason-item .ink-radio__content {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+
+/* The list item owns the selected surface; the shared radio only renders its
+   native circular control here. */
+.report-reason-item .ink-radio--control {
+  cursor: pointer;
+}
+
+.report-reason-item .ink-radio__control {
+  display: inline-grid;
+  align-items: center;
+  justify-content: center;
 }
 
 .detail-reader-modal-overlay .report-reason-list {
@@ -7090,13 +7486,14 @@ p {
     line-height: 1.35;
   }
 
-  .detail-reader-modal-overlay .report-reason-radio {
+  .detail-reader-modal-overlay .report-reason-control .ink-radio__control {
     width: 16px;
     height: 16px;
+    flex-basis: 16px;
     border-width: 1.5px;
   }
 
-  .detail-reader-modal-overlay .report-reason-item.selected .report-reason-radio::after {
+  .detail-reader-modal-overlay .report-reason-control .ink-radio__input:checked + .ink-radio__control::after {
     width: 5px;
     height: 5px;
   }
@@ -10410,7 +10807,6 @@ p {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 52px;
   padding: 16px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -12430,7 +12826,6 @@ p {
 #page-create .image-upload-area {
   position: relative;
   display: flex;
-  min-height: 220px;
   align-items: center;
   justify-content: center;
   flex-direction: column;
@@ -12602,6 +12997,15 @@ p {
   background: var(--color-card);
   box-shadow: 0 22px 70px rgba(26, 26, 26, 0.18);
   animation: publish-modal-slide-up 0.22s ease-out;
+}
+
+/* The schedule selector needs more horizontal room than the short draft
+   dialog. Its width includes the padding so the date/time row always stays
+   inside the dialog, while the max-width keeps it safe on narrow screens. */
+#page-create.publish-article-page .publish-modal.publish-modal-schedule {
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
 }
 
 #page-create.publish-article-page .publish-modal-header {
@@ -13553,16 +13957,19 @@ p {
 /* Series creation: two-step channel/category selection. */
 #page-create.publish-series-page .series-type-section { margin-bottom: var(--spacing-xl); }
 #page-create.publish-series-page .radio-options.series-audience-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
-#page-create.publish-series-page .series-audience-options .radio-option { min-height: 48px; justify-content: center; padding: 10px 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text); background: var(--color-card); box-shadow: none; }
+#page-create.publish-series-page .series-audience-options .radio-option { justify-content: center; padding: 10px 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text); background: var(--color-card); box-shadow: none; }
 #page-create.publish-series-page .series-audience-options .radio-option:hover,
 #page-create.publish-series-page .series-audience-options .radio-option:focus-visible { border-color: var(--color-primary-light); color: var(--color-primary); background: var(--color-primary-light); }
 #page-create.publish-series-page .series-audience-options .radio-option.selected { border-color: var(--color-primary); color: var(--color-primary); background: rgba(242, 107, 91, .04); }
 #page-create.publish-series-page .series-audience-options .radio-option-text { color: inherit; font-size: 14px; font-weight: 500; }
 #page-create.publish-series-page .series-genre-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-#page-create.publish-series-page .series-genre-options button { min-height: 36px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-full); color: var(--color-text-muted); background: var(--color-bg-secondary); font: 500 13px var(--font-family); white-space: nowrap; }
-#page-create.publish-series-page .series-genre-options button:hover,
-#page-create.publish-series-page .series-genre-options button:focus-visible { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
-#page-create.publish-series-page .series-genre-options button.selected { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+#page-create.publish-series-page .series-genre-options .ink-radio { align-items: center; padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-full); color: var(--color-text-muted); background: var(--color-bg-secondary); font: 500 13px var(--font-family); white-space: nowrap; }
+#page-create.publish-series-page .series-genre-options .ink-radio:hover,
+#page-create.publish-series-page .series-genre-options .ink-radio:focus-within { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); }
+#page-create.publish-series-page .series-genre-options .ink-radio.selected,
+#page-create.publish-series-page .series-genre-options .ink-radio:has(input:checked) { border-color: var(--color-primary); color: #fff; background: var(--color-primary); }
+#page-create.publish-series-page .series-genre-options .ink-radio__control { display: none; }
+#page-create.publish-series-page .series-genre-options .ink-radio__content { min-width: 0; }
 #page-create.publish-series-page .series-field-count { margin-top: 6px; color: var(--color-text-light); font-size: 12px; text-align: right; }
 #page-create.publish-series-page .series-field-count.warning { color: var(--color-primary); }
 #page-create.publish-series-page .btn-publish { padding: 14px 36px; border: 0; color: #fff; background: var(--color-primary) !important; opacity: 1; }
@@ -13712,6 +14119,288 @@ p {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* --------------------------------------------------------------------------
+   Publish-form surface treatment
+   Keep creation and chapter publishing controls on the same surface language
+   as the home page: white surfaces without a resting frame, with the brand
+   frame reserved for hover, focus, or selection.
+   -------------------------------------------------------------------------- */
+#page-create .ink-input,
+#page-create .ink-textarea,
+#page-create .ink-tag-input__list {
+  border: var(--ink-border-width-thin) solid transparent;
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+#page-create .ink-input:hover,
+#page-create .ink-textarea:hover,
+#page-create .ink-tag-input__list:hover,
+#page-create .ink-input:focus,
+#page-create .ink-textarea:focus,
+#page-create .ink-tag-input__list:focus-within {
+  border-color: var(--ink-color-brand);
+  box-shadow: none;
+}
+
+#page-create .ink-field--success .ink-input,
+#page-create .ink-field--success .ink-textarea,
+#page-create .ink-field--warning .ink-input,
+#page-create .ink-field--warning .ink-textarea,
+#page-create .ink-field--error .ink-input,
+#page-create .ink-field--error .ink-textarea {
+  box-shadow: none;
+}
+
+#page-create .ink-input[readonly],
+#page-create .ink-textarea[readonly],
+#page-create .ink-input:disabled,
+#page-create .ink-textarea:disabled {
+  border-color: transparent;
+  background: var(--ink-color-bg-surface-subtle);
+  box-shadow: none;
+}
+
+#page-create .editor-wrap:not(.editor-wrap-expanded) {
+  border: var(--ink-border-width-thin) solid transparent;
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+#page-create .editor-wrap:not(.editor-wrap-expanded):hover,
+#page-create .editor-wrap:not(.editor-wrap-expanded):focus-within {
+  border-color: var(--ink-color-brand);
+  box-shadow: none;
+}
+
+#page-create .editor-wrap:not(.editor-wrap-expanded) .editor-toolbar,
+#page-create .editor-wrap:not(.editor-wrap-expanded) .editor-content,
+#page-create .editor-wrap:not(.editor-wrap-expanded) .editor-footer {
+  background: var(--ink-color-bg-surface);
+}
+
+#page-create .editor-wrap:not(.editor-wrap-expanded) .editor-toolbar,
+#page-create .editor-wrap:not(.editor-wrap-expanded) .editor-footer {
+  border-color: transparent;
+}
+
+#page-create .editor-wrap:not(.editor-wrap-expanded) .editor-toolbar {
+  border-bottom: var(--ink-border-width-thin) solid var(--ink-color-border);
+}
+
+#page-create .image-upload-area {
+  border: var(--ink-border-width-thin) solid transparent;
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+#page-create .image-upload-area:hover,
+#page-create .image-upload-area:focus-visible {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+#page-create .ink-radio--card,
+#page-create .collection-option,
+#page-create.publish-series-page .series-audience-options .radio-option,
+#page-create.publish-series-page .series-genre-options .ink-radio {
+  border-color: transparent;
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+#page-create .ink-radio--card:hover,
+#page-create .ink-radio--card:focus-within,
+#page-create .ink-radio--card:has(.ink-radio__input:checked),
+#page-create .collection-option:hover,
+#page-create .collection-option:focus-within,
+#page-create .collection-option.selected,
+#page-create.publish-series-page .series-audience-options .radio-option:hover,
+#page-create.publish-series-page .series-audience-options .radio-option:focus-within,
+#page-create.publish-series-page .series-audience-options .radio-option.selected,
+#page-create.publish-series-page .series-genre-options .ink-radio:hover,
+#page-create.publish-series-page .series-genre-options .ink-radio:focus-within,
+#page-create.publish-series-page .series-genre-options .ink-radio.selected,
+#page-create.publish-series-page .series-genre-options .ink-radio:has(input:checked) {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+#page-create.publish-series-page .series-audience-options .radio-option:hover,
+#page-create.publish-series-page .series-audience-options .radio-option:focus-within,
+#page-create.publish-series-page .series-audience-options .radio-option.selected,
+#page-create.publish-series-page .series-genre-options .ink-radio:hover,
+#page-create.publish-series-page .series-genre-options .ink-radio:focus-within,
+#page-create.publish-series-page .series-genre-options .ink-radio.selected,
+#page-create.publish-series-page .series-genre-options .ink-radio:has(input:checked) {
+  color: var(--ink-color-brand);
+}
+
+#page-create.publish-article-page .custom-select-trigger,
+#page-create.publish-article-page .collection-new-form .form-input {
+  border-color: transparent;
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+#page-create.publish-article-page .custom-select-trigger:hover,
+#page-create.publish-article-page .custom-select.open .custom-select-trigger,
+#page-create.publish-article-page .collection-new-form .form-input:hover,
+#page-create.publish-article-page .collection-new-form .form-input:focus {
+  border-color: var(--ink-color-brand);
+  box-shadow: none;
+}
+
+/* Chapter title remains an underline field; never show a four-sided frame. */
+#page-create.chapter-create-page .chapter-number-input,
+#page-create.chapter-create-page .chapter-name-input {
+  border: 0 !important;
+  border-bottom: 2px solid var(--color-border) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#page-create.chapter-create-page .chapter-number-input:hover,
+#page-create.chapter-create-page .chapter-name-input:hover {
+  border-bottom-color: var(--color-border) !important;
+  box-shadow: none !important;
+}
+
+#page-create.chapter-create-page .chapter-number-input:focus,
+#page-create.chapter-create-page .chapter-name-input:focus {
+  border-bottom-color: var(--color-primary) !important;
+  box-shadow: none !important;
+}
+
+/* The open menu must occupy exactly the same width as its split action. */
+#page-create.publish-article-page .publish-dropdown,
+#page-create.chapter-create-page .publish-dropdown,
+#page-create.publish-article-page .btn-publish-split,
+#page-create.chapter-create-page .btn-publish-split {
+  width: 220px;
+}
+
+#page-create.publish-article-page .btn-publish-split,
+#page-create.chapter-create-page .btn-publish-split {
+  justify-content: stretch;
+}
+
+#page-create.publish-article-page .btn-publish,
+#page-create.chapter-create-page .btn-publish {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+#page-create.publish-article-page .publish-dropdown-menu,
+#page-create.chapter-create-page .publish-dropdown-menu {
+  width: 100%;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  #page-create.publish-article-page .publish-dropdown,
+  #page-create.chapter-create-page .publish-dropdown,
+  #page-create.publish-article-page .btn-publish-split,
+  #page-create.chapter-create-page .btn-publish-split {
+    width: 100%;
+  }
+}
+
+/* Tag / TagInput states from the component-library contract. */
+.ink-tag--outline {
+  border: var(--ink-border-width-thin) solid var(--ink-color-border);
+  color: var(--ink-color-text-secondary);
+  background: transparent;
+}
+
+.ink-tag--removable {
+  width: auto;
+  height: var(--ink-height-tag);
+  min-height: var(--ink-height-tag);
+  gap: var(--ink-size-4);
+  padding: var(--ink-size-4) var(--ink-size-6) var(--ink-size-4) var(--ink-space-4);
+  box-sizing: border-box;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ink-tag__remove {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 var(--ink-space-tag-remove-inline) 0 var(--ink-space-tag-remove-start);
+  border: 0;
+  border-radius: var(--ink-radius-none);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ink-tag__remove svg {
+  display: block;
+  width: var(--ink-size-10);
+  height: var(--ink-size-10);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: var(--ink-icon-stroke-width);
+}
+
+.ink-tag__remove:disabled {
+  cursor: not-allowed;
+}
+
+.ink-tag--removable:has(.ink-tag__remove:disabled) {
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+.ink-tag__remove:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
+.ink-tag--selectable {
+  cursor: pointer;
+  transition: color var(--ink-motion-fast) ease, border-color var(--ink-motion-fast) ease, background-color var(--ink-motion-fast) ease;
+}
+
+.ink-tag--selectable:hover,
+.ink-tag--selectable:focus-visible {
+  border-color: var(--ink-color-brand);
+  color: var(--ink-color-brand);
+  background: var(--ink-color-brand-light);
+}
+
+.ink-tag--selectable:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
+.ink-tag-input__suggestions {
+  display: grid;
+  gap: var(--ink-gap-4);
+  margin-top: var(--ink-space-2);
+}
+
+.ink-tag-input__suggestions-label {
+  color: var(--ink-color-text-tertiary);
+  font: var(--ink-font-tag-helper);
+}
+
+.ink-tag-input__suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ink-gap-inline);
 }
 
 /* ===== 全站圆角统一 ===== */
@@ -13864,4 +14553,824 @@ img.load-error {
 
 .image-upload-progress svg[data-icon-name="fa-spinner"] {
   font-size: 15px;
+}
+
+/* Shared scheduled-publish picker: date and time stay separate, while both
+   publish flows use the same calendar and wheel-like hour/minute columns. */
+.schedule-picker-fields {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: var(--ink-space-3);
+  margin-top: var(--ink-space-2);
+}
+
+.schedule-picker-field {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.schedule-picker-field:first-child {
+  flex: 1 1 278px;
+  min-width: 278px;
+}
+
+.schedule-picker-field:last-child {
+  flex: 0 0 148px;
+  min-width: 148px;
+}
+
+.schedule-picker-label {
+  display: block;
+  margin-bottom: var(--ink-space-2);
+  color: var(--ink-color-text-secondary);
+  font: var(--ink-font-input-label);
+}
+
+.schedule-picker-trigger {
+  display: flex;
+  width: 100%;
+  min-height: var(--ink-height-control-md);
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  padding: 0 var(--ink-space-3);
+  border: var(--ink-border-width-thin) solid var(--ink-color-border);
+  border-radius: var(--ink-radius-sm);
+  color: var(--ink-color-text-secondary);
+  background: var(--ink-color-bg-page);
+  font: var(--ink-font-control);
+  text-align: left;
+  transition: border-color var(--ink-motion-fast) ease, background-color var(--ink-motion-fast) ease, box-shadow var(--ink-motion-fast) ease;
+}
+
+.schedule-picker-trigger,
+.schedule-picker-trigger > span {
+  font: var(--ink-font-control);
+}
+
+.schedule-picker-trigger:hover,
+.schedule-picker-trigger.open,
+.schedule-picker-trigger:focus-visible {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-bg-surface);
+}
+
+.schedule-picker-trigger:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
+.schedule-picker-trigger.selected {
+  color: var(--ink-color-text-primary);
+}
+
+.schedule-picker-trigger > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--ink-space-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.schedule-picker-trigger > span svg {
+  flex: 0 0 auto;
+  width: var(--ink-size-16);
+  height: var(--ink-size-16);
+  color: var(--ink-color-brand);
+}
+
+.schedule-picker-trigger > svg {
+  flex: 0 0 auto;
+  width: var(--ink-size-12);
+  height: var(--ink-size-12);
+  color: var(--ink-color-text-tertiary);
+  transition: transform var(--ink-motion-fast) ease;
+}
+
+.schedule-picker-trigger > svg.up {
+  transform: rotate(180deg);
+}
+
+.schedule-picker-trigger:disabled {
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+.schedule-calendar-popover,
+.schedule-time-popover {
+  position: absolute;
+  top: calc(100% + var(--ink-space-2));
+  z-index: 40;
+  box-sizing: border-box;
+  border: var(--ink-border-width-thin) solid var(--ink-color-border);
+  border-radius: var(--ink-radius-md);
+  background: var(--ink-color-bg-surface);
+  box-shadow: var(--ink-shadow-lg);
+  animation: schedule-picker-in var(--ink-motion-fast) ease-out;
+}
+
+.schedule-calendar-popover {
+  left: 0;
+  width: 100%;
+  min-width: 278px;
+  padding: var(--ink-space-3);
+}
+
+.schedule-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ink-space-3);
+}
+
+.schedule-calendar-header strong {
+  color: var(--ink-color-text-primary);
+  font: var(--ink-font-control-label);
+}
+
+.schedule-calendar-header button {
+  display: grid;
+  width: var(--ink-height-control-sm);
+  height: var(--ink-height-control-sm);
+  place-items: center;
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-color-text-secondary);
+}
+
+.schedule-calendar-header button:hover:not(:disabled),
+.schedule-calendar-header button:focus-visible {
+  color: var(--ink-color-brand);
+  background: var(--ink-color-brand-light);
+}
+
+.schedule-calendar-header button:disabled {
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+.schedule-calendar-weekdays,
+.schedule-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(32px, 1fr));
+  align-items: center;
+  min-width: 224px;
+  text-align: center;
+}
+
+.schedule-calendar-weekdays {
+  margin-bottom: var(--ink-size-2);
+  color: var(--ink-color-text-tertiary);
+  font: var(--ink-font-tag-helper);
+}
+
+.schedule-calendar-grid {
+  row-gap: var(--ink-size-2);
+}
+
+.schedule-calendar-grid button {
+  display: grid;
+  width: var(--ink-height-control-sm);
+  height: var(--ink-height-control-sm);
+  place-items: center;
+  margin: 0 auto;
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-color-text-primary);
+  font: var(--ink-font-body-sm);
+}
+
+.schedule-calendar-grid button:hover:not(:disabled),
+.schedule-calendar-grid button.today {
+  color: var(--ink-color-brand);
+  background: var(--ink-color-brand-light);
+}
+
+.schedule-calendar-grid button.selected {
+  color: var(--ink-color-text-anti);
+  background: var(--ink-color-brand);
+}
+
+.schedule-calendar-grid button.past,
+.schedule-calendar-grid button.past:hover {
+  cursor: not-allowed;
+  color: var(--ink-color-text-disabled);
+  background: transparent;
+  opacity: var(--ink-opacity-disabled);
+}
+
+.schedule-time-popover {
+  right: auto;
+  left: 0;
+  width: 100%;
+  min-width: 148px;
+  padding: var(--ink-space-3);
+}
+
+.schedule-time-popover-title {
+  display: block;
+  margin-bottom: var(--ink-space-3);
+  color: var(--ink-color-text-primary);
+  font: var(--ink-font-control-label);
+}
+
+.schedule-time-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ink-space-3);
+}
+
+.schedule-time-column-label {
+  display: block;
+  margin-bottom: var(--ink-size-2);
+  color: var(--ink-color-text-tertiary);
+  font: var(--ink-font-tag-helper);
+  text-align: center;
+}
+
+.schedule-time-options {
+  display: flex;
+  max-height: 192px;
+  flex-direction: column;
+  gap: var(--ink-size-1);
+  overflow-y: auto;
+  padding: var(--ink-size-1);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.schedule-time-options button {
+  min-height: var(--ink-height-control-sm);
+  flex: 0 0 var(--ink-height-control-sm);
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-color-text-secondary);
+  font: var(--ink-font-body-sm);
+}
+
+.schedule-time-options button:hover,
+.schedule-time-options button.selected {
+  color: var(--ink-color-brand);
+  background: var(--ink-color-brand-light);
+}
+
+.schedule-time-options button.selected {
+  font-weight: var(--ink-font-weight-bold);
+}
+
+.schedule-time-confirm {
+  display: inline-flex;
+  min-width: 64px;
+  min-height: var(--ink-height-control-sm);
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--ink-space-3);
+  margin-left: auto;
+  padding: 0 var(--ink-space-3);
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-color-text-anti);
+  background: var(--ink-color-brand);
+  font: var(--ink-font-button-secondary);
+  transition: background-color var(--ink-motion-fast) ease, opacity var(--ink-motion-fast) ease;
+}
+
+.schedule-time-confirm:hover:not(:disabled) {
+  background: var(--ink-color-brand-hover);
+}
+
+.schedule-time-confirm:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
+.schedule-time-confirm:disabled {
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+@keyframes schedule-picker-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .schedule-picker-fields {
+    flex-direction: column;
+  }
+
+  .schedule-picker-field,
+  .schedule-picker-field:first-child {
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .schedule-picker-field:last-child,
+  .schedule-calendar-popover,
+  .schedule-time-popover {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .schedule-time-popover {
+    top: auto;
+    bottom: calc(100% + var(--ink-space-2));
+    max-height: min(280px, calc(100dvh - 32px));
+    overflow-y: auto;
+  }
+
+  .schedule-time-options {
+    max-height: 160px;
+  }
+
+  .schedule-picker-trigger {
+    height: 48px;
+    min-height: 48px;
+  }
+}
+
+/* The create page has older, more specific publish-picker rules. Keep the
+   shared selector dimensions and typography authoritative there as well. */
+#page-create.publish-article-page .schedule-picker-fields .schedule-picker-field:first-child {
+  flex: 1 1 278px;
+  min-width: 278px;
+}
+
+#page-create.publish-article-page .schedule-picker-fields .schedule-picker-field:last-child {
+  flex: 0 0 148px;
+  min-width: 148px;
+}
+
+#page-create.publish-article-page .schedule-picker-fields .schedule-picker-trigger,
+#page-create.publish-article-page .schedule-picker-fields .schedule-picker-trigger > span {
+  font: var(--ink-font-control);
+}
+
+#page-create.publish-article-page .schedule-picker-fields .schedule-calendar-popover {
+  left: 0;
+  width: 100%;
+  min-width: 278px;
+}
+
+#page-create.publish-article-page .schedule-picker-fields .schedule-time-popover {
+  right: auto;
+  left: 0;
+  width: 100%;
+  min-width: 148px;
+}
+
+@media (max-width: 640px) {
+  #page-create.publish-article-page .schedule-picker-fields .schedule-picker-field:first-child,
+  #page-create.publish-article-page .schedule-picker-fields .schedule-picker-field:last-child {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  #page-create.publish-article-page .schedule-picker-fields .schedule-calendar-popover,
+  #page-create.publish-article-page .schedule-picker-fields .schedule-time-popover {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #page-create.publish-article-page .schedule-picker-fields .schedule-time-popover {
+    top: auto;
+    bottom: calc(100% + var(--ink-space-2));
+    max-height: min(280px, calc(100dvh - 32px));
+    overflow-y: auto;
+  }
+
+  #page-create.publish-article-page .schedule-picker-fields .schedule-time-options {
+    max-height: 160px;
+  }
+
+  #page-create.publish-article-page .schedule-picker-fields .schedule-picker-trigger {
+    height: 48px;
+    min-height: 48px;
+  }
+
+  #page-create.publish-article-page .schedule-picker-fields .schedule-time-column-label {
+    text-align: center;
+  }
+}
+
+/* Scheduled summary follows the neutral, selectable-tag resting treatment. */
+#page-create.publish-article-page .scheduled-summary,
+#page-create.chapter-create-page .scheduled-summary {
+  display: inline-flex;
+  width: auto;
+  max-width: 250px;
+  height: var(--ink-height-touch);
+  min-height: var(--ink-height-touch);
+  box-sizing: border-box;
+  align-items: center;
+  gap: var(--ink-gap-inline);
+  margin-right: var(--ink-space-2);
+  padding: 0 var(--ink-space-2) 0 var(--ink-space-3);
+  border: var(--ink-border-width-thin) solid var(--ink-color-border);
+  border-radius: var(--ink-radius-pill);
+  color: var(--ink-color-text-secondary);
+  background: var(--ink-color-bg-component-disabled);
+  font: var(--ink-font-site-tag);
+  line-height: var(--ink-line-height-mark-sm);
+}
+
+#page-create.publish-article-page .scheduled-summary > svg,
+#page-create.chapter-create-page .scheduled-summary > svg {
+  flex: 0 0 auto;
+  width: var(--ink-size-16);
+  height: var(--ink-size-16);
+  color: var(--ink-color-text-secondary);
+}
+
+#page-create.publish-article-page .scheduled-summary > span,
+#page-create.chapter-create-page .scheduled-summary > span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#page-create.publish-article-page .scheduled-summary > button,
+#page-create.chapter-create-page .scheduled-summary > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-color-text-secondary);
+  background: transparent;
+}
+
+#page-create.publish-article-page .scheduled-summary > button:hover,
+#page-create.chapter-create-page .scheduled-summary > button:hover {
+  color: var(--ink-color-text-primary);
+  background: var(--ink-color-bg-component);
+}
+
+#page-create.publish-article-page .scheduled-summary > button svg,
+#page-create.chapter-create-page .scheduled-summary > button svg {
+  width: var(--ink-size-12);
+  height: var(--ink-size-12);
+}
+
+/* Publish scheduling is an inline opt-in control. The picker stays hidden
+   until the switch is enabled, and the footer keeps draft/publish actions
+   independent instead of using the retired split menu. */
+#page-create .schedule-publish-section {
+  display: grid;
+  gap: var(--ink-space-3);
+}
+
+#page-create .schedule-publish-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ink-space-4);
+}
+
+#page-create .schedule-publish-header .form-label {
+  margin: 0;
+}
+
+#page-create .schedule-publish-switch {
+  position: relative;
+  display: inline-flex;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 48px;
+  align-items: center;
+  padding: 0;
+  border: 1px solid var(--ink-color-border);
+  border-radius: var(--ink-radius-pill);
+  background: var(--ink-color-bg-component-disabled);
+  cursor: pointer;
+  transition: background-color var(--ink-motion-fast) ease, border-color var(--ink-motion-fast) ease;
+}
+
+#page-create .schedule-publish-switch > span {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin-left: 3px;
+  border-radius: 50%;
+  background: var(--ink-color-bg-surface);
+  box-shadow: var(--ink-shadow-sm);
+  transition: transform var(--ink-motion-fast) ease;
+}
+
+#page-create .schedule-publish-switch.active {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-color-brand);
+}
+
+#page-create .schedule-publish-switch.active > span {
+  transform: translateX(20px);
+}
+
+#page-create .schedule-publish-switch:hover:not(:disabled),
+#page-create .schedule-publish-switch:focus-visible {
+  border-color: var(--ink-color-brand);
+}
+
+#page-create .schedule-publish-switch:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
+#page-create .schedule-publish-switch:disabled {
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+#page-create .schedule-publish-section .schedule-picker-fields {
+  margin-top: 0;
+}
+
+#page-create .schedule-picker-fields-compact {
+  display: grid;
+  /* The legacy calendar popover keeps 16px inner padding. Size the trigger
+     from the calendar's 7 x 32px content plus that padding and its border. */
+  --schedule-calendar-width: calc(224px + var(--ink-space-4) + var(--ink-space-4) + var(--ink-border-width-thin) + var(--ink-border-width-thin));
+  --schedule-time-width: 280px;
+  grid-template-columns: var(--schedule-calendar-width) var(--schedule-time-width);
+  gap: var(--ink-space-3);
+}
+
+#page-create .schedule-picker-fields-compact .schedule-picker-field:first-child {
+  width: var(--schedule-calendar-width);
+  min-width: 0;
+  flex: none;
+}
+
+#page-create .schedule-picker-fields-compact .schedule-picker-field:last-child {
+  width: var(--schedule-time-width);
+  min-width: 0;
+  flex: none;
+}
+
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-field:first-child {
+  width: var(--schedule-calendar-width);
+  min-width: 0;
+  flex: none;
+}
+
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-field:last-child {
+  width: var(--schedule-time-width);
+  min-width: 0;
+  flex: none;
+}
+
+#page-create .schedule-picker-fields-compact .schedule-calendar-popover {
+  width: var(--schedule-calendar-width);
+  min-width: var(--schedule-calendar-width);
+  max-height: min(320px, calc(100dvh - 24px));
+  overflow-y: auto;
+}
+
+#page-create .schedule-picker-fields-compact .schedule-time-popover {
+  width: var(--schedule-time-width);
+  min-width: var(--schedule-time-width);
+  max-height: min(280px, calc(100dvh - 24px));
+  overflow-y: auto;
+}
+
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-calendar-popover,
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-time-popover {
+  width: auto;
+  min-width: 0;
+}
+
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-calendar-popover {
+  width: var(--schedule-calendar-width);
+  min-width: var(--schedule-calendar-width);
+}
+
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-time-popover {
+  width: var(--schedule-time-width);
+  min-width: var(--schedule-time-width);
+}
+
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger,
+#page-create.chapter-create-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger {
+  border-color: transparent;
+  background: var(--ink-surface);
+}
+
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger:hover,
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger.open,
+#page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger:focus-visible,
+#page-create.chapter-create-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger:hover,
+#page-create.chapter-create-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger.open,
+#page-create.chapter-create-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger:focus-visible {
+  border-color: var(--ink-color-brand);
+  background: var(--ink-surface);
+  box-shadow: var(--ink-shadow-none);
+}
+
+#page-create .schedule-picker-fields-compact .schedule-time-popover {
+  display: flex;
+  flex-direction: column;
+}
+
+#page-create .schedule-picker-fields-compact .schedule-time-confirm {
+  align-self: flex-end;
+  margin-left: 0;
+}
+
+/* Keep the wheel columns usable without letting three nested scrollbars cover
+   the hour/minute hover states. Scrolling still works with wheel/touch input. */
+#page-create .schedule-picker-fields-compact .schedule-time-popover,
+#page-create .schedule-picker-fields-compact .schedule-time-options {
+  scrollbar-width: none;
+}
+
+#page-create .schedule-picker-fields-compact .schedule-time-popover::-webkit-scrollbar,
+#page-create .schedule-picker-fields-compact .schedule-time-options::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+#page-create .editor-footer > span:first-child,
+#page-create .publish-guidelines {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ink-space-2);
+}
+
+#page-create .publish-guidelines > svg {
+  flex: 0 0 auto;
+}
+
+#page-create .publish-actions,
+#page-create .publish-actions-right {
+  width: fit-content;
+  max-width: 100%;
+  gap: var(--ink-space-2);
+}
+
+#page-create .article-draft-button,
+#page-create .btn-publish {
+  min-height: var(--ink-button-medium-height);
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ink-button-border-radius);
+  font: var(--ink-button-medium-font);
+  white-space: nowrap;
+}
+
+#page-create .article-draft-button {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  flex: 1 1 0;
+  gap: var(--ink-gap-inline);
+  padding: 0 var(--ink-button-medium-padding-horizontal);
+  border: var(--ink-button-border-width) solid var(--ink-button-default-border);
+  color: var(--ink-button-default-color);
+  background: var(--ink-surface);
+  cursor: pointer;
+  transition: color var(--ink-motion-fast) ease, border-color var(--ink-motion-fast) ease, background-color var(--ink-motion-fast) ease, transform var(--ink-motion-fast) ease;
+}
+
+#page-create .article-draft-button:hover:not(:disabled),
+#page-create .article-draft-button:focus-visible {
+  border-color: var(--ink-color-border-strong);
+  color: var(--ink-button-default-color);
+  background: var(--ink-button-outline-active-bg);
+}
+
+#page-create.publish-article-page .btn-publish,
+#page-create.chapter-create-page .btn-publish,
+#page-create.publish-series-page .btn-publish {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  flex: 1 1 0;
+  gap: var(--ink-gap-inline);
+  padding: 0 var(--ink-button-medium-padding-horizontal);
+  border: var(--ink-button-border-width) solid transparent;
+  border-radius: var(--ink-button-border-radius);
+  color: var(--ink-button-primary-color);
+  background: var(--ink-button-primary-bg);
+  box-shadow: var(--ink-shadow-none);
+  cursor: pointer;
+  transition: background-color var(--ink-motion-fast) ease, box-shadow var(--ink-motion-fast) ease, transform var(--ink-motion-fast) ease;
+}
+
+/* Keep the active create-page buttons on the exact library medium-button
+   typography even when older page-specific rules appear earlier in the file. */
+#page-create.publish-article-page .btn-publish,
+#page-create.chapter-create-page .btn-publish,
+#page-create.publish-series-page .btn-publish,
+#page-create .article-draft-button {
+  font: var(--ink-button-medium-font);
+}
+
+#page-create.publish-article-page .btn-publish:hover:not(:disabled),
+#page-create.publish-article-page .btn-publish:focus-visible,
+#page-create.chapter-create-page .btn-publish:hover:not(:disabled),
+#page-create.chapter-create-page .btn-publish:focus-visible,
+#page-create.publish-series-page .btn-publish:hover:not(:disabled),
+#page-create.publish-series-page .btn-publish:focus-visible {
+  background: var(--ink-button-primary-active-bg);
+  box-shadow: var(--ink-shadow-none);
+  transform: translateY(-1px);
+}
+
+#page-create .article-draft-button:focus-visible,
+#page-create.publish-article-page .btn-publish:focus-visible,
+#page-create.chapter-create-page .btn-publish:focus-visible,
+#page-create.publish-series-page .btn-publish:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
+#page-create .article-draft-button:disabled {
+  border-color: transparent;
+  color: var(--ink-button-default-disabled-color);
+  background: var(--ink-button-default-disabled-bg);
+  cursor: not-allowed;
+  opacity: 1;
+  transform: none;
+}
+
+#page-create.publish-article-page .btn-publish:disabled,
+#page-create.chapter-create-page .btn-publish:disabled,
+#page-create.publish-series-page .btn-publish:disabled {
+  border-color: transparent;
+  color: var(--ink-button-primary-disabled-color);
+  background: var(--ink-button-primary-disabled-bg);
+  cursor: not-allowed;
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  #page-create .article-draft-button,
+  #page-create.publish-article-page .btn-publish,
+  #page-create.chapter-create-page .btn-publish,
+  #page-create.publish-series-page .btn-publish {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 0;
+  }
+
+  #page-create .publish-actions,
+  #page-create .publish-actions-right {
+    width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  #page-create.chapter-create-page .publish-actions-right {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  #page-create .schedule-picker-fields-compact .schedule-picker-field:first-child,
+  #page-create .schedule-picker-fields-compact .schedule-picker-field:last-child {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  #page-create .schedule-picker-fields-compact {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-field:first-child,
+  #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-field:last-child {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  #page-create .schedule-picker-fields-compact .schedule-calendar-popover,
+  #page-create .schedule-picker-fields-compact .schedule-time-popover {
+    width: 100%;
+    min-width: 0;
+    inset: calc(100% + var(--ink-space-2)) auto auto 0;
+  }
+
+  #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-calendar-popover,
+  #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-time-popover,
+  #page-create.chapter-create-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-calendar-popover,
+  #page-create.chapter-create-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-time-popover {
+    width: 100%;
+    min-width: 0;
+    inset: calc(100% + var(--ink-space-2)) auto auto 0;
+  }
+
+  #page-create .collection-option-desc {
+    display: none;
+  }
 }
