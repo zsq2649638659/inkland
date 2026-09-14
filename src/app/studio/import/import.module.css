@@ -353,8 +353,8 @@
 .tagEditorHint { color: #8a7e78; font-size: 12px; line-height: 1.5; }
 .cardActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .copyrightBox { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; color: #554a45; line-height: 1.55; cursor: pointer; }
-.copyrightBox input { margin-top: 4px; }
-.copyrightBox span { display: grid; gap: 2px; }
+.copyrightBox :global(.ink-checkbox__control) { margin-top: 4px; }
+.copyrightBox :global(.ink-checkbox__label) { display: grid; gap: 2px; }
 .emptyState, .centerState { text-align: center; padding: 64px 20px; }
 .emptyState h2, .centerState h1 { margin-bottom: 8px; }
 .emptyState p, .centerState p { color: #786f6a; margin-bottom: 20px; }
@@ -519,50 +519,16 @@
   background: transparent;
 }
 
-.selectAllLabel .selectCheckbox { width: 18px; height: 18px; flex-basis: 18px; border-radius: 5px; }
+.selectAllLabel :global(.ink-checkbox__control) { width: 20px; height: 20px; flex-basis: 20px; }
 
 .selectCheckbox {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  display: grid;
-  place-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   margin: 1px 0 0;
-  appearance: none;
-  border: 1.5px solid color-mix(in srgb, var(--color-primary) 58%, var(--color-border));
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
-.selectCheckbox::after {
-  content: "";
-  width: 5px;
-  height: 9px;
-  border: solid var(--color-primary);
-  border-width: 0 2px 2px 0;
-  opacity: 0;
-  transform: translateY(-1px) rotate(45deg) scale(.7);
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
-}
-
-.selectCheckbox:checked {
-  border-color: var(--color-primary);
-  background: #fff;
-}
-
-.selectCheckbox:checked::after {
-  opacity: 1;
-  transform: translateY(-1px) rotate(45deg) scale(1);
-}
-
-.selectCheckbox:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
-  outline-offset: 2px;
-}
-
-.selectCheckbox:disabled { cursor: not-allowed; opacity: .48; }
+.selectCheckbox :global(.ink-checkbox__control) { width: 20px; height: 20px; flex-basis: 20px; }
 
 .encodingField {
   display: grid;
@@ -1111,6 +1077,7 @@
     text-align: center;
     white-space: normal;
   }
+
 }
 
 .previewCard {
@@ -1311,13 +1278,6 @@
   color: var(--color-text-muted);
   background: color-mix(in srgb, var(--color-text) 10%, var(--color-card));
 }
-
-:global([data-theme="dark"]) .selectCheckbox:checked {
-  border-color: var(--color-primary);
-  background: #fff;
-}
-
-:global([data-theme="dark"]) .selectCheckbox:checked::after { border-color: var(--color-primary); }
 
 :global([data-theme="dark"]) .sourceTabs button,
 :global([data-theme="dark"]) .dropZone,

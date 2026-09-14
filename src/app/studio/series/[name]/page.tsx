@@ -3,11 +3,16 @@ import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { SkeletonSeriesDetail } from "@/components/Skeleton";
 import { useAuth } from "@/components/AuthProvider";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import Input from "@/components/inkland/Input";
+import Textarea from "@/components/inkland/Textarea";
+import Tag from "@/components/inkland/Tag";
+import TagInput from "@/components/inkland/TagInput";
 import { normalizeModerationReason } from "@shared/moderationReasons";
 
 interface ChapterInfo {
@@ -41,13 +46,16 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
   const supabase = createClient();
   const { user } = useAuth();
   const dialog = useAppDialog();
+  const router = useRouter();
   const [series, setSeries] = useState<SeriesInfo | null>(null);
   const [chapters, setChapters] = useState<ChapterInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [editSeries, setEditSeries] = useState(false);
+  const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editTagInput, setEditTagInput] = useState("");
+  const [recentTags, setRecentTags] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [profile, setProfile] = useState<{ nickname: string; avatar_url: string | null } | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -86,11 +94,26 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
       .select("nickname, avatar_url")
       .eq("id", user.id)
       .single();
-    const [{ data: seriesData }, { data: chData }, { data: profileData }] = await Promise.all([
+    const recentTagsPromise = supabase
+      .from("user_tag_usage")
+      .select("last_used_at, tags(name)")
+      .eq("user_id", user.id)
+      .order("last_used_at", { ascending: false })
+      .limit(10);
+    const [{ data: seriesData }, { data: chData }, { data: profileData }, { data: recentTagData }] = await Promise.all([
       seriesPromise,
       chaptersPromise,
       profilePromise,
+      recentTagsPromise,
     ]);
+
+    const recentTagNames = ((recentTagData || []) as Array<Record<string, unknown>>)
+      .map((row) => {
+        const tag = row.tags as { name?: string } | { name?: string }[] | null;
+        return Array.isArray(tag) ? tag[0]?.name : tag?.name;
+      })
+      .filter((tag): tag is string => Boolean(tag));
+    setRecentTags([...new Set(recentTagNames)].slice(0, 10));
 
     if (seriesData) {
       const s = seriesData as unknown as Record<string, unknown>;
@@ -105,6 +128,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
         created_at: s.created_at as string,
         updated_at: s.updated_at as string,
       });
+      setEditName((s.name as string) || "");
       setEditDesc((s.description as string) || "");
       setEditTags((s.tags as string[]) || []);
     }
@@ -132,18 +156,35 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
   };
 
   const handleSaveSeries = async () => {
-    if (!series) return;
+    if (!series || !user) return;
+    const nextName = editName.trim();
+    if (!nextName) { await dialog.alert({ title:"保存失败", message:"连载标题不能为空", variant:"danger" }); return; }
     const { error } = await supabase
       .from("series")
       .update({
+        name: nextName,
         description: editDesc,
         tags: editTags,
       })
       .eq("id", series.id);
 
     if (error) { await dialog.alert({ title:"保存失败", message:error.message, variant:"danger" }); return; }
-    setSeries({ ...series, description: editDesc, tags: editTags });
+    if (nextName !== series.name) {
+      const { error: chapterError } = await supabase
+        .from("posts")
+        .update({ series_name: nextName })
+        .eq("series_name", series.name)
+        .eq("post_type", "serial")
+        .eq("user_id", user.id);
+      if (chapterError) {
+        await supabase.from("series").update({ name: series.name }).eq("id", series.id);
+        await dialog.alert({ title:"保存失败", message:chapterError.message, variant:"danger" });
+        return;
+      }
+    }
+    setSeries({ ...series, name: nextName, description: editDesc, tags: editTags });
     setEditSeries(false);
+    if (nextName !== series.name) router.replace(`/studio/series/${encodeURIComponent(nextName)}`);
   };
 
   const handleDeleteChapter = async (chId: string) => {
@@ -156,28 +197,6 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     if (!series) return;
     await supabase.from("series").update({ status: newStatus }).eq("id", series.id);
     setSeries({ ...series, status: newStatus });
-  };
-
-  const addTag = (tag: string) => {
-    const t = tag.trim();
-    if (t && !editTags.includes(t)) {
-      setEditTags([...editTags, t]);
-      setEditTagInput("");
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setEditTags(editTags.filter((t) => t !== tag));
-  };
-
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addTag(editTagInput);
-    }
-    if (e.key === "Backspace" && editTagInput === "" && editTags.length > 0) {
-      removeTag(editTags[editTags.length - 1]);
-    }
   };
 
   const totalWords = chapters.reduce((s, c) => s + c.word_count, 0);
@@ -200,14 +219,14 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     return { className: "ch-status-draft", label: "草稿" };
   };
 
-  if (loading) return <div id="page-series" className="min-h-screen bg-[#f5f6f7]"><SkeletonSeriesDetail /></div>;
+  if (loading) return <div id="page-series" className="min-h-screen bg-paper"><SkeletonSeriesDetail /></div>;
 
   if (!user) {
-    return <div id="page-series" className="min-h-screen bg-[#f5f6f7] flex items-center justify-center"><p className="text-muted">请先登录</p></div>;
+    return <div id="page-series" className="min-h-screen bg-paper flex items-center justify-center"><p className="text-muted">请先登录</p></div>;
   }
 
   return (
-    <div id="page-series" className="min-h-screen bg-[#f5f6f7]">
+    <div id="page-series" className="min-h-screen bg-paper">
       <div className="page-wrapper">
         <div className="content-container">
 
@@ -215,10 +234,10 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
           <div className="hero-card">
             <div className="hero-title-row">
               <div className="hero-title-left">
-                <h1 className="hero-title">{decodedName}</h1>
-                <span className={`serial-badge ${series?.status === "completed" ? "completed" : ""}`}>
+                <h1 className="hero-title">{series?.name || decodedName}</h1>
+                <Tag variant={series?.status === "completed" ? "status-complete" : "status-active"} className="serial-badge">
                   {series?.status === "ongoing" ? "连载中" : "已完结"}
-                </span>
+                </Tag>
               </div>
               <div className="hero-actions">
                 <button className="hero-action-btn primary" onClick={() => setEditSeries(!editSeries)}>
@@ -300,31 +319,34 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
             {/* Edit panel — 重新设计的编辑区域 */}
             {editSeries && series && (
               <div className="series-edit-panel">
+                {/* 连载标题编辑 */}
+                <div className="edit-field">
+                  <Input
+                    label="连载标题"
+                    value={editName}
+                    onChange={(event) => setEditName(event.target.value)}
+                    maxLength={20}
+                    showLimitNumber
+                    placeholder="输入连载标题"
+                  />
+                </div>
+
                 {/* 标签编辑 */}
                 <div className="edit-field">
                   <div className="edit-field-header">
                     <span className="edit-field-label">标签</span>
                     <span className="edit-field-count">{editTags.length} 个</span>
                   </div>
-                  <div className="tag-edit-area">
-                    {editTags.map((tag, idx) => (
-                      <span key={tag} className="tag-edit-pill">
-                        <span className="tag-edit-text">{tag}</span>
-                        <span className="tag-chip-remove" data-index={idx} onClick={() => removeTag(tag)}>
-                          <SiteIcon name="fa-xmark" variant="solid" />
-                        </span>
-                      </span>
-                    ))}
-                    <input
-                      type="text"
-                      className="tag-edit-input"
-                      placeholder="输入标签后按回车添加..."
-                      value={editTagInput}
-                      onChange={(e) => setEditTagInput(e.target.value)}
-                      onKeyDown={handleTagKeyDown}
-                      autoComplete="off"
-                    />
-                  </div>
+                  <TagInput
+                    tags={editTags}
+                    inputValue={editTagInput}
+                    onChange={setEditTags}
+                    onInputValueChange={setEditTagInput}
+                    fieldClassName="series-edit-tag-input"
+                    placeholder="输入标签后按回车添加..."
+                    suggestedTags={recentTags}
+                    onSelectSuggestedTag={(tag) => setEditTags((current) => current.includes(tag) ? current : [...current, tag])}
+                  />
                   <p className="edit-field-hint">按 Enter 确认添加，按 Backspace 删除最后一个标签</p>
                 </div>
 
@@ -332,15 +354,15 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                 <div className="edit-field">
                   <div className="edit-field-header">
                     <span className="edit-field-label">简介</span>
-                    <span className="edit-field-count">{editDesc.length} / 500</span>
                   </div>
-                  <textarea
+                  <Textarea
                     className="desc-edit-input"
                     value={editDesc}
-                    onChange={(e) => {
-                      if (e.target.value.length <= 500) setEditDesc(e.target.value);
-                    }}
-                    rows={4}
+                    onChange={(event) => setEditDesc(event.target.value)}
+                    maxLength={500}
+                    showLimitNumber
+                    height="autosize"
+                    autosize={{ minRows: 1 }}
                     placeholder="写下这个系列的简介，让读者更好地了解你的作品..."
                     autoComplete="off"
                   />
@@ -355,6 +377,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                     className="edit-cancel-btn"
                     onClick={() => {
                       setEditSeries(false);
+                      setEditName(series.name || "");
                       setEditDesc(series.description || "");
                       setEditTags(series.tags || []);
                     }}
@@ -400,7 +423,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                   {chapters.length === 0 ? (
                     <tr>
                       <td colSpan={6} style={{ textAlign: "center", padding: "48px 0", color: "var(--color-text-light)", fontSize: "var(--font-size-base)" }}>
-                        暂无章节数据，点击"新建章节"开始创作
+                        暂无章节数据，点击“新建章节”开始创作
                       </td>
                     </tr>
                   ) : (

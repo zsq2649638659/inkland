@@ -1,5 +1,8 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
+import Checkbox from "@/components/inkland/Checkbox";
+import Radio from "@/components/inkland/Radio";
+import SchedulePicker from "@/components/inkland/SchedulePicker";
 
 import Link from "next/link";
 import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -124,12 +127,6 @@ function getDuplicateNoticeTitle(kind: ImportDuplicateMatch["kind"]) {
   if (kind === "update") return "检测到已有章节";
   if (kind === "batch") return "本批次章节冲突";
   return "疑似重复";
-}
-
-function getDuplicateKeepLabel(kind: ImportDuplicateMatch["kind"]) {
-  if (kind === "exact") return "保留为新作";
-  if (kind === "batch") return "保留为独立内容";
-  return "保留为新作";
 }
 
 function getExtension(fileName: string) {
@@ -705,115 +702,12 @@ function TagEditor({ tags = [], onChange, disabled = false, showHint = true, pla
   );
 }
 
-function SchedulePicker({ disabled, onChange }: { disabled?: boolean; onChange: (value: string) => void }) {
-  const [value, setValue] = useState("");
-  const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
-  const [timePickerOpen, setTimePickerOpen] = useState(false);
-  const [scheduleMonth, setScheduleMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [scheduleTime, setScheduleTime] = useState("20:00");
-
-  const calendarMonthDate = new Date(`${scheduleMonth}-01T00:00:00`);
-  const calendarYear = calendarMonthDate.getFullYear();
-  const calendarMonthIndex = calendarMonthDate.getMonth();
-  const now = new Date();
-  const todayLocalValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const currentCalendarMonth = todayLocalValue.slice(0, 7);
-  const calendarDays = Array.from(
-    { length: new Date(calendarYear, calendarMonthIndex + 1, 0).getDate() + new Date(calendarYear, calendarMonthIndex, 1).getDay() },
-    (_, index) => index < new Date(calendarYear, calendarMonthIndex, 1).getDay() ? null : index - new Date(calendarYear, calendarMonthIndex, 1).getDay() + 1,
-  );
-  const scheduleSelectedDate = value ? value.slice(0, 10) : "";
-  const scheduleHour = scheduleTime.split(":")[0] || "20";
-  const scheduleMinute = scheduleTime.split(":")[1] || "00";
-  const scheduleDisplayValue = value
-    ? new Date(value).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
-    : "选择公开日期";
-
-  const openDatePicker = () => { setSchedulePickerOpen(!schedulePickerOpen); setTimePickerOpen(false); };
-  const openTimePicker = () => { setTimePickerOpen(!timePickerOpen); setSchedulePickerOpen(false); };
-  const changeValue = (nextValue: string) => { setValue(nextValue); onChange(nextValue); };
-
-  return (
-    <div className={styles.schedulePickerFields}>
-      <div className={styles.schedulePickerField}>
-        <span className={styles.schedulePickerLabel}>公开日期</span>
-        <button type="button" className={`${styles.schedulePickerTrigger} ${value ? styles.schedulePickerSelected : ""}`} disabled={disabled} onClick={openDatePicker} aria-expanded={schedulePickerOpen}>
-          <span><SiteIcon name="fa-calendar-days" variant="outline" aria-hidden="true" /> {scheduleDisplayValue}</span>
-          <SiteIcon name="fa-chevron-down" variant="solid" className={schedulePickerOpen ? styles.schedulePickerChevronUp : undefined} aria-hidden="true" />
-        </button>
-        {schedulePickerOpen && (
-          <div className={styles.scheduleCalendarPopover} role="dialog" aria-label="选择公开日期">
-            <div className={styles.scheduleCalendarHeader}>
-              <button type="button" aria-label="上个月" disabled={scheduleMonth <= currentCalendarMonth} onClick={() => {
-                const previous = new Date(calendarYear, calendarMonthIndex - 1, 1);
-                setScheduleMonth(`${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`);
-              }}><SiteIcon name="fa-chevron-left" variant="solid" aria-hidden="true" /></button>
-              <strong>{calendarYear} 年 {calendarMonthIndex + 1} 月</strong>
-              <button type="button" aria-label="下个月" onClick={() => {
-                const next = new Date(calendarYear, calendarMonthIndex + 1, 1);
-                setScheduleMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
-              }}><SiteIcon name="fa-chevron-right" variant="solid" aria-hidden="true" /></button>
-            </div>
-            <div className={styles.scheduleCalendarWeekdays}>{["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day}>{day}</span>)}</div>
-            <div className={styles.scheduleCalendarGrid}>
-              {calendarDays.map((day, index) => {
-                if (!day) return <span key={`empty-${index}`} />;
-                const dayValue = `${scheduleMonth}-${String(day).padStart(2, "0")}`;
-                const isSelected = scheduleSelectedDate === dayValue;
-                const isToday = todayLocalValue === dayValue;
-                const isPast = dayValue < todayLocalValue;
-                return (
-                  <button type="button" key={dayValue} disabled={isPast} className={`${isSelected ? styles.scheduleDaySelected : ""} ${isToday ? styles.scheduleDayToday : ""} ${isPast ? styles.scheduleDayPast : ""}`} onClick={() => { if (isPast) return; changeValue(`${dayValue}T${scheduleTime}`); setSchedulePickerOpen(false); }}>
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-      <div className={styles.schedulePickerField}>
-        <span className={styles.schedulePickerLabel}>公开时间</span>
-        <button type="button" className={`${styles.schedulePickerTrigger} ${timePickerOpen ? styles.schedulePickerOpen : ""}`} disabled={disabled} onClick={openTimePicker} aria-expanded={timePickerOpen}>
-          <span><SiteIcon name="fa-clock" variant="outline" aria-hidden="true" /> {scheduleTime}</span>
-          <SiteIcon name="fa-chevron-down" variant="solid" className={timePickerOpen ? styles.schedulePickerChevronUp : undefined} aria-hidden="true" />
-        </button>
-        {timePickerOpen && (
-          <div className={styles.scheduleTimePopover} role="dialog" aria-label="选择公开时间">
-            <span className={styles.scheduleTimePopoverTitle}>选择小时和分钟</span>
-            <div className={styles.scheduleTimeColumns}>
-              <div className={styles.scheduleTimeColumn}>
-                <span>小时</span>
-                <div className={styles.scheduleTimeOptions}>
-                  {Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0")).map((hour) => (
-                    <button type="button" key={hour} className={scheduleHour === hour ? styles.scheduleTimeOptionSelected : ""} onClick={() => { const nextTime = `${hour}:${scheduleMinute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) changeValue(`${scheduleSelectedDate}T${nextTime}`); }}>{hour}</button>
-                  ))}
-                </div>
-              </div>
-              <div className={styles.scheduleTimeColumn}>
-                <span>分钟</span>
-                <div className={styles.scheduleTimeOptions}>
-                  {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((minute) => (
-                    <button type="button" key={minute} className={scheduleMinute === minute ? styles.scheduleTimeOptionSelected : ""} onClick={() => { const nextTime = `${scheduleHour}:${minute}`; setScheduleTime(nextTime); if (scheduleSelectedDate) changeValue(`${scheduleSelectedDate}T${nextTime}`); setTimePickerOpen(false); }}>{minute}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function ImportWorkspace() {
   const { user, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleValueRef = useRef("");
+  const [scheduleValue, setScheduleValue] = useState("");
   const sourceTabRefs = useRef<Record<SourceTabKey, HTMLButtonElement | null>>({
     local: null,
     notion: null,
@@ -1085,6 +979,30 @@ export default function ImportWorkspace() {
     setNoticeModalWorkId(null);
     const selectedAfter = parsedWorks.filter((work) => work.id === currentWorkId ? action !== "skip" : work.selected).length;
     if (selectedAfter > 0) setCurrentStep(3);
+  };
+
+  const finishAllDuplicateNotices = (action: Extract<ImportDuplicateAction, "skip" | "keep" | "update">) => {
+    const targetWorkIds = noticeModalWorkIds.filter((workId) => {
+      const work = parsedWorks.find((item) => item.id === workId);
+      if (!work?.duplicateMatch) return false;
+      return action !== "update" || work.duplicateMatch.kind === "update";
+    });
+    if (targetWorkIds.length === 0) return;
+
+    const targetWorkIdSet = new Set(targetWorkIds);
+    setParsedWorks((works) => works.map((work) => targetWorkIdSet.has(work.id)
+      ? { ...work, duplicateAction: action, selected: action !== "skip" }
+      : work));
+    setError("");
+
+    const remainingWorkIds = noticeModalWorkIds.filter((workId) => !targetWorkIdSet.has(workId));
+    setNoticeModalWorkIds(remainingWorkIds);
+    setNoticeModalWorkId(remainingWorkIds[0] || null);
+
+    if (remainingWorkIds.length === 0) {
+      const selectedAfter = parsedWorks.filter((work) => targetWorkIdSet.has(work.id) ? action !== "skip" : work.selected).length;
+      if (selectedAfter > 0) setCurrentStep(3);
+    }
   };
 
   const setParsedSelection = (workId: string, selected: boolean) => {
@@ -1434,6 +1352,7 @@ export default function ImportWorkspace() {
     setCopyrightConfirmed(false);
     setPublishMode("publish");
     scheduleValueRef.current = "";
+    setScheduleValue("");
     setPublishResults([]);
     setPublishProgress(0);
     setPublishComplete(false);
@@ -1625,6 +1544,8 @@ export default function ImportWorkspace() {
     || textPlans.find((plan) => plan.mode !== "single" && parsedWorks.some((work) => work.selected && work.sourcePlanId === plan.id));
   const activeGroupedPlans = activeGroupedPlan ? [activeGroupedPlan] : [];
   const noticeModalWork = parsedWorks.find((work) => work.id === noticeModalWorkId);
+  const noticeDuplicateWorks = parsedWorks.filter((work) => noticeModalWorkIds.includes(work.id) && work.duplicateMatch);
+  const noticeExactDuplicateCount = noticeDuplicateWorks.filter((work) => work.duplicateMatch?.kind === "exact").length;
   const metadataCandidateModalPlan = textPlans.find((plan) => plan.id === metadataCandidateModalPlanId);
   const splitSummary = textPlans
     .filter((plan) => plan.chapters.length >= 2 && plan.mode !== "single")
@@ -1752,13 +1673,18 @@ export default function ImportWorkspace() {
                     <div className={styles.encodingField}><span>文字编码</span><EncodingSelect value={encodingPlan.encoding} disabled={busy} onChange={(encoding) => void updateTextPlan(encodingPlan.id, { encoding })} /></div>
                   </section>}
                   {splitPlan && <section className={styles.textPlanCard}>
-                    <fieldset className={styles.splitOptions}><legend>导入方式</legend><label><input type="radio" name="import-mode" checked={splitPlan.mode === "serial"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "serial" })} />长篇连载</label><label><input type="radio" name="import-mode" checked={splitPlan.mode === "collection"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "collection" })} />合集单篇</label><label><input type="radio" name="import-mode" checked={splitPlan.mode === "single"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "single" })} />保持整篇</label></fieldset>
+                    <fieldset className={styles.splitOptions}>
+                      <legend>导入方式</legend>
+                      <Radio name="import-mode" value="serial" checked={splitPlan.mode === "serial"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "serial" })}>长篇连载</Radio>
+                      <Radio name="import-mode" value="collection" checked={splitPlan.mode === "collection"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "collection" })}>合集单篇</Radio>
+                      <Radio name="import-mode" value="single" checked={splitPlan.mode === "single"} disabled={busy} onChange={() => void updateTextPlan(splitPlan.id, { mode: "single" })}>保持整篇</Radio>
+                    </fieldset>
                   </section>}
                 </div>}
-                <div className={styles.previewToolbar}><strong>作品内容</strong><label className={styles.selectAllLabel}><input className={styles.selectCheckbox} type="checkbox" checked={selectedParsedCount === parsedWorks.length} disabled={busy} onChange={(event) => setAllParsedSelection(event.target.checked)} /> 全选</label></div>
+                <div className={styles.previewToolbar}><strong>作品内容</strong><Checkbox className={styles.selectAllLabel} checked={parsedWorks.length > 0 && selectedParsedCount === parsedWorks.length} indeterminate={selectedParsedCount > 0 && selectedParsedCount < parsedWorks.length} disabled={busy} onChange={(event) => setAllParsedSelection(event.target.checked)}>全选</Checkbox></div>
                 {splitSummary && <p className={styles.previewDescription}>{splitSummary}</p>}
                 <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
-                <div className={`${styles.previewList} ${parsedWorks.length === 1 ? styles.previewListSingle : parsedWorks.length === 2 ? styles.previewListDouble : ""}`}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><input className={styles.selectCheckbox} type="checkbox" checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div><label className={styles.contentField}><span>正文</span><div className={styles.contentFieldControl}><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /><span className={styles.wordCount}>{work.wordCount.toLocaleString()} 字</span></div></label></div></article>)}</div>
+                <div className={`${styles.previewList} ${parsedWorks.length === 1 ? styles.previewListSingle : parsedWorks.length === 2 ? styles.previewListDouble : ""}`}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><Checkbox as="span" className={styles.selectCheckbox} checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div><label className={styles.contentField}><span>正文</span><div className={styles.contentFieldControl}><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /><span className={styles.wordCount}>{work.wordCount.toLocaleString()} 字</span></div></label></div></article>)}</div>
                 </div>
                 <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>下一步</button></div>
               </div>}
@@ -1787,18 +1713,18 @@ export default function ImportWorkspace() {
                 <section className={styles.publishPanel} aria-label="确认发布">
                   <fieldset className={`${styles.publishModes} collection-options`}>
                     <legend>发布方式</legend>
-                    <button type="button" className={`collection-option ${publishMode === "publish" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "publish"} disabled={busy || publishComplete} onClick={() => setPublishMode("publish")}>
+                    <Radio name="publish-mode" value="publish" className={`collection-option ${publishMode === "publish" ? "selected" : ""}`} checked={publishMode === "publish"} disabled={busy || publishComplete} onChange={() => setPublishMode("publish")}>
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>立即发布</strong></span><span className="collection-option-desc">提交审核，审核通过后公开</span></span>
-                    </button>
-                    <button type="button" className={`collection-option ${publishMode === "draft" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "draft"} disabled={busy || publishComplete} onClick={() => setPublishMode("draft")}>
+                    </Radio>
+                    <Radio name="publish-mode" value="draft" className={`collection-option ${publishMode === "draft" ? "selected" : ""}`} checked={publishMode === "draft"} disabled={busy || publishComplete} onChange={() => setPublishMode("draft")}>
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>保存到草稿箱</strong></span><span className="collection-option-desc">稍后在作品管理中继续编辑</span></span>
-                    </button>
-                    <button type="button" className={`collection-option ${publishMode === "schedule" ? "selected" : ""}`} role="radio" aria-checked={publishMode === "schedule"} disabled={busy || publishComplete} onClick={() => setPublishMode("schedule")}>
+                    </Radio>
+                    <Radio name="publish-mode" value="schedule" className={`collection-option ${publishMode === "schedule" ? "selected" : ""}`} checked={publishMode === "schedule"} disabled={busy || publishComplete} onChange={() => setPublishMode("schedule")}>
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>定时发布</strong></span><span className="collection-option-desc">提交审核，通过后按设定时间公开</span></span>
-                    </button>
+                    </Radio>
                   </fieldset>
-                  {publishMode === "schedule" && <SchedulePicker disabled={busy || publishComplete} onChange={(value) => { scheduleValueRef.current = value; }} />}
-                  <label className={styles.copyrightBox}><input type="checkbox" checked={copyrightConfirmed} disabled={busy || publishComplete} onChange={(event) => setCopyrightConfirmed(event.target.checked)} /><span>我确认自己是所选内容的作者，或已取得在 Inkland 发布这些内容的许可。</span></label>
+                  {publishMode === "schedule" && <SchedulePicker value={scheduleValue} disabled={busy || publishComplete} onChange={(value) => { scheduleValueRef.current = value; setScheduleValue(value); }} />}
+                  <Checkbox className={styles.copyrightBox} checked={copyrightConfirmed} disabled={busy || publishComplete} onChange={(event) => setCopyrightConfirmed(event.target.checked)}>我确认自己是所选内容的作者，或已取得在 Inkland 发布这些内容的许可。</Checkbox>
                   <div className={styles.finalActions}>{!publishComplete && <button type="button" disabled={busy} onClick={() => { setError(""); setCurrentStep(3); }}>上一步</button>}<button type="button" className={styles.primaryButton} disabled={busy || publishComplete || selectedParsedCount === 0} onClick={() => void publishSelectedWorks()}>{busy ? "正在处理..." : "下一步"}</button></div>
                 </section>
               </div>}
@@ -1853,20 +1779,22 @@ export default function ImportWorkspace() {
               <div className="modal" role="dialog" aria-modal="true" aria-labelledby={`import-notice-title-${noticeModalWork.id}`} onClick={(event) => event.stopPropagation()}>
                 <div className="modal-title" id={`import-notice-title-${noticeModalWork.id}`}>{noticeModalWork.duplicateMatch ? getDuplicateNoticeTitle(noticeModalWork.duplicateMatch.kind) : "导入提示"}</div>
                 <div className="modal-body">
-                  <p className={styles.importNoticeWorkTitle}>《{noticeModalWork.title}》</p>
+                  {noticeModalWork.duplicateMatch?.kind !== "exact" && <p className={styles.importNoticeWorkTitle}>《{noticeModalWork.title}》</p>}
                   {noticeModalWork.warning && <p>{noticeModalWork.warning}</p>}
-                  {noticeModalWork.duplicateMatch && <p>{noticeModalWork.duplicateMatch.message}</p>}
+                  {noticeModalWork.duplicateMatch && <p>{noticeModalWork.duplicateMatch.kind === "exact"
+                    ? `本次共有 ${noticeExactDuplicateCount} 篇内容完全相同，建议全部跳过。`
+                    : noticeModalWork.duplicateMatch.message}</p>}
                 </div>
                 <div className={`modal-actions ${styles.importNoticeActions}`}>
                   {noticeModalWork.duplicateMatch
                     ? <>
                       <button type="button" className="btn-modal btn-modal-cancel" onClick={closeImportNotices}>取消</button>
-                      {noticeModalWork.duplicateMatch.kind === "update" && <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("update")}>更新已有版本</button>}
+                      {noticeModalWork.duplicateMatch.kind === "update" && <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishAllDuplicateNotices("update")}>全部更新已有版本</button>}
                       {noticeModalWork.duplicateMatch.kind === "update"
-                        ? <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("keep")}>作为新章节</button>
+                        ? <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishAllDuplicateNotices("keep")}>全部保留</button>
                         : <>
-                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("skip")}>跳过</button>
-                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice("keep")}>{getDuplicateKeepLabel(noticeModalWork.duplicateMatch.kind)}</button>
+                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishAllDuplicateNotices("skip")}>全部跳过</button>
+                          <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishAllDuplicateNotices("keep")}>全部保留</button>
                         </>}
                     </>
                     : <button type="button" className="btn-modal btn-modal-primary" onClick={() => finishImportNotice()}>知道了</button>}

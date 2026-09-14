@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MODERATION_REASON_OPTIONS } from "@shared/moderationReasons";
+import Radio from "@/components/inkland/Radio";
 
 type ModerationMode = "report" | "block";
 
@@ -36,15 +37,15 @@ export default function ModerationReasonModal({ open, mode, submitting = false, 
         <div className="modal-body">
           {mode === "report" ? (
             <>
-              <ul className="report-reason-list">
+              <ul className="report-reason-list" role="radiogroup" aria-label="举报原因">
                 {MODERATION_REASON_OPTIONS.map((reason) => (
                   <li
                     key={reason}
                     className={`report-reason-item${selectedReason === reason ? " selected" : ""}`}
-                    onClick={() => setSelectedReason(reason)}
                   >
-                    <span className="report-reason-radio" />
-                    {reason}
+                    <Radio name="moderation-reason" value={reason} variant="control" className="report-reason-control" checked={selectedReason === reason} onChange={() => setSelectedReason(reason)}>
+                      {reason}
+                    </Radio>
                   </li>
                 ))}
               </ul>
