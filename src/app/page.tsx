@@ -421,7 +421,7 @@ export default function HomePage() {
                   </>
                 ) : (
                   <EmptyState
-                    icon={error ? "fa-triangle-exclamation" : "fa-feather-pointed"}
+                    icon={error ? "fa-circle-exclamation" : "fa-feather-pointed"}
                     title={error ? `数据加载失败: ${error}` : "还没有关注任何作品"}
                     description={error ? undefined : "关注你喜欢的创作者，这里将显示他们的最新作品"}
                     actionLabel={error ? undefined : "去发现创作者"}
@@ -509,7 +509,7 @@ export default function HomePage() {
               </>
             ) : (
               <EmptyState
-                icon={error ? "fa-triangle-exclamation" : "fa-feather-pointed"}
+                icon={error ? "fa-circle-exclamation" : "fa-feather-pointed"}
                 title={error ? `数据加载失败: ${error}` : "还没有任何作品"}
                 description={error ? undefined : "创建你的第一个作品，开始创作之旅"}
                 actionLabel={error ? undefined : "创建作品"}

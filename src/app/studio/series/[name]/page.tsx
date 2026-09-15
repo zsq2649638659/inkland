@@ -328,6 +328,9 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                     maxLength={20}
                     showLimitNumber
                     placeholder="输入连载标题"
+                    historyKey="work-title"
+                    historyLabel="连载标题"
+                    onHistorySelect={setEditName}
                   />
                 </div>
 
@@ -365,6 +368,9 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                     autosize={{ minRows: 1 }}
                     placeholder="写下这个系列的简介，让读者更好地了解你的作品..."
                     autoComplete="off"
+                    historyKey="series-description"
+                    historyLabel="连载简介"
+                    onHistorySelect={setEditDesc}
                   />
                 </div>
 
@@ -450,13 +456,13 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                           <td>
                             <div className="ch-actions">
                               <Link href={`/create?editPost=${ch.id}`} className="ch-action-btn" title="编辑">
-                                <SiteIcon name="fa-pencil" variant="solid" size={16} />
+                                <SiteIcon name="fa-action-edit" size={16} />
                               </Link>
-                              <Link href={`/read/${ch.id}`} className="ch-action-btn" title="查看" target="_blank">
-                                <SiteIcon name="fa-eye" variant="outline" size={16} />
+                              <Link href={`/read/${ch.id}`} className="ch-action-btn" title="预览" target="_blank">
+                                <SiteIcon name="fa-action-preview-open" size={16} />
                               </Link>
                               <button className="ch-action-btn" title="删除" onClick={() => handleDeleteChapter(ch.id)}>
-                                <SiteIcon name="fa-trash-can" variant="solid" size={16} />
+                                <SiteIcon name="fa-action-delete" size={16} />
                               </button>
                             </div>
                           </td>

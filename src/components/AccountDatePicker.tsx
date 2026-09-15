@@ -81,7 +81,7 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
         aria-haspopup="dialog"
         onClick={togglePicker}
       >
-        <span><SiteIcon name="fa-calendar-days" variant="outline" aria-hidden="true" /> {formatDate(value)}</span>
+        <span><SiteIcon name="fa-calendar" variant="outline" aria-hidden="true" /> {formatDate(value)}</span>
         <SiteIcon name="fa-chevron-down" variant="solid" className={open ? "up" : undefined} aria-hidden="true" />
       </button>
 

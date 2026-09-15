@@ -142,7 +142,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
               </div>
               <div className="collection-hero-actions">
                 <button type="button" className={`collection-action-btn${isSaved ? " saved" : ""}`} onClick={() => setIsSaved((saved) => !saved)}><SiteIcon name="fa-bookmark" variant="solid" /> {isSaved ? "已收藏" : "收藏合集"}</button>
-                <button type="button" className="collection-action-btn" onClick={handleShare}><SiteIcon name="fa-share-nodes" variant="solid" /> 分享</button>
+                <button type="button" className="collection-action-btn" onClick={handleShare}><SiteIcon name="fa-share-from-square" variant="solid" /> 分享</button>
               </div>
             </div>
             {collection.description && <p className="collection-description">{collection.description}</p>}

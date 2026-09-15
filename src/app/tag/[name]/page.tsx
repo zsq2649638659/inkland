@@ -470,7 +470,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
               </button>
             )}
             <button type="button" className="profile-action-btn" onClick={handleShare}>
-              <SiteIcon name="fa-share-nodes" variant="solid" /> 分享
+              <SiteIcon name="fa-share-from-square" variant="solid" /> 分享
             </button>
           </div>
         </section>

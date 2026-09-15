@@ -7,6 +7,8 @@ import Textarea from "@/components/inkland/Textarea";
 import TagInput from "@/components/inkland/TagInput";
 import Tag from "@/components/inkland/Tag";
 import SchedulePicker from "@/components/inkland/SchedulePicker";
+import { InputHistoryPopover, useInputHistory } from "@/components/inkland/InputHistoryPopover";
+import type { InputHistoryField } from "@/lib/inputHistory";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -362,16 +364,28 @@ function ArticleEditorSurface({
   value,
   onChange,
   editorTools = false,
+  historyKey,
 }: {
   value: string;
   onChange: (value: string) => void;
   editorTools?: boolean;
+  historyKey?: InputHistoryField;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [editorFontSize, setEditorFontSize] = useState(16);
+  const editorHistory = useInputHistory({
+    field: historyKey,
+    value,
+    onSelect: (nextValue) => {
+      onChange(nextValue);
+      window.requestAnimationFrame(() => {
+        if (surfaceRef.current) surfaceRef.current.innerHTML = renderSafeMarkdown(nextValue);
+      });
+    },
+  });
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -422,7 +436,7 @@ function ArticleEditorSurface({
         if (surfaceRef.current) surfaceRef.current.innerHTML = html;
         onChange(paragraphs.join("\n\n"));
       }} />
-      <div className="editor-body">
+      <div ref={editorHistory.controlRef} className="editor-body">
         <div
           ref={surfaceRef}
           className="editor-content"
@@ -432,6 +446,8 @@ function ArticleEditorSurface({
           aria-multiline="true"
           style={editorTools ? { fontSize: `${editorFontSize}px` } : undefined}
           onInput={(event) => onChange(htmlToMarkdown(event.currentTarget.innerHTML))}
+          onFocus={editorHistory.handleFocus}
+          onBlur={editorHistory.handleBlur}
           onPaste={(event) => {
             event.preventDefault();
             const plainText = event.clipboardData.getData("text/plain");
@@ -446,6 +462,7 @@ function ArticleEditorSurface({
             }
           }}
         />
+        {editorHistory.open ? <InputHistoryPopover entries={editorHistory.entries} label="正文" placement={editorHistory.placement} popoverRef={editorHistory.popoverRef} style={editorHistory.position} onSelect={editorHistory.handleSelect} /> : null}
       </div>
       {importError && <div className="editor-import-error" role="alert"><SiteIcon name="fa-circle-exclamation" variant="solid" />{importError}</div>}
       <div className="editor-footer">
@@ -1494,7 +1511,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     reviewRejectionReason && (
       <div className="review-rejection-banner" role="alert">
         <div className="review-rejection-head">
-          <SiteIcon name="fa-triangle-exclamation" variant="solid" aria-hidden="true" />
+          <SiteIcon name="fa-circle-exclamation" variant="solid" aria-hidden="true" />
           <strong>作品未通过审核</strong>
         </div>
         <p className="review-rejection-reason">{reviewRejectionReason}</p>
@@ -1613,12 +1630,15 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 showLimitNumber
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                historyKey="work-title"
+                historyLabel="作品标题"
+                onHistorySelect={setTitle}
               />
             </div>
 
             <div className="form-section">
               <label className="form-label">正文</label>
-              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} editorTools />
+              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} editorTools historyKey="article-body" />
             </div>
 
             <div className="form-section">
@@ -1717,6 +1737,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 type="text" placeholder="（选填）" maxLength={20}
                 label="作品标题" showLimitNumber
                 value={title} onChange={(e) => setTitle(e.target.value)}
+                historyKey="work-title"
+                historyLabel="作品标题"
+                onHistorySelect={setTitle}
               />
             </div>
 
@@ -1786,6 +1809,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 autosize={{ minRows: 1 }}
                 value={imageDesc}
                 onChange={(e) => setImageDesc(e.target.value)}
+                historyKey="image-description"
+                historyLabel="图片说明"
+                onHistorySelect={setImageDesc}
               />
             </div>
 
@@ -1885,6 +1911,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 showLimitNumber
                 value={newSeriesName}
                 onChange={(e) => setNewSeriesName(e.target.value)}
+                historyKey="work-title"
+                historyLabel="连载名称"
+                onHistorySelect={setNewSeriesName}
               />
             </div>
 
@@ -1901,6 +1930,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 aria-required="true"
                 value={newSeriesDesc}
                 onChange={(e) => setNewSeriesDesc(e.target.value)}
+                historyKey="series-description"
+                historyLabel="连载简介"
+                onHistorySelect={setNewSeriesDesc}
               />
             </div>
 
@@ -2049,12 +2081,15 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   showLimitNumber
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  historyKey="chapter-title"
+                  historyLabel="章节标题"
+                  onHistorySelect={setTitle}
                 />
               </div>
             </section>
             <section className="form-section chapter-editor-section">
               <div className="form-section-header"><label className="form-label">正文内容</label></div>
-              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} editorTools />
+              <ArticleEditorSurface value={editor.content} onChange={editor.setContentRaw} editorTools historyKey="chapter-body" />
             </section>
             <section className="form-section chapter-author-note-field">
               <Textarea
@@ -2068,6 +2103,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 height="autosize"
                 autosize={{ minRows: 1 }}
                 showLimitNumber
+                historyKey="author-note"
+                historyLabel="作者的话"
+                onHistorySelect={setAuthorNote}
               />
             </section>
             <SchedulePublishOptions

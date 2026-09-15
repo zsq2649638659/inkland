@@ -54,7 +54,7 @@ export default function ChapterPreviewPage() {
         <div className="work-content">
           <div className="reader-content" dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(preview.content) }} />
         </div>
-        {preview.authorNote && <aside className="chapter-static-author-note"><strong>作者的话</strong><p>{preview.authorNote}</p></aside>}
+        {preview.authorNote && <aside className="chapter-author-note chapter-static-author-note"><strong>作者的话</strong><p>{preview.authorNote}</p></aside>}
         <div className="chapter-nav chapter-static-preview-nav">
           <span className="chapter-nav-btn prev disabled"><span className="chapter-nav-label"><SiteIcon name="fa-chevron-left" variant="solid" /> 上一章</span></span>
           <span className="chapter-nav-btn back"><span className="chapter-nav-label">返回目录</span></span>
