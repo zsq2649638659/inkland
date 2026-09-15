@@ -2798,8 +2798,10 @@ p {
 }
 
 .publish-article-page .publish-form {
-  max-width: 800px;
+  width: 100%;
+  max-width: 600px;
   margin: 0 auto;
+  padding: 32px 24px 120px;
 }
 
 .publish-article-page .form-section {
@@ -3016,7 +3018,7 @@ p {
 
 .publish-article-page .collection-options {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -3081,7 +3083,6 @@ p {
 .publish-article-page .collection-option-text {
   color: var(--color-text);
   font-size: 14px;
-  font-weight: 500;
 }
 
 .publish-article-page .collection-option-desc {
@@ -3267,7 +3268,7 @@ p {
 }
 
 #page-create.publish-article-page .collection-options {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 #page-create.publish-article-page .custom-select {
@@ -10657,8 +10658,10 @@ p {
 }
 
 .publish-series-page .publish-form {
-  max-width: 800px;
+  width: 100%;
+  max-width: 600px;
   margin: 0 auto;
+  padding: 48px 24px 120px;
 }
 
 .publish-series-page .form-section {
@@ -12081,7 +12084,7 @@ p {
 }
 
 #page-create .publish-container {
-  max-width: 1200px;
+  max-width: 600px;
   margin: 0 auto;
   padding: var(--spacing-lg) var(--spacing-lg) 120px;
 }
@@ -12121,7 +12124,8 @@ p {
 }
 
 #page-create .publish-form {
-  max-width: 800px;
+  width: 100%;
+  max-width: 600px;
   margin: 0 auto;
 }
 
@@ -12504,7 +12508,6 @@ p {
 
 #page-create .collection-option-text {
   font-size: 14px;
-  font-weight: 500;
   color: var(--color-text);
   letter-spacing: -0.02em;
 }
@@ -12832,7 +12835,7 @@ p {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-card);
-  padding: var(--spacing-2xl) var(--spacing-lg);
+  padding: var(--spacing-lg);
   text-align: center;
   transition: all 0.25s ease;
   cursor: pointer;
@@ -12845,7 +12848,7 @@ p {
 
 #page-create .image-upload-icon {
   display: block;
-  margin: 0 0 var(--spacing-md);
+  margin: 0 0 var(--ink-space-2);
   font-size: 40px;
   color: var(--color-primary-light);
   transition: color 0.25s ease;
@@ -13981,7 +13984,7 @@ p {
 #page-create.chapter-create-page input,
 #page-create.chapter-create-page textarea,
 #page-create.chapter-create-page .editor-content { font-family: var(--font-family) !important; }
-#page-create.chapter-create-page .chapter-container { width: auto; max-width: 800px; margin: 0 auto; padding: var(--spacing-xl) var(--spacing-lg) 120px; }
+#page-create.chapter-create-page .chapter-container { width: 100%; max-width: 600px; margin: 0 auto; padding: var(--spacing-xl) var(--spacing-lg) 120px; }
 #page-create.chapter-create-page .serial-info-card { display: flex; align-items: center; gap: var(--spacing-lg); margin-bottom: var(--spacing-xl); border-radius: var(--radius-lg); }
 #page-create.chapter-create-page .serial-info-body { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: var(--spacing-lg); }
 #page-create.chapter-create-page .serial-info-name { color: var(--color-text); font-size: var(--font-size-lg); font-weight: 700; line-height: 1.3; }
@@ -14893,13 +14896,13 @@ img.load-error {
 /* The create page has older, more specific publish-picker rules. Keep the
    shared selector dimensions and typography authoritative there as well. */
 #page-create.publish-article-page .schedule-picker-fields .schedule-picker-field:first-child {
-  flex: 1 1 278px;
-  min-width: 278px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 #page-create.publish-article-page .schedule-picker-fields .schedule-picker-field:last-child {
-  flex: 0 0 148px;
-  min-width: 148px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 #page-create.publish-article-page .schedule-picker-fields .schedule-picker-trigger,
@@ -15042,22 +15045,22 @@ img.load-error {
   position: relative;
   display: inline-flex;
   width: 48px;
-  height: 28px;
+  height: 26px;
   flex: 0 0 48px;
   align-items: center;
   padding: 0;
-  border: 1px solid var(--ink-color-border);
+  border: 0;
   border-radius: var(--ink-radius-pill);
-  background: var(--ink-color-bg-component-disabled);
+  background: var(--ink-color-bg-component);
   cursor: pointer;
   transition: background-color var(--ink-motion-fast) ease, border-color var(--ink-motion-fast) ease;
 }
 
 #page-create .schedule-publish-switch > span {
   display: block;
-  width: 20px;
-  height: 20px;
-  margin-left: 3px;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
   border-radius: 50%;
   background: var(--ink-color-bg-surface);
   box-shadow: var(--ink-shadow-sm);
@@ -15070,17 +15073,18 @@ img.load-error {
 }
 
 #page-create .schedule-publish-switch.active > span {
-  transform: translateX(20px);
+  transform: translateX(22px);
 }
 
 #page-create .schedule-publish-switch:hover:not(:disabled),
 #page-create .schedule-publish-switch:focus-visible {
-  border-color: var(--ink-color-brand);
+  border-color: transparent;
 }
 
 #page-create .schedule-publish-switch:focus-visible {
   outline: var(--ink-outline-focus);
   outline-offset: var(--ink-outline-offset-focus);
+  box-shadow: none;
 }
 
 #page-create .schedule-publish-switch:disabled {
@@ -15094,48 +15098,39 @@ img.load-error {
 
 #page-create .schedule-picker-fields-compact {
   display: grid;
-  /* The legacy calendar popover keeps 16px inner padding. Size the trigger
-     from the calendar's 7 x 32px content plus that padding and its border. */
-  --schedule-calendar-width: calc(224px + var(--ink-space-4) + var(--ink-space-4) + var(--ink-border-width-thin) + var(--ink-border-width-thin));
-  --schedule-time-width: 280px;
-  grid-template-columns: var(--schedule-calendar-width) var(--schedule-time-width);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ink-space-3);
 }
 
-#page-create .schedule-picker-fields-compact .schedule-picker-field:first-child {
-  width: var(--schedule-calendar-width);
-  min-width: 0;
-  flex: none;
-}
-
+#page-create .schedule-picker-fields-compact .schedule-picker-field:first-child,
 #page-create .schedule-picker-fields-compact .schedule-picker-field:last-child {
-  width: var(--schedule-time-width);
+  width: auto;
   min-width: 0;
-  flex: none;
+  flex: initial;
 }
 
 #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-field:first-child {
-  width: var(--schedule-calendar-width);
+  width: 100%;
   min-width: 0;
-  flex: none;
+  flex: initial;
 }
 
 #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-field:last-child {
-  width: var(--schedule-time-width);
+  width: 100%;
   min-width: 0;
-  flex: none;
+  flex: initial;
 }
 
 #page-create .schedule-picker-fields-compact .schedule-calendar-popover {
-  width: var(--schedule-calendar-width);
-  min-width: var(--schedule-calendar-width);
+  width: 100%;
+  min-width: 0;
   max-height: min(320px, calc(100dvh - 24px));
   overflow-y: auto;
 }
 
 #page-create .schedule-picker-fields-compact .schedule-time-popover {
-  width: var(--schedule-time-width);
-  min-width: var(--schedule-time-width);
+  width: 100%;
+  min-width: 0;
   max-height: min(280px, calc(100dvh - 24px));
   overflow-y: auto;
 }
@@ -15147,13 +15142,13 @@ img.load-error {
 }
 
 #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-calendar-popover {
-  width: var(--schedule-calendar-width);
-  min-width: var(--schedule-calendar-width);
+  width: 100%;
+  min-width: 0;
 }
 
 #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-time-popover {
-  width: var(--schedule-time-width);
-  min-width: var(--schedule-time-width);
+  width: 100%;
+  min-width: 0;
 }
 
 #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-trigger,
@@ -15343,8 +15338,8 @@ img.load-error {
   }
 
   #page-create .schedule-picker-fields-compact {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   #page-create.publish-article-page .schedule-picker-fields.schedule-picker-fields-compact .schedule-picker-field:first-child,
@@ -15372,5 +15367,271 @@ img.load-error {
 
   #page-create .collection-option-desc {
     display: none;
+  }
+}
+
+/* Publish-page collection selection: two equal choices, followed by a
+   neutral dropdown whose first action creates a new collection. */
+#page-create .collection-options {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ink-space-3);
+}
+
+#page-create .collection-option {
+  width: 100%;
+  height: var(--ink-input-height-md);
+  min-height: var(--ink-input-height-md);
+  flex-direction: row;
+  justify-content: center;
+  gap: 0;
+  padding: 0 var(--ink-space-3);
+  text-align: center;
+}
+
+#page-create .collection-option-copy {
+  gap: 0;
+}
+
+#page-create .collection-option-desc {
+  display: none;
+}
+
+#page-create .custom-select-create-option {
+  display: flex;
+  width: 100%;
+  min-height: var(--ink-height-control-sm);
+  align-items: center;
+  gap: var(--ink-gap-inline);
+  padding: 0 var(--ink-space-3);
+  border: 0;
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-color-brand);
+  background: transparent;
+  font: var(--ink-font-control);
+  text-align: left;
+  transition: color var(--ink-motion-fast) ease, background-color var(--ink-motion-fast) ease;
+}
+
+#page-create .custom-select-create-option > svg {
+  width: var(--ink-size-16);
+  height: var(--ink-size-16);
+  flex: 0 0 auto;
+}
+
+#page-create .custom-select-create-option:hover,
+#page-create .custom-select-create-option:focus-visible {
+  color: var(--ink-color-brand-hover);
+  background: var(--ink-color-brand-light);
+}
+
+#page-create .custom-select-dropdown {
+  overflow: hidden;
+}
+
+#page-create .custom-select-option {
+  display: flex;
+  width: 100%;
+  min-height: var(--ink-height-control-sm);
+  align-items: center;
+  text-align: left;
+}
+
+/* The form itself is the 600px outer measure on desktop. Its two-column
+   controls must stretch to the full grid tracks rather than shrink to their
+   content. */
+#page-create .schedule-picker-fields-compact {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#page-create.publish-article-page .publish-form,
+#page-create.publish-series-page .publish-form {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+#page-create .collection-create-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ink-z-modal, 40);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ink-space-4);
+  background: rgba(26, 26, 26, .42);
+  backdrop-filter: blur(4px);
+}
+
+#page-create .collection-create-modal {
+  display: grid;
+  width: min(440px, 100%);
+  max-height: min(640px, calc(100dvh - 32px));
+  gap: var(--ink-space-4);
+  overflow-y: auto;
+  padding: var(--ink-space-5);
+  border: var(--ink-border-width-thin) solid var(--ink-color-border-subtle);
+  border-radius: var(--ink-radius-lg);
+  background: var(--ink-color-bg-surface);
+  box-shadow: var(--ink-shadow-lg);
+  animation: publish-modal-slide-up .2s ease-out;
+}
+
+#page-create .collection-create-modal .ink-input,
+#page-create .collection-create-modal .ink-textarea {
+  border-color: var(--ink-color-border-subtle);
+}
+
+#page-create .collection-create-modal .ink-input:focus,
+#page-create .collection-create-modal .ink-textarea:focus {
+  border-color: var(--ink-color-brand);
+  box-shadow: var(--ink-focus);
+}
+
+#page-create .collection-create-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ink-space-3);
+}
+
+#page-create .collection-create-modal-header h2 {
+  color: var(--ink-color-text-primary);
+  font: 600 20px/1.4 var(--ink-font-family);
+}
+
+#page-create .collection-create-modal-close {
+  display: grid;
+  width: var(--ink-height-control-sm);
+  height: var(--ink-height-control-sm);
+  flex: 0 0 var(--ink-height-control-sm);
+  place-items: center;
+  border-radius: var(--ink-radius-xs);
+  color: var(--ink-color-text-secondary);
+  background: transparent;
+}
+
+#page-create .collection-create-modal-close:hover,
+#page-create .collection-create-modal-close:focus-visible {
+  color: var(--ink-color-text-primary);
+  background: var(--ink-color-bg-component);
+}
+
+#page-create .collection-create-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ink-space-2);
+  padding-top: var(--ink-space-2);
+}
+
+#page-create .collection-create-modal-cancel,
+#page-create .collection-create-modal-submit {
+  min-height: var(--ink-button-medium-height);
+  padding: 0 var(--ink-button-medium-padding-horizontal);
+  border-radius: var(--ink-button-border-radius);
+  font: var(--ink-button-medium-font);
+}
+
+#page-create .collection-create-modal-cancel {
+  border: var(--ink-button-border-width) solid var(--ink-button-default-border);
+  color: var(--ink-button-default-color);
+  background: var(--ink-surface);
+}
+
+#page-create .collection-create-modal-cancel:hover,
+#page-create .collection-create-modal-cancel:focus-visible {
+  background: var(--ink-button-outline-active-bg);
+}
+
+#page-create .collection-create-modal-submit {
+  border: var(--ink-button-border-width) solid transparent;
+  color: var(--ink-button-primary-color);
+  background: var(--ink-button-primary-bg);
+}
+
+#page-create .collection-create-modal-submit:hover:not(:disabled),
+#page-create .collection-create-modal-submit:focus-visible {
+  background: var(--ink-button-primary-active-bg);
+}
+
+#page-create .collection-create-modal-submit:disabled {
+  cursor: not-allowed;
+  opacity: var(--ink-opacity-disabled);
+}
+
+@media (max-width: 640px) {
+  #page-create.publish-article-page .publish-form,
+  #page-create.publish-series-page .publish-form {
+    padding-right: var(--ink-space-2);
+    padding-left: var(--ink-space-2);
+  }
+
+  #page-create .schedule-picker-fields-compact {
+    grid-template-columns: 1fr;
+  }
+
+  #page-create .schedule-picker-fields-compact .schedule-picker-field:first-child,
+  #page-create .schedule-picker-fields-compact .schedule-picker-field:last-child {
+    width: 100%;
+  }
+
+  #page-create .collection-options {
+    grid-template-columns: 1fr;
+  }
+
+  #page-create .collection-option {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  #page-create .collection-create-modal-overlay {
+    align-items: flex-end;
+    padding: var(--ink-space-3);
+  }
+
+  #page-create .collection-create-modal {
+    max-height: calc(100dvh - 24px);
+    padding: var(--ink-space-4);
+    border-radius: var(--ink-radius-md);
+  }
+
+  #page-create .collection-create-modal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The scheduling controls use the schedule section itself as their measure.
+   Override the legacy calendar/time minimums so both triggers occupy equal
+   full-width tracks and their popovers cannot be wider than those tracks. */
+#page-create .schedule-publish-section > .schedule-picker-fields {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ink-space-3);
+}
+
+#page-create .schedule-publish-section > .schedule-picker-fields > .schedule-picker-field:first-child,
+#page-create .schedule-publish-section > .schedule-picker-fields > .schedule-picker-field:last-child {
+  width: 100%;
+  min-width: 0;
+  flex: none;
+}
+
+#page-create .schedule-publish-section > .schedule-picker-fields > .schedule-picker-field .schedule-picker-trigger,
+#page-create .schedule-publish-section > .schedule-picker-fields > .schedule-picker-field .schedule-calendar-popover,
+#page-create .schedule-publish-section > .schedule-picker-fields > .schedule-picker-field .schedule-time-popover {
+  width: 100%;
+  min-width: 0;
+}
+
+#page-create.publish-article-page .collection-options {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  #page-create .schedule-publish-section > .schedule-picker-fields {
+    grid-template-columns: 1fr;
   }
 }

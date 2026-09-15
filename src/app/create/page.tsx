@@ -107,15 +107,141 @@ function VisibilityOptions({
       <span className="form-label">可见范围</span>
       <div className="collection-options" role="radiogroup" aria-label="可见范围">
         <Radio name="visibility" value="public" className={`collection-option ${value === "public" ? "selected" : ""}`} checked={value === "public"} onChange={() => onChange("public")} disabled={disabled}>
-          <span className="collection-option-copy"><span className="collection-option-text">公开</span><span className="collection-option-desc">所有人可见</span></span>
+          <span className="collection-option-copy"><span className="collection-option-text">公开</span></span>
         </Radio>
         <Radio name="visibility" value="followers_only" className={`collection-option ${value === "followers_only" ? "selected" : ""}`} checked={value === "followers_only"} onChange={() => onChange("followers_only")} disabled={disabled}>
-          <span className="collection-option-copy"><span className="collection-option-text">仅关注可见</span><span className="collection-option-desc">只有关注作者的人可见</span></span>
-        </Radio>
-        <Radio name="visibility" value="private" className={`collection-option ${value === "private" ? "selected" : ""}`} checked={value === "private"} onChange={() => onChange("private")} disabled={disabled}>
-          <span className="collection-option-copy"><span className="collection-option-text">仅自己可见</span><span className="collection-option-desc">保存为草稿，仅作者本人可见</span></span>
+          <span className="collection-option-copy"><span className="collection-option-text">仅关注可见</span></span>
         </Radio>
       </div>
+    </div>
+  );
+}
+
+type CollectionMode = "none" | "select" | "create";
+
+function CollectionSelector({
+  mode,
+  selectedCollection,
+  existingCollections,
+  open,
+  onModeChange,
+  onSelect,
+  onOpenChange,
+  onCreate,
+}: {
+  mode: CollectionMode;
+  selectedCollection: string;
+  existingCollections: { name: string; count: number }[];
+  open: boolean;
+  onModeChange: (mode: CollectionMode) => void;
+  onSelect: (name: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="form-section">
+      <span className="form-label">加入合集</span>
+      <div className="collection-options" role="radiogroup" aria-label="加入合集">
+        <Radio
+          name="collection-mode"
+          value="none"
+          className={`collection-option ${mode === "none" ? "selected" : ""}`}
+          checked={mode === "none"}
+          onChange={() => { onModeChange("none"); onOpenChange(false); }}
+        >
+          <span className="collection-option-copy"><span className="collection-option-text">不加入合集</span></span>
+        </Radio>
+        <Radio
+          name="collection-mode"
+          value="select"
+          className={`collection-option ${mode === "select" ? "selected" : ""}`}
+          checked={mode === "select"}
+          onChange={() => onModeChange("select")}
+        >
+          <span className="collection-option-copy"><span className="collection-option-text">选择已有合集</span></span>
+        </Radio>
+      </div>
+      {mode === "select" && (
+        <div className="collection-existing-select show">
+          <div className={`custom-select ${open ? "open" : ""}`}>
+            <button type="button" className="custom-select-trigger" onClick={() => onOpenChange(!open)} aria-expanded={open} aria-haspopup="listbox">
+              <span className={`custom-select-value ${selectedCollection ? "selected" : ""}`}>{selectedCollection || "请选择合集..."}</span>
+              <SiteIcon name="fa-chevron-down" variant="solid" className="custom-select-arrow" aria-hidden="true" />
+            </button>
+            {open && (
+              <div className="custom-select-dropdown" role="listbox" aria-label="已有合集">
+                <button type="button" className="custom-select-create-option" onClick={onCreate}>
+                  <SiteIcon name="fa-plus" variant="solid" aria-hidden="true" />
+                  创建新合集
+                </button>
+                {existingCollections.map((collection) => (
+                  <button type="button" key={collection.name} className={`custom-select-option ${selectedCollection === collection.name ? "selected" : ""}`} onClick={() => { onSelect(collection.name); onOpenChange(false); }}>
+                    {collection.name}（{collection.count} 篇）
+                  </button>
+                ))}
+                {existingCollections.length === 0 && <div className="custom-select-empty">暂无可选合集</div>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CollectionCreateDialog({
+  open,
+  name,
+  description,
+  submitting,
+  onNameChange,
+  onDescriptionChange,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  name: string;
+  description: string;
+  submitting: boolean;
+  onNameChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="collection-create-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <form className="collection-create-modal" role="dialog" aria-modal="true" aria-labelledby="collection-create-title" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+        <div className="collection-create-modal-header">
+          <h2 id="collection-create-title">创建新合集</h2>
+          <button type="button" className="collection-create-modal-close" aria-label="关闭创建合集弹窗" onClick={onClose}>
+            <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+          </button>
+        </div>
+        <Input
+          label="合集名称"
+          placeholder="请输入合集名称"
+          maxLength={30}
+          showLimitNumber
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          autoFocus
+        />
+        <Textarea
+          label="合集简介"
+          placeholder="请输入合集简介（选填）"
+          maxLength={300}
+          showLimitNumber
+          height="autosize"
+          autosize={{ minRows: 3, maxRows: 6 }}
+          value={description}
+          onChange={(event) => onDescriptionChange(event.target.value)}
+        />
+        <div className="collection-create-modal-actions">
+          <button type="button" className="collection-create-modal-cancel" onClick={onClose}>取消</button>
+          <button type="submit" className="collection-create-modal-submit" disabled={submitting}>创建合集</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -578,7 +704,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [imageDesc, setImageDesc] = useState("");
 
   // ---- 合集 ----
-  const [collectionMode, setCollectionMode] = useState<"none" | "select" | "create">("none");
+  const [collectionMode, setCollectionMode] = useState<CollectionMode>("none");
   const [collectionName, setCollectionName] = useState("");
   const [collectionDesc, setCollectionDesc] = useState("");
   const [collectionTags, setCollectionTags] = useState<string[]>([]);
@@ -586,6 +712,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [existingCollections, setExistingCollections] = useState<{ name: string; count: number }[]>([]);
   const [selectedCollection, setSelectedCollection] = useState("");
   const [collectionSelectOpen, setCollectionSelectOpen] = useState(false);
+  const [collectionCreateOpen, setCollectionCreateOpen] = useState(false);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleValue, setScheduleValue] = useState("");
 
@@ -889,6 +1016,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const createCollection = async () => {
     const name = collectionName.trim();
     if (!name) { setErrorMsg("请填写合集名称"); setSuccessMsg(""); return; }
+    if (Array.from(name).length > 30) { setErrorMsg("合集名称不能超过30个字"); setSuccessMsg(""); return; }
+    if (Array.from(collectionDesc.trim()).length > 300) { setErrorMsg("合集简介不能超过300个字"); setSuccessMsg(""); return; }
     setSubmitting(true);
     setErrorMsg("");
     setSuccessMsg("");
@@ -915,6 +1044,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     setCollectionMode("select");
     setSelectedCollection(name);
+    setExistingCollections((current) => current.some((collection) => collection.name === name) ? current : [{ name, count: 0 }, ...current]);
+    setCollectionCreateOpen(false);
+    setCollectionSelectOpen(false);
     setCollectionName("");
     setCollectionDesc("");
     setSubmitting(false);
@@ -926,6 +1058,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   const submitText = async (options?: { scheduledAt?: string }) => {
     if (!title.trim()) { setErrorMsg("请填写作品标题"); setSuccessMsg(""); return; }
+    if (title.trim().length > 20) { setErrorMsg("作品标题不能超过20个字"); setSuccessMsg(""); return; }
     if (!editor.content.trim()) { setErrorMsg("请填写内容"); return; }
     setSubmitting(true);
     setErrorMsg("");
@@ -942,7 +1075,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
     let finalSeriesName: string | null = null;
     if (collectionMode === "select" && selectedCollection) finalSeriesName = selectedCollection;
-    if (collectionMode === "create" && collectionName.trim()) finalSeriesName = collectionName.trim();
 
     const scheduledAt = visibility !== "private" && scheduleEnabled
       ? (options?.scheduledAt || (scheduleValue ? new Date(scheduleValue).toISOString() : undefined))
@@ -998,6 +1130,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   const handleSaveDraft = async () => {
     if (!title.trim()) { setErrorMsg("请填写作品标题"); setSuccessMsg(""); return; }
+    if (title.trim().length > 20) { setErrorMsg("作品标题不能超过20个字"); setSuccessMsg(""); return; }
     if (!editor.content.trim()) { setErrorMsg("请先填写内容再保存草稿"); return; }
     setSubmitting(true);
     setErrorMsg("");
@@ -1034,6 +1167,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   const submitImage = async (options?: { scheduledAt?: string; draft?: boolean }) => {
     if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
+    if (title.trim().length > 20) { setErrorMsg("作品标题不能超过20个字"); return; }
     if (tags.length === 0) { setErrorMsg("请至少添加一个标签"); return; }
     setSubmitting(true);
     setErrorMsg("");
@@ -1054,11 +1188,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     if (imageDesc.trim()) parts.push(imageDesc.trim());
     parts.push(imageMd);
     const fullContent = parts.join("\n\n");
-    const finalSeriesName = collectionMode === "select" && selectedCollection
-      ? selectedCollection
-      : collectionMode === "create" && collectionName.trim()
-        ? collectionName.trim()
-        : null;
+    const finalSeriesName = collectionMode === "select" && selectedCollection ? selectedCollection : null;
 
     const scheduledAt = visibility !== "private" && !options?.draft && scheduleEnabled
       ? (options?.scheduledAt || (scheduleValue ? new Date(scheduleValue).toISOString() : undefined))
@@ -1177,6 +1307,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   const submitChapter = async (options?: { scheduledAt?: string; draft?: boolean }) => {
     if (!title.trim()) { setErrorMsg("请填写章节标题"); return; }
+    if (title.trim().length > 20) { setErrorMsg("章节标题不能超过20个字"); return; }
     if (!editor.content.trim()) { setErrorMsg("请填写章节内容"); return; }
     if (authorNote.length > 500) { setErrorMsg("作者的话不能超过500个字"); return; }
 
@@ -1467,8 +1598,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   if (view === "text") {
     return (
       <main id="page-create" className="publish-page publish-article-page">
-        <div className="publish-container">
-          <div className="publish-form">
+        <div className="publish-form">
             {renderNotice()}
             {renderRejectionBanner()}
             {renderPendingReviewBanner()}
@@ -1479,7 +1609,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 label={<><span>作品标题</span> <span className="required-mark">*</span></>}
                 placeholder="请输入作品标题"
                 required
-                maxLength={50}
+                maxLength={20}
                 showLimitNumber
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -1515,59 +1645,29 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               onChange={setScheduleValue}
             />
 
-            <div className="form-section">
-              <span className="form-label">加入合集</span>
-              <div className="collection-options" role="radiogroup" aria-label="加入合集">
-                {[
-                  { value: "none" as const, title: "不加入合集", desc: "作品将独立发布，不归属任何合集" },
-                  { value: "select" as const, title: "选择已有合集", desc: "将作品加入你已创建的合集" },
-                  { value: "create" as const, title: "创建新合集", desc: "为此作品创建一个全新的合集" },
-                ].map((option) => (
-                  <Radio
-                    name="collection-mode"
-                    value={option.value}
-                    key={option.value}
-                    className={`collection-option ${collectionMode === option.value ? "selected" : ""}`}
-                    checked={collectionMode === option.value}
-                    onChange={() => setCollectionMode(option.value)}
-                  >
-                    <span className="collection-option-copy">
-                      <span className="collection-option-text">{option.title}</span>
-                      <span className="collection-option-desc">{option.desc}</span>
-                    </span>
-                  </Radio>
-                ))}
-              </div>
-              {collectionMode === "select" && (
-                <div className="collection-existing-select show">
-                  <div className={`custom-select ${collectionSelectOpen ? "open" : ""}`}>
-                  <button type="button" className="custom-select-trigger" onClick={() => setCollectionSelectOpen(!collectionSelectOpen)}>
-                    <span className={`custom-select-value ${selectedCollection ? "selected" : ""}`}>{selectedCollection || "请选择合集..."}</span>
-                    <SiteIcon name="fa-chevron-down" variant="solid" className="custom-select-arrow" />
-                  </button>
-                  {collectionSelectOpen && (
-                    <div className="custom-select-dropdown">
-                      {existingCollections.map((collection) => (
-                        <button type="button" key={collection.name} className={`custom-select-option ${selectedCollection === collection.name ? "selected" : ""}`} onClick={() => { setSelectedCollection(collection.name); setCollectionSelectOpen(false); }}>
-                          {collection.name}（{collection.count} 篇）
-                        </button>
-                      ))}
-                      {existingCollections.length === 0 && <div className="custom-select-empty">暂无可选合集</div>}
-                    </div>
-                  )}
-                  </div>
-                </div>
-              )}
-              {collectionMode === "create" && (
-                <div className="collection-new-form show">
-                  <input className="form-input" placeholder="合集名称" maxLength={50} value={collectionName} onChange={(e) => setCollectionName(e.target.value)} />
-                  <input className="form-input" placeholder="合集简介（选填）" maxLength={200} value={collectionDesc} onChange={(e) => setCollectionDesc(e.target.value)} />
-                  <button type="button" className="btn-collection-create" onClick={createCollection} disabled={submitting}>
-                    <SiteIcon name="fa-check" variant="solid" /> 创建合集
-                  </button>
-                </div>
-              )}
-            </div>
+            <CollectionSelector
+              mode={collectionMode}
+              selectedCollection={selectedCollection}
+              existingCollections={existingCollections}
+              open={collectionSelectOpen}
+              onModeChange={setCollectionMode}
+              onSelect={setSelectedCollection}
+              onOpenChange={setCollectionSelectOpen}
+              onCreate={() => {
+                setCollectionSelectOpen(false);
+                setCollectionCreateOpen(true);
+              }}
+            />
+            <CollectionCreateDialog
+              open={collectionCreateOpen}
+              name={collectionName}
+              description={collectionDesc}
+              submitting={submitting}
+              onNameChange={setCollectionName}
+              onDescriptionChange={setCollectionDesc}
+              onClose={() => setCollectionCreateOpen(false)}
+              onSubmit={() => void createCollection()}
+            />
 
             <VisibilityOptions
               value={visibility}
@@ -1596,7 +1696,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 </button>
               </div>
             </div>
-          </div>
         </div>
       </main>
     );
@@ -1606,8 +1705,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   if (view === "image") {
     return (
       <div id="page-create" className="publish-page publish-article-page min-h-screen bg-paper">
-        <div className="publish-container">
-          <div className="publish-form">
+        <div className="publish-form">
             {renderNotice()}
             {renderRejectionBanner()}
             {renderPendingReviewBanner()}
@@ -1616,7 +1714,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             <div className="form-section">
               <Input
                 id="imageTitle"
-                type="text" placeholder="（选填）" maxLength={100}
+                type="text" placeholder="（选填）" maxLength={20}
                 label="作品标题" showLimitNumber
                 value={title} onChange={(e) => setTitle(e.target.value)}
               />
@@ -1683,7 +1781,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 id="imageDescription"
                 label="图片说明"
                 placeholder="分享一些关于图片的看法或说明（选填）"
-                maxLength={2000}
+                maxLength={500}
                 height="autosize"
                 autosize={{ minRows: 1 }}
                 value={imageDesc}
@@ -1715,60 +1813,29 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               onChange={setScheduleValue}
             />
 
-            {/* 加入合集 */}
-            <div className="form-section">
-              <span className="form-label">加入合集</span>
-              <div className="collection-options" role="radiogroup" aria-label="加入合集">
-                {[
-                  { value: "none" as const, title: "不加入合集", desc: "作品将独立发布，不归属任何合集" },
-                  { value: "select" as const, title: "选择已有合集", desc: "将作品加入你已创建的合集" },
-                  { value: "create" as const, title: "创建新合集", desc: "为此作品创建一个全新的合集" },
-                ].map((option) => (
-                  <Radio
-                    name="collection-mode"
-                    value={option.value}
-                    key={option.value}
-                    className={`collection-option ${collectionMode === option.value ? "selected" : ""}`}
-                    checked={collectionMode === option.value}
-                    onChange={() => setCollectionMode(option.value)}
-                  >
-                    <span className="collection-option-copy">
-                      <span className="collection-option-text">{option.title}</span>
-                      <span className="collection-option-desc">{option.desc}</span>
-                    </span>
-                  </Radio>
-                ))}
-              </div>
-              {collectionMode === "select" && (
-                <div className="collection-existing-select show">
-                  <div className={`custom-select ${collectionSelectOpen ? "open" : ""}`}>
-                    <button type="button" className="custom-select-trigger" onClick={() => setCollectionSelectOpen(!collectionSelectOpen)}>
-                      <span className={`custom-select-value ${selectedCollection ? "selected" : ""}`}>{selectedCollection || "请选择合集..."}</span>
-                      <SiteIcon name="fa-chevron-down" variant="solid" className="custom-select-arrow" />
-                    </button>
-                    {collectionSelectOpen && (
-                      <div className="custom-select-dropdown">
-                        {existingCollections.map((collection) => (
-                          <button type="button" key={collection.name} className={`custom-select-option ${selectedCollection === collection.name ? "selected" : ""}`} onClick={() => { setSelectedCollection(collection.name); setCollectionSelectOpen(false); }}>
-                            {collection.name}（{collection.count} 篇）
-                          </button>
-                        ))}
-                        {existingCollections.length === 0 && <div className="custom-select-empty">暂无可选合集</div>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {collectionMode === "create" && (
-                <div className="collection-new-form show">
-                  <input className="form-input" placeholder="合集名称" maxLength={50} value={collectionName} onChange={(e) => setCollectionName(e.target.value)} />
-                  <input className="form-input" placeholder="合集简介（选填）" maxLength={200} value={collectionDesc} onChange={(e) => setCollectionDesc(e.target.value)} />
-                  <button type="button" className="btn-collection-create" onClick={createCollection} disabled={submitting}>
-                    <SiteIcon name="fa-check" variant="solid" /> 创建合集
-                  </button>
-                </div>
-              )}
-            </div>
+            <CollectionSelector
+              mode={collectionMode}
+              selectedCollection={selectedCollection}
+              existingCollections={existingCollections}
+              open={collectionSelectOpen}
+              onModeChange={setCollectionMode}
+              onSelect={setSelectedCollection}
+              onOpenChange={setCollectionSelectOpen}
+              onCreate={() => {
+                setCollectionSelectOpen(false);
+                setCollectionCreateOpen(true);
+              }}
+            />
+            <CollectionCreateDialog
+              open={collectionCreateOpen}
+              name={collectionName}
+              description={collectionDesc}
+              submitting={submitting}
+              onNameChange={setCollectionName}
+              onDescriptionChange={setCollectionDesc}
+              onClose={() => setCollectionCreateOpen(false)}
+              onSubmit={() => void createCollection()}
+            />
 
             <VisibilityOptions
               value={visibility}
@@ -1798,7 +1865,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 </button>
               </div>
             </div>
-          </div>
         </div>
       </div>
     );
@@ -1808,8 +1874,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   if (view === "series-create") {
     return (
       <main id="page-create" className="publish-page publish-series-page">
-        <div className="publish-container">
-          <div className="publish-form">
+        <div className="publish-form">
             <div className="form-section">
               <Input
                 id="seriesName"
@@ -1877,7 +1942,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 {submitting ? "发布中..." : (editingSeries ? "保存修改" : "发布长篇")}
               </button>
             </div>
-          </div>
         </div>
       </main>
     );
@@ -1980,8 +2044,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                   type="text"
                   fieldClassName="chapter-name-field"
                   className="chapter-name-input"
-                  placeholder="章节标题（30字以内）"
-                  maxLength={30}
+                  placeholder="章节标题（20字以内）"
+                  maxLength={20}
                   showLimitNumber
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
