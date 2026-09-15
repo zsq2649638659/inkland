@@ -778,7 +778,7 @@ export default function StudioPage() {
           <div className="toolbar toolbar-mobile">
             <div className="studio-mobile-filter-bar">
               <button type="button" className="studio-mobile-filter-button" onClick={openMobileFilter} aria-label="打开筛选">
-                <SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" />
+                <SiteIcon name="fa-filter" variant="default" aria-hidden="true" />
                 <span>筛选</span>
               </button>
               <button
@@ -905,7 +905,7 @@ export default function StudioPage() {
             <div className="card-load-more" ref={workLoadMoreRef}>
               {shownWorks < allWorks.length ? (
                 <button type="button" className="btn-load-more" onClick={() => setShownWorks((count) => count + 12)}>
-                  <SiteIcon name="fa-angles-down" variant="solid" aria-hidden="true" /> 加载更多
+                  <SiteIcon name="fa-chevron-down" variant="solid" aria-hidden="true" /> 加载更多
                 </button>
               ) : (
                 <span className="load-more-end">已加载全部 {allWorks.length} 项作品</span>

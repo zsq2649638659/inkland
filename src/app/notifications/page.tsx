@@ -509,8 +509,6 @@ export default function NotificationsPage() {
     );
   };
 
-  const interactionNotifications = notifications.filter((notification) => notification.type !== "system");
-  const systemNotifications = notifications.filter((notification) => notification.type === "system");
   const renderNotificationGroup = (items: NotificationItem[], ariaLabel: string, label?: string) => {
     if (items.length === 0) return null;
     const headingId = label ? "notification-group-system" : undefined;
@@ -580,8 +578,9 @@ export default function NotificationsPage() {
               </div>
             ) : (
               <div className="notification-list-stack" data-composition-contract="notification.list@0.1" data-composition-dependencies="List Icon Link Typography">
-                {renderNotificationGroup(interactionNotifications, "通知中心互动消息")}
-                {renderNotificationGroup(systemNotifications, "通知中心系统消息", "系统通知")}
+                {filterType === "system"
+                  ? renderNotificationGroup(notifications, "通知中心系统消息", "系统通知")
+                  : renderNotificationGroup(notifications, "通知中心消息")}
               </div>
             )}
           </div>

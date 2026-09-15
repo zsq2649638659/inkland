@@ -7,13 +7,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
-import PostTagCard from "@/components/PostTagCard";
 import ProfileCardCollection from "@/components/ProfileCardCollection";
 import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import UserCard from "@/components/UserCard";
-import { SkeletonProfile, SkeletonWorksGrid, SkeletonUserCardList } from "@/components/Skeleton";
+import { SkeletonProfile, SkeletonUserCardList } from "@/components/Skeleton";
 import { slimContent } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 import { getOrCreateClientCache } from "@/lib/client-cache";
@@ -60,12 +60,6 @@ const stripMarkdown = (text: string): string => {
     .replace(/\n{2,}/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-};
-
-const formatChapterPreviewTitle = (series: SeriesInfo): string => {
-  const title = series.latestChapterTitle?.trim() || "";
-  if (series.latestChapterNumber === null) return title;
-  return `第${series.latestChapterNumber}章${title ? ` ${title}` : ""}`;
 };
 
 interface FollowUser {
@@ -178,6 +172,7 @@ const assembleSeriesInfo = async (
 export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: TabType }) {
   const supabase = createClient();
   const router = useRouter();
+  const dialog = useAppDialog();
   const { user, profile, loading: authLoading } = useAuth();
   const [displayPosts, setDisplayPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,6 +196,10 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   const [following, setFollowing] = useState<FollowUser[]>([]);
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [relationshipSearch, setRelationshipSearch] = useState("");
+  const [relationshipBatchMode, setRelationshipBatchMode] = useState(false);
+  const [selectedRelationshipIds, setSelectedRelationshipIds] = useState<Set<string>>(new Set());
+  const [relationshipBatchLoading, setRelationshipBatchLoading] = useState(false);
   const [tabLoading, setTabLoading] = useState(false);
   const [shownProfileItems, setShownProfileItems] = useState(12);
   const profileLoadMoreRef = useRef<HTMLDivElement>(null);
@@ -530,6 +529,13 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
     else if (tab === "followers") loadFollowers();
   }, [user, tab]);
 
+  useEffect(() => {
+    if (tab !== "following" && tab !== "followers") return;
+    setRelationshipSearch("");
+    setRelationshipBatchMode(false);
+    setSelectedRelationshipIds(new Set());
+  }, [tab]);
+
   const filterPills: { key: FilterType; label: string }[] = [
     { key: "all", label: "全部" },
     { key: "single", label: "单篇" },
@@ -539,6 +545,15 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
 
   const showFilters = tab === "works" || tab === "likes" || tab === "bookmarks";
   const relationshipPage = defaultTab === "following" || defaultTab === "followers";
+  const relationshipQuery = relationshipSearch.trim().toLocaleLowerCase();
+  const matchesRelationshipUser = (item: FollowUser) => {
+    if (!relationshipQuery) return true;
+    return `${item.nickname} ${item.bio || ""}`.toLocaleLowerCase().includes(relationshipQuery);
+  };
+  const filteredFollowing = following.filter(matchesRelationshipUser);
+  const filteredFollowers = followers.filter(matchesRelationshipUser);
+  const activeRelationshipUsers = tab === "following" ? filteredFollowing : filteredFollowers;
+  const activeRelationshipItems = tab === "following" ? following : followers;
 
   // “全部”需要把长篇、单篇和图片放进同一个时间序列，而不是按卡片类型分组。
   const profilePageTotal = (() => {
@@ -565,14 +580,14 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
         : bookmarkedPosts.filter((p) => (bookmarkFilter === "image" ? hasImages(p) : !hasImages(p))).length;
       return seriesCount + posts;
     }
-    if (tab === "following") return following.length;
-    if (tab === "followers") return followers.length;
+    if (tab === "following") return filteredFollowing.length;
+    if (tab === "followers") return filteredFollowers.length;
     return 0;
   })();
 
   useEffect(() => {
     setShownProfileItems(12);
-  }, [tab, filter, likeFilter, bookmarkFilter]);
+  }, [tab, filter, likeFilter, bookmarkFilter, relationshipSearch]);
 
   useEffect(() => {
     const el = profileLoadMoreRef.current;
@@ -587,40 +602,54 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [tab, filter, likeFilter, bookmarkFilter, profilePageTotal]);
+  }, [tab, filter, likeFilter, bookmarkFilter, relationshipSearch, profilePageTotal]);
 
-  const workOrder = new Map(
-    [
-      ...seriesList.map((series) => ({
-        id: `series:${series.id}`,
-        time: new Date(series.created_at || "").getTime(),
-      })),
-      ...displayPosts.map((post) => ({
-        id: `post:${post.id}`,
-        time: new Date(post.published_at || post.created_at || "").getTime(),
-      })),
-    ]
-      .sort((a, b) => b.time - a.time)
-      .map((item, index) => [item.id, index] as const),
-  );
+  const toggleRelationshipSelect = (id: string) => {
+    setSelectedRelationshipIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
-  const likeOrder = new Map(
-    [
-      ...likedSeriesList.map((series) => ({ id: `series:${series.id}`, time: new Date(series.interaction_at || series.created_at || "").getTime() })),
-      ...likedPosts.map((post) => ({ id: `post:${post.id}`, time: new Date((post as Post & { interaction_at?: string }).interaction_at || "").getTime() })),
-    ]
-      .sort((a, b) => b.time - a.time)
-      .map((item, index) => [item.id, index] as const),
-  );
+  const selectAllRelationships = () => {
+    const ids = activeRelationshipUsers.map((item) => item.id);
+    const allSelected = ids.length > 0 && ids.every((id) => selectedRelationshipIds.has(id));
+    setSelectedRelationshipIds(allSelected ? new Set() : new Set(ids));
+  };
 
-  const bookmarkOrder = new Map(
-    [
-      ...bookmarkedSeriesList.map((series) => ({ id: `series:${series.id}`, time: new Date(series.interaction_at || series.created_at || "").getTime() })),
-      ...bookmarkedPosts.map((post) => ({ id: `post:${post.id}`, time: new Date((post as Post & { interaction_at?: string }).interaction_at || "").getTime() })),
-    ]
-      .sort((a, b) => b.time - a.time)
-      .map((item, index) => [item.id, index] as const),
-  );
+  const handleRelationshipBatch = async () => {
+    if (!user || relationshipBatchLoading || selectedRelationshipIds.size === 0) return;
+    const ids = Array.from(selectedRelationshipIds);
+    const isFollowingTab = tab === "following";
+    const actionLabel = isFollowingTab ? "批量取关" : "批量移除";
+    if (!await dialog.confirm({ title: actionLabel, message: `确定${actionLabel}选中的 ${ids.length} 位用户吗？`, confirmLabel: actionLabel, variant: "danger" })) return;
+
+    setRelationshipBatchLoading(true);
+    const result = isFollowingTab
+      ? await supabase.from("follows").delete().eq("follower_id", user.id).in("following_id", ids)
+      : await supabase.from("follows").delete().eq("following_id", user.id).in("follower_id", ids);
+    setRelationshipBatchLoading(false);
+    if (result.error) {
+      await dialog.alert({ title: `${actionLabel}失败`, message: result.error.message, variant: "danger" });
+      return;
+    }
+
+    if (isFollowingTab) {
+      setFollowing((items) => items.filter((item) => !ids.includes(item.id)));
+      setFollowingIds((current) => {
+        const next = new Set(current);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setFollowers((items) => items.filter((item) => !ids.includes(item.id)));
+    }
+    setSelectedRelationshipIds(new Set());
+    setRelationshipBatchMode(false);
+    dialog.toast(`${actionLabel}完成`);
+  };
 
   const activeProfileFilter = tab === "likes" ? likeFilter : tab === "bookmarks" ? bookmarkFilter : filter;
   const activeProfilePosts = tab === "likes" ? likedPosts : tab === "bookmarks" ? bookmarkedPosts : displayPosts;
@@ -647,7 +676,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                 <div className="feed-empty-tag-ring">
                   <div className="feed-empty-ring-outer"></div>
                   <div className="feed-empty-ring-inner">
-                    <SiteIcon name="fa-user-circle" variant="solid" />
+                    <SiteIcon name="fa-profile-settings" variant="solid" />
                   </div>
                 </div>
               </div>
@@ -711,7 +740,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                 <ProfileFilterSelect label="排序" id="profile-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最近更新" }, { value: "created", label: "最近创建" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as SortMode)} />
               </div>
               <div className="profile-mobile-filter-bar">
-                <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(activeProfileFilter); setMobileDraftStatus(statusFilter); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" /></button>
+                <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(activeProfileFilter); setMobileDraftStatus(statusFilter); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter" variant="default" aria-hidden="true" /></button>
                 <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为单列列表"} aria-pressed={mobileCardLayout === "square"}><SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" /></button>
               </div>
               {mobileFilterOpen && (
@@ -729,547 +758,92 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
               ) : !loading ? <div className="empty-state"><h2 className="empty-title">这里还没有作品</h2><p className="empty-desc">发布或收藏作品后，会显示在这里。</p></div> : null}
             </>
           )}
-        </div>
-        <div className="profile-legacy-render">
-        {/* Segmented Tabs */}
-        <div className="segmented-tabs">
-          <div className="segmented-tabs-left">
-            <button
-              className={`segmented-tab${tab === "works" ? " active" : ""}`}
-              onClick={() => handleProfileTabChange("works")}
-            ><span className="my-prefix">我的</span>作品</button>
-            <button
-              className={`segmented-tab${tab === "likes" ? " active" : ""}`}
-              onClick={() => handleProfileTabChange("likes")}
-            ><span className="my-prefix">我的</span>喜欢</button>
-            <button
-              className={`segmented-tab${tab === "bookmarks" ? " active" : ""}`}
-              onClick={() => handleProfileTabChange("bookmarks")}
-            ><span className="my-prefix">我的</span>收藏</button>
-          </div>
-          <div className="segmented-tabs-right">
-            <button
-              className={`segmented-tab${tab === "following" ? " active" : ""}`}
-              onClick={() => setTab("following")}
-            ><span className="my-prefix">我的</span>关注</button>
-            <button
-              className={`segmented-tab${tab === "followers" ? " active" : ""}`}
-              onClick={() => setTab("followers")}
-            ><span className="my-prefix">我的</span>粉丝</button>
-          </div>
-        </div>
 
-        {/* Type Filters + View Toggle */}
-        {showFilters && (
-          <div className="type-filters-row">
-            <div className="type-filters">
-              {filterPills.map((f) => {
-                const currentFilter = tab === "likes" ? likeFilter : tab === "bookmarks" ? bookmarkFilter : filter;
-                const isActive = currentFilter === f.key;
-                return (
-                  <button
-                    key={f.key}
-                    className={`type-filter-pill${isActive ? " active" : ""}`}
-                    onClick={() => {
-                      if (tab === "likes") setLikeFilter(f.key);
-                      else if (tab === "bookmarks") setBookmarkFilter(f.key);
-                      else setFilter(f.key);
-                    }}
-                  >{f.label}</button>
-                );
-              })}
+          {!showFilters && (
+            <div className="relationship-content">
+              <div className="relationship-toolbar">
+                <div className="filter-system-field filter-system-field--query relationship-search-field">
+                  <div className="profile-filter-search-shell">
+                    <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                    <input
+                      className="form-control"
+                      type="search"
+                      value={relationshipSearch}
+                      onChange={(event) => setRelationshipSearch(event.target.value)}
+                      placeholder={tab === "following" ? "搜索关注用户" : "搜索粉丝用户"}
+                      aria-label={tab === "following" ? "搜索关注用户" : "搜索粉丝用户"}
+                    />
+                    <button type="button" className="profile-filter-search-clear" aria-label="清除用户搜索" onClick={() => setRelationshipSearch("")}>
+                      <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+                {!relationshipBatchMode ? (
+                  <button type="button" className="studio-toolbar-action relationship-batch-toggle" onClick={() => { setRelationshipBatchMode(true); setSelectedRelationshipIds(new Set()); }}>
+                    <SiteIcon name="fa-list-check" variant="solid" aria-hidden="true" />
+                    批量操作
+                  </button>
+                ) : (
+                  <div className="relationship-batch-row">
+                    <button type="button" className="studio-toolbar-action" disabled={relationshipBatchLoading || selectedRelationshipIds.size === 0} onClick={() => void handleRelationshipBatch()}>
+                      <SiteIcon name="fa-user-minus" variant="solid" aria-hidden="true" />
+                      {tab === "following" ? "批量取关" : "批量移除"}
+                    </button>
+                    <button type="button" className="studio-toolbar-action" onClick={selectAllRelationships}>全选</button>
+                    <button type="button" className="studio-toolbar-action" onClick={() => { setRelationshipBatchMode(false); setSelectedRelationshipIds(new Set()); }}>取消</button>
+                  </div>
+                )}
+              </div>
+
+              {tabLoading ? (
+                <SkeletonUserCardList />
+              ) : activeRelationshipItems.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-illustration">
+                    <div className="empty-tag-ring">
+                      <div className="tag-ring-outer"></div>
+                      <div className="tag-ring-inner">
+                        <SiteIcon name={tab === "following" ? "fa-user-group" : "fa-users"} variant="solid" />
+                      </div>
+                    </div>
+                  </div>
+                  <h2 className="empty-title">{tab === "following" ? "还没有关注任何用户" : "还没有粉丝"}</h2>
+                  <p className="empty-desc">{tab === "following" ? "去发现更多创作者，关注他们不会错过精彩内容" : "发布更多精彩内容，吸引粉丝关注你"}</p>
+                </div>
+              ) : activeRelationshipUsers.length === 0 ? (
+                <div className="empty-state relationship-filter-empty">
+                  <h2 className="empty-title">没有找到匹配的用户</h2>
+                  <p className="empty-desc">试试其他昵称或简介关键词。</p>
+                </div>
+              ) : (
+                <div className="user-cards-grid">
+                  {activeRelationshipUsers.slice(0, shownProfileItems).map((item) => (
+                    <UserCard
+                      key={item.id}
+                      user={item}
+                      currentUserId={user.id}
+                      isFollowingTab={tab === "following"}
+                      isFollowed={tab === "followers" ? followingIds.has(item.id) : undefined}
+                      selectable={relationshipBatchMode}
+                      selected={selectedRelationshipIds.has(item.id)}
+                      onToggleSelect={() => toggleRelationshipSelect(item.id)}
+                      onUpdate={() => { if (tab === "following") void loadFollowing(); else void loadFollowers(); }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-
-          </div>
+          )}
+        </div>
+        {shownProfileItems < profilePageTotal && (
+          <div
+            className="profile-load-more-sentinel"
+            ref={profileLoadMoreRef}
+            aria-hidden="true"
+          />
         )}
-
-        {/* Tab: Works */}
-        <div className={`tab-content${tab === "works" ? " active" : ""}`}>
-          {loading ? (
-            <SkeletonWorksGrid count={6} />
-          ) : error ? (
-            <div className="text-center py-8"><p className="text-sm text-red-500 mb-2">{error}</p></div>
-          ) : displayPosts.length === 0 && seriesList.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-illustration">
-                <div className="empty-tag-ring">
-                  <div className="tag-ring-outer"></div>
-                  <div className="tag-ring-inner">
-                    <SiteIcon name="fa-book" variant="solid" />
-                  </div>
-                </div>
-              </div>
-              <h2 className="empty-title">还没有发布任何作品</h2>
-              <p className="empty-desc">写下你的第一个故事，与世界分享你的创作</p>
-              <Link href="/studio" className="empty-action"><SiteIcon name="fa-pen-to-square" variant="solid" style={{ marginRight: 6 }} />发布作品</Link>
-            </div>
-          ) : (
-            <div className="card-grid">
-              {/* 连载卡片 */}
-              {(filter === "all" || filter === "series") &&
-                seriesList.slice(0, shownProfileItems).map((series) => (
-                    <div key={series.id} className="tag-card series" data-type="series" style={{ order: workOrder.get(`series:${series.id}`) ?? 9999 }}>
-                    <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
-                      <div className="series-header-info">
-                        <span className={`series-header-badge${series.status === "completed" ? " completed" : ""}`}>
-                          {series.status === "completed" ? "已完结" : "连载中"}
-                        </span>
-                        <span className="series-header-name">{series.name}</span>
-                        <div className="series-header-desc">{series.description || "暂无简介"}</div>
-                        {series.tags && series.tags.length > 0 && (
-                          <div className="card-tags has-overflow">
-                            {series.tags.map((tag) => (
-                              <span key={tag} className="card-tag">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div></Link>
-                    {series.totalChapters > 0 ? (
-                      <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
-                        <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
-                        <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
-                      </div></Link>
-                    ) : (
-                      <div className="series-empty">
-                        <div className="series-empty-box">
-                          <div className="series-empty-icon">
-                            <SiteIcon name="fa-pen-to-square" variant="outline" />
-                          </div>
-                          <div className="series-empty-info">
-                            <div className="series-empty-label">等待开篇</div>
-                            <div className="series-empty-hint">作者正在构思中</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="card-footer">
-                      <div className="card-stats">
-                        <span className="card-stat">
-                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              {/* 帖子卡片 */}
-              {displayPosts
-                .filter((post) => {
-                  if (filter === "all") return true;
-                  if (filter === "image") return hasImages(post);
-                  if (filter === "single") return !hasImages(post);
-                  if (filter === "series") return false;
-                  return true;
-                })
-                .slice(0, shownProfileItems)
-                .map((post) => (
-                  <PostTagCard key={post.id} post={post} style={{ order: workOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />
-                ))}
-            </div>
-          )}
-        </div>
-
-        {/* Tab: Likes */}
-        <div className={`tab-content${tab === "likes" ? " active" : ""}`}>
-          {loading ? (
-            <SkeletonWorksGrid count={6} />
-          ) : likeFilter === "series" ? (
-            likedSeriesList.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-illustration">
-                  <div className="empty-tag-ring">
-                    <div className="tag-ring-outer"></div>
-                    <div className="tag-ring-inner">
-                      <SiteIcon name="fa-heart" variant="outline" />
-                    </div>
-                  </div>
-                </div>
-                <h2 className="empty-title">还没有喜欢任何长篇连载</h2>
-                <p className="empty-desc">喜欢一个长篇连载后，它就会出现在这里</p>
-              </div>
-            ) : (
-              <div className="card-grid">
-                {likedSeriesList.slice(0, shownProfileItems).map((series) => (
-                  <div key={series.id} className="tag-card series" data-type="series" style={{ order: likeOrder.get(`series:${series.id}`) ?? 9999 }}>
-                    <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
-                      <div className="series-header-info">
-                        <span className={`series-header-badge${series.status === "completed" ? " completed" : ""}`}>
-                          {series.status === "completed" ? "已完结" : "连载中"}
-                        </span>
-                        <span className="series-header-name">{series.name}</span>
-                        <div className="series-header-desc">{series.description || "暂无简介"}</div>
-                        {series.tags && series.tags.length > 0 && (
-                          <div className="card-tags has-overflow">
-                            {series.tags.map((tag) => (
-                              <span key={tag} className="card-tag">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div></Link>
-                    {series.totalChapters > 0 ? (
-                      <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
-                        <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
-                        <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
-                      </div></Link>
-                    ) : (
-                      <div className="series-empty">
-                        <div className="series-empty-box">
-                          <div className="series-empty-icon">
-                            <SiteIcon name="fa-pen-to-square" variant="outline" />
-                          </div>
-                          <div className="series-empty-info">
-                            <div className="series-empty-label">等待开篇</div>
-                            <div className="series-empty-hint">作者正在构思中</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="card-footer">
-                      <div className="card-stats">
-                        <span className="card-stat">
-                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : (() => {
-            const filteredLikes = likedPosts.filter((p) => {
-              if (likeFilter === "all") return true;
-              if (likeFilter === "image") return hasImages(p);
-              if (likeFilter === "single") return !hasImages(p);
-              if (likeFilter === "series") return false;
-              return true;
-            });
-            const showSeries = likeFilter === "all" && likedSeriesList.length > 0;
-            const hasContent = showSeries || filteredLikes.length > 0;
-            return !hasContent ? (
-              <div className="empty-state">
-                <div className="empty-illustration">
-                  <div className="empty-tag-ring">
-                    <div className="tag-ring-outer"></div>
-                    <div className="tag-ring-inner">
-                      <SiteIcon name="fa-heart" variant="outline" />
-                    </div>
-                  </div>
-                </div>
-                <h2 className="empty-title">还没有喜欢任何作品</h2>
-                <p className="empty-desc">去发现更多精彩内容，为你喜欢的作品点亮爱心</p>
-              </div>
-            ) : (
-              <div className="card-grid">
-                {showSeries && likedSeriesList.slice(0, shownProfileItems).map((series) => (
-                  <div key={series.id} className="tag-card series" data-type="series" style={{ order: likeOrder.get(`series:${series.id}`) ?? 9999 }}>
-                    <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
-                      <div className="series-header-info">
-                        <span className={`series-header-badge${series.status === "completed" ? " completed" : ""}`}>
-                          {series.status === "completed" ? "已完结" : "连载中"}
-                        </span>
-                        <span className="series-header-name">{series.name}</span>
-                        <div className="series-header-desc">{series.description || "暂无简介"}</div>
-                        {series.tags && series.tags.length > 0 && (
-                          <div className="card-tags has-overflow">
-                            {series.tags.map((tag) => (
-                              <span key={tag} className="card-tag">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div></Link>
-                    {series.totalChapters > 0 ? (
-                      <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
-                        <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
-                        <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
-                      </div></Link>
-                    ) : (
-                      <div className="series-empty">
-                        <div className="series-empty-box">
-                          <div className="series-empty-icon">
-                            <SiteIcon name="fa-pen-to-square" variant="outline" />
-                          </div>
-                          <div className="series-empty-info">
-                            <div className="series-empty-label">等待开篇</div>
-                            <div className="series-empty-hint">作者正在构思中</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="card-footer">
-                      <div className="card-stats">
-                        <span className="card-stat">
-                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {filteredLikes.slice(0, shownProfileItems).map((post) => <PostTagCard key={post.id} post={post} style={{ order: likeOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Tab: Bookmarks */}
-        <div className={`tab-content${tab === "bookmarks" ? " active" : ""}`}>
-          {loading ? (
-            <SkeletonWorksGrid count={6} />
-          ) : bookmarkFilter === "series" ? (
-            bookmarkedSeriesList.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-illustration">
-                  <div className="empty-tag-ring">
-                    <div className="tag-ring-outer"></div>
-                    <div className="tag-ring-inner">
-                      <SiteIcon name="fa-bookmark" variant="solid" />
-                    </div>
-                  </div>
-                </div>
-                <h2 className="empty-title">还没有收藏任何长篇连载</h2>
-                <p className="empty-desc">收藏一个长篇连载后，它就会出现在这里</p>
-              </div>
-            ) : (
-              <div className="card-grid">
-                {bookmarkedSeriesList.slice(0, shownProfileItems).map((series) => (
-                  <div key={series.id} className="tag-card series" data-type="series" style={{ order: bookmarkOrder.get(`series:${series.id}`) ?? 9999 }}>
-                    <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
-                      <div className="series-header-info">
-                        <span className={`series-header-badge${series.status === "completed" ? " completed" : ""}`}>
-                          {series.status === "completed" ? "已完结" : "连载中"}
-                        </span>
-                        <span className="series-header-name">{series.name}</span>
-                        <div className="series-header-desc">{series.description || "暂无简介"}</div>
-                        {series.tags && series.tags.length > 0 && (
-                          <div className="card-tags has-overflow">
-                            {series.tags.map((tag) => (
-                              <span key={tag} className="card-tag">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div></Link>
-                    {series.totalChapters > 0 ? (
-                      <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
-                        <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
-                        <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
-                      </div></Link>
-                    ) : (
-                      <div className="series-empty">
-                        <div className="series-empty-box">
-                          <div className="series-empty-icon">
-                            <SiteIcon name="fa-pen-to-square" variant="outline" />
-                          </div>
-                          <div className="series-empty-info">
-                            <div className="series-empty-label">等待开篇</div>
-                            <div className="series-empty-hint">作者正在构思中</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="card-footer">
-                      <div className="card-stats">
-                        <span className="card-stat">
-                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : (() => {
-            const filteredBookmarks = bookmarkedPosts.filter((p) => {
-              if (bookmarkFilter === "all") return true;
-              if (bookmarkFilter === "image") return hasImages(p);
-              if (bookmarkFilter === "single") return !hasImages(p);
-              if (bookmarkFilter === "series") return false;
-              return true;
-            });
-            const showSeries = bookmarkFilter === "all" && bookmarkedSeriesList.length > 0;
-            const hasContent = showSeries || filteredBookmarks.length > 0;
-            return !hasContent ? (
-              <div className="empty-state">
-                <div className="empty-illustration">
-                  <div className="empty-tag-ring">
-                    <div className="tag-ring-outer"></div>
-                    <div className="tag-ring-inner">
-                      <SiteIcon name="fa-bookmark" variant="solid" />
-                    </div>
-                  </div>
-                </div>
-                <h2 className="empty-title">还没有收藏任何作品</h2>
-                <p className="empty-desc">收藏喜欢的作品，随时回来阅读</p>
-              </div>
-            ) : (
-              <div className="card-grid">
-                {showSeries && bookmarkedSeriesList.slice(0, shownProfileItems).map((series) => (
-                  <div key={series.id} className="tag-card series" data-type="series" style={{ order: bookmarkOrder.get(`series:${series.id}`) ?? 9999 }}>
-                    <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
-                      <div className="series-header-info">
-                        <span className={`series-header-badge${series.status === "completed" ? " completed" : ""}`}>
-                          {series.status === "completed" ? "已完结" : "连载中"}
-                        </span>
-                        <span className="series-header-name">{series.name}</span>
-                        <div className="series-header-desc">{series.description || "暂无简介"}</div>
-                        {series.tags && series.tags.length > 0 && (
-                          <div className="card-tags has-overflow">
-                            {series.tags.map((tag) => (
-                              <span key={tag} className="card-tag">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div></Link>
-                    {series.totalChapters > 0 ? (
-                      <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
-                        <div className="chapter-preview-label">最新章节</div>
-                        <div className="chapter-preview-title">{formatChapterPreviewTitle(series)}</div>
-                        <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
-                      </div></Link>
-                    ) : (
-                      <div className="series-empty">
-                        <div className="series-empty-box">
-                          <div className="series-empty-icon">
-                            <SiteIcon name="fa-pen-to-square" variant="outline" />
-                          </div>
-                          <div className="series-empty-info">
-                            <div className="series-empty-label">等待开篇</div>
-                            <div className="series-empty-hint">作者正在构思中</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="card-footer">
-                      <div className="card-stats">
-                        <span className="card-stat">
-                          <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
-                        </span>
-                        <span className="card-stat">
-                          <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {filteredBookmarks.slice(0, shownProfileItems).map((post) => <PostTagCard key={post.id} post={post} style={{ order: bookmarkOrder.get(`post:${post.id}`) ?? 9999 }} imageTagsInOverlay />)}
-              </div>
-            );
-          })()}
-        </div>
-
-        </div>
-
-        {/* Tab: Following */}
-        <div className={`tab-content${tab === "following" ? " active" : ""}`}>
-          {tabLoading ? (
-            <SkeletonUserCardList />
-          ) : following.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-illustration">
-                <div className="empty-tag-ring">
-                  <div className="tag-ring-outer"></div>
-                  <div className="tag-ring-inner">
-                    <SiteIcon name="fa-user-group" variant="solid" />
-                  </div>
-                </div>
-              </div>
-              <h2 className="empty-title">还没有关注任何用户</h2>
-              <p className="empty-desc">去发现更多创作者，关注他们不会错过精彩内容</p>
-            </div>
-          ) : (
-            <>
-              <div className="section-header">
-                <span className="section-title">全部关注</span>
-                <div className="list-search-wrapper">
-                  <input type="text" className="list-search" id="search-following" placeholder="搜索关注用户..." />
-                  <SiteIcon name="fa-magnifying-glass" variant="solid" className="list-search-icon" />
-                </div>
-              </div>
-              <div className="user-cards-grid">
-                {following.slice(0, shownProfileItems).map((u) => (
-                  <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={true} onUpdate={() => { loadFollowing(); }} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Tab: Followers */}
-        <div className={`tab-content${tab === "followers" ? " active" : ""}`}>
-          {tabLoading ? (
-            <SkeletonUserCardList />
-          ) : followers.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-illustration">
-                <div className="empty-tag-ring">
-                  <div className="tag-ring-outer"></div>
-                  <div className="tag-ring-inner">
-                    <SiteIcon name="fa-users" variant="solid" />
-                  </div>
-                </div>
-              </div>
-              <h2 className="empty-title">还没有粉丝</h2>
-              <p className="empty-desc">发布更多精彩内容，吸引粉丝关注你</p>
-            </div>
-          ) : (
-            <>
-              <div className="section-header">
-                <span className="section-title">全部粉丝</span>
-                <div className="list-search-wrapper">
-                  <input type="text" className="list-search" id="search-followers" placeholder="搜索粉丝用户..." />
-                  <SiteIcon name="fa-magnifying-glass" variant="solid" className="list-search-icon" />
-                </div>
-              </div>
-              <div className="user-cards-grid">
-                {followers.slice(0, shownProfileItems).map((u) => (
-                  <UserCard key={u.id} user={u} currentUserId={user.id} isFollowingTab={false} isFollowed={followingIds.has(u.id)} onUpdate={() => { loadFollowers(); }} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-          {shownProfileItems < profilePageTotal && (
-            <div
-              className="profile-load-more-sentinel"
-              ref={profileLoadMoreRef}
-              aria-hidden="true"
-            />
-          )}
-        </div>
       </div>
+    </div>
     </div>
   );
 }

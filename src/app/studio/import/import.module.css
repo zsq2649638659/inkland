@@ -1035,7 +1035,7 @@
 }
 
 .splitOptions label:has(input:checked) {
-  border-color: var(--color-primary);
+  border-color: var(--ink-color-brand);
   background: color-mix(in srgb, var(--color-primary) 4%, var(--color-card));
   color: var(--color-text);
 }

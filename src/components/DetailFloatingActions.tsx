@@ -64,7 +64,7 @@ export default function DetailFloatingActions({
     <>
       <div className="floating-sidebar detail-floating-sidebar" style={{ left: `${contentRight + 48}px`, right: "auto" }}>
         <button className="floating-btn" title={darkMode ? "切换日间模式" : "切换夜间模式"} onClick={toggleTheme}>
-          <SiteIcon name="fa-detail-night-mode" size={22} />
+          <SiteIcon name="fa-moon" size={22} />
         </button>
         <button className="floating-btn" title="字体设置" onClick={() => openPanel("font")}>
           <SiteIcon name="fa-detail-font-adjust" size={22} />
@@ -90,7 +90,7 @@ export default function DetailFloatingActions({
           {mobileMoreOpen && (
             <div className="detail-mobile-more-menu" role="menu" aria-label="更多详情页操作">
               <button className="floating-btn" title={darkMode ? "切换日间模式" : "切换夜间模式"} onClick={toggleTheme}>
-                <SiteIcon name="fa-detail-night-mode" size={22} />
+                <SiteIcon name="fa-moon" size={22} />
               </button>
               <button className="floating-btn" title="字体调整" onClick={() => openPanel("font")}>
                 <SiteIcon name="fa-detail-font-adjust" size={22} />

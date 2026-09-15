@@ -713,6 +713,13 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
             </div>
           )}
 
+          {post.author_note?.trim() && (
+            <aside className="chapter-author-note">
+              <strong>作者的话</strong>
+              <p>{post.author_note.trim()}</p>
+            </aside>
+          )}
+
           {/* Chapter Navigation (合集作品) */}
           {post.series_name && (
             <ChapterNav

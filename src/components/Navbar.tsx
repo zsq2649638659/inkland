@@ -198,6 +198,7 @@ export default function Navbar() {
         {/* V2: navbar-center with search input */}
         <div className="navbar-center" ref={searchRef}>
           <div style={{ position: "relative" }}>
+            <SiteIcon name="fa-magnifying-glass" variant="solid" className="navbar-search-icon" aria-hidden="true" />
             <input
               type="search"
               name="site-search"
@@ -216,6 +217,11 @@ export default function Navbar() {
               onKeyDown={handleSearchKey}
               onFocus={() => { if (searchQuery) fetchSuggestions(searchQuery); }}
             />
+            {searchQuery && (
+              <button type="button" className="navbar-search-clear" aria-label="清除全局搜索" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchQuery(""); setTagSuggestions([]); setUserSuggestions([]); setPostSuggestions([]); setContentSuggestions([]); }}>
+                <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+              </button>
+            )}
             {hasAnyResults && (
               <div className="search-dropdown">
                 {/* Filter Tabs */}

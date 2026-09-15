@@ -12,6 +12,8 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
+import { InputHistoryPopover, useInputHistory } from "./InputHistoryPopover";
+import type { InputHistoryField } from "@/lib/inputHistory";
 
 export type InklandTextareaStatus = "default" | "success" | "warning" | "error";
 export type InklandTextareaHeight = "fixed" | "autosize" | "minmax";
@@ -28,6 +30,9 @@ export interface InklandTextareaProps extends Omit<TextareaHTMLAttributes<HTMLTe
   autosize?: InklandTextareaAutosize;
   fieldClassName?: string;
   showLimitNumber?: boolean;
+  historyKey?: InputHistoryField;
+  historyLabel?: string;
+  onHistorySelect?: (value: string) => void;
 }
 
 function assignRef<T>(ref: ForwardedRef<T>, value: T | null) {
@@ -52,13 +57,19 @@ const Textarea = forwardRef<HTMLTextAreaElement, InklandTextareaProps>(function 
     fieldClassName,
     showLimitNumber,
     maxLength,
+    historyKey,
+    historyLabel = "输入内容",
+    onHistorySelect,
     value,
     defaultValue,
     id: providedId,
     className,
+    autoComplete: providedAutoComplete,
     disabled,
     readOnly,
     onChange,
+    onFocus: providedOnFocus,
+    onBlur: providedOnBlur,
     "aria-describedby": ariaDescribedBy,
     ...props
   },
@@ -85,6 +96,13 @@ const Textarea = forwardRef<HTMLTextAreaElement, InklandTextareaProps>(function 
     isAutosize ? "ink-textarea--autosize" : "",
     className || "",
   ].filter(Boolean).join(" ");
+  const inputHistory = useInputHistory({
+    field: historyKey,
+    value: currentValue,
+    disabled,
+    readOnly,
+    onSelect: (nextValue) => onHistorySelect?.(nextValue),
+  });
 
   const resize = useCallback(() => {
     const textarea = textareaRef.current;
@@ -117,7 +135,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, InklandTextareaProps>(function 
   return (
     <div className={fieldClasses}>
       {label !== undefined ? <label className="ink-field__label" htmlFor={id}>{label}</label> : null}
-      <div className="ink-field__control">
+      <div ref={inputHistory.controlRef} className="ink-field__control">
         <textarea
           {...props}
           ref={(node) => {
@@ -129,13 +147,17 @@ const Textarea = forwardRef<HTMLTextAreaElement, InklandTextareaProps>(function 
           value={value}
           defaultValue={defaultValue}
           maxLength={maxLength}
+          autoComplete={historyKey ? "off" : providedAutoComplete}
           disabled={disabled}
           readOnly={readOnly}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           onChange={handleChange}
+          onFocus={(event) => { inputHistory.handleFocus(); providedOnFocus?.(event); }}
+          onBlur={(event) => { inputHistory.handleBlur(); providedOnBlur?.(event); }}
         />
         {counterId ? <output className={`ink-textarea__counter${measureLength(currentValue) > maxLength! ? " ink-textarea__counter--over" : ""}`} id={counterId} aria-live="polite">{measureLength(currentValue)} / {maxLength}</output> : null}
+        {inputHistory.open ? <InputHistoryPopover entries={inputHistory.entries} label={historyLabel} placement={inputHistory.placement} popoverRef={inputHistory.popoverRef} style={inputHistory.position} onSelect={inputHistory.handleSelect} /> : null}
       </div>
       {hint ? <p className="ink-field__hint" id={hintId}>{hint}</p> : null}
       {feedback ? <p className={`ink-field__feedback ink-field__feedback--${status}`} id={feedbackId} role={error ? "alert" : "status"}>{feedback}</p> : null}

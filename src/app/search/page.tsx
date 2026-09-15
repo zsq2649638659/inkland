@@ -557,7 +557,7 @@ function SearchContent() {
                 aria-controls="search-filter-mobile-modal"
                 onClick={openMobileFilter}
               >
-                <SiteIcon name="fa-filter-compact" variant="default" aria-hidden="true" />
+                <SiteIcon name="fa-filter" variant="default" aria-hidden="true" />
                 <span>筛选</span>
               </button>
             </div>

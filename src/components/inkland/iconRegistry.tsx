@@ -31,9 +31,11 @@ type InklandIconPath = { d: string; variant?: "default" | "outline" | "solid"; [
 export type InklandIconDefinition = { viewBox: string; paths: InklandIconPath[]; supportsVariants?: boolean };
 
 export const inklandIconRegistry: Record<InklandIconName, InklandIconDefinition> = {
-  "fa-magnifying-glass": { viewBox: "0 0 512 512", paths: [
-    { "d": "M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376C296.3 401.1 253.9 416 208 416 93.1 416 0 322.9 0 208S93.1 0 208 0 416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 0 0 0 288z", "variant": "default", "fill": "currentColor" },
-  ] },
+  "fa-magnifying-glass": { viewBox: "0 0 48 48", paths: [
+    { d: "M21 38C30.3888 38 38 30.3888 38 21C38 11.6112 30.3888 4 21 4C11.6112 4 4 11.6112 4 21C4 30.3888 11.6112 38 21 38Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M26.657 14.3431C25.2093 12.8954 23.2093 12 21.0001 12C18.791 12 16.791 12.8954 15.3433 14.3431", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M33.2216 33.2217L41.7069 41.707", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+  ], supportsVariants: false },
   "fa-file-lines": { viewBox: "0 0 24 24", paths: [
     {"d": "M5.25 1.5H14.25V5.99995C14.25 7.24259 15.2574 8.24995 16.5 8.24995H21V20.25C21 21.4926 19.9927 22.5 18.75 22.5H5.25C4.00737 22.5 3 21.4926 3 20.25V3.75C3 2.50737 4.00737 1.5 5.25 1.5ZM7.50016 12.75H16.5002V11.25H7.50016V12.75ZM16.5002 16.5V15H7.50016V16.5H16.5002ZM7.50016 9H12.0002V7.5H7.50016V9Z", "variant": "default", "fill": "currentColor"},
     {"d": "M20.5593 5.6951C20.8397 5.9748 20.9981 6.354 21 6.74986H16.5C16.0858 6.74986 15.75 6.41407 15.75 5.99986V1.5C16.1411 1.50435 16.5154 1.66136 16.7926 1.93791L20.5593 5.6951Z", "variant": "default", "fill": "currentColor"},
@@ -66,11 +68,17 @@ export const inklandIconRegistry: Record<InklandIconName, InklandIconDefinition>
   "fa-reply": { viewBox: "0 0 512 512", paths: [
     { "d": "M204.2 18.4c12 5 19.8 16.6 19.8 29.6l0 80 112 0c97.2 0 176 78.8 176 176 0 113.3-81.5 163.9-100.2 174.1-2.5 1.4-5.3 1.9-8.1 1.9-10.9 0-19.7-8.9-19.7-19.7 0-7.5 4.3-14.4 9.8-19.5 9.4-8.8 22.2-26.4 22.2-56.7 0-53-43-96-96-96l-96 0 0 80c0 12.9-7.8 24.6-19.8 29.6s-25.7 2.2-34.9-6.9l-160-160c-12.5-12.5-12.5-32.8 0-45.3l160-160c9.2-9.2 22.9-11.9 34.9-6.9z", "variant": "default", "fill": "currentColor" },
   ] },
-  "fa-user-plus": { viewBox: "0 0 640 512", paths: [
-    { "d": "M285.7 304c98.5 0 178.3 79.8 178.3 178.3 0 16.4-13.3 29.7-29.7 29.7L77.7 512C61.3 512 48 498.7 48 482.3 48 383.8 127.8 304 226.3 304l59.4 0zM528 80c13.3 0 24 10.7 24 24l0 48 48 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-48 0 0 48c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-48-48 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0 0-48c0-13.3 10.7-24 24-24zM256 248a120 120 0 1 1 0-240 120 120 0 1 1 0 240z", "variant": "default", "fill": "currentColor" },
+  "fa-user-plus": { viewBox: "0 0 48 48", paths: [
+    { d: "M24 4C28.4183 4 32 7.58172 32 12C32 16.4183 28.4183 20 24 20C19.5817 20 16 16.4183 16 12C16 7.58172 19.5817 4 24 4Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M42 44C42 34.0589 33.9411 26 24 26C14.0589 26 6 34.0589 6 44", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M19 39H29", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M24 34V44", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ] },
-  "fa-circle-info": { viewBox: "0 0 512 512", paths: [
-    { "d": "M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zM224 160a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm-8 64l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24z", "variant": "default", "fill": "currentColor" },
+  "fa-circle-info": { viewBox: "0 0 48 48", paths: [
+    { d: "M24 44C29.5228 44 34.5228 41.7614 38.1421 38.1421C41.7614 34.5228 44 29.5228 44 24C44 18.4772 41.7614 13.4772 38.1421 9.85786C34.5228 6.23858 29.5228 4 24 4C18.4772 4 13.4772 6.23858 9.85786 9.85786C6.23858 6.23858 4 18.4772 4 24C4 29.5228 6.23858 34.5228 9.85786 38.1421C13.4772 41.7614 18.4772 44 24 44Z", variant: "default", fill: "currentColor", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+    { d: "M24 11C25.3807 11 26.5 12.1193 26.5 13.5C26.5 14.8807 25.3807 16 24 16C22.6193 16 21.5 14.8807 21.5 13.5C21.5 12.1193 22.6193 11 24 11Z", variant: "default", fill: "var(--ink-color-text-anti)" },
+    { d: "M24.5 34V20H23.5H22.5", variant: "default", fill: "none", stroke: "var(--ink-color-text-anti)", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M21 34H28", variant: "default", fill: "none", stroke: "var(--ink-color-text-anti)", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ] },
   "fa-bars": { viewBox: "0 0 448 512", paths: [
     { "d": "M0 96C0 78.3 14.3 64 32 64l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 128C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 288c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32L32 448c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32 14.3 32 32z", "variant": "default", "fill": "currentColor" },
@@ -92,11 +100,14 @@ export const inklandIconRegistry: Record<InklandIconName, InklandIconDefinition>
   "fa-chevron-right": { viewBox: "0 0 320 512", paths: [
     { "d": "M310.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L242.7 256 73.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z", "variant": "default", "fill": "currentColor" },
   ] },
-  "fa-circle-check": { viewBox: "0 0 512 512", paths: [
-    { "d": "M256 512a256 256 0 1 1 0-512 256 256 0 1 1 0 512zM374 145.7c-10.7-7.8-25.7-5.4-33.5 5.3L221.1 315.2 169 263.1c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l72 72c5 5 11.8 7.5 18.8 7s13.4-4.1 17.5-9.8L379.3 179.2c7.8-10.7 5.4-25.7-5.3-33.5z", "variant": "default", "fill": "currentColor" },
+  "fa-circle-check": { viewBox: "0 0 48 48", paths: [
+    { d: "M24 44C29.5228 44 34.5228 41.7614 38.1421 38.1421C41.7614 34.5228 44 29.5228 44 24C44 18.4772 41.7614 13.4772 38.1421 9.85786C34.5228 6.23858 29.5228 4 24 4C18.4772 4 13.4772 6.23858 9.85786 9.85786C6.23858 13.4772 4 18.4772 4 24C4 29.5228 6.23858 34.5228 9.85786 38.1421C13.4772 41.7614 18.4772 44 24 44Z", variant: "default", fill: "currentColor", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+    { d: "M16 24L22 30L34 18", variant: "default", fill: "none", stroke: "var(--ink-color-text-anti)", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: false },
-  "fa-circle-exclamation": { viewBox: "0 0 512 512", paths: [
-    { "d": "M256 512a256 256 0 1 1 0-512 256 256 0 1 1 0 512zm0-192a32 32 0 1 0 0 64 32 32 0 1 0 0-64zm0-192c-18.2 0-32.7 15.5-31.4 33.7l7.4 104c.9 12.6 11.4 22.3 23.9 22.3 12.6 0 23-9.7 23.9-22.3l7.4-104c1.3-18.2-13.1-33.7-31.4-33.7z", "variant": "default", "fill": "currentColor" },
+  "fa-circle-exclamation": { viewBox: "0 0 48 48", paths: [
+    { d: "M24 44C29.5228 44 34.5228 41.7614 38.1421 38.1421C41.7614 34.5228 44 29.5228 44 24C44 18.4772 41.7614 13.4772 38.1421 9.85786C34.5228 6.23858 29.5228 4 24 4C18.4772 4 13.4772 6.23858 9.85786 9.85786C6.23858 6.23858 4 18.4772 4 24C4 29.5228 6.23858 34.5228 9.85786 38.1421C13.4772 41.7614 18.5228 44 24 44Z", variant: "default", fill: "currentColor", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+    { d: "M24 37C25.3807 37 26.5 35.8807 26.5 34.5C26.5 33.1193 25.3807 32 24 32C22.6193 32 21.5 33.1193 21.5 34.5C21.5 35.8807 22.6193 37 24 37Z", variant: "default", fill: "var(--ink-color-text-anti)" },
+    { d: "M24 12V28", variant: "default", fill: "none", stroke: "var(--ink-color-text-anti)", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: false },
   "fa-triangle-exclamation": { viewBox: "0 0 512 512", paths: [
     { "d": "M256 0c14.7 0 28.2 8.1 35.2 21l216 400c6.7 12.4 6.4 27.4-.8 39.5S486.1 480 472 480L40 480c-14.1 0-27.2-7.4-34.4-19.5s-7.5-27.1-.8-39.5l216-400c7-12.9 20.5-21 35.2-21zm0 352a32 32 0 1 0 0 64 32 32 0 1 0 0-64zm0-192c-18.2 0-32.7 15.5-31.4 33.7l7.4 104c.9 12.5 11.4 22.3 23.9 22.3 12.6 0 23-9.7 23.9-22.3l7.4-104c1.3-18.2-13.1-33.7-31.4-33.7z", "variant": "default", "fill": "currentColor" },

@@ -403,7 +403,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
                 <SettingsStatus kind={notificationMessageKind === "error" ? "error" : "success"} message={notificationMessage} />
               )}
               <button type="button" className="settings-btn-save" onClick={() => void handleNotificationPreferencesSave()} disabled={notificationSaving}>
-                <SiteIcon name="fa-check" variant="solid" aria-hidden="true" /> {notificationSaving ? "保存中…" : "保存设置"}
+                {notificationSaving ? "保存中…" : "保存设置"}
               </button>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import Checkbox from "@/components/inkland/Checkbox";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { submitReportV1 } from "@/lib/reportContent";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
@@ -23,10 +24,14 @@ interface UserCardProps {
   isFollowingTab: boolean;
   /** 是否已关注该用户 */
   isFollowed?: boolean;
+  /** 是否显示批量操作复选框 */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
   onUpdate: () => void;
 }
 
-export default function UserCard({ user, currentUserId, isFollowingTab, isFollowed, onUpdate }: UserCardProps) {
+export default function UserCard({ user, currentUserId, isFollowingTab, isFollowed, selectable = false, selected = false, onToggleSelect, onUpdate }: UserCardProps) {
   const supabase = createClient();
   const dialog = useAppDialog();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -84,8 +89,30 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
   const btnText = isFollowingTab ? "取消关注" : (isFollowed ? "取消关注" : "回关");
 
   return (
-    <div className={`user-card${moreOpen ? " show-popup" : ""}`}>
-      <Link href={`/user/${user.id}`} className="no-underline" style={{ display: 'flex', alignItems: 'center', gap: 'inherit', flex: 1, minWidth: 0 }}>
+    <div
+      className={`user-card${moreOpen ? " show-popup" : ""}${selectable ? " user-card--selectable" : ""}${selected ? " selected" : ""}`}
+      role={selectable ? "button" : undefined}
+      tabIndex={selectable ? 0 : undefined}
+      aria-pressed={selectable ? selected : undefined}
+      onClick={selectable ? () => onToggleSelect?.() : undefined}
+      onKeyDown={selectable ? (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onToggleSelect?.();
+        }
+      } : undefined}
+    >
+      {selectable && (
+        <Checkbox
+          as="span"
+          className="user-card-check"
+          checked={selected}
+          aria-label={`选择用户：${user.nickname}`}
+          onChange={() => onToggleSelect?.()}
+          onClick={(event) => event.stopPropagation()}
+        />
+      )}
+      <Link href={`/user/${user.id}`} className="no-underline" aria-disabled={selectable || undefined} onClick={selectable ? (event) => event.preventDefault() : undefined} style={{ display: 'flex', alignItems: 'center', gap: 'inherit', flex: 1, minWidth: 0 }}>
         <div className="user-avatar">
           {user.avatar_url ? (
             <img src={user.avatar_url} alt="" />
@@ -98,7 +125,7 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
           {user.bio && <div className="user-bio">{user.bio}</div>}
         </div>
       </Link>
-      <div className="user-actions">
+      <div className="user-actions" onClick={(event) => event.stopPropagation()}>
         <button className={`btn-follow${isFollowed || isFollowingTab ? " followed" : ""}`} onClick={handleUnfollow}>
           {btnText}
         </button>

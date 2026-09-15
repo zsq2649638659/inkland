@@ -9,7 +9,7 @@ export default function SettingsStatus({ kind, message }: SettingsStatusProps) {
   const iconClass = kind === "success"
     ? "fa-circle-check"
     : kind === "warning"
-      ? "fa-triangle-exclamation"
+      ? "fa-circle-exclamation"
       : "fa-circle-xmark";
   const statusClass = kind === "success" ? "" : ` settings-status-${kind}`;
 

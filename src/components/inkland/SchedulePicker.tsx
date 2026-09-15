@@ -183,7 +183,7 @@ export default function SchedulePicker({ value, onChange, disabled = false, clas
           onClick={() => { setDateOpen((open) => !open); setTimeOpen(false); setMonthValue((dateValue || todayValue).slice(0, 7)); }}
           aria-expanded={dateOpen}
         >
-          <span><SiteIcon name="fa-calendar-days" variant="outline" aria-hidden="true" /> {dateLabel(dateValue)}</span>
+          <span><SiteIcon name="fa-calendar" variant="outline" aria-hidden="true" /> {dateLabel(dateValue)}</span>
           <SiteIcon name="fa-chevron-down" variant="solid" className={dateOpen ? "up" : undefined} aria-hidden="true" />
         </button>
         {dateOpen && (

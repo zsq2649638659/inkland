@@ -101,7 +101,7 @@ export default async function ReadPage({
   const postQuery = withTestDataVisibility(
     supabase
       .from("posts")
-      .select("id,title,content,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url,bio),post_tags(tags!inner(name))")
+      .select("id,title,content,author_note,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url,bio),post_tags(tags!inner(name))")
       .eq("id", id)
       .eq("status", "published"),
     includeTestData,
@@ -161,6 +161,7 @@ export default async function ReadPage({
     id: p.id as string,
     title: p.title as string,
     content: resolvedContent,
+    author_note: (p.author_note as string) || null,
     post_type: p.post_type as Post["post_type"],
     user_id: p.user_id as string,
     cover_url: resolvedCover,
