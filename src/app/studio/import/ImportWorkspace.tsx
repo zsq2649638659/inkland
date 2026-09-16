@@ -3,6 +3,7 @@ import SiteIcon from "@/components/SiteIcon";
 import Checkbox from "@/components/inkland/Checkbox";
 import Radio from "@/components/inkland/Radio";
 import SchedulePicker from "@/components/inkland/SchedulePicker";
+import TagInput from "@/components/inkland/TagInput";
 
 import Link from "next/link";
 import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -16,7 +17,7 @@ import { cleanImportHeading, extractImportPreamble, splitImportChapters, type Im
 import { clearImportBatch, loadImportBatch, saveImportBatch, type ImportBatchSnapshot } from "@/lib/importBatchStore";
 import { findImportDuplicate, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
 import { extractTextImportMetadata, normalizeImportedDescription, normalizeImportedTitle } from "@/lib/importMetadata";
-import { addTags, MAX_TAGS_PER_WORK, splitTags } from "@/lib/tagRules";
+import { MAX_TAGS_PER_WORK } from "@/lib/tagRules";
 import styles from "./import.module.css";
 
 const ACCEPTED_EXTENSIONS = new Set(["txt", "text", "md", "markdown", "html", "htm", "docx", "epub"]);
@@ -681,22 +682,20 @@ async function parseFile(file: File): Promise<ParsedFileResult> {
   return { works: await buildTextWorks(plan), textPlan: plan };
 }
 
-function TagEditor({ tags = [], onChange, disabled = false, showHint = true, placeholder = "多个标签可用逗号或空格隔开" }: { tags?: string[]; onChange: (tags: string[]) => void; disabled?: boolean; showHint?: boolean; placeholder?: string }) {
+function TagEditor({ tags = [], onChange, suggestedTags = [], disabled = false, showHint = true, placeholder = "多个标签可用逗号或空格隔开" }: { tags?: string[]; onChange: (tags: string[]) => void; suggestedTags?: string[]; disabled?: boolean; showHint?: boolean; placeholder?: string }) {
   const [value, setValue] = useState("");
-  const addTag = () => {
-    const nextTags = splitTags(value);
-    if (nextTags.length === 0) return;
-    onChange(addTags(tags, nextTags));
-    setValue("");
-  };
   return (
     <div className={styles.tagEditor}>
-      <div className={styles.tagInputWrapper}>
-        {tags.map((tag) => (
-          <span className={styles.tag} key={tag}>{tag}<button type="button" disabled={disabled} aria-label={`删除标签 ${tag}`} onClick={() => onChange(tags.filter((item) => item !== tag))}><SiteIcon name="fa-xmark" variant="solid" /></button></span>
-        ))}
-        <input value={value} disabled={disabled} placeholder={placeholder} onChange={(event) => setValue(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === "Enter") { event.preventDefault(); addTag(); } }} />
-      </div>
+      <TagInput
+        tags={tags}
+        inputValue={value}
+        onChange={(nextTags) => onChange(nextTags.slice(0, MAX_TAGS_PER_WORK))}
+        onInputValueChange={setValue}
+        suggestedTags={suggestedTags}
+        disabled={disabled}
+        placeholder={placeholder}
+        fieldClassName={styles.tagEditorInput}
+      />
       {showHint && <span className={styles.tagEditorHint}>每个作品最多 {MAX_TAGS_PER_WORK} 个标签</span>}
     </div>
   );
@@ -708,12 +707,6 @@ export default function ImportWorkspace() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleValueRef = useRef("");
   const [scheduleValue, setScheduleValue] = useState("");
-  const sourceTabRefs = useRef<Record<SourceTabKey, HTMLButtonElement | null>>({
-    local: null,
-    notion: null,
-    feishu: null,
-    export: null,
-  });
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [batchId, setBatchId] = useState("");
   const [parsedWorks, setParsedWorks] = useState<ParsedWork[]>([]);
@@ -727,6 +720,7 @@ export default function ImportWorkspace() {
   const [metadataCandidateModalPlanId, setMetadataCandidateModalPlanId] = useState<string | null>(null);
   const metadataCandidatePromptedPlanRef = useRef<string | null>(null);
   const [bulkTags, setBulkTags] = useState<string[]>([]);
+  const [recentTags, setRecentTags] = useState<string[]>([]);
   const [copyrightConfirmed, setCopyrightConfirmed] = useState(false);
   const [publishMode, setPublishMode] = useState<"publish" | "draft" | "schedule">("publish");
   const [publishResults, setPublishResults] = useState<PublishResult[]>([]);
@@ -750,18 +744,31 @@ export default function ImportWorkspace() {
     }
   }, []);
 
-  const handleSourceTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const focusedIndex = SOURCE_TABS.findIndex(([key]) => sourceTabRefs.current[key] === document.activeElement);
-    const activeIndex = focusedIndex >= 0 ? focusedIndex : SOURCE_TABS.findIndex(([key]) => key === sourceTab);
-    let nextIndex = activeIndex;
-    if (event.key === "ArrowRight") nextIndex = (activeIndex + 1) % SOURCE_TABS.length;
-    else if (event.key === "ArrowLeft") nextIndex = (activeIndex - 1 + SOURCE_TABS.length) % SOURCE_TABS.length;
-    else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = SOURCE_TABS.length - 1;
-    else return;
-    event.preventDefault();
-    sourceTabRefs.current[SOURCE_TABS[nextIndex][0]]?.focus();
-  };
+  useEffect(() => {
+    if (!user?.id) {
+      setRecentTags([]);
+      return;
+    }
+    let active = true;
+    const loadRecentTags = async () => {
+      const { data } = await supabase
+        .from("user_tag_usage")
+        .select("last_used_at, tags(name)")
+        .eq("user_id", user.id)
+        .order("last_used_at", { ascending: false })
+        .limit(10);
+      if (!active) return;
+      const names = ((data || []) as Array<Record<string, unknown>>)
+        .map((row) => {
+          const tag = row.tags as { name?: string } | { name?: string }[] | null;
+          return Array.isArray(tag) ? tag[0]?.name : tag?.name;
+        })
+        .filter((name): name is string => Boolean(name));
+      setRecentTags([...new Set(names)].slice(0, 10));
+    };
+    void loadRecentTags();
+    return () => { active = false; };
+  }, [supabase, user?.id]);
 
   useEffect(() => {
     // OAuth 状态只能在浏览器挂载后从同源接口读取。
@@ -1595,11 +1602,11 @@ export default function ImportWorkspace() {
           <section className={styles.panel}>
               {currentStep === 1 && <>
               <p className={styles.sourceGroupLabel}>导入方法</p>
-              <div className={styles.sourceTabs} role="tablist" aria-label="选择导入来源" onKeyDown={handleSourceTabKeyDown}>
+              <div className={styles.sourceTabs} role="radiogroup" aria-label="选择导入来源">
                 {SOURCE_TABS.map(([key, title, description]) => (
-                  <button key={key} id={`source-tab-${key}`} ref={(element) => { sourceTabRefs.current[key] = element; }} type="button" role="tab" aria-selected={sourceTab === key} aria-controls="import-source-panel" className={sourceTab === key ? styles.activeSource : ""} onClick={() => { setSourceTab(key); setOnlineUrl(""); setError(""); setNotice(""); }}>
+                  <Radio key={key} id={`source-tab-${key}`} name="import-source" value={key} variant="card" checked={sourceTab === key} className={styles.sourceOption} onChange={() => { setSourceTab(key); setOnlineUrl(""); setError(""); setNotice(""); }}>
                     <span><strong>{title}</strong><small>{description}</small></span>
-                  </button>
+                  </Radio>
                 ))}
               </div>
 
@@ -1686,7 +1693,7 @@ export default function ImportWorkspace() {
                 <div className={`${styles.stepScrollArea} ${styles.previewStepScrollArea}`}>
                 <div className={`${styles.previewList} ${parsedWorks.length === 1 ? styles.previewListSingle : parsedWorks.length === 2 ? styles.previewListDouble : ""}`}>{parsedWorks.map((work) => <article key={work.id} className={`${styles.previewCard}${work.selected ? ` ${styles.previewCardSelected}` : ""}`} onClick={() => { if (!busy && !work.duplicateMatch) setParsedSelection(work.id, !work.selected); }}><div className={styles.previewBody}><div className={styles.previewTitleRow}><span>标题</span><input className={styles.titleInput} value={work.title} disabled={busy} aria-label="作品标题" maxLength={100} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, title: event.target.value, duplicateMatch: undefined, duplicateAction: undefined } : item))} /><Checkbox as="span" className={styles.selectCheckbox} checked={work.selected} disabled={busy} aria-label={`选择 ${work.title}`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedSelection(work.id, event.target.checked)} /></div><label className={styles.contentField}><span>正文</span><div className={styles.contentFieldControl}><textarea value={work.content} disabled={busy} aria-label={`${work.title} 正文`} onClick={(event) => event.stopPropagation()} onChange={(event) => setParsedWorks((current) => current.map((item) => item.id === work.id ? { ...item, content: event.target.value, wordCount: countWords(event.target.value), duplicateMatch: undefined, duplicateAction: undefined } : item))} /><span className={styles.wordCount}>{work.wordCount.toLocaleString()} 字</span></div></label></div></article>)}</div>
                 </div>
-                <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>下一步</button></div>
+                <div className={styles.stepActions}><button type="button" className={styles.previousButton} onClick={() => { setError(""); setCurrentStep(1); }}>上一步</button><span>已选择 {selectedParsedCount} 篇</span><button type="button" className={styles.primaryButton} disabled={busy} onClick={continueFromConfirm}>下一步</button></div>
               </div>}
 
               {currentStep === 3 && <div className={styles.stepPage}>
@@ -1695,16 +1702,16 @@ export default function ImportWorkspace() {
                   {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}>
                     <label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label>
                     <label><span>{plan.mode === "serial" ? "连载简介" : "合集简介"}</span><textarea value={plan.groupDescription || ""} maxLength={500} placeholder="请确认或填写简介，最多500字" onChange={(event) => updateGroupInformation(plan.id, { groupDescription: event.target.value })} /></label>
-                    {plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}
+                    {plan.mode === "serial" && <div className={styles.tagsSection}><strong>连载标签 <span>这些标签属于整部长篇，不会重复加到章节</span></strong><TagEditor tags={plan.groupTags || []} suggestedTags={recentTags} onChange={(groupTags) => updateGroupInformation(plan.id, { groupTags })} /></div>}
                   </section>)}
                   {parsedWorks.some((work) => work.selected && work.groupMode !== "serial") && <>
                     <div className={styles.bulkTagBar}>
                       <span>批量添加单篇标签</span>
-                      <TagEditor tags={bulkTags} showHint={false} placeholder={`逗号或空格隔开；每篇最多 ${MAX_TAGS_PER_WORK} 个`} onChange={handleBulkTagsChange} />
+                      <TagEditor tags={bulkTags} suggestedTags={recentTags} showHint={false} placeholder={`逗号或空格隔开；每篇最多 ${MAX_TAGS_PER_WORK} 个`} onChange={handleBulkTagsChange} />
                     </div>
                   </>}
                 </div>
-                <div className={styles.stepActions}><button type="button" onClick={() => { setError(""); setCurrentStep(2); }}>上一步</button><span>{selectedWithTagsCount}/{selectedParsedCount} 篇已满足标签要求</span><button type="button" className={styles.primaryButton} onClick={continueFromTags}>下一步</button></div>
+                <div className={styles.stepActions}><button type="button" className={styles.previousButton} onClick={() => { setError(""); setCurrentStep(2); }}>上一步</button><span>{selectedWithTagsCount}/{selectedParsedCount} 篇已满足标签要求</span><button type="button" className={styles.primaryButton} onClick={continueFromTags}>下一步</button></div>
               </div>}
 
               {currentStep === 4 && <div className={styles.previewSection}>
@@ -1723,9 +1730,9 @@ export default function ImportWorkspace() {
                       <span className="collection-option-copy"><span className="collection-option-text"><strong>定时发布</strong></span><span className="collection-option-desc">提交审核，通过后按设定时间公开</span></span>
                     </Radio>
                   </fieldset>
-                  {publishMode === "schedule" && <SchedulePicker value={scheduleValue} disabled={busy || publishComplete} onChange={(value) => { scheduleValueRef.current = value; setScheduleValue(value); }} />}
+                  {publishMode === "schedule" && <SchedulePicker value={scheduleValue} disabled={busy || publishComplete} onChange={(value) => { scheduleValueRef.current = value; setScheduleValue(value); }} hideLabels />}
                   <Checkbox className={styles.copyrightBox} checked={copyrightConfirmed} disabled={busy || publishComplete} onChange={(event) => setCopyrightConfirmed(event.target.checked)}>我确认自己是所选内容的作者，或已取得在 Inkland 发布这些内容的许可。</Checkbox>
-                  <div className={styles.finalActions}>{!publishComplete && <button type="button" disabled={busy} onClick={() => { setError(""); setCurrentStep(3); }}>上一步</button>}<button type="button" className={styles.primaryButton} disabled={busy || publishComplete || selectedParsedCount === 0} onClick={() => void publishSelectedWorks()}>{busy ? "正在处理..." : "下一步"}</button></div>
+                  <div className={styles.finalActions}>{!publishComplete && <button type="button" className={styles.previousButton} disabled={busy} onClick={() => { setError(""); setCurrentStep(3); }}>上一步</button>}<button type="button" className={styles.primaryButton} disabled={busy || publishComplete || selectedParsedCount === 0} onClick={() => void publishSelectedWorks()}>{busy ? "正在处理..." : "下一步"}</button></div>
                 </section>
               </div>}
 

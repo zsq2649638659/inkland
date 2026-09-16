@@ -338,7 +338,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
                 <SettingsStatus kind={passwordMessageKind === "error" ? "error" : "success"} message={passwordMessage} />
               )}
               <button type="submit" className="settings-btn-save" disabled={passwordSaving}>
-                <SiteIcon name="fa-check" variant="solid" aria-hidden="true" /> {passwordSaving ? "保存中…" : "保存修改"}
+                {passwordSaving ? "保存中…" : "保存修改"}
               </button>
             </div>
           </form>
@@ -522,9 +522,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
             </div>
 
             <div className="settings-form-actions settings-feedback-actions">
-              <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
-                <SiteIcon name={feedbackSubmitting ? "fa-spinner" : "fa-paper-plane"} variant="solid" className={feedbackSubmitting ? "animate-spin" : undefined} aria-hidden="true" /> {feedbackSubmitting ? "提交中…" : "提交反馈"}
-              </button>
               {feedbackSuccess && (
                 <SettingsStatus kind="success" message={feedbackSuccess} />
               )}
@@ -532,6 +529,9 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               {feedbackError && (
                 <SettingsStatus kind="error" message={feedbackError} />
               )}
+              <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
+                {feedbackSubmitting ? "提交中…" : "提交反馈"}
+              </button>
             </div>
           </div>
         </div>

@@ -1378,3 +1378,255 @@
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Keep the import publish modes in one desktop row, despite the main-site
+   publish form's two-column collection rule. */
+:global(#page-create) .publishModes {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+/* Keep every bulk-import "上一步" action on the shared Inkland button contract. */
+:global(#page-create) .stepActions > button:not(.primaryButton),
+:global(#page-create) .finalActions > button:not(.primaryButton) {
+  display: inline-flex;
+  width: 120px;
+  min-width: 120px;
+  height: 40px;
+  min-height: 40px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ink-space-2);
+  padding: 0 var(--ink-radius-md);
+  border: 0;
+  border-radius: 8px;
+  color: #6b6b6b;
+  background: #ede9e5;
+  font-size: 14px;
+  line-height: 40px;
+  font-family: inherit;
+  font-weight: 400;
+  box-shadow: none;
+  transform: none;
+}
+
+:global(#page-create) .stepActions > button:not(.primaryButton):hover:not(:disabled),
+:global(#page-create) .finalActions > button:not(.primaryButton):hover:not(:disabled) {
+  color: #6b6b6b;
+  border-color: transparent;
+  background: #d4cec8;
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+
+@media (max-width: 768px) {
+  :global(#page-create) .publishModes {
+    grid-template-columns: 1fr !important;
+  }
+
+  :global(#page-create) .stepActions > button:not(.primaryButton),
+  :global(#page-create) .finalActions > button:not(.primaryButton) {
+    width: 100px;
+    min-width: 100px;
+    padding: 0 var(--ink-radius-sm);
+  }
+}
+
+/* Batch-import controls use the same centered cards and selector language as
+   the other creation flows. */
+:global(#page-create) .steps li {
+  justify-content: center;
+  text-align: center;
+}
+
+:global(#page-create) .sourceTabs :global(.ink-radio) {
+  display: grid;
+  width: 100%;
+  min-height: 68px;
+  box-sizing: border-box;
+  grid-template-columns: 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: 0;
+  padding: var(--spacing-md) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  box-shadow: none;
+  text-align: center;
+}
+
+:global(#page-create) .sourceTabs :global(.ink-radio):hover,
+:global(#page-create) .sourceTabs :global(.ink-radio):focus-within,
+:global(#page-create) .sourceTabs :global(.ink-radio):has(.ink-radio__input:checked) {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-card));
+  box-shadow: none;
+  transform: none;
+}
+
+:global(#page-create) .sourceTabs :global(.ink-radio__content) {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 4px;
+}
+
+:global(#page-create) .sourceTabs :global(.ink-radio__content) strong {
+  color: var(--color-text);
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+
+:global(#page-create) .sourceTabs :global(.ink-radio__content) small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+:global(#page-create) .previousButton,
+:global(#page-create) .previousButton:hover:not(:disabled),
+:global(#page-create) .previousButton:focus-visible {
+  border: 0;
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+:global(#page-create) .previousButton {
+  color: #6b6b6b;
+  background: #ede9e5;
+}
+
+:global(#page-create) .previousButton:hover:not(:disabled),
+:global(#page-create) .previousButton:focus-visible {
+  color: #6b6b6b;
+  background: #d4cec8;
+  outline: none;
+}
+
+:global(#page-create) .encodingTrigger {
+  width: 100%;
+  min-height: var(--ink-input-height-md);
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 var(--ink-input-padding-inline);
+  border: var(--ink-button-border-width) solid transparent;
+  border-radius: var(--ink-radius-md);
+  color: var(--ink-text-secondary);
+  background: var(--ink-surface);
+  font: var(--ink-font-control);
+  line-height: normal;
+  box-shadow: none;
+  transition: color var(--ink-motion-fast) ease, background-color var(--ink-motion-fast) ease, border-color var(--ink-motion-fast) ease;
+}
+
+:global(#page-create) .encodingTrigger:hover,
+:global(#page-create) .encodingTrigger[aria-expanded="true"],
+:global(#page-create) .encodingTrigger:focus-visible {
+  border-color: transparent;
+  color: var(--ink-text-secondary);
+  background: var(--ink-surface);
+  outline: none;
+  box-shadow: none;
+}
+
+:global(#page-create) .encodingTrigger i {
+  color: var(--ink-text-tertiary);
+}
+
+:global(#page-create) .encodingMenu {
+  gap: var(--ink-gap-tight);
+  padding: var(--ink-input-menu-padding);
+  border: var(--ink-border-width-thin) solid var(--ink-border);
+  border-radius: var(--ink-radius-sm);
+  background: var(--ink-surface);
+  box-shadow: var(--ink-input-menu-shadow);
+}
+
+:global(#page-create) .encodingMenu button {
+  min-height: var(--ink-input-option-height);
+  padding: 0 var(--ink-input-padding-inline-option);
+  border: var(--ink-border-none);
+  border-radius: var(--ink-input-option-radius);
+  color: var(--ink-text-secondary);
+  background: transparent;
+  font: var(--ink-font-control);
+}
+
+:global(#page-create) .encodingMenu button:hover,
+:global(#page-create) .encodingMenu button:focus-visible,
+:global(#page-create) .encodingMenu .encodingOptionSelected {
+  color: var(--ink-primary);
+  background: var(--ink-primary-bg);
+  outline: none;
+  box-shadow: none;
+}
+
+:global(#page-create) .encodingMenu button i {
+  color: inherit;
+}
+
+:global(#page-create) .encodingMenu button svg {
+  color: inherit;
+}
+
+/* Bulk tag entry uses the same removable tag component as the single/image
+   publishing flows, but the surrounding field remains borderless. */
+:global(#page-create) .tagEditorInput :global(.ink-tag-input__list),
+:global(#page-create) .tagEditorInput :global(.ink-tag-input__list:focus-within) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+:global(#page-create) .tagEditorInput :global(.ink-tag__remove),
+:global(#page-create) .tagEditorInput :global(.ink-tag__remove:hover),
+:global(#page-create) .tagEditorInput :global(.ink-tag__remove:focus-visible) {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+:global(#page-create) .splitOptions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ink-space-3);
+  margin-top: var(--ink-space-4);
+}
+
+:global(#page-create) .splitOptions label {
+  min-height: var(--ink-input-height-md);
+  height: var(--ink-input-height-md);
+  box-sizing: border-box;
+  padding: 0 var(--ink-space-3);
+  border: var(--ink-button-border-width) solid transparent;
+  border-radius: var(--ink-radius-md);
+  color: var(--ink-text-secondary);
+  background: var(--ink-surface);
+  font: var(--ink-font-control);
+  line-height: normal;
+  box-shadow: none;
+}
+
+:global(#page-create) .splitOptions label:hover,
+:global(#page-create) .splitOptions label:focus-within,
+:global(#page-create) .splitOptions label:has(input:checked) {
+  border-color: var(--ink-color-brand);
+  color: var(--ink-text-primary);
+  background: var(--ink-surface);
+  box-shadow: none;
+}
+
+:global(#page-create) .splitOptions label:has(input:focus-visible) {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
+@media (max-width: 768px) {
+  :global(#page-create) .splitOptions {
+    grid-template-columns: 1fr;
+  }
+}

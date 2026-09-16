@@ -780,13 +780,11 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                 </div>
                 {!relationshipBatchMode ? (
                   <button type="button" className="studio-toolbar-action relationship-batch-toggle" onClick={() => { setRelationshipBatchMode(true); setSelectedRelationshipIds(new Set()); }}>
-                    <SiteIcon name="fa-list-check" variant="solid" aria-hidden="true" />
                     批量操作
                   </button>
                 ) : (
                   <div className="relationship-batch-row">
                     <button type="button" className="studio-toolbar-action" disabled={relationshipBatchLoading || selectedRelationshipIds.size === 0} onClick={() => void handleRelationshipBatch()}>
-                      <SiteIcon name="fa-user-minus" variant="solid" aria-hidden="true" />
                       {tab === "following" ? "批量取关" : "批量移除"}
                     </button>
                     <button type="button" className="studio-toolbar-action" onClick={selectAllRelationships}>全选</button>

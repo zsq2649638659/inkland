@@ -9,12 +9,14 @@ export default function ProfileFilterSelect({
   options,
   onChange,
   id,
+  disabled = false,
 }: {
   label: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
   id: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -32,11 +34,11 @@ export default function ProfileFilterSelect({
     <div className="filter-system-field">
       <span className="filter-system-select-wrap">
         <div className="custom-select" data-select ref={rootRef}>
-          <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={id} aria-label={label} onClick={() => setOpen((current) => !current)}>
+            <button type="button" disabled={disabled} aria-haspopup="listbox" aria-expanded={!disabled && open} aria-controls={id} aria-label={label} onClick={() => { if (!disabled) setOpen((current) => !current); }}>
             <span data-select-label>{active.label}</span>
-            <SiteIcon name="fa-chevron-right" variant="solid" aria-hidden="true" style={{ transform: `rotate(${open ? "-90deg" : "90deg"})` }} />
+            <SiteIcon name="fa-chevron-right" variant="solid" aria-hidden="true" style={{ transform: `rotate(${!disabled && open ? "-90deg" : "90deg"})` }} />
           </button>
-          <div className="select-menu" id={id} role="listbox" aria-label={label} hidden={!open}>
+          <div className="select-menu" id={id} role="listbox" aria-label={label} hidden={!open || disabled}>
             {options.map((option) => (
               <button key={option.value} className="select-option" type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); setOpen(false); }}>
                 {option.label}

@@ -7,6 +7,7 @@ import { inklandIconRegistry, type InklandIconName } from "@/components/inkland/
 const chineseLabels: Partial<Record<InklandIconName, string>> = {
   "fa-about-us": "关于我们",
   "fa-action-delete": "删除",
+  "fa-action-forbid": "屏蔽",
   "fa-action-edit": "编辑",
   "fa-action-preview-open": "预览",
   "fa-align-center": "居中对齐",
@@ -19,7 +20,6 @@ const chineseLabels: Partial<Record<InklandIconName, string>> = {
   "fa-arrow-down-wide-short": "降序排序",
   "fa-arrow-up-wide-short": "升序排序",
   "fa-angles-down": "向下展开（旧）",
-  "fa-ban": "屏蔽",
   "fa-bars": "菜单",
   "fa-bell": "通知",
   "fa-book": "书籍",
@@ -99,9 +99,13 @@ const chineseLabels: Partial<Record<InklandIconName, string>> = {
   "fa-spinner": "加载中",
   "fa-sun": "日间模式",
   "fa-tag": "标签",
+  "fa-tag-heat": "标签热度",
+  "fa-tag-participants": "标签参与",
+  "fa-tag-works": "标签作品",
   "fa-tag-remove": "移除标签",
   "fa-tags": "标签组",
   "fa-trash-can": "删除",
+  "fa-word-count": "字数",
   "fa-triangle-exclamation": "警告（旧）",
   "fa-user": "用户",
   "fa-user-check": "正确用户",
@@ -198,7 +202,7 @@ const baseIconGroups: IconGroup[] = [
     title: "上传与作品内容",
     description: "图片上传、文件上传、作品类型与内容容器",
     names: [
-      "fa-image", "fa-images", "fa-camera", "fa-file-arrow-up", "fa-cloud-arrow-up",
+      "fa-image", "fa-images", "fa-camera", "fa-file-arrow-up", "fa-cloud-arrow-up", "fa-word-count",
       "fa-file-lines", "fa-book", "fa-book-open", "fa-long-serial", "fa-layer-group",
     ],
   },
@@ -208,7 +212,7 @@ const baseIconGroups: IconGroup[] = [
     description: "作品卡片、详情页、消息列表中的互动与操作菜单",
     names: [
       "fa-heart", "fa-comment", "fa-bookmark", "fa-reply", "fa-share-from-square",
-      "fa-ellipsis-vertical", "fa-flag", "fa-face-smile", "fa-message", "fa-paper-plane",
+      "fa-ellipsis-vertical", "fa-flag", "fa-action-delete", "fa-action-forbid", "fa-face-smile", "fa-message", "fa-paper-plane",
     ],
   },
   {
@@ -221,10 +225,16 @@ const baseIconGroups: IconGroup[] = [
     ],
   },
   {
+    id: "tag-detail",
+    title: "标签详情页",
+    description: "标签详情页头部的作品、参与与浏览统计",
+    names: ["fa-tag-works", "fa-tag-participants", "fa-tag-heat"],
+  },
+  {
     id: "studio-actions",
     title: "作品管理操作",
     description: "作品管理与长篇连载章节管理中的编辑、预览、删除",
-    names: ["fa-action-preview-open", "fa-action-edit", "fa-action-delete", "fa-play"],
+    names: ["fa-action-preview-open", "fa-action-edit", "fa-play"],
   },
   {
     id: "navigation-feedback",
@@ -234,7 +244,7 @@ const baseIconGroups: IconGroup[] = [
       "fa-arrow-left", "fa-arrow-right", "fa-arrow-up", "fa-arrow-down", "fa-arrow-rotate-right",
       "fa-chevron-down", "fa-angles-left", "fa-angles-right", "fa-chevron-left", "fa-chevron-right",
       "fa-chevron-up", "fa-circle-check", "fa-circle-exclamation", "fa-circle-info",
-      "fa-ban", "fa-spinner", "fa-lock", "fa-xmark", "fa-check", "fa-hourglass-half",
+      "fa-spinner", "fa-lock", "fa-xmark", "fa-check", "fa-hourglass-half",
     ],
   },
 ];

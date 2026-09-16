@@ -40,6 +40,15 @@ interface SeriesInfo {
   updated_at: string;
 }
 
+function formatDateYmd(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "暂无";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function SeriesManagePage({ params }: { params: Promise<{ name: string }> }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
@@ -241,15 +250,15 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
               </div>
               <div className="hero-actions">
                 <button className="hero-action-btn primary" onClick={() => setEditSeries(!editSeries)}>
-                  <SiteIcon name="fa-pencil" variant="solid" /> 编辑信息
+                  编辑信息
                 </button>
                 {series?.status === "ongoing" ? (
                   <button className="hero-action-btn" onClick={() => handleSeriesStatus("completed")}>
-                    <SiteIcon name="fa-flag" variant="solid" /> 标记完结
+                    标记完结
                   </button>
                 ) : (
                   <button className="hero-action-btn" onClick={() => handleSeriesStatus("ongoing")}>
-                    <SiteIcon name="fa-play" variant="solid" /> 恢复连载
+                    恢复连载
                   </button>
                 )}
               </div>
@@ -268,7 +277,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
               </div>
               <span className="meta-sep">|</span>
               <span className="meta-item">
-                最近更新 <span>{chapters.length > 0 ? new Date(chapters[chapters.length - 1].updated_at).toLocaleDateString("zh-CN") : "暂无"}</span>
+                最近更新 <span>{chapters.length > 0 ? formatDateYmd(chapters[chapters.length - 1].updated_at) : "暂无"}</span>
               </span>
               {chapters.length > 0 && (
                 <>
@@ -377,7 +386,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                 {/* 操作按钮 */}
                 <div className="edit-actions">
                   <button className="edit-save-btn" onClick={handleSaveSeries}>
-                    <SiteIcon name="fa-check" variant="solid" /> 保存修改
+                    保存修改
                   </button>
                   <button
                     className="edit-cancel-btn"
@@ -405,11 +414,11 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
               <div className="chapter-header-actions">
                 {chapters.length > 0 && (
                   <button className="sort-toggle" onClick={toggleSort}>
-                    <SiteIcon name="fa-arrow-down" variant="solid" /> {sortOrder === "asc" ? "正序" : "倒序"}
+                    <SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" /> {sortOrder === "asc" ? "正序" : "倒序"}
                   </button>
                 )}
                 <Link href={`/create?seriesName=${encodeURIComponent(decodedName)}`} className="btn-new-chapter">
-                  <SiteIcon name="fa-plus" variant="solid" /> 新建章节
+                  新建章节
                 </Link>
               </div>
             </div>
@@ -451,7 +460,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                             )}
                           </td>
                           <td><span className="ch-words">{ch.word_count?.toLocaleString() || 0}</span></td>
-                          <td><span className="ch-time">{new Date(ch.updated_at || ch.created_at).toLocaleDateString("zh-CN")}</span></td>
+                          <td><span className="ch-time">{formatDateYmd(ch.updated_at || ch.created_at)}</span></td>
                           <td><span className={badge.className}>{badge.label}</span></td>
                           <td>
                             <div className="ch-actions">
@@ -462,7 +471,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                                 <SiteIcon name="fa-action-preview-open" size={16} />
                               </Link>
                               <button className="ch-action-btn" title="删除" onClick={() => handleDeleteChapter(ch.id)}>
-                                <SiteIcon name="fa-action-delete" size={16} />
+                                <SiteIcon name="fa-action-delete" variant="outline" size={16} />
                               </button>
                             </div>
                           </td>

@@ -250,7 +250,7 @@ function MobileDrawerContent() {
               onClick={() => handleNav("/settings")}
             >
               <span className="sidebar-menu-icon">
-                <SiteIcon name="fa-gear" variant="solid" />
+                <SiteIcon name="fa-gear" variant="solid" size={16} />
               </span>
               <span className="sidebar-menu-label">设置和隐私</span>
             </button>

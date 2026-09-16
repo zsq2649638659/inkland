@@ -97,6 +97,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
   // 评论回复状态
   const [replyOpenId, setReplyOpenId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [likedCommentIds, setLikedCommentIds] = useState<Set<string>>(new Set());
   // 评论 hover 状态
   const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null);
   // Toast 提示
@@ -264,10 +265,21 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
           });
         }
       }
+      const likedIds = new Set<string>();
+      if (user && ids.length > 0) {
+        const { data: likedRows } = await supabase
+          .from("comment_likes")
+          .select("comment_id")
+          .eq("user_id", user.id)
+          .in("comment_id", ids);
+        for (const row of (likedRows || []) as Array<Record<string, unknown>>) likedIds.add(row.comment_id as string);
+      }
+      setLikedCommentIds(likedIds);
       for (const c of all) {
         const st = statsMap.get(c.id) || { like_count: 0, reply_count: 0 };
         c.like_count = st.like_count;
         c.reply_count = st.reply_count;
+        c.liked_by_me = likedIds.has(c.id);
       }
 
       // 分离顶级评论和回复
@@ -284,6 +296,23 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
       setReplies(replyMap);
       setTotalComments(all.length);
     }
+  };
+
+  const toggleCommentLike = async (commentId: string) => {
+    if (!user) { goToLogin(); return; }
+    const liked = likedCommentIds.has(commentId);
+    const result = liked
+      ? await supabase.from("comment_likes").delete().eq("user_id", user.id).eq("comment_id", commentId)
+      : await supabase.from("comment_likes").insert({ user_id: user.id, comment_id: commentId });
+    if (result.error) return;
+    setLikedCommentIds((current) => {
+      const next = new Set(current);
+      if (liked) next.delete(commentId); else next.add(commentId);
+      return next;
+    });
+    const delta = liked ? -1 : 1;
+    setComments((current) => current.map((comment) => comment.id === commentId ? { ...comment, like_count: Math.max(0, (comment.like_count || 0) + delta), liked_by_me: !liked } : comment));
+    setReplies((current) => Object.fromEntries(Object.entries(current).map(([parentId, replyList]) => [parentId, replyList.map((reply) => reply.id === commentId ? { ...reply, like_count: Math.max(0, (reply.like_count || 0) + delta), liked_by_me: !liked } : reply)])));
   };
 
   const loadParaCommentCounts = async () => {
@@ -663,7 +692,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
               </Link>
               <div className="work-meta">
                 <span className="meta-item">
-                  <SiteIcon name="fa-file-lines" variant="outline" />
+                  <SiteIcon name="fa-word-count" variant="default" />
                   <span className="meta-value">{post.word_count?.toLocaleString() || 0}字</span>
                 </span>
                 <span className="meta-item">
@@ -741,7 +770,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
               className="stat-item"
             />
             <span className="stat-item" data-stat="comment">
-              <SiteIcon name="fa-comment" variant="outline" />
+              <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
               <span>{stats.comment_count}</span>
             </span>
             <BookmarkButton
@@ -753,7 +782,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
               className="stat-item"
             />
             <button className="stat-item" data-stat="share" onClick={goToLogin}>
-              <SiteIcon name="fa-share-from-square" variant="outline" />
+              <SiteIcon name="fa-share-from-square" variant="outline" hoverVariant="solid" />
               <span>分享</span>
             </button>
           </div>
@@ -792,7 +821,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                       onClick={submitComment}
                       disabled={commentLoading || !commentText.trim()}
                     >
-                      <SiteIcon name="fa-paper-plane" variant="solid" /> 发布
+                      发布
                     </button>
                   </div>
                 </div>
@@ -804,7 +833,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                   登录后参与评论
                 </p>
                 <Link href="/login" className="btn-submit" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
-                  <SiteIcon name="fa-right-to-bracket" variant="solid" /> 登录
+                  登录
                 </Link>
               </div>
             )}
@@ -846,13 +875,10 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                       <p className="comment-text">{c.content}</p>
                       <div className="comment-actions">
                         <button
-                          className="comment-action-btn"
-                          onClick={() => {
-                            if (!user) { goToLogin(); return; }
-                            // TODO: like comment
-                          }}
+                          className={`comment-action-btn${likedCommentIds.has(c.id) ? " liked" : ""}`}
+                          onClick={() => void toggleCommentLike(c.id)}
                         >
-                          <SiteIcon name="fa-heart" variant="outline" />
+                          <SiteIcon name="fa-heart" variant={likedCommentIds.has(c.id) ? "solid" : "outline"} hoverVariant={likedCommentIds.has(c.id) ? undefined : "solid"} />
                           <span>{c.like_count || 0}</span>
                         </button>
                         {user && (
@@ -865,8 +891,8 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                               }
                             }}
                           >
-                            <SiteIcon name="fa-comment" variant="outline" />
-                            <span>回复</span>
+                            <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
+                            <span>{c.reply_count || replies[c.id]?.length || 0}</span>
                           </button>
                         )}
                         {user && c.user_id === user.id && (
@@ -874,12 +900,11 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                             className="comment-action-btn-delete"
                             onClick={() => handleDeleteComment(c.id)}
                           >
-                            <SiteIcon name="fa-trash-can" variant="outline" />
+                            <SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" size={13} />
                           </button>
                         )}
                         <button
                           className="comment-more-btn"
-                          style={{ opacity: hoveredCommentId === c.id ? 1 : 0 }}
                           title="更多"
                           onClick={() => setCommentMenuId(commentMenuId === c.id ? null : c.id)}
                         >
@@ -898,7 +923,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                               className="comment-popup-item"
                               onClick={() => { setCommentMenuId(null); handleBlockUser(c.user_id); }}
                             >
-                              <SiteIcon name="fa-ban" variant="solid" />
+                              <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />
                               屏蔽
                             </button>
                           </div>
@@ -930,12 +955,10 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                                 <p className="nested-reply-text">{reply.content}</p>
                                 <div className="nested-reply-actions">
                                   <button
-                                    className="comment-action-btn"
-                                    onClick={() => {
-                                      if (!user) { goToLogin(); return; }
-                                    }}
+                                    className={`comment-action-btn${likedCommentIds.has(reply.id) ? " liked" : ""}`}
+                                    onClick={() => void toggleCommentLike(reply.id)}
                                   >
-                                    <SiteIcon name="fa-heart" variant="outline" />
+                                    <SiteIcon name="fa-heart" variant={likedCommentIds.has(reply.id) ? "solid" : "outline"} hoverVariant={likedCommentIds.has(reply.id) ? undefined : "solid"} />
                                     <span>{reply.like_count || 0}</span>
                                   </button>
                                   {user && (
@@ -948,8 +971,8 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                                         }
                                       }}
                                     >
-                                      <SiteIcon name="fa-comment" variant="outline" />
-                                      <span>回复</span>
+                                      <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
+                                      <span>{reply.reply_count || 0}</span>
                                     </button>
                                   )}
                                   {user && reply.user_id === user.id && (
@@ -957,12 +980,12 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                                       className="comment-action-btn-delete"
                                       onClick={() => handleDeleteComment(reply.id)}
                                     >
-                                      <SiteIcon name="fa-trash-can" variant="outline" />
+                                      <SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" size={13} />
                                     </button>
                                   )}
                                   <button
                                     className="comment-more-btn"
-                                    style={{ opacity: hoveredCommentId === reply.id ? 1 : 0, marginLeft: 'auto' }}
+                                    style={{ marginLeft: 'auto' }}
                                     title="更多"
                                     onClick={() => setCommentMenuId(commentMenuId === reply.id ? null : reply.id)}
                                   >
@@ -981,7 +1004,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                                         className="comment-popup-item"
                                         onClick={() => { setCommentMenuId(null); handleBlockUser(reply.user_id); }}
                                       >
-                                        <SiteIcon name="fa-ban" variant="solid" />
+                                        <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />
                                         屏蔽
                                       </button>
                                     </div>
@@ -1063,7 +1086,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                                 setCommentLoading(false);
                               }}
                             >
-                              <SiteIcon name="fa-paper-plane" variant="solid" /> 发布
+                              发布
                             </button>
                           </div>
                         </div>

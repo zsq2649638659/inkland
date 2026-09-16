@@ -310,7 +310,7 @@ export default function Navbar() {
         {/* V2: navbar-right — only create button + mobile menu (avatar is in sidebar) */}
         <div className="navbar-right">
           <Link href={user || authLoading ? "/create" : "/login"} className="btn-create no-underline">
-            <SiteIcon name="fa-pen-to-square" variant="solid" /> 创作
+            创作
           </Link>
 
           {/* V2: mobile menu button */}

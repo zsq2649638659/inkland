@@ -40,7 +40,6 @@ onReport,
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [commentSort, setCommentSort] = useState<"recent" | "hot">("hot");
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
-  const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null);
   const [commentMenuId, setCommentMenuId] = useState<string | null>(null);
   const [blockModal, setBlockModal] = useState<{ open: boolean; userId: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -54,22 +53,6 @@ onReport,
     const timer = setTimeout(() => setToastMessage(null), 2000);
     return () => clearTimeout(timer);
   }, [toastMessage]);
-
-  // 事件委托：鼠标悬停时查找最近的 [data-comment-id] 元素
-  const handleCommentMouseOver = useCallback((e: React.MouseEvent) => {
-    const el = (e.target as HTMLElement).closest('[data-comment-id]');
-    if (el) {
-      const id = el.getAttribute('data-comment-id');
-      if (id) setHoveredCommentId(id);
-    }
-  }, []);
-
-  // 鼠标离开评论容器时重置 hover 状态
-  const handleCommentMouseOut = useCallback((e: React.MouseEvent) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setHoveredCommentId(null);
-    }
-  }, []);
 
   const loadComments = useCallback(async () => {
     setLoading(true);
@@ -441,7 +424,7 @@ onReport,
             <p>来做第一个评论的人吧</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3.5" onMouseOver={handleCommentMouseOver} onMouseOut={handleCommentMouseOut}>
+          <div className="flex flex-col gap-3.5">
             {sortedComments.map((c) => (
               <div
                 key={c.id}
@@ -479,19 +462,18 @@ onReport,
                         onClick={() => { setReplyTo(c); setReplyText(""); }}
                       >
                         <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
-                        <span>回复</span>
+                        <span>{c.reply_count || c.replies?.length || 0}</span>
                       </button>
                       {user && c.user_id === user.id && (
                         <button
                           className="comment-action-btn-delete"
                           onClick={() => handleDeleteComment(c.id)}
                         >
-                          <SiteIcon name="fa-trash-can" variant="outline" />
+                          <SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" size={13} />
                         </button>
                       )}
                       <button
                         className="comment-more-btn"
-                        style={{ opacity: hoveredCommentId === c.id ? 1 : 0 }}
                         title="更多"
                         onClick={(e) => { e.stopPropagation(); setCommentMenuId(commentMenuId === c.id ? null : c.id); }}
                       >
@@ -509,7 +491,7 @@ onReport,
                             className="comment-popup-item"
                             onClick={(e) => { e.stopPropagation(); handleBlockUser(c.user_id); }}
                           >
-                            <SiteIcon name="fa-ban" variant="solid" /> 屏蔽
+                            <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" /> 屏蔽
                           </button>
                         </div>
                       )}
@@ -535,7 +517,7 @@ onReport,
                             onClick={() => submitReply(c)}
                             disabled={submitting || !replyText.trim()}
                           >
-                            <SiteIcon name="fa-paper-plane" variant="solid" /> 发布
+                            发布
                           </button>
                         </div>
                       </div>
@@ -586,19 +568,19 @@ onReport,
                                         onClick={() => { setReplyTo(c); setReplyText(""); }}
                                       >
                                         <SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" />
-                                        <span>回复</span>
+                                        <span>{reply.reply_count || 0}</span>
                                       </button>
                                       {user && reply.user_id === user.id && (
                                         <button
                                           className="comment-action-btn-delete"
                                           onClick={() => handleDeleteComment(reply.id)}
                                         >
-                                          <SiteIcon name="fa-trash-can" variant="outline" />
+                                          <SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" size={13} />
                                         </button>
                                       )}
                                       <button
                                         className="comment-more-btn"
-                                        style={{ opacity: hoveredCommentId === reply.id ? 1 : 0, marginLeft: 'auto' }}
+                                        style={{ marginLeft: 'auto' }}
                                         title="更多"
                                         onClick={(e) => { e.stopPropagation(); setCommentMenuId(commentMenuId === reply.id ? null : reply.id); }}
                                       >
@@ -616,7 +598,7 @@ onReport,
                                             className="comment-popup-item"
                                             onClick={(e) => { e.stopPropagation(); handleBlockUser(reply.user_id); }}
                                           >
-                                            <SiteIcon name="fa-ban" variant="solid" /> 屏蔽
+                                            <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" /> 屏蔽
                                           </button>
                                         </div>
                                       )}

@@ -35,12 +35,10 @@ export default function EmptyState({
         {actionLabel && (
           actionHref ? (
             <Link href={actionHref} className="btn-accent no-underline inline-flex items-center gap-1.5 text-sm">
-              <SiteIcon name="fa-pen-to-square" variant="solid" className="text-xs" />
               {actionLabel}
             </Link>
           ) : actionOnClick ? (
             <button onClick={actionOnClick} className="btn-accent inline-flex items-center gap-1.5 text-sm">
-              <SiteIcon name="fa-pen-to-square" variant="solid" className="text-xs" />
               {actionLabel}
             </button>
           ) : null

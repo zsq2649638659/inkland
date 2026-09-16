@@ -502,7 +502,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                 {moreOpen && (
                   <div className="more-dropdown" onClick={(e) => e.stopPropagation()}>
                     <button className="more-dropdown-item" onClick={() => void handleBlock(id)}>
-                      <SiteIcon name="fa-ban" variant="solid" />
+                      <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />
                       {blockedRecordId ? "取消屏蔽" : "屏蔽"}
                     </button>
                     <button className="more-dropdown-item danger" onClick={handleReport}>
@@ -517,7 +517,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           {isOwnProfile && (
             <div className="profile-actions">
               <Link href="/profile/edit" className="btn-edit-profile">
-                <SiteIcon name="fa-pen" variant="solid" /> 编辑资料
+                编辑资料
               </Link>
             </div>
           )}

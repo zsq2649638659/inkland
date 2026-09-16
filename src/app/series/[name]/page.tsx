@@ -20,6 +20,7 @@ interface ChapterInfo {
   chapter_title: string;
   word_count: number;
   created_at: string;
+  updated_at: string;
 }
 
 interface SeriesInfo {
@@ -34,6 +35,15 @@ interface SeriesInfo {
   tags: string[];
   status: string;
   series_type: string;
+}
+
+function formatDateYmd(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "暂无";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export default function SeriesPage({ params }: { params: Promise<{ name: string }> }) {
@@ -67,7 +77,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
         withTestDataVisibility(
           supabase
             .from("posts")
-            .select("id, title, chapter_number, chapter_title, word_count, created_at, user_id, status")
+            .select("id, title, chapter_number, chapter_title, word_count, created_at, updated_at, user_id, status")
             .eq("series_name", decodedName)
             .eq("post_type", "serial")
             .eq("status", "published")
@@ -124,6 +134,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
         chapter_title: (chapter.chapter_title as string) || "",
         word_count: (chapter.word_count as number) || 0,
         created_at: chapter.created_at as string,
+        updated_at: (chapter.updated_at as string) || (chapter.created_at as string),
       })));
       setLoading(false);
     };
@@ -240,7 +251,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               <div className="hero-actions">
                 {chapters.length > 0 && (
                   <Link href={`/read/${chapters[0]?.id}`} className="hero-action-btn primary">
-                    <SiteIcon name="fa-book-open" variant="solid" /> 开始阅读
+                    开始阅读
                   </Link>
                 )}
                 {user && !isOwner && (
@@ -249,7 +260,6 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                       className={`hero-action-btn ${isFollowing ? "bookmarked" : "primary"}`}
                       onClick={handleFollow}
                     >
-                      <SiteIcon name="fa-bookmark" variant="solid" />
                       {isFollowing ? "已收藏" : "收藏连载"}
                     </button>
                     <span className="series-follow-note">新章节会出现在首页“关注”内容中</span>
@@ -257,7 +267,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                 )}
                 {isOwner && (
                   <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="hero-action-btn">
-                    <SiteIcon name="fa-gear" variant="solid" /> 管理
+                    管理
                   </Link>
                 )}
               </div>
@@ -282,7 +292,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               </span>
               <span className="meta-sep">|</span>
               <span className="meta-item">
-                最近更新 <span>{lastChapter ? new Date(lastChapter.created_at).toLocaleDateString("zh-CN") : "暂无"}</span>
+                最近更新 <span>{lastChapter ? formatDateYmd(lastChapter.updated_at) : "暂无"}</span>
               </span>
               {lastChapter && (
                 <>
@@ -335,7 +345,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
               </div>
               {chapters.length > 0 && (
                 <button className={`sort-toggle${sortOrder === "desc" ? " reversed" : ""}`} onClick={toggleSort}>
-                  <SiteIcon name="fa-arrow-down" variant="solid" /> {sortOrder === "desc" ? "正序" : "倒序"}
+                  <SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" /> {sortOrder === "asc" ? "正序" : "倒序"}
                 </button>
               )}
             </div>

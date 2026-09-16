@@ -222,7 +222,7 @@ function HomeSidebarContent() {
             </Link>
           ))}
           <Link href="/settings" title="设置和隐私" className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}>
-            <span className="sidebar-menu-icon"><SiteIcon name="fa-gear" variant="solid" /></span>
+            <span className="sidebar-menu-icon"><SiteIcon name="fa-gear" variant="solid" size={16} /></span>
             <span className="sidebar-menu-label">设置和隐私</span>
           </Link>
           <button className="sidebar-menu-item sidebar-more-trigger text-left" title="更多" onClick={() => setMoreOpen(!moreOpen)}>
@@ -368,7 +368,7 @@ function HomeSidebarContent() {
         className={`sidebar-menu-item ${isActive("settings") ? "active" : ""}`}
       >
         <span className="sidebar-menu-icon">
-          <SiteIcon name="fa-gear" variant="solid" />
+          <SiteIcon name="fa-gear" variant="solid" size={16} />
         </span>
         <span className="sidebar-menu-label">设置和隐私</span>
       </Link>

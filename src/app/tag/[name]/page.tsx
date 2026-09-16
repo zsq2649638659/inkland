@@ -1,17 +1,18 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useEffect, useState, use, useCallback } from "react";
+import { useEffect, useState, use } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { SkeletonTagPage } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
-import PostTagCard from "@/components/PostTagCard";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
+import TagHistoryCard from "@/components/TagHistoryCard";
 import type { Post } from "@/lib/types";
 import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
-type TagTab = "latest" | "hottest";
+type SortFilter = "published" | "hot";
 type TimeFilter = "all" | "day" | "week" | "month";
 type TypeFilter = "all" | "single" | "image" | "series";
 
@@ -46,16 +47,13 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
   const [seriesList, setSeriesList] = useState<SeriesEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [tagInfo, setTagInfo] = useState<{ id: string; post_count: number } | null>(null);
-  const [tagTab, setTagTab] = useState<TagTab>("latest");
+  const [sortFilter, setSortFilter] = useState<SortFilter>("published");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [draftTimeFilter, setDraftTimeFilter] = useState<TimeFilter>("all");
-  const [draftTypeFilter, setDraftTypeFilter] = useState<TypeFilter>("all");
-  const [isFollowingTag, setIsFollowingTag] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [viewCount, setViewCount] = useState(0);
+  const [isFollowingTag, setIsFollowingTag] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -81,14 +79,14 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
 
       let allPosts: Post[] = [];
       let standalonePostsList: Post[] = [];
-      let chapterSeriesNames: Set<string> = new Set();
+      const chapterSeriesNames: Set<string> = new Set();
 
       if (ptData && ptData.length > 0) {
         const postIds = ptData.map((p: Record<string, unknown>) => p.post_id as string);
         const postsPromise = withTestDataVisibility(
           supabase
             .from("posts")
-            .select("id, title, content, word_count, post_type, chapter_number, series_name, created_at, cover_url, user_id, author:profiles!posts_user_id_fkey(nickname, avatar_url), post_tags(tags(name))")
+            .select("id, title, content, word_count, post_type, chapter_number, series_name, created_at, published_at, cover_url, user_id, author:profiles!posts_user_id_fkey(nickname, avatar_url), post_tags(tags(name))")
             .in("id", postIds)
             .eq("status", "published"),
           includeTestData,
@@ -107,7 +105,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
             }
           }
 
-          let statsMap: Record<string, { like_count: number; comment_count: number; bookmark_count: number }> = {};
+          const statsMap: Record<string, { like_count: number; comment_count: number; bookmark_count: number }> = {};
           if (stats) {
             for (const s of stats as Array<Record<string, unknown>>) {
               statsMap[s.id as string] = {
@@ -129,7 +127,7 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
               post_type: p.post_type as Post["post_type"],
               series_name: p.series_name as string | null,
               chapter_number: p.chapter_number as number | null,
-              word_count: p.word_count as number, created_at: p.created_at as string,
+              word_count: p.word_count as number, created_at: p.created_at as string, published_at: p.published_at as string | null,
               user_id: p.user_id as string,
               author: { nickname: a?.nickname || "匿名用户", avatar_url: a?.avatar_url },
               like_count: s.like_count, comment_count: s.comment_count, bookmark_count: s.bookmark_count,
@@ -308,68 +306,37 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
       setLoading(false);
     };
     load();
-  }, [decodedName, supabase, profile?.is_test_account]);
+  }, [decodedName, supabase, profile]);
 
-  // 登录状态只影响关注按钮，不应让整张标签页重新查询帖子和系列。
   useEffect(() => {
-    if (!user || !tagInfo?.id) {
-      setIsFollowingTag(false);
-      return;
-    }
     let active = true;
-    void supabase
-      .from("tag_follows")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("tag_id", tagInfo.id)
-      .maybeSingle()
-      .then((result: { data: unknown }) => { if (active) setIsFollowingTag(!!result.data); });
+    const loadFollowState = async () => {
+      if (!user?.id || !tagInfo?.id) {
+        setIsFollowingTag(false);
+        return;
+      }
+      const { data } = await supabase
+        .from("tag_follows")
+        .select("tag_id")
+        .eq("tag_id", tagInfo.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (active) setIsFollowingTag(Boolean(data));
+    };
+    void loadFollowState();
     return () => { active = false; };
-  }, [supabase, user?.id, tagInfo?.id]);
+  }, [supabase, tagInfo?.id, user?.id]);
 
   const handleTagFollow = async () => {
-    if (!user || !tagInfo) return;
+    if (!user?.id || !tagInfo?.id || followLoading) return;
     setFollowLoading(true);
-    if (isFollowingTag) {
-      await supabase.from("tag_follows").delete().eq("user_id", user.id).eq("tag_id", tagInfo.id);
-      setIsFollowingTag(false);
-    } else {
-      await supabase.from("tag_follows").insert({ user_id: user.id, tag_id: tagInfo.id });
-      setIsFollowingTag(true);
-    }
+    const nextFollowing = !isFollowingTag;
+    const result = nextFollowing
+      ? await supabase.from("tag_follows").insert({ tag_id: tagInfo.id, user_id: user.id })
+      : await supabase.from("tag_follows").delete().eq("tag_id", tagInfo.id).eq("user_id", user.id);
+    if (!result.error) setIsFollowingTag(nextFollowing);
     setFollowLoading(false);
   };
-
-  const handleShare = useCallback(() => {
-    if (typeof window !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href).catch(() => {});
-    }
-  }, []);
-
-  const openFilterModal = () => {
-    setDraftTimeFilter(timeFilter);
-    setDraftTypeFilter(typeFilter);
-    setIsFilterModalOpen(true);
-  };
-
-  const applyMobileFilters = () => {
-    setTimeFilter(draftTimeFilter);
-    setTypeFilter(draftTypeFilter);
-    setIsFilterModalOpen(false);
-  };
-
-  useEffect(() => {
-    if (!isFilterModalOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsFilterModalOpen(false);
-    };
-    document.addEventListener("keydown", handleEscape);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "";
-    };
-  }, [isFilterModalOpen]);
 
   // 时间筛选
   const applyTimeFilter = (items: Array<Post | SeriesEntry>): Array<Post | SeriesEntry> => {
@@ -393,8 +360,6 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
     );
   }
 
-  const hasContent = standalonePosts.length > 0 || seriesList.length > 0;
-
   // 类型筛选
   const isImagePost = (post: Post) => post.post_type === "illustration" || post.post_type === "comic" || post.post_type === "cosplay";
   const filteredStandalone = typeFilter === "series"
@@ -407,18 +372,23 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
 
   const filteredSeries = typeFilter === "single" || typeFilter === "image" ? [] : seriesList;
 
-  // 最热模式下应用时间筛选
-  const displayStandalone = tagTab === "hottest" ? applyTimeFilter(filteredStandalone) as Post[] : filteredStandalone;
-  const displaySeries = tagTab === "hottest" ? applyTimeFilter(filteredSeries) as SeriesEntry[] : filteredSeries;
+  // 最热模式下应用时间筛选；显示数组使用副本，避免筛选操作改写原始查询结果。
+  const displayStandalone = (sortFilter === "hot" ? applyTimeFilter([...filteredStandalone]) : [...filteredStandalone]) as Post[];
+  const displaySeries = (sortFilter === "hot" ? applyTimeFilter([...filteredSeries]) : [...filteredSeries]) as SeriesEntry[];
 
-  // 最热排序
-  if (tagTab === "hottest") {
+  if (sortFilter === "hot") {
     displayStandalone.sort((a, b) =>
       ((b.like_count || 0) + (b.comment_count || 0)) - ((a.like_count || 0) + (a.comment_count || 0))
     );
     displaySeries.sort((a, b) =>
       (b.like_count + b.comment_count * 2 + b.bookmark_count * 3) - (a.like_count + a.comment_count * 2 + a.bookmark_count * 3)
     );
+  } else if (sortFilter === "published") {
+    displayStandalone.sort((a, b) => new Date(b.published_at || b.created_at || "").getTime() - new Date(a.published_at || a.created_at || "").getTime());
+    displaySeries.sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime());
+  } else {
+    displayStandalone.sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime());
+    displaySeries.sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime());
   }
 
   const formatCount = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
@@ -429,199 +399,87 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
         {/* ===== Profile Section ===== */}
         <section className="profile-section">
           <div className="profile-avatar">
-            <SiteIcon name="fa-hashtag" variant="solid" />
+            <SiteIcon name="fa-tag" variant="solid" />
           </div>
           <div className="profile-info">
             <h1 className="profile-name">{decodedName}</h1>
-            <p className="profile-bio">浏览标签下的所有作品，发现更多精彩内容</p>
             <div className="profile-stats">
               <div className="profile-stat">
-                <SiteIcon name="fa-book" variant="solid" />
+                <SiteIcon name="fa-tag-works" aria-hidden="true" />
                 <span>作品</span>
                 <span className="stat-value">{tagInfo ? tagInfo.post_count : 0}</span>
               </div>
               <div className="profile-stat">
-                <SiteIcon name="fa-users" variant="solid" />
+                <SiteIcon name="fa-tag-participants" aria-hidden="true" />
                 <span>参与</span>
                 <span className="stat-value">{formatCount(participantCount)}</span>
               </div>
               <div className="profile-stat">
-                <SiteIcon name="fa-eye" variant="solid" />
+                <SiteIcon name="fa-tag-heat" aria-hidden="true" />
                 <span>浏览</span>
                 <span className="stat-value">{formatCount(viewCount)}</span>
               </div>
             </div>
           </div>
           <div className="profile-actions">
-            {user && (
-              <button
-                type="button"
-                className={`profile-action-btn${isFollowingTag ? " saved" : ""}`}
-                onClick={handleTagFollow}
-                disabled={followLoading}
-              >
-                {followLoading ? (
-                  <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />
-                ) : isFollowingTag ? (
-                  <><SiteIcon name="fa-bookmark" variant="solid" /> 已关注</>
-                ) : (
-                  <><SiteIcon name="fa-bookmark" variant="solid" /> 关注标签</>
-                )}
-              </button>
-            )}
-            <button type="button" className="profile-action-btn" onClick={handleShare}>
-              <SiteIcon name="fa-share-from-square" variant="solid" /> 分享
+            <button
+              type="button"
+              className="profile-action-btn profile-action-btn--primary"
+              onClick={() => void handleTagFollow()}
+              disabled={followLoading}
+              aria-label={isFollowingTag ? "已关注" : "关注"}
+            >
+              <SiteIcon name={isFollowingTag ? "fa-check" : "fa-plus"} variant="solid" className="profile-action-icon" aria-hidden="true" />
+              <span className="profile-action-label">{isFollowingTag ? "已关注" : "关注"}</span>
             </button>
           </div>
         </section>
 
-        {/* ===== Segmented Tabs ===== */}
-        <div className="segmented-tabs">
-          <div className="segmented-tabs-left">
-            <button
-              className={`segmented-tab${tagTab === "latest" ? " active" : ""}`}
-              onClick={() => setTagTab("latest")}
-            >最新</button>
-            <button
-              className={`segmented-tab${tagTab === "hottest" ? " active" : ""}`}
-              onClick={() => setTagTab("hottest")}
-            >最热</button>
-          </div>
-          {tagTab === "hottest" && (
-            <div className="segmented-tabs-right">
-              <button
-                className={`segmented-tab${timeFilter === "all" ? " active" : ""}`}
-                onClick={() => setTimeFilter("all")}
-              >全部</button>
-              <button
-                className={`segmented-tab${timeFilter === "day" ? " active" : ""}`}
-                onClick={() => setTimeFilter("day")}
-              >一日</button>
-              <button
-                className={`segmented-tab${timeFilter === "week" ? " active" : ""}`}
-                onClick={() => setTimeFilter("week")}
-              >一周</button>
-              <button
-                className={`segmented-tab${timeFilter === "month" ? " active" : ""}`}
-                onClick={() => setTimeFilter("month")}
-              >一月</button>
-            </div>
-          )}
-        </div>
-
-        {/* ===== Type Filters Row ===== */}
-        <div className="type-filters-row">
-          <div className="type-filters">
-            <button
-              className={`type-filter-pill${typeFilter === "all" ? " active" : ""}`}
-              onClick={() => setTypeFilter("all")}
-            >全部</button>
-            <button
-              className={`type-filter-pill${typeFilter === "single" ? " active" : ""}`}
-              onClick={() => setTypeFilter("single")}
-            >单篇</button>
-            <button
-              className={`type-filter-pill${typeFilter === "image" ? " active" : ""}`}
-              onClick={() => setTypeFilter("image")}
-            >图片</button>
-            <button
-              className={`type-filter-pill${typeFilter === "series" ? " active" : ""}`}
-              onClick={() => setTypeFilter("series")}
-            >长篇连载</button>
-          </div>
-        </div>
-
-        {/* 移动端筛选入口：选项在弹窗中确认后才应用 */}
-        <button
-          type="button"
-          className="tag-mobile-filter-trigger"
-          onClick={openFilterModal}
-          aria-haspopup="dialog"
-          aria-expanded={isFilterModalOpen}
-        >
-          <SiteIcon name="fa-sliders" variant="solid" aria-hidden="true" />
-          <span>筛选</span>
-          {(timeFilter !== "all" || typeFilter !== "all") && <SiteIcon name="fa-circle-check" variant="solid" className="tag-mobile-filter-active" aria-label="已有筛选" />}
-        </button>
-
-        {isFilterModalOpen && (
-          <div className="tag-filter-modal" role="dialog" aria-modal="true" aria-label="筛选作品">
-            <button
-              type="button"
-              className="tag-filter-modal-backdrop"
-              onClick={() => setIsFilterModalOpen(false)}
-              aria-label="关闭筛选弹窗"
+        <section className="tag-filter-selectors" aria-label="筛选作品">
+          <div className={`tag-filter-selectors__sort${sortFilter === "hot" ? " tag-filter-selectors__sort--with-time" : ""}`}>
+            <ProfileFilterSelect
+              label="排序"
+              id="tag-sort-menu"
+              value={sortFilter}
+              options={[{ value: "published", label: "最新发布" }, { value: "hot", label: "热度最高" }]}
+              onChange={(value) => { setSortFilter(value as SortFilter); if (value !== "hot") setTimeFilter("all"); }}
             />
-            <div className="tag-filter-modal-panel">
-              <div className="tag-filter-modal-header">
-                <h2>筛选作品</h2>
-                <button
-                  type="button"
-                  className="tag-filter-modal-close"
-                  onClick={() => setIsFilterModalOpen(false)}
-                  aria-label="关闭筛选弹窗"
-                >
-                  <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
-                </button>
-              </div>
-
-              {tagTab === "hottest" && (
-                <fieldset className="tag-filter-group">
-                  <legend>时间范围</legend>
-                  <div className="tag-filter-options">
-                    {([
-                      ["all", "全部"],
-                      ["day", "一日"],
-                      ["week", "一周"],
-                      ["month", "一月"],
-                    ] as Array<[TimeFilter, string]>).map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className={`tag-filter-option${draftTimeFilter === value ? " selected" : ""}`}
-                        onClick={() => setDraftTimeFilter(value)}
-                      >
-                        <span>{label}</span>
-                        {draftTimeFilter === value && <SiteIcon name="fa-check" variant="solid" aria-hidden="true" />}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
-
-              <fieldset className="tag-filter-group">
-                <legend>内容类型</legend>
-                <div className="tag-filter-options">
-                  {([
-                    ["all", "全部"],
-                    ["single", "单篇"],
-                    ["image", "图片"],
-                    ["series", "连载"],
-                  ] as Array<[TypeFilter, string]>).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`tag-filter-option${draftTypeFilter === value ? " selected" : ""}`}
-                      onClick={() => setDraftTypeFilter(value)}
-                    >
-                      <span>{label}</span>
-                      {draftTypeFilter === value && <SiteIcon name="fa-check" variant="solid" aria-hidden="true" />}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="tag-filter-modal-actions">
-                <button type="button" className="tag-filter-reset" onClick={() => { setDraftTimeFilter("all"); setDraftTypeFilter("all"); }}>
-                  重置
-                </button>
-                <button type="button" className="tag-filter-apply" onClick={applyMobileFilters}>
-                  筛选
-                </button>
-              </div>
+            <div className="tag-hot-time-select">
+              <ProfileFilterSelect
+                label="热度时间范围"
+                id="tag-hot-time-menu"
+                value={timeFilter}
+                disabled={sortFilter !== "hot"}
+                options={[{ value: "all", label: "全部" }, { value: "day", label: "一日" }, { value: "week", label: "一周" }, { value: "month", label: "一月" }]}
+                onChange={(value) => setTimeFilter(value as TimeFilter)}
+              />
             </div>
+            {sortFilter === "hot" && (
+              <div className="tag-hot-time-buttons" role="group" aria-label="热度时间范围">
+                {[{ value: "all", label: "全部" }, { value: "day", label: "一日" }, { value: "week", label: "一周" }, { value: "month", label: "一月" }].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={timeFilter === option.value ? "is-selected" : ""}
+                    onClick={() => setTimeFilter(option.value as TimeFilter)}
+                    aria-pressed={timeFilter === option.value}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+          <div className="tag-filter-selectors__type">
+            <ProfileFilterSelect
+              label="作品类型"
+              id="tag-type-menu"
+              value={typeFilter}
+              options={[{ value: "all", label: "所有作品" }, { value: "single", label: "单篇" }, { value: "image", label: "图片" }, { value: "series", label: "长篇连载" }]}
+              onChange={(value) => setTypeFilter(value as TypeFilter)}
+            />
+          </div>
+        </section>
 
         {/* ===== Card Grid ===== */}
         {displayStandalone.length === 0 && displaySeries.length === 0 ? (
@@ -629,12 +487,12 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
             <EmptyState icon="fa-tag" title="该标签下暂无作品" />
           </div>
         ) : (
-          <div className="card-grid">
+          <div className="tag-history-card-grid">
             {displaySeries.map((series) => {
               const postForCard: Post = {
                 id: series.id,
-                title: series.name,
-                content: series.description,
+                title: series.latestChapterTitle || series.name,
+                content: series.description || series.latestChapterContent || "",
                 cover_url: series.cover_url,
                 user_id: series.user_id,
                 author: series.author,
@@ -643,13 +501,15 @@ export default function TagPage({ params }: { params: Promise<{ name: string }> 
                 bookmark_count: series.bookmark_count,
                 tags: series.tags,
                 created_at: series.created_at,
+                post_type: "serial",
                 series_name: series.name,
+                chapter_number: series.latestChapterNumber,
                 status: "published",
               };
-              return <PostTagCard key={`series-${series.id}`} post={postForCard} showAuthorAvatar />;
+              return <TagHistoryCard key={`series-${series.id}`} post={postForCard} />;
             })}
             {displayStandalone.map((post) => (
-              <PostTagCard key={post.id} post={post} showAuthorAvatar />
+              <TagHistoryCard key={post.id} post={post} />
             ))}
           </div>
         )}
