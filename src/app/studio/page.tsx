@@ -787,7 +787,6 @@ export default function StudioPage() {
                 onClick={() => { setBatchMode((current) => !current); setSelectedIds(new Set()); }}
                 aria-pressed={batchMode}
               >
-                <SiteIcon name="fa-list-check" variant="solid" aria-hidden="true" />
                 <span>批量操作</span>
               </button>
             </div>
@@ -821,9 +820,9 @@ export default function StudioPage() {
                 <div className="studio-batch-row studio-batch-row--mobile">
                   <span className="studio-batch-count">已选 {selectedIds.size} 项</span>
                   <button type="button" className="studio-toolbar-action" onClick={selectAll}>全选</button>
-                  <button type="button" className="studio-toolbar-action" onClick={batchPublish}><SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 发布</button>
-                  <button type="button" className="studio-toolbar-action" onClick={batchDelete}><SiteIcon name="fa-trash-can" variant="solid" /> 删除</button>
-                  <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}><SiteIcon name="fa-xmark" variant="solid" /> 取消</button>
+                    <button type="button" className="studio-toolbar-action" onClick={batchPublish}>发布</button>
+                    <button type="button" className="studio-toolbar-action" onClick={batchDelete}>删除</button>
+                    <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>取消</button>
                 </div>
               )}
             </div>
@@ -847,16 +846,16 @@ export default function StudioPage() {
                     </div>
                     <div className="toolbar-spacer"></div>
                     <button type="button" className="studio-toolbar-action studio-toolbar-action--batch-toggle" onClick={() => { setBatchMode(true); setSelectedIds(new Set()); }}>
-                      <SiteIcon name="fa-list-check" variant="solid" /> 批量操作
+                      批量操作
                     </button>
                   </div>
                 ) : (
                   <div className="studio-batch-row">
                     <span className="studio-batch-count">已选 {selectedIds.size} 项</span>
                     <button type="button" className="studio-toolbar-action" onClick={selectAll}>全选</button>
-                    <button type="button" className="studio-toolbar-action" onClick={batchPublish}><SiteIcon name="fa-cloud-arrow-up" variant="solid" /> 批量发布</button>
-                    <button type="button" className="studio-toolbar-action" onClick={batchDelete}><SiteIcon name="fa-trash-can" variant="solid" /> 批量删除</button>
-                    <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}><SiteIcon name="fa-xmark" variant="solid" /> 取消选择</button>
+                    <button type="button" className="studio-toolbar-action" onClick={batchPublish}>批量发布</button>
+                    <button type="button" className="studio-toolbar-action" onClick={batchDelete}>批量删除</button>
+                    <button type="button" className="studio-toolbar-action" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>取消选择</button>
                   </div>
                 )}
               </div>
@@ -878,7 +877,7 @@ export default function StudioPage() {
               <p className="empty-desc">{searchQuery ? "换个关键词试试吧" : "创建你的第一个作品，开始创作之旅"}</p>
               {!searchQuery && (
                 <Link href="/create" className="empty-action">
-                  <SiteIcon name="fa-plus" variant="solid" style={{ marginRight: 6 }} />创建作品
+                  创建作品
                 </Link>
               )}
             </div>

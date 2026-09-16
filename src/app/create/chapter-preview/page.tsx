@@ -48,7 +48,7 @@ export default function ChapterPreviewPage() {
         <h1 className="work-title">{displayTitle}</h1>
         <div className="chapter-static-preview-meta">
           <span><SiteIcon name="fa-book-open" variant="solid" />{preview.seriesName}</span>
-          <span><SiteIcon name="fa-file-lines" variant="outline" />{preview.wordCount.toLocaleString()}字</span>
+          <span><SiteIcon name="fa-word-count" variant="default" />{preview.wordCount.toLocaleString()}字</span>
           <span><SiteIcon name="fa-calendar" variant="outline" />发布后显示日期</span>
         </div>
         <div className="work-content">

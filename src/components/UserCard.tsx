@@ -134,7 +134,7 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
         </button>
         <div className={`user-action-popup${moreOpen ? " show" : ""}`} ref={popupRef}>
           <button className="user-action-popup-item" onClick={handleBlock}>
-            <SiteIcon name="fa-ban" variant="solid" />屏蔽
+            <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />屏蔽
           </button>
           <button className="user-action-popup-item" onClick={handleReport}>
             <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />举报

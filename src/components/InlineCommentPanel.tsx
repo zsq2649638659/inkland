@@ -86,7 +86,7 @@ export default function InlineCommentPanel({
             />
             <div className="comment-submit-row">
               <button className="btn-submit" onClick={onSubmit} disabled={submitting || !commentText.trim()}>
-                <SiteIcon name="fa-paper-plane" variant="solid" /> {submitting ? "发布中" : "发布"}
+                {submitting ? "发布中" : "发布"}
               </button>
             </div>
           </div>
@@ -94,7 +94,7 @@ export default function InlineCommentPanel({
       ) : (
         <div className="inline-comment-login">
           <p><SiteIcon name="fa-message" variant="outline" /> 登录后参与评论</p>
-          <Link href="/login" className="btn-submit no-underline"><SiteIcon name="fa-right-to-bracket" variant="solid" /> 登录</Link>
+          <Link href="/login" className="btn-submit no-underline">登录</Link>
         </div>
       )}
 
@@ -157,9 +157,9 @@ export default function InlineCommentPanel({
                     {menuId === comment.id && (
                       <div className="comment-popup show">
                         {user?.id === comment.user_id ? (
-                          <button className="comment-popup-item" onPointerDown={(event) => event.stopPropagation()} onClick={async (event) => { event.stopPropagation(); await onDelete?.(comment.id); setMenuId(null); }}><SiteIcon name="fa-trash-can" variant="solid" /> 删除</button>
+                          <button className="comment-popup-item" onPointerDown={(event) => event.stopPropagation()} onClick={async (event) => { event.stopPropagation(); await onDelete?.(comment.id); setMenuId(null); }}><SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" /> 删除</button>
                         ) : <>
-                          <button className="comment-popup-item" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onBlock?.(comment.user_id); setMenuId(null); }}><SiteIcon name="fa-ban" variant="solid" /> 屏蔽</button>
+                          <button className="comment-popup-item" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onBlock?.(comment.user_id); setMenuId(null); }}><SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" /> 屏蔽</button>
                           <button className="comment-popup-item" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onReport?.(comment.id, comment.user_id); setMenuId(null); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button>
                         </>}
                       </div>
@@ -170,7 +170,7 @@ export default function InlineCommentPanel({
                       <textarea className="inline-reply-textarea" value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder={`回复 ${comment.author?.nickname || "匿名用户"}...`} rows={2} autoFocus />
                       <div className="inline-reply-actions">
                         <button type="button" className="btn-cancel-reply" onClick={() => { setReplyingTo(null); setReplyText(""); }}>取消</button>
-                        <button type="button" className="btn-submit-reply" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), comment.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}><SiteIcon name="fa-paper-plane" variant="solid" /> 回复</button>
+                        <button type="button" className="btn-submit-reply" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), comment.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}>发布</button>
                       </div>
                     </div>
                   )}
@@ -191,9 +191,9 @@ export default function InlineCommentPanel({
                             <button className={`comment-action-btn ${(likeOverrides[reply.id]?.liked ?? reply.liked_by_me) ? "liked" : ""}`} aria-label="喜欢" onClick={async () => { if (!user?.id) return; const liked = likeOverrides[reply.id]?.liked ?? !!reply.liked_by_me; const currentCount = likeOverrides[reply.id]?.count ?? reply.like_count ?? 0; if (liked) await supabase.from("comment_likes").delete().eq("comment_id", reply.id).eq("user_id", user.id); else await supabase.from("comment_likes").insert({ comment_id: reply.id, user_id: user.id }); setLikeOverrides((current) => ({ ...current, [reply.id]: { liked: !liked, count: Math.max(0, currentCount + (liked ? -1 : 1)) } })); }}><SiteIcon name="fa-heart" variant={(likeOverrides[reply.id]?.liked ?? reply.liked_by_me) ? "solid" : "outline"} hoverVariant={(likeOverrides[reply.id]?.liked ?? reply.liked_by_me) ? undefined : "solid"} /> {likeOverrides[reply.id]?.count ?? reply.like_count ?? 0}</button>
                             <button className="comment-action-btn" aria-label="回复" onClick={() => { setReplyingTo(replyingTo === reply.id ? null : reply.id); setReplyText(""); }}><SiteIcon name="fa-comment" variant="outline" hoverVariant="solid" /> {reply.reply_count || 0}</button>
                             <button className="comment-more-btn inline-comment-more" title="更多" aria-label="回复更多操作" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setMenuId(menuId === reply.id ? null : reply.id); }}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
-                            {menuId === reply.id && <div className="comment-popup show">{user?.id === reply.user_id ? <button className="comment-popup-item" onClick={async () => { await onDelete?.(reply.id); setMenuId(null); }}><SiteIcon name="fa-trash-can" variant="solid" /> 删除</button> : <><button className="comment-popup-item" onClick={() => { onBlock?.(reply.user_id); setMenuId(null); }}><SiteIcon name="fa-ban" variant="solid" /> 屏蔽</button><button className="comment-popup-item" onClick={() => { onReport?.(reply.id, reply.user_id); setMenuId(null); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button></>}</div>}
+                            {menuId === reply.id && <div className="comment-popup show">{user?.id === reply.user_id ? <button className="comment-popup-item" onClick={async () => { await onDelete?.(reply.id); setMenuId(null); }}><SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" /> 删除</button> : <><button className="comment-popup-item" onClick={() => { onBlock?.(reply.user_id); setMenuId(null); }}><SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" /> 屏蔽</button><button className="comment-popup-item" onClick={() => { onReport?.(reply.id, reply.user_id); setMenuId(null); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button></>}</div>}
                           </div>
-                          {replyingTo === reply.id && <div className="inline-reply-composer inline-reply-area show"><textarea className="inline-reply-textarea" value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder={`回复 ${reply.author?.nickname || "匿名用户"}...`} rows={2} autoFocus /><div className="inline-reply-actions"><button type="button" className="btn-cancel-reply" onClick={() => { setReplyingTo(null); setReplyText(""); }}>取消</button><button type="button" className="btn-submit-reply" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), reply.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}><SiteIcon name="fa-paper-plane" variant="solid" /> 回复</button></div></div>}
+                          {replyingTo === reply.id && <div className="inline-reply-composer inline-reply-area show"><textarea className="inline-reply-textarea" value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder={`回复 ${reply.author?.nickname || "匿名用户"}...`} rows={2} autoFocus /><div className="inline-reply-actions"><button type="button" className="btn-cancel-reply" onClick={() => { setReplyingTo(null); setReplyText(""); }}>取消</button><button type="button" className="btn-submit-reply" disabled={!replyText.trim()} onClick={async () => { await onReply?.(comment.id, replyText.trim(), reply.author?.nickname || "匿名用户"); setReplyText(""); setReplyingTo(null); }}>发布</button></div></div>}
                         </div>
                       </div>;
                     })}

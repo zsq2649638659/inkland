@@ -249,7 +249,7 @@ export default function ProfileEditForm() {
                     className="inline-edit-btn"
                     onClick={() => setNicknameEditOpen(true)}
                   >
-                    <SiteIcon name="fa-pen" variant="solid" /> 修改
+                    修改
                   </button>
                 </div>
                 {nicknameEditOpen && (
@@ -324,7 +324,7 @@ export default function ProfileEditForm() {
                     className="inline-edit-btn"
                     onClick={() => setEmailEditOpen(true)}
                   >
-                    <SiteIcon name="fa-pen" variant="solid" /> 修改
+                    修改
                   </button>
                 </div>
                 {emailEditOpen && (
@@ -361,7 +361,7 @@ export default function ProfileEditForm() {
                     {saving ? (
                       <><SiteIcon name="fa-spinner" variant="solid" style={{ animation: "spin 1s linear infinite" }} />保存中...</>
                     ) : (
-                      <><SiteIcon name="fa-check" variant="solid" aria-hidden="true" /> 保存</>
+                      <>保存</>
                     )}
                   </button>
                 </div>

@@ -13,7 +13,6 @@ export type InklandAdditionalIconName =
   | "fa-arrow-down"
   | "fa-arrow-up"
   | "fa-arrow-up-from-bracket"
-  | "fa-ban"
   | "fa-bell"
   | "fa-bold"
   | "fa-book"
@@ -85,6 +84,9 @@ export type InklandAdditionalIconName =
   | "fa-spinner"
   | "fa-strikethrough"
   | "fa-tag"
+  | "fa-tag-heat"
+  | "fa-tag-participants"
+  | "fa-tag-works"
   | "fa-tags"
   | "fa-underline"
   | "fa-user"
@@ -118,7 +120,9 @@ export type InklandAdditionalIconName =
   | "fa-sliders"
   | "fa-action-preview-open"
   | "fa-action-edit"
-  | "fa-action-delete";
+  | "fa-action-delete"
+  | "fa-action-forbid"
+  | "fa-word-count";
 
 
 export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, InklandIconDefinition> = {
@@ -178,9 +182,6 @@ export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, In
   ], supportsVariants: false },
   "fa-arrow-up-from-bracket": { viewBox: "0 0 448 512", paths: [
     {"d":"M246.6 9.4c-12.5-12.5-32.8-12.5-45.3 0l-128 128c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 109.3 192 320c0 17.7 14.3 32 32 32s32-14.3 32-32l0-210.7 73.4 73.4c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-128-128zM64 352c0-17.7-14.3-32-32-32S0 334.3 0 352l0 64c0 53 43 96 96 96l256 0c53 0 96-43 96-96l0-64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64c0 17.7-14.3 32-32 32L96 448c-17.7 0-32-14.3-32-32l0-64z","variant":"default","fill":"currentColor"},
-  ], supportsVariants: false },
-  "fa-ban": { viewBox: "0 0 512 512", paths: [
-    {"d":"M367.2 412.5L99.5 144.8c-22.4 31.4-35.5 69.8-35.5 111.2 0 106 86 192 192 192 41.5 0 79.9-13.1 111.2-35.5zm45.3-45.3c22.4-31.4 35.5-69.8 35.5-111.2 0-106-86-192-192-192-41.5 0-79.9 13.1-111.2 35.5L412.5 367.2zM0 256a256 256 0 1 1 512 0 256 256 0 1 1 -512 0z","variant":"default","fill":"currentColor"},
   ], supportsVariants: false },
   "fa-bell": { viewBox: "0 0 48 48", paths: [
     { d: "M24 4C16.268 4 10 10.268 10 18V38H38V18C38 10.268 31.732 4 24 4Z", variant: "default", fill: "none" },
@@ -445,8 +446,22 @@ export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, In
     { d: "M35.9999 12C35.9999 12 33 4 23.9999 4C14.9999 4 11.4359 11.5995 15.6096 18", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
     { d: "M12 36C12 36 15.9999 44 24 44C32 44 36.564 36.4005 32.3903 30", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: false },
-  "fa-tag": { viewBox: "0 0 512 512", paths: [
-    {"d":"M32.5 96l0 149.5c0 17 6.7 33.3 18.7 45.3l192 192c25 25 65.5 25 90.5 0L483.2 333.3c25-25 25-65.5 0-90.5l-192-192C279.2 38.7 263 32 246 32L96.5 32c-35.3 0-64 28.7-64 64zm112 16a32 32 0 1 1 0 64 32 32 0 1 1 0-64z","variant":"default","fill":"currentColor"},
+  "fa-tag": { viewBox: "0 0 48 48", paths: [
+    { d: "M8 44L8 6C8 4.89543 8.89543 4 10 4H38C39.1046 4 40 4.89543 40 6V44L24 35.7273L8 44Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+    { d: "M16 18H32", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+  ], supportsVariants: false },
+  "fa-tag-heat": { viewBox: "0 0 48 48", paths: [
+    { d: "M24 44C32.2347 44 38.9998 37.4742 38.9998 29.0981C38.9998 27.0418 38.8953 24.8375 37.7555 21.4116C36.6157 17.9858 36.3861 17.5436 35.1809 15.4279C34.666 19.7454 31.911 21.5448 31.2111 22.0826C31.2111 21.5231 29.5445 15.3359 27.0176 11.6339C24.537 8 21.1634 5.61592 19.1853 4C19.1853 7.06977 18.3219 11.6339 17.0854 13.9594C15.8489 16.2849 15.6167 16.3696 14.0722 18.1002C12.5278 19.8308 11.8189 20.3653 10.5274 22.4651C9.23596 24.565 9 27.3618 9 29.4181C9 37.7942 15.7653 44 24 44Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+  ], supportsVariants: false },
+  "fa-tag-participants": { viewBox: "0 0 48 48", paths: [
+    { d: "M19 20C22.866 20 26 16.866 26 13C26 9.13401 22.866 6 19 6C15.134 6 12 9.13401 12 13C12 16.866 15.134 20 19 20Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M32.6077 7C34.6405 8.2249 36.0001 10.4537 36.0001 13C36.0001 15.5463 34.6405 17.7751 32.6077 19", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M4 40.8V42H34V40.8C34 36.3196 34 34.0794 33.1281 32.3681C32.3611 30.8628 31.1372 29.6389 29.6319 28.8719C27.9206 28 25.6804 28 21.2 28H16.8C12.3196 28 10.0794 28 8.36808 28.8719C6.86278 29.6389 5.63893 30.8628 4.87195 32.3681C4 34.0794 4 36.3196 4 40.8Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M43.9999 42.0001V40.8001C43.9999 36.3197 43.9999 34.0795 43.128 32.3682C42.361 30.8629 41.1371 29.6391 39.6318 28.8721", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+  ], supportsVariants: false },
+  "fa-tag-works": { viewBox: "0 0 48 48", paths: [
+    { d: "M5 6H39C39 6 43 8 43 13C43 18 39 20 39 20H5C5 20 9 18 9 13C9 8 5 6 5 6Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M43 28H9C9 28 5 30 5 35C5 40 9 42 9 42H43C43 42 39 40 39 35C39 30 43 28 43 28Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: false },
   "fa-tags": { viewBox: "0 0 576 512", paths: [
     {"d":"M401.2 39.1L549.4 189.4c27.7 28.1 27.7 73.1 0 101.2L393 448.9c-9.3 9.4-24.5 9.5-33.9 .2s-9.5-24.5-.2-33.9L515.3 256.8c9.2-9.3 9.2-24.4 0-33.7L367 72.9c-9.3-9.4-9.2-24.6 .2-33.9s24.6-9.2 33.9 .2zM32.1 229.5L32.1 96c0-35.3 28.7-64 64-64l133.5 0c17 0 33.3 6.7 45.3 18.7l144 144c25 25 25 65.5 0 90.5L285.4 418.7c-25 25-65.5 25-90.5 0l-144-144c-12-12-18.7-28.3-18.7-45.3zm144-85.5a32 32 0 1 0 -64 0 32 32 0 1 0 64 0z","variant":"default","fill":"currentColor"},
@@ -612,9 +627,24 @@ export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, In
     { d: "M42 26V40C42 41.1046 41.1046 42 40 42H8C6.89543 42 6 41.1046 6 40V8C6 6.89543 6.89543 6 8 6L22 6", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
     { d: "M14 26.7199V34H21.3172L42 13.3081L34.6951 6L14 26.7199Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
   ], supportsVariants: false },
-  "fa-action-delete": { viewBox: "0 0 48 48", paths: [
-    { d: "M8 11L40 11", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
-    { d: "M18 5L30 5", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
-    { d: "M12 17H36V40C36 41.6569 34.6569 43 33 43H15C13.3431 43 12 41.6569 12 40V17Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+  "fa-action-delete": { viewBox: "6 3 36 42", paths: [
+    { d: "M8 11L40 11", variant: "outline", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M18 5L30 5", variant: "outline", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M12 17H36V40C36 41.6569 34.6569 43 33 43H15C13.3431 43 12 41.6569 12 40V17Z", variant: "outline", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+    { d: "M8 11L40 11", variant: "solid", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M18 5L30 5", variant: "solid", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M12 17H36V40C36 41.6569 34.6569 43 33 43H15C13.3431 43 12 41.6569 12 40V17Z", variant: "solid", fill: "currentColor", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+  ], supportsVariants: true },
+  "fa-action-forbid": { viewBox: "0 0 48 48", paths: [
+    { d: "M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z", variant: "outline", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M15 15L33 33", variant: "outline", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z", variant: "solid", fill: "currentColor", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M15 15L33 33", variant: "solid", fill: "none", stroke: "var(--ink-color-text-anti)", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+  ], supportsVariants: true },
+  "fa-word-count": { viewBox: "0 0 48 48", paths: [
+    { d: "M40 23V14L31 4H10C8.89543 4 8 4.89543 8 6V42C8 43.1046 8.89543 44 10 44H22", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M34 30V44", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M28 30H34L40 30", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M30 4V14H40", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: false },
 };

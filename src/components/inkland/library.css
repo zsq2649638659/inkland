@@ -534,8 +534,8 @@
 /* 首页移动端布局：内容留 8px 侧边空间，继续阅读保持紧凑的左右排布。 */
 @media (max-width: 768px) {
   #navbar .navbar-inner {
-    padding-right: var(--ink-space-2);
-    padding-left: var(--ink-space-2);
+    padding-right: var(--ink-space-0);
+    padding-left: var(--ink-space-0);
   }
 
   #page-home > .main-container {
@@ -563,6 +563,247 @@
     justify-content: center;
     padding-inline: var(--ink-space-3);
   }
+}
+
+/* 标签详情页：与阅读历史共用 site-card 结构，筛选器在所有断点都保持选择器形态。 */
+#page-tag .main-container {
+  width: 900px;
+  max-width: calc(100% - 32px);
+  margin-inline: auto;
+  padding: var(--ink-space-5) 0 var(--ink-space-7);
+}
+
+#page-tag .profile-section {
+  display: grid;
+  grid-template-columns: var(--ink-avatar-size-lg) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ink-space-4);
+  min-width: 0;
+  margin: 0 0 var(--ink-space-4);
+  padding: var(--ink-space-5);
+  border: var(--ink-border-none);
+  border-radius: var(--ink-radius-lg);
+  background: var(--ink-surface);
+}
+
+#page-tag .profile-avatar {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: var(--ink-radius-full);
+  color: var(--ink-primary);
+  background: var(--ink-primary-bg);
+}
+
+#page-tag .profile-avatar svg { width: 32px; height: 32px; }
+#page-tag .profile-info { min-width: 0; display: grid; gap: var(--ink-space-3); }
+#page-tag .profile-name { margin: 0; color: var(--ink-text); font: var(--ink-font-title-xl); line-height: 1.2; }
+#page-tag .profile-bio { display: none; }
+#page-tag .profile-stats { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--ink-space-4); margin: 0; }
+#page-tag .profile-stat { display: inline-flex; align-items: center; gap: var(--ink-space-1); color: var(--ink-muted); font: var(--ink-font-control); white-space: nowrap; }
+#page-tag .profile-stat svg { width: 15px; height: 15px; color: currentColor; }
+#page-tag .profile-stat .stat-value { color: var(--ink-text); font-weight: 600; }
+#page-tag .profile-actions { display: flex; align-items: center; justify-content: flex-end; }
+#page-tag .profile-action-btn {
+  display: inline-flex;
+  width: var(--ink-button-width, 120px);
+  height: var(--ink-button-height, 40px);
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--ink-radius-md);
+  border: var(--ink-border-none);
+  border-radius: 8px;
+  color: var(--ink-button-primary-color, #fff);
+  background: var(--ink-button-primary-bg, #f26b5b);
+  font: var(--ink-button-medium-font);
+  line-height: 40px;
+  cursor: pointer;
+}
+#page-tag .profile-action-btn:hover,
+#page-tag .profile-action-btn:focus-visible { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-active-bg, #e85a4a); outline: var(--ink-outline-none); }
+#page-tag .profile-action-icon { display: none; width: var(--ink-size-16); height: var(--ink-size-16); }
+
+#page-tag .tag-filter-selectors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ink-space-3); margin-bottom: var(--ink-space-4); }
+#page-tag .tag-filter-selectors__sort { display: contents; }
+#page-tag .tag-filter-selectors__sort--with-time { display: contents; }
+#page-tag .tag-hot-time-select { display: block; min-width: 0; }
+#page-tag .tag-hot-time-buttons { display: none; }
+#page-tag .tag-filter-selectors .filter-system-field { display: grid; min-width: 0; gap: var(--ink-gap-compact); color: var(--ink-text-secondary); font: var(--ink-font-control); }
+#page-tag .tag-filter-selectors .filter-system-select-wrap,
+#page-tag .tag-filter-selectors .custom-select { position: relative; display: block; min-width: 0; }
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"] {
+  display: flex;
+  width: 100%;
+  min-height: var(--ink-input-height-md);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ink-gap-compact);
+  padding: 0 var(--ink-input-padding-inline);
+  border: var(--ink-border-none);
+  border-radius: var(--ink-radius-md);
+  color: var(--ink-text-secondary);
+  background: var(--ink-surface);
+  font: var(--ink-font-control);
+  text-align: left;
+  cursor: pointer;
+}
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"]:hover,
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"][aria-expanded="true"],
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"]:focus-visible {
+  color: var(--ink-text-secondary);
+  background: var(--ink-surface);
+  outline: var(--ink-outline-none);
+}
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"]:disabled {
+  color: var(--ink-muted);
+  background: var(--ink-surface-subtle);
+  cursor: not-allowed;
+  opacity: .65;
+}
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"] > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"] svg { width: var(--ink-input-search-icon-size); height: var(--ink-input-search-icon-size); flex: 0 0 var(--ink-input-search-icon-size); }
+#page-tag .tag-filter-selectors .select-menu {
+  position: absolute;
+  top: calc(100% + var(--ink-input-menu-offset));
+  right: 0;
+  left: 0;
+  z-index: var(--ink-input-menu-z-index);
+  display: grid;
+  max-height: min(var(--ink-input-menu-max-height), 60vh);
+  gap: var(--ink-gap-tight);
+  overflow: auto;
+  padding: var(--ink-input-menu-padding);
+  border: var(--ink-border-width-thin) solid var(--ink-border);
+  border-radius: var(--ink-radius-sm);
+  background: var(--ink-surface);
+  box-shadow: var(--ink-input-menu-shadow);
+}
+#page-tag .tag-filter-selectors .select-option {
+  display: flex;
+  width: 100%;
+  min-height: var(--ink-input-option-height);
+  align-items: center;
+  padding: 0 var(--ink-input-padding-inline-option);
+  border: var(--ink-border-none);
+  border-radius: var(--ink-input-option-radius);
+  color: var(--ink-text-secondary);
+  background: transparent;
+  font: var(--ink-font-control);
+  text-align: left;
+  cursor: pointer;
+}
+#page-tag .tag-filter-selectors .select-option:hover,
+#page-tag .tag-filter-selectors .select-option[aria-selected="true"] { color: var(--ink-primary); background: var(--ink-primary-bg); }
+
+#page-tag .tag-history-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ink-gap-inline);
+  align-items: stretch;
+}
+#page-tag .tag-history-card-grid .site-card {
+  display: flex;
+  min-width: 0;
+  min-height: 250px;
+  flex-direction: column;
+  gap: var(--ink-space-3);
+  padding: var(--ink-space-4);
+  border: var(--ink-border-none);
+  border-radius: var(--ink-space-4);
+  background: var(--ink-surface);
+  box-shadow: var(--ink-shadow-none);
+  transition: box-shadow var(--ink-motion-base) var(--ink-ease-standard);
+}
+#page-tag .tag-history-card-grid .site-card:hover { box-shadow: var(--ink-shadow-sm); }
+#page-tag .tag-history-card-grid .site-card > * { margin: 0; }
+#page-tag .tag-history-card-grid .site-card__title-link { display: block; min-width: 0; color: inherit; text-decoration: none; cursor: pointer; }
+#page-tag .tag-history-card-grid .site-card__title { display: -webkit-box; margin: 0; overflow: hidden; color: var(--ink-text); font: var(--ink-font-card-title); -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+#page-tag .tag-history-card-grid .site-card__excerpt { display: -webkit-box; margin: 0; overflow: hidden; color: var(--ink-muted); font: var(--ink-font-card-excerpt); -webkit-box-orient: vertical; -webkit-line-clamp: 5; cursor: pointer; }
+#page-tag .tag-history-card-grid .site-card--feed-serial .site-card__excerpt,
+#page-tag .tag-history-card-grid .site-card--feed-serial .site-card__serial-intro { -webkit-line-clamp: 3; cursor: pointer; }
+#page-tag .tag-history-card-grid .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 5; }
+#page-tag .tag-history-card-grid .site-card__tags { display: flex; min-width: 0; flex-wrap: nowrap; gap: var(--ink-gap-inline); margin: 0; overflow-x: auto; scrollbar-width: none; }
+#page-tag .tag-history-card-grid .site-card__tags::-webkit-scrollbar { display: none; }
+#page-tag .tag-history-card-grid .site-card__tag { display: inline-flex; height: var(--ink-height-tag); min-height: var(--ink-height-tag); flex: 0 0 auto; align-items: center; padding: var(--ink-space-1) var(--ink-space-3); border-radius: var(--ink-radius-xl); color: var(--ink-muted); background: var(--ink-surface-subtle); font: var(--ink-font-site-tag); text-decoration: none; white-space: nowrap; }
+#page-tag .tag-history-card-grid .site-card__tag:hover,
+#page-tag .tag-history-card-grid .site-card__tag:focus-visible { color: var(--ink-primary); background: var(--ink-primary-bg); outline: var(--ink-outline-none); }
+#page-tag .tag-history-card-grid .site-card__serial-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--ink-gap-lg); }
+#page-tag .tag-history-card-grid .site-card__serial-heading .site-card__title-link { min-width: 0; flex: 1 1 auto; }
+#page-tag .tag-history-card-grid .site-card__status { display: inline-flex; min-height: var(--ink-height-tag); flex: 0 0 auto; align-items: center; padding: 0 var(--ink-space-3); border-radius: var(--ink-radius-xs); color: var(--ink-primary); background: var(--ink-primary-bg); font: var(--ink-font-mark-md); white-space: nowrap; }
+#page-tag .tag-history-card-grid .site-card__latest-chapter { display: inline-flex; width: auto; max-width: 100%; min-height: var(--ink-height-tag); align-items: center; gap: var(--ink-gap-4); margin: 0; overflow: hidden; padding: 0 var(--ink-space-3); border: var(--ink-border-none); border-radius: var(--ink-radius-xs); color: var(--ink-muted); background: var(--ink-surface-subtle); font: var(--ink-font-type-tag); text-decoration: none; white-space: nowrap; }
+#page-tag .tag-history-card-grid .site-card__latest-chapter:hover { color: var(--ink-primary); background: var(--ink-primary-bg); }
+#page-tag .tag-history-card-grid .site-card__latest-chapter-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-tag .tag-history-card-grid .site-card__feed-images-shell { position: relative; min-width: 0; }
+#page-tag .tag-history-card-grid .site-card__feed-images { display: flex; height: 154px; min-width: 0; overflow: hidden; }
+#page-tag .tag-history-card-grid .site-card__feed-image { position: relative; display: grid; width: 100%; height: 154px; min-height: 154px; place-items: center; overflow: hidden; border-radius: var(--ink-radius-sm); color: var(--ink-primary-hover); background: var(--ink-surface-subtle); text-decoration: none; }
+#page-tag .tag-history-card-grid .site-card__feed-image img { width: 100%; height: 100%; object-fit: cover; }
+#page-tag .tag-history-card-grid .site-card__feed-image-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--ink-space-2); padding: var(--ink-space-4); color: var(--ink-on-primary); background: linear-gradient(to top, rgba(26,26,26,.82), rgba(26,26,26,.2) 68%, transparent); opacity: 0; pointer-events: none; }
+#page-tag .tag-history-card-grid .site-card__feed-image:hover .site-card__feed-image-overlay,
+#page-tag .tag-history-card-grid .site-card__feed-image:focus-visible .site-card__feed-image-overlay { opacity: 1; }
+#page-tag .tag-history-card-grid .site-card__feed-image-overlay .site-card__title,
+#page-tag .tag-history-card-grid .site-card__feed-image-overlay .site-card__excerpt { margin: 0; color: inherit; }
+#page-tag .tag-history-card-grid .site-card__feed-image-count { position: absolute; right: var(--ink-space-2); bottom: var(--ink-space-2); display: inline-flex; align-items: center; gap: var(--ink-gap-xs); padding: var(--ink-space-1) var(--ink-gap-control); border-radius: var(--ink-size-6); color: var(--ink-on-primary); background: rgba(34,34,34,.72); font: var(--ink-font-tag-meta); }
+#page-tag .tag-history-card-grid .site-card__feed-image-count svg { width: var(--ink-size-14); height: var(--ink-size-14); }
+#page-tag .tag-history-card-grid .site-card__search-meta { display: flex; width: 100%; min-width: 0; min-height: var(--ink-height-card-action); align-items: center; align-self: stretch; justify-content: space-between; gap: var(--ink-gap-inline); margin-top: auto; }
+#page-tag .tag-history-card-grid .site-card__tag-interactions { display: flex; min-width: 0; align-items: center; gap: var(--ink-space-3); color: var(--ink-muted); font: var(--ink-font-control); }
+#page-tag .tag-history-card-grid .site-card__tag-interactions span { display: inline-flex; min-height: var(--ink-height-card-action); align-items: center; gap: var(--ink-size-2); padding: var(--ink-space-2) var(--ink-space-1); border: 0; border-radius: 0; color: inherit; background: transparent; cursor: pointer; transition: color var(--ink-motion-base) var(--ink-ease-standard); }
+#page-tag .tag-history-card-grid .site-card__tag-interactions span:hover,
+#page-tag .tag-history-card-grid .site-card__tag-interactions span:focus-visible { color: var(--ink-primary); outline: var(--ink-outline-none); }
+#page-tag .tag-history-card-grid .site-card__tag-interactions .site-icon-hover { display: inline-flex; }
+#page-tag .tag-history-card-grid .site-card__tag-interactions span:hover .site-icon-hover__default,
+#page-tag .tag-history-card-grid .site-card__tag-interactions span:focus-visible .site-icon-hover__default { display: none; }
+#page-tag .tag-history-card-grid .site-card__tag-interactions span:hover .site-icon-hover__active,
+#page-tag .tag-history-card-grid .site-card__tag-interactions span:focus-visible .site-icon-hover__active { display: inline-flex; }
+#page-tag .tag-history-card-grid .site-card__tag-interactions svg { width: var(--ink-size-14); height: var(--ink-size-14); }
+#page-tag .tag-history-card-grid .site-card__avatar-link,
+#page-tag .tag-history-card-grid .site-card__avatar { width: var(--ink-avatar-size-sm); height: var(--ink-avatar-size-sm); flex: 0 0 var(--ink-avatar-size-sm); }
+#page-tag .tag-history-card-grid .site-card__avatar-link { display: inline-flex; align-items: center; justify-content: center; border-radius: var(--ink-radius-full); text-decoration: none; }
+#page-tag .tag-history-card-grid .site-card__avatar { display: grid; place-items: center; overflow: hidden; border-radius: var(--ink-radius-full); color: var(--ink-on-primary); background: var(--ink-primary); font: var(--ink-font-card-author); }
+#page-tag .tag-history-card-grid .site-card__avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+@media (max-width: 768px) {
+  #page-tag .main-container { width: calc(100% - 32px); max-width: none; padding-block: var(--ink-space-4) var(--ink-space-8); }
+  #page-tag .profile-section { grid-template-columns: 32px minmax(0, 1fr) auto; gap: var(--ink-space-3); padding: var(--ink-space-3); }
+  #page-tag .profile-avatar { width: 32px; height: 32px; }
+  #page-tag .profile-avatar svg { width: 18px; height: 18px; }
+  #page-tag .profile-actions { grid-column: auto; justify-content: flex-end; }
+  #page-tag .profile-action-btn { width: 40px; height: 40px; padding: 0; }
+  #page-tag .profile-action-icon { display: block; width: 18px; height: 18px; }
+  #page-tag .profile-action-label { display: none; }
+  #page-tag .tag-filter-selectors { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  #page-tag .tag-filter-selectors__sort { display: contents; }
+  #page-tag .tag-filter-selectors__sort > .filter-system-field:first-child { order: 1; }
+  #page-tag .tag-filter-selectors__type { order: 2; }
+  #page-tag .tag-filter-selectors__sort--with-time { display: contents; }
+  #page-tag .tag-hot-time-select { display: none; }
+  #page-tag .tag-hot-time-buttons { display: grid; grid-column: 1 / -1; order: 3; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ink-space-2); }
+  #page-tag .tag-hot-time-buttons button { width: 100%; height: 40px; padding: 0 var(--ink-radius-sm); border: var(--ink-border-none); border-radius: 8px; color: var(--ink-text-secondary); background: var(--ink-surface-subtle); font: var(--ink-button-medium-font); line-height: 40px; cursor: pointer; }
+  #page-tag .tag-hot-time-buttons button:hover { color: var(--ink-text-secondary); background: var(--ink-border); }
+  #page-tag .tag-hot-time-buttons button.is-selected { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-bg, #f26b5b); }
+  #page-tag .tag-hot-time-buttons button.is-selected:hover { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-active-bg, #e85a4a); }
+  #page-tag .tag-history-card-grid { display: block; column-count: 2; column-gap: var(--ink-gap-inline); }
+  #page-tag .tag-history-card-grid .site-card { display: flex; width: auto; min-height: 0; margin: 0 0 var(--ink-gap-inline); break-inside: avoid; padding: var(--ink-space-3); border-radius: var(--ink-radius-sm); }
+  #page-tag .tag-history-card-grid .site-card__title { font: var(--ink-font-card-title-mobile-square); -webkit-line-clamp: 1; }
+  #page-tag .tag-history-card-grid .site-card__excerpt { font: var(--ink-font-card-body-mobile-square); -webkit-line-clamp: 2; }
+  #page-tag .tag-history-card-grid .site-card--feed-serial .site-card__excerpt { -webkit-line-clamp: 3; }
+  #page-tag .tag-history-card-grid .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 5; }
+  #page-tag .tag-history-card-grid .site-card__tag { min-height: var(--ink-height-card-meta); padding-inline: var(--ink-space-2); font: var(--ink-font-card-tag); }
+  #page-tag .tag-history-card-grid .site-card__feed-images,
+  #page-tag .tag-history-card-grid .site-card__feed-image { height: auto; min-height: 0; aspect-ratio: 4 / 5; }
+  #page-tag .tag-history-card-grid .site-card__search-meta { min-height: var(--ink-height-card-meta); gap: var(--ink-size-2); }
+  #page-tag .tag-history-card-grid .site-card__tag-interactions { gap: var(--ink-size-2); font-size: var(--ink-font-size-xs); }
+  #page-tag .tag-history-card-grid .site-card__tag-interactions svg { width: 15px; height: 15px; }
+  #page-tag .tag-history-card-grid .site-card__avatar-link,
+  #page-tag .tag-history-card-grid .site-card__avatar { width: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); height: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); flex-basis: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); }
+}
+
+@media (max-width: 480px) {
+  #page-tag .profile-section { grid-template-columns: 32px minmax(0, 1fr) auto; gap: var(--ink-space-3); }
+  #page-tag .profile-avatar { width: 32px; height: 32px; }
+  #page-tag .profile-stats { gap: var(--ink-space-2); }
+  #page-tag .profile-stat { font-size: var(--ink-font-size-xs); }
+  #page-tag .tag-filter-selectors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* 创作中心作品卡片：复用 Card Device Cards 的 studio@0.1 契约。
@@ -1757,4 +1998,396 @@
   #page-history .page-header { margin-bottom: var(--ink-space-3); }
   #page-history .page-title,
   #page-history .page-subtitle { margin: var(--ink-space-0); }
+}
+
+/* Final late overrides for page-specific contracts. */
+#page-series .hero-action-btn,
+#page-series .hero-actions > .hero-action-btn {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  box-sizing: border-box !important;
+  padding: 0 var(--ink-radius-md) !important;
+  gap: var(--ink-space-2) !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  line-height: 40px !important;
+}
+
+#page-series .serial-badge,
+#page-series .serial-badge.ink-tag,
+#page-series .ch-status-draft,
+#page-series .ch-status-published,
+#page-series .ch-status-review,
+#page-series .ch-status-rejected {
+  min-height: var(--ink-height-tag, 28px) !important;
+  box-sizing: border-box !important;
+  align-items: center !important;
+  padding: 0 var(--ink-space-3) !important;
+  border-radius: var(--ink-radius-xs, 4px) !important;
+  line-height: 20px !important;
+  white-space: nowrap !important;
+}
+
+#page-series .ch-actions .ch-action-btn {
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  color: #6b6b6b !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#page-series .ch-actions .ch-action-btn:hover,
+#page-series .ch-actions .ch-action-btn:focus-visible {
+  color: #f26b5b !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.inline-reply-actions > :is(button, a),
+.reply-input-actions > :is(button, a) {
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  flex: 0 0 120px !important;
+  box-sizing: border-box !important;
+  padding: 0 var(--ink-radius-md) !important;
+  gap: var(--ink-space-2) !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  line-height: 40px !important;
+}
+
+@media (max-width: 767px) {
+  #page-series .hero-action-btn,
+  #page-series .hero-actions > .hero-action-btn,
+  .inline-reply-actions > :is(button, a),
+  .reply-input-actions > :is(button, a) {
+    padding: 0 var(--ink-radius-sm) !important;
+  }
+}
+
+/* The two chapter-header actions share one geometry. Their visual roles stay
+   different: sort is neutral and create is primary. */
+#page-series .sort-toggle,
+#page-series .btn-new-chapter {
+  display: inline-flex !important;
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  flex: 0 0 120px !important;
+  box-sizing: border-box !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--ink-space-2) !important;
+  padding: 0 var(--ink-radius-md) !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  line-height: 40px !important;
+  letter-spacing: normal !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+#page-series .sort-toggle {
+  color: #6b6b6b !important;
+  border: 0 !important;
+  background: #ede9e5 !important;
+}
+
+#page-series .sort-toggle:hover,
+#page-series .sort-toggle:focus-visible {
+  color: #6b6b6b !important;
+  border: 0 !important;
+  background: #d4cec8 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+#page-series .btn-new-chapter {
+  color: #fff !important;
+  border: 0 !important;
+  background: #f26b5b !important;
+  text-decoration: none !important;
+}
+
+#page-series .btn-new-chapter:hover,
+#page-series .btn-new-chapter:focus-visible {
+  color: #fff !important;
+  border: 0 !important;
+  background: #e85a4a !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Scope the comment contract to every reader surface so nested-comment
+   legacy selectors cannot reintroduce a filled Like/More control. */
+.detail-reader-page .comment-actions,
+.detail-reader-page .nested-reply-actions,
+.para-comment-panel .comment-actions,
+.para-comment-panel .nested-reply-actions {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--ink-space-2);
+  background: transparent;
+}
+
+.detail-reader-page .comment-actions > .comment-action-btn,
+.detail-reader-page .nested-reply-actions > .comment-action-btn,
+.para-comment-panel .comment-actions > .comment-action-btn,
+.para-comment-panel .nested-reply-actions > .comment-action-btn {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0 8px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 0;
+  color: #6b6b6b;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.detail-reader-page .comment-actions > .comment-action-btn-delete,
+.detail-reader-page .nested-reply-actions > .comment-action-btn-delete,
+.para-comment-panel .comment-actions > .comment-action-btn-delete,
+.para-comment-panel .nested-reply-actions > .comment-action-btn-delete {
+  display: inline-flex;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0;
+  flex: 0 0 32px;
+  border: 0;
+  border-radius: 0;
+  color: #6b6b6b;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.detail-reader-page .comment-actions > .comment-action-btn-delete:hover,
+.detail-reader-page .comment-actions > .comment-action-btn-delete:focus-visible,
+.detail-reader-page .comment-actions > .comment-action-btn-delete:active,
+.detail-reader-page .nested-reply-actions > .comment-action-btn-delete:hover,
+.detail-reader-page .nested-reply-actions > .comment-action-btn-delete:focus-visible,
+.detail-reader-page .nested-reply-actions > .comment-action-btn-delete:active,
+.para-comment-panel .comment-actions > .comment-action-btn-delete:hover,
+.para-comment-panel .comment-actions > .comment-action-btn-delete:focus-visible,
+.para-comment-panel .comment-actions > .comment-action-btn-delete:active,
+.para-comment-panel .nested-reply-actions > .comment-action-btn-delete:hover,
+.para-comment-panel .nested-reply-actions > .comment-action-btn-delete:focus-visible,
+.para-comment-panel .nested-reply-actions > .comment-action-btn-delete:active {
+  color: #f26b5b;
+  background: transparent;
+  border-color: transparent;
+}
+
+.detail-reader-page .comment-actions > .comment-action-btn:hover,
+.detail-reader-page .comment-actions > .comment-action-btn:focus-visible,
+.detail-reader-page .comment-actions > .comment-action-btn.liked,
+.detail-reader-page .nested-reply-actions > .comment-action-btn:hover,
+.detail-reader-page .nested-reply-actions > .comment-action-btn:focus-visible,
+.detail-reader-page .nested-reply-actions > .comment-action-btn.liked,
+.para-comment-panel .comment-actions > .comment-action-btn:hover,
+.para-comment-panel .comment-actions > .comment-action-btn:focus-visible,
+.para-comment-panel .comment-actions > .comment-action-btn.liked,
+.para-comment-panel .nested-reply-actions > .comment-action-btn:hover,
+.para-comment-panel .nested-reply-actions > .comment-action-btn:focus-visible,
+.para-comment-panel .nested-reply-actions > .comment-action-btn.liked {
+  color: #f26b5b;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.detail-reader-page .comment-actions > .comment-more-btn,
+.detail-reader-page .nested-reply-actions > .comment-more-btn,
+.para-comment-panel .comment-actions > .comment-more-btn,
+.para-comment-panel .nested-reply-actions > .comment-more-btn {
+  display: inline-flex;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #6b6b6b;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.detail-reader-page .comment-actions > .comment-more-btn:hover,
+.detail-reader-page .comment-actions > .comment-more-btn:focus-visible,
+.detail-reader-page .comment-actions > .comment-more-btn:active,
+.detail-reader-page .comment-actions > .comment-more-btn[aria-expanded="true"],
+.detail-reader-page .nested-reply-actions > .comment-more-btn:hover,
+.detail-reader-page .nested-reply-actions > .comment-more-btn:focus-visible,
+.detail-reader-page .nested-reply-actions > .comment-more-btn:active,
+.detail-reader-page .nested-reply-actions > .comment-more-btn[aria-expanded="true"],
+.para-comment-panel .comment-actions > .comment-more-btn:hover,
+.para-comment-panel .comment-actions > .comment-more-btn:focus-visible,
+.para-comment-panel .comment-actions > .comment-more-btn:active,
+.para-comment-panel .comment-actions > .comment-more-btn[aria-expanded="true"],
+.para-comment-panel .nested-reply-actions > .comment-more-btn:hover,
+.para-comment-panel .nested-reply-actions > .comment-more-btn:focus-visible,
+.para-comment-panel .nested-reply-actions > .comment-more-btn:active,
+.para-comment-panel .nested-reply-actions > .comment-more-btn[aria-expanded="true"] {
+  color: #f26b5b;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Solid heart is selected/hover state only; the resting outline remains the
+   registered default variant. */
+.detail-reader-page .comment-action-btn:hover .site-icon-hover__default,
+.detail-reader-page .comment-action-btn:focus-visible .site-icon-hover__default,
+.detail-reader-page .comment-action-btn-delete:hover .site-icon-hover__default,
+.detail-reader-page .comment-action-btn-delete:focus-visible .site-icon-hover__default,
+.para-comment-panel .comment-action-btn:hover .site-icon-hover__default,
+.para-comment-panel .comment-action-btn:focus-visible .site-icon-hover__default,
+.para-comment-panel .comment-action-btn-delete:hover .site-icon-hover__default,
+.para-comment-panel .comment-action-btn-delete:focus-visible .site-icon-hover__default {
+  display: none;
+}
+
+.detail-reader-page .comment-action-btn:hover .site-icon-hover__active,
+.detail-reader-page .comment-action-btn:focus-visible .site-icon-hover__active,
+.detail-reader-page .comment-action-btn-delete:hover .site-icon-hover__active,
+.detail-reader-page .comment-action-btn-delete:focus-visible .site-icon-hover__active,
+.para-comment-panel .comment-action-btn:hover .site-icon-hover__active,
+.para-comment-panel .comment-action-btn:focus-visible .site-icon-hover__active,
+.para-comment-panel .comment-action-btn-delete:hover .site-icon-hover__active,
+.para-comment-panel .comment-action-btn-delete:focus-visible .site-icon-hover__active {
+  display: inline-flex;
+}
+
+/* Inline comment panels use the same action contract as the reader and
+   paragraph comment surfaces. Keep these controls content-sized and remove
+   the legacy hover fill from the base comment rules. */
+.inline-comment-panel .comment-actions,
+.inline-comment-panel .nested-reply-actions {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--ink-space-2);
+  background: transparent;
+}
+
+.inline-comment-panel .comment-actions > .comment-action-btn,
+.inline-comment-panel .nested-reply-actions > .comment-action-btn {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  color: #6b6b6b;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.inline-comment-panel .comment-actions > .comment-action-btn:hover,
+.inline-comment-panel .comment-actions > .comment-action-btn:focus-visible,
+.inline-comment-panel .comment-actions > .comment-action-btn.liked,
+.inline-comment-panel .nested-reply-actions > .comment-action-btn:hover,
+.inline-comment-panel .nested-reply-actions > .comment-action-btn:focus-visible,
+.inline-comment-panel .nested-reply-actions > .comment-action-btn.liked {
+  color: #f26b5b;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.inline-comment-panel .comment-actions > .comment-more-btn,
+.inline-comment-panel .nested-reply-actions > .comment-more-btn {
+  display: inline-flex;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #6b6b6b;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.inline-comment-panel .comment-actions > .comment-more-btn:hover,
+.inline-comment-panel .comment-actions > .comment-more-btn:focus-visible,
+.inline-comment-panel .comment-actions > .comment-more-btn:active,
+.inline-comment-panel .comment-actions > .comment-more-btn[aria-expanded="true"],
+.inline-comment-panel .nested-reply-actions > .comment-more-btn:hover,
+.inline-comment-panel .nested-reply-actions > .comment-more-btn:focus-visible,
+.inline-comment-panel .nested-reply-actions > .comment-more-btn:active,
+.inline-comment-panel .nested-reply-actions > .comment-more-btn[aria-expanded="true"] {
+  color: #f26b5b;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.inline-comment-panel .comment-action-btn:hover .site-icon-hover__default,
+.inline-comment-panel .comment-action-btn:focus-visible .site-icon-hover__default,
+.inline-comment-panel .comment-action-btn-delete:hover .site-icon-hover__default,
+.inline-comment-panel .comment-action-btn-delete:focus-visible .site-icon-hover__default {
+  display: none;
+}
+
+.inline-comment-panel .comment-action-btn:hover .site-icon-hover__active,
+.inline-comment-panel .comment-action-btn:focus-visible .site-icon-hover__active,
+.inline-comment-panel .comment-action-btn-delete:hover .site-icon-hover__active,
+.inline-comment-panel .comment-action-btn-delete:focus-visible .site-icon-hover__active {
+  display: inline-flex;
 }
