@@ -131,7 +131,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
                 <div className={`card-tags card-image-tags${isTagsOverflow ? " has-overflow" : ""}`} ref={tagsRef}>
                   {tags.map((tag) => {
                     const tagName = typeof tag === "string" ? tag : tag.name;
-                    return <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`} className="card-tag">{tagName}</Link>;
+                    return <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`} className="tag tag--site site-card__tag">{tagName}</Link>;
                   })}
                 </div>
               )}
@@ -175,7 +175,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
             {tags.map((tag) => {
               const tagName = typeof tag === "string" ? tag : tag.name;
               return (
-                <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`} className="card-tag">
+                <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`} className="tag tag--site site-card__tag">
                   {tagName}
                 </Link>
               );
@@ -212,7 +212,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
           {tags.map((tag) => {
             const tagName = typeof tag === "string" ? tag : tag.name;
             return (
-              <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`} className="card-tag">
+              <Link key={tagName} href={`/tag/${encodeURIComponent(tagName)}`} className="tag tag--site site-card__tag">
                 {tagName}
               </Link>
             );

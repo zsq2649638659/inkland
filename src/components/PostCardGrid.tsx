@@ -117,7 +117,7 @@ export default function PostCardGrid({ post, showAuthor = true }: PostCardGridPr
                 <Link
                   key={tagName}
                   href={`/tag/${encodeURIComponent(tagName)}`}
-                  className="inline-block px-1.5 py-0.5 text-[0.6rem] rounded-full bg-accent-light/40 text-accent/70 hover:bg-accent-light/60 no-underline"
+                  className="tag tag--site site-card__tag"
                 >
                   {tagName}
                 </Link>

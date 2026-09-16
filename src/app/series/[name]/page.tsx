@@ -328,7 +328,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
             {seriesInfo.tags.length > 0 && (
               <div className="tags-row">
                 {seriesInfo.tags.map((tag) => (
-                  <Link key={tag} href={`/tag/${encodeURIComponent(tag)}`} className="card-tag">
+                  <Link key={tag} href={`/tag/${encodeURIComponent(tag)}`} className="tag tag--site site-card__tag">
                     {tag}
                   </Link>
                 ))}

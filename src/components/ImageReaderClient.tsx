@@ -595,7 +595,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
         {tagNames.length > 0 && (
           <div className="tags-row">
             {tagNames.map((tag) => (
-              <Link key={tag} href={`/tag/${tag}`} className="tag">
+              <Link key={tag} href={`/tag/${tag}`} className="tag tag--site site-card__tag">
                 {tag}
               </Link>
             ))}
