@@ -60,7 +60,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
   const [fontSize, setFontSize] = useState<number | null>(null);
   const [lineHeightPosition, setLineHeightPosition] = useState<number | null>(null);
   const [paragraphSpacing, setParagraphSpacing] = useState<number | null>(null);
-  const [readerWidth, setReaderWidth] = useState("800");
+  const [readerWidth, setReaderWidth] = useState("900");
   const [fontFamily, setFontFamily] = useState("sans");
   const [showSettings, setShowSettings] = useState(false);
   const [selectedParaIndex, setSelectedParaIndex] = useState<number | null>(null);
@@ -660,7 +660,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
         ref={contentRef}
         className={`content-wrapper detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
         style={{
-          maxWidth: readerWidth === "auto" ? "var(--content-width, 800px)" : `${readerWidth}px`,
+          maxWidth: readerWidth === "auto" ? "var(--content-width, 900px)" : `${readerWidth}px`,
           color: darkMode ? "#b8b0a0" : themeColors[currentTheme].text,
         }}
       >
@@ -1218,7 +1218,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
           setSelectedParaIndex(null);
         }}
       >
-        <div className="para-comment-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: readerWidth === "auto" ? "var(--content-width, 800px)" : `${readerWidth}px` }}>
+        <div className="para-comment-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: readerWidth === "auto" ? "var(--content-width, 900px)" : `${readerWidth}px` }}>
           {isTextPost && selectedParaIndex !== null && (
             <ParagraphCommentPanel
               postId={post.id}

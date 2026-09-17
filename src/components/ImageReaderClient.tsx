@@ -63,7 +63,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
   const [fontSize, setFontSize] = useState<number | null>(null);
   const [lineHeightPosition, setLineHeightPosition] = useState<number | null>(null);
   const [paragraphSpacing, setParagraphSpacing] = useState<number | null>(null);
-  const [readerWidth, setReaderWidth] = useState("800");
+  const [readerWidth, setReaderWidth] = useState("900");
   const [fontFamily, setFontFamily] = useState("sans");
   const [showSettings, setShowSettings] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -584,7 +584,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
         ref={contentRef}
         className={`content-wrapper image-reader-page detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
         style={{
-          maxWidth: readerWidth === "auto" ? "var(--content-width, 800px)" : `${readerWidth}px`,
+          maxWidth: readerWidth === "auto" ? "var(--content-width, 900px)" : `${readerWidth}px`,
           color: darkMode ? "#b8a090" : themeColors[currentTheme].text,
         }}
       >

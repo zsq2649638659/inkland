@@ -1,15 +1,14 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useEffect, useState, use, useCallback } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { submitReportV1 } from "@/lib/reportContent";
 import { useAuth } from "@/components/AuthProvider";
-import PostCardGrid from "@/components/PostCardGrid";
-import PostTagCard from "@/components/PostTagCard";
-import SeriesCardGrid from "@/components/SeriesCardGrid";
+import ProfileCardCollection from "@/components/ProfileCardCollection";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import { SkeletonProfile } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import type { Post } from "@/lib/types";
@@ -48,6 +47,16 @@ interface SeriesInfo {
   bookmark_count: number;
 }
 
+type ProfileFilterType = "all" | "single" | "image" | "series";
+type ProfileSortMode = "latest" | "hot";
+
+const profileWorkFilters: Array<{ key: ProfileFilterType; label: string }> = [
+  { key: "all", label: "全部" },
+  { key: "single", label: "单篇" },
+  { key: "image", label: "图片" },
+  { key: "series", label: "长篇连载" },
+];
+
 export default function UserPage({ params }: { params: Promise<{ id: string }> }) {
   const [reportOpen, setReportOpen] = useState(false);
   const { id } = use(params);
@@ -62,7 +71,13 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [filterType, setFilterType] = useState<string>("all");
+  const [filterType, setFilterType] = useState<ProfileFilterType>("all");
+  const [sortMode, setSortMode] = useState<ProfileSortMode>("latest");
+  const [profileSearch, setProfileSearch] = useState("");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileDraftFilter, setMobileDraftFilter] = useState<ProfileFilterType>("all");
+  const [mobileDraftSort, setMobileDraftSort] = useState<ProfileSortMode>("latest");
+  const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [following, setFollowing] = useState<FollowUser[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
@@ -72,21 +87,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [blockDialogMessage, setBlockDialogMessage] = useState("");
   const [blockBusy, setBlockBusy] = useState(false);
   const [blockTargetId, setBlockTargetId] = useState<string | null>(null);
-
-  // 判断帖子是否有图片
-  const hasImages = (post: Post): boolean => {
-    const cp = post as unknown as Record<string, unknown>;
-    if (cp.cover_url && !(cp.cover_url as string).startsWith("private://")) return true;
-    const content = (cp.content as string) || "";
-    return /!\[.*?\]\((?!private:\/\/).*?\)/g.test(content);
-  };
-
-  // Stats
-  const [postCount, setPostCount] = useState(0);
-  const [likeCount, setLikeCount] = useState(0);
-  const [bookmarkCount, setBookmarkCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [followerCount, setFollowerCount] = useState(0);
 
   const isOwnProfile = currentUser?.id === id;
 
@@ -137,56 +137,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     setTabLoading(false);
   };
 
-  const loadStats = useCallback(async (userId: string) => {
-    const includeTestData = includeTestDataForProfile(currentProfile);
-    let postIdsQuery = supabase
-      .from("posts")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "published");
-    postIdsQuery = withTestDataVisibility(postIdsQuery, includeTestData);
-    let followingQuery = supabase
-      .from("follows")
-      .select("id, target:profiles!follows_following_id_fkey!inner(is_test_account)", { count: "exact", head: true })
-      .eq("follower_id", userId);
-    let followerQuery = supabase
-      .from("follows")
-      .select("id, source:profiles!follows_follower_id_fkey!inner(is_test_account)", { count: "exact", head: true })
-      .eq("following_id", userId);
-    if (!includeTestData) {
-      followingQuery = followingQuery.eq("target.is_test_account", false);
-      followerQuery = followerQuery.eq("source.is_test_account", false);
-    }
-    // 个人资料统计互不依赖；帖子 ID 同时用于帖子总数和互动汇总，避免重复查一遍 posts。
-    const [postIdsResult, followingResult, followerResult] = await Promise.all([
-      postIdsQuery,
-      followingQuery,
-      followerQuery,
-    ]);
-    const postIds = (postIdsResult.data || []) as Array<{ id: string }>;
-    setPostCount(postIds.length);
-    setFollowingCount(followingResult.count || 0);
-    setFollowerCount(followerResult.count || 0);
-
-    if (postIds.length > 0) {
-      const { data: stats } = await supabase
-        .from("post_stats")
-        .select("like_count, bookmark_count")
-        .in("id", postIds.map((post) => post.id));
-      let totalLikes = 0;
-      let totalBookmarks = 0;
-      for (const s of (stats || []) as Array<{ like_count: number; bookmark_count: number }>) {
-        totalLikes += s.like_count || 0;
-        totalBookmarks += s.bookmark_count || 0;
-      }
-      setLikeCount(totalLikes);
-      setBookmarkCount(totalBookmarks);
-    } else {
-      setLikeCount(0);
-      setBookmarkCount(0);
-    }
-  }, [supabase, currentProfile?.is_test_account]);
-
   useEffect(() => {
     const load = async () => {
       const includeTestData = includeTestDataForProfile(currentProfile);
@@ -207,7 +157,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           .eq("user_id", id),
         includeTestData,
       ).order("created_at", { ascending: false });
-      void loadStats(id);
       const [{ data: prof }, { data: rawData }, { data: allSeriesData }] = await Promise.all([
         profilePromise,
         postsPromise,
@@ -318,7 +267,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       setLoading(false);
     };
     load();
-  }, [id, supabase, currentUser, currentProfile?.is_test_account, isOwnProfile, loadStats]);
+  }, [id, supabase, currentUser, currentProfile?.is_test_account, isOwnProfile]);
 
   const handleFollow = async () => {
     if (!currentUser) return;
@@ -327,7 +276,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       const { error } = await supabase.from("follows").delete().eq("follower_id", currentUser.id).eq("following_id", id);
       if (!error) {
         setIsFollowing(false);
-        setFollowerCount((prev) => Math.max(0, prev - 1));
       }
     } else {
       const blocked = await assertCanInteract();
@@ -339,7 +287,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       const { error } = await supabase.from("follows").insert({ follower_id: currentUser.id, following_id: id });
       if (!error) {
         setIsFollowing(true);
-        setFollowerCount((prev) => prev + 1);
       }
     }
     setFollowLoading(false);
@@ -423,7 +370,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     if (!moreOpen) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest(".profile-actions-wrapper") && !target.closest(".more-dropdown")) {
+      if (!target.closest(".profile-actions-wrapper")) {
         setMoreOpen(false);
       }
     };
@@ -436,44 +383,18 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   return (
     <div id="page-user" className="min-h-screen bg-paper">
       <main className="main-container">
-        {/* ─── Profile Section ─── */}
         <section className="profile-section">
-          <div className="profile-avatar">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt={displayName} />
-            ) : (
-              <DefaultAvatar name={displayName} />
-            )}
-          </div>
-          <div className="profile-info">
-            <h1 className="profile-name">{displayName}</h1>
-            <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
-            <div className="profile-stats">
-              <div className="profile-stat">
-                <SiteIcon name="fa-book" variant="solid" />
-                <span>作品数</span>
-                <span className="stat-value">{postCount}</span>
-              </div>
-              <div className="profile-stat">
-                <SiteIcon name="fa-heart" variant="outline" />
-                <span>喜欢数</span>
-                <span className="stat-value">{likeCount}</span>
-              </div>
-              <div className="profile-stat">
-                <SiteIcon name="fa-bookmark" variant="solid" />
-                <span>收藏数</span>
-                <span className="stat-value">{bookmarkCount}</span>
-              </div>
-              <div className="profile-stat">
-                <SiteIcon name="fa-user-plus" variant="solid" />
-                <span>关注数</span>
-                <span className="stat-value">{followingCount}</span>
-              </div>
-              <div className="profile-stat">
-                <SiteIcon name="fa-users" variant="solid" />
-                <span>粉丝数</span>
-                <span className="stat-value">{followerCount}</span>
-              </div>
+          <div className="profile-identity">
+            <div className="profile-avatar">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt={displayName} />
+              ) : (
+                <DefaultAvatar name={displayName} />
+              )}
+            </div>
+            <div className="profile-info">
+              <h1 className="profile-name">{displayName}</h1>
+              <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
             </div>
           </div>
           {!isOwnProfile && currentUser && (
@@ -500,12 +421,12 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                   <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
                 </button>
                 {moreOpen && (
-                  <div className="more-dropdown" onClick={(e) => e.stopPropagation()}>
-                    <button className="more-dropdown-item" onClick={() => void handleBlock(id)}>
+                  <div className="comment-popup show" onClick={(e) => e.stopPropagation()}>
+                    <button className="comment-popup-item" onClick={() => void handleBlock(id)}>
                       <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />
                       {blockedRecordId ? "取消屏蔽" : "屏蔽"}
                     </button>
-                    <button className="more-dropdown-item danger" onClick={handleReport}>
+                    <button className="comment-popup-item" onClick={handleReport}>
                       <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
                       举报
                     </button>
@@ -586,96 +507,35 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           <>
             <h2 className="section-title">作品列表</h2>
 
-            <div className="type-filters-row">
-              <div className="type-filters">
-                {["all", "single", "image", "series"].map((f) => (
-                  <button
-                    key={f}
-                    className={`type-filter-pill${filterType === f ? " active" : ""}`}
-                    onClick={() => setFilterType(f)}
-                  >
-                    {f === "all" ? "全部" : f === "single" ? "单篇" : f === "image" ? "图片" : "长篇连载"}
+            <div className="filter-system-composition-row user-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+              <div className="filter-system-field filter-system-field--query">
+                <div className="profile-filter-search-shell">
+                  <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                  <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                  <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setProfileSearch("")}>
+                    <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                   </button>
-                ))}
+                </div>
               </div>
-              
+              <ProfileFilterSelect label="作品类型" id="user-filter-type-menu" value={filterType} options={profileWorkFilters.map((item) => ({ value: item.key, label: item.key === "all" ? "所有作品" : item.label }))} onChange={(value) => setFilterType(value as ProfileFilterType)} />
+              <ProfileFilterSelect label="排序" id="user-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最新发布" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as ProfileSortMode)} />
             </div>
 
-            {posts.length === 0 && seriesList.length === 0 ? (
-              <div className="text-center py-12">
-                <EmptyState icon="fa-feather-pointed" title="暂无作品" />
-              </div>
-            ) : (
-              <div className="card-grid">
-                {/* 连载卡片 */}
-                {(filterType === "all" || filterType === "series") &&
-                  seriesList.map((series) => (
-                    <div key={series.id} className="tag-card series" data-type="series">
-                      <Link href={`/series/${encodeURIComponent(series.name)}`} className="no-underline"><div className="series-header">
-                        <div className="series-header-info">
-                          <span className={`series-header-badge${series.status === "completed" ? " completed" : ""}`}>
-                            {series.status === "completed" ? "已完结" : "连载中"}
-                          </span>
-                          <span className="series-header-name">{series.name}</span>
-                          <div className="series-header-desc">{series.description || "暂无简介"}</div>
-                          {series.tags && series.tags.length > 0 && (
-                            <div className="card-tags has-overflow">
-                              {series.tags.map((tag) => (
-                                <span key={tag} className="tag tag--site site-card__tag">{tag}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div></Link>
-                      {series.totalChapters > 0 ? (
-                        <Link href={`/read/${series.latestChapterId}`} className="no-underline"><div className="chapter-preview">
-                          <div className="chapter-preview-label">最新章节</div>
-                          <div className="chapter-preview-title">{series.latestChapterTitle || ""}</div>
-                          <div className="chapter-preview-excerpt">{series.latestChapterContent || ""}</div>
-                        </div></Link>
-                      ) : (
-                        <div className="series-empty">
-                          <div className="series-empty-box">
-                            <div className="series-empty-icon">
-                              <SiteIcon name="fa-pen-to-square" variant="outline" />
-                            </div>
-                            <div className="series-empty-info">
-                              <div className="series-empty-label">等待开篇</div>
-                              <div className="series-empty-hint">作者正在构思中</div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      <div className="card-footer">
-                        <div className="card-stats">
-                          <span className="card-stat">
-                            <SiteIcon name="fa-heart" variant="outline" /> {series.like_count || 0}
-                          </span>
-                          <span className="card-stat">
-                            <SiteIcon name="fa-comment" variant="outline" /> {series.comment_count || 0}
-                          </span>
-                          <span className="card-stat">
-                            <SiteIcon name="fa-bookmark" variant="outline" /> {series.bookmark_count || 0}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                {/* 帖子卡片 */}
-                {(filterType === "all" || filterType === "single" || filterType === "image") &&
-                  posts
-                    .filter((post) => {
-                      if (filterType === "all") return true;
-                      if (filterType === "image") return hasImages(post);
-                      if (filterType === "single") return !hasImages(post);
-                      return true;
-                    })
-                    .map((post) => (
-                      <PostTagCard key={post.id} post={post} />
-                    ))}
+            <div className="profile-mobile-filter-bar">
+              <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(filterType); setMobileDraftSort(sortMode); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter" variant="default" aria-hidden="true" /></button>
+              <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为单列列表"} aria-pressed={mobileCardLayout === "square"}><SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" /></button>
+            </div>
+            {mobileFilterOpen && (
+              <div className="profile-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
+                <section className="profile-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选作品" onClick={(event) => event.stopPropagation()}>
+                  <h2>筛选作品</h2>
+                  <div className="profile-filter-drawer-section"><strong>作品类型</strong><div>{profileWorkFilters.map((item) => <button key={item.key} type="button" className={`profile-filter-control${mobileDraftFilter === item.key ? " is-active" : ""}`} onClick={() => setMobileDraftFilter(item.key)}>{item.label}</button>)}</div></div>
+                  <div className="profile-filter-drawer-section"><strong>排序</strong><div>{[{ value: "latest" as const, label: "最新发布" }, { value: "hot" as const, label: "热度最高" }].map((item) => <button key={item.value} type="button" className={`profile-filter-control${mobileDraftSort === item.value ? " is-active" : ""}`} onClick={() => setMobileDraftSort(item.value)}>{item.label}</button>)}</div></div>
+                  <div className="profile-filter-drawer-actions"><button type="button" onClick={() => { setMobileDraftFilter("all"); setMobileDraftSort("latest"); }}>重置</button><button type="button" className="is-primary" onClick={() => { setFilterType(mobileDraftFilter); setSortMode(mobileDraftSort); setMobileFilterOpen(false); }}>应用筛选</button></div>
+                </section>
               </div>
             )}
+            <ProfileCardCollection posts={posts} series={seriesList} filter={filterType} query={profileSearch} status="all" sort={sortMode} limit={50} mobileLayout={mobileCardLayout} />
           </>
         )}
         <div className={`modal-overlay${blockDialog ? " active" : ""}`} onClick={() => { if (!blockBusy) setBlockDialog(null); }}>
