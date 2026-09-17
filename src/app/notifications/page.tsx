@@ -541,7 +541,7 @@ export default function NotificationsPage() {
           </div>
 
           {/* 标签切换 */}
-          <div className="segmented-tabs">
+          <div className="segmented-tabs segmented-tabs--notifications">
             <div className="segmented-tabs-left">
               {tabs.map((tab) => (
                 <button

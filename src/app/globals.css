@@ -4538,6 +4538,13 @@ p {
   justify-content: center;
   gap: 8px;
 }
+.auth-form-panel > form {
+  display: flex;
+  flex-direction: column;
+}
+.auth-form-panel .auth-submit-btn {
+  align-self: flex-end;
+}
 .auth-submit-btn:hover:not(:disabled) {
   background: var(--color-primary-hover, #E85A4A);
   transform: translateY(-1px);
@@ -14825,6 +14832,13 @@ p {
   z-index: 20000 !important;
 }
 
+/* 消息分类跟随列表吸顶，但始终与 navbar 保持 12px 间距。 */
+#page-notifications .segmented-tabs--notifications {
+  position: sticky;
+  top: calc(var(--navbar-height) + var(--ink-space-3));
+  z-index: 100;
+}
+
 /* ===== 一键回到顶部 ===== */
 .back-to-top {
   position: fixed;
@@ -14848,6 +14862,26 @@ p {
   color: #fff;
   transform: scale(1.1);
   box-shadow: 0 4px 16px rgba(242, 107, 91, 0.3);
+}
+
+/* PC 端回到顶部按钮沿主内容列定位，参考作品详情页的内容列间距。 */
+@media (min-width: 769px) {
+  body:has(.main-container) .back-to-top {
+    right: auto;
+    bottom: 160px;
+    left: min(
+      calc((100vw - var(--main-layout-width)) / 2 + var(--spacing-lg) + var(--sidebar-width) + var(--main-layout-gap) + var(--main-content-width) + var(--spacing-2xl)),
+      calc(100vw - 72px)
+    );
+  }
+
+  /* 首页桌面布局取消了 main-container 的左右 padding，内容组因此向外偏移 24px。 */
+  body:has(#page-home) .back-to-top {
+    left: min(
+      calc((100vw - var(--main-layout-width)) / 2 + (var(--spacing-lg) * 2) + var(--sidebar-width) + var(--main-layout-gap) + var(--main-content-width) + var(--spacing-2xl)),
+      calc(100vw - 72px)
+    );
+  }
 }
 
 /* ===== 加载更多 / 已加载全部 ===== */

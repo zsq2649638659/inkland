@@ -507,6 +507,42 @@
   display: inline-flex;
 }
 
+/* 首页导航使用完整高度的 sticky 外壳，保持文档流并覆盖滚动内容。 */
+#page-home > .main-container {
+  padding-top: var(--ink-space-0);
+  padding-bottom: var(--spacing-lg);
+}
+
+#page-home .sidebar {
+  top: calc(var(--navbar-height) + var(--spacing-lg));
+  margin-top: var(--spacing-lg);
+}
+
+#page-home .tabs-wrapper--home {
+  position: sticky;
+  top: var(--navbar-height);
+  z-index: 100;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 0 var(--ink-space-2);
+  background: var(--ink-page);
+}
+
+#page-home .tabs-wrapper--home-surface {
+  width: 100%;
+  height: 72px;
+  box-sizing: border-box;
+  padding: calc(var(--ink-space-3) + var(--ink-space-1)) 0 var(--ink-space-3);
+  background: var(--ink-page);
+}
+
+#page-home .tabs-wrapper--home .tabs-inner {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
 @media (max-width: 680px) {
   #page-home .card-device--pc {
     width: 100%;
@@ -569,8 +605,21 @@
     padding: 0 var(--ink-space-2);
   }
 
-  #page-home .tabs-wrapper {
-    padding-bottom: var(--ink-space-0);
+  #page-home .tabs-wrapper--home {
+    width: calc(100% + (var(--ink-space-2) * 2));
+    margin-right: calc(-1 * var(--ink-space-2));
+    margin-left: calc(-1 * var(--ink-space-2));
+    padding-bottom: var(--ink-space-2);
+  }
+
+  #page-home .tabs-wrapper--home-surface {
+    width: 100%;
+    height: 68px;
+    padding: calc(var(--ink-space-3) + var(--ink-space-1)) var(--ink-space-2) var(--ink-space-2);
+  }
+
+  #page-home .tabs-wrapper--home .tabs-inner {
+    width: 100%;
   }
 
   #page-home .home-continue-reading {
