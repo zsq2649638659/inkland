@@ -210,6 +210,13 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
 
   const totalWords = chapters.reduce((s, c) => s + c.word_count, 0);
   const publishedCount = chapters.filter((c) => c.status === "published").length;
+  const latestChapter = chapters[chapters.length - 1];
+  const latestChapterTitle = latestChapter?.chapter_title || latestChapter?.title || "";
+  const latestChapterLabel = latestChapter
+    ? latestChapterTitle.startsWith(`第${latestChapter.chapter_number}章`)
+      ? latestChapterTitle
+      : `第${latestChapter.chapter_number}章 ${latestChapterTitle || "无标题"}`
+    : "暂无";
 
   const sortedChapters = [...chapters].sort((a, b) => {
     return sortOrder === "asc"
@@ -227,6 +234,26 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     if (ch.review_status === "pending") return { className: "ch-status-review", label: "审核中" };
     return { className: "ch-status-draft", label: "草稿" };
   };
+
+  const getChapterDisplayTitle = (ch: ChapterInfo) => {
+    const rawTitle = ch.chapter_title || ch.title || "";
+    const title = rawTitle.replace(new RegExp(`^第\\s*${ch.chapter_number}\\s*章\\s*`), "").trim();
+    return title || "无标题";
+  };
+
+  const renderChapterActions = (chapterId: string, className: string) => (
+    <div className={className}>
+      <Link href={`/create?editPost=${chapterId}`} className="chapter-control" title="编辑" aria-label="编辑章节">
+        <SiteIcon name="fa-action-edit" size={16} />
+      </Link>
+      <Link href={`/read/${chapterId}`} className="chapter-control" title="预览" aria-label="预览章节" target="_blank">
+        <SiteIcon name="fa-action-preview-open" size={16} />
+      </Link>
+      <button className="chapter-control" title="删除" aria-label="删除章节" onClick={() => handleDeleteChapter(chapterId)} type="button">
+        <SiteIcon name="fa-action-delete" variant="outline" size={14} />
+      </button>
+    </div>
+  );
 
   if (loading) return <div id="page-series" className="min-h-screen bg-paper"><SkeletonSeriesDetail /></div>;
 
@@ -248,7 +275,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                   {series?.status === "ongoing" ? "连载中" : "已完结"}
                 </Tag>
               </div>
-              <div className="hero-actions">
+              <div className="series-hero-actions">
                 <button className="hero-action-btn primary" onClick={() => setEditSeries(!editSeries)}>
                   编辑信息
                 </button>
@@ -273,34 +300,31 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                     <DefaultAvatar name={profile?.nickname || user?.email?.split("@")[0] || "我"} />
                   )}
                 </div>
+                <span className="hero-author-label">作者</span>
                 <span className="hero-author-name">{profile?.nickname || user?.email?.split("@")[0] || "我"}</span>
               </div>
-              <span className="meta-sep">|</span>
               <span className="meta-item">
-                最近更新 <span>{chapters.length > 0 ? formatDateYmd(chapters[chapters.length - 1].updated_at) : "暂无"}</span>
+                <span className="meta-label">最近更新</span>
+                <span>{latestChapter ? formatDateYmd(latestChapter.updated_at) : "暂无"}</span>
               </span>
-              {chapters.length > 0 && (
-                <>
-                  <span className="meta-sep">|</span>
-                  <span className="meta-item">
-                    最新章 <span>{chapters[chapters.length - 1].chapter_title || `第${chapters[chapters.length - 1].chapter_number}章`}</span>
-                  </span>
-                </>
-              )}
+              <span className="meta-item">
+                <span className="meta-label">最新章节</span>
+                <span>{latestChapterLabel}</span>
+              </span>
             </div>
 
             <div className="hero-stats-row">
-              <div className="stat-item">
+              <div className="hero-stat-item">
                 <span className="stat-label">总章节</span>
                 <span className="stat-value">{chapters.length}</span>
               </div>
               <span className="stat-sep">|</span>
-              <div className="stat-item">
+              <div className="hero-stat-item">
                 <span className="stat-label">总字数</span>
                 <span className="stat-value">{totalWords.toLocaleString()}</span>
               </div>
               <span className="stat-sep">|</span>
-              <div className="stat-item">
+              <div className="hero-stat-item">
                 <span className="stat-label">已发布</span>
                 <span className="stat-value">{publishedCount}</span>
               </div>
@@ -308,19 +332,19 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
 
             {/* 简介展示区 */}
             {series?.description && !editSeries && (
-              <>
+              <div className="synopsis-row">
                 <div className="synopsis-header">
                   <span className="synopsis-title">作品简介</span>
                 </div>
                 <p className="synopsis-text">{series.description}</p>
-              </>
+              </div>
             )}
 
             {/* 标签展示区 */}
             {series && series.tags.length > 0 && !editSeries && (
               <div className="tags-row">
                 {series.tags.map((tag) => (
-                  <span key={tag} className="card-tag">{tag}</span>
+                  <span key={tag} className="tag tag--site site-card__tag">{tag}</span>
                 ))}
               </div>
             )}
@@ -384,20 +408,22 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                 </div>
 
                 {/* 操作按钮 */}
-                <div className="edit-actions">
-                  <button className="edit-save-btn" onClick={handleSaveSeries}>
-                    保存修改
-                  </button>
+                <div className="series-edit-actions">
                   <button
-                    className="edit-cancel-btn"
+                    className="series-edit-control"
+                    data-tone="neutral"
                     onClick={() => {
                       setEditSeries(false);
                       setEditName(series.name || "");
                       setEditDesc(series.description || "");
                       setEditTags(series.tags || []);
                     }}
+                    type="button"
                   >
                     取消
+                  </button>
+                  <button className="series-edit-control" data-tone="brand" onClick={handleSaveSeries} type="button">
+                    保存修改
                   </button>
                 </div>
               </div>
@@ -409,16 +435,29 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
             <div className="chapter-section-header">
               <div>
                 <span className="chapter-section-title">章节管理</span>
-                <span className="chapter-section-count"> &middot; 共 {chapters.length} 章</span>
+                <span className="chapter-section-count">共 {chapters.length} 章</span>
               </div>
               <div className="chapter-header-actions">
                 {chapters.length > 0 && (
-                  <button className="sort-toggle" onClick={toggleSort}>
-                    <SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" /> {sortOrder === "asc" ? "正序" : "倒序"}
+                  <button
+                    className="series-chapter-sort"
+                    onClick={toggleSort}
+                    type="button"
+                    title={sortOrder === "asc" ? "切换为倒序" : "切换为正序"}
+                    aria-label={sortOrder === "asc" ? "切换为倒序" : "切换为正序"}
+                  >
+                    <SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" aria-hidden="true" />
+                    <span className="series-chapter-sort-label">{sortOrder === "asc" ? "正序" : "倒序"}</span>
                   </button>
                 )}
-                <Link href={`/create?seriesName=${encodeURIComponent(decodedName)}`} className="btn-new-chapter">
-                  新建章节
+                <Link
+                  href={`/create?seriesName=${encodeURIComponent(decodedName)}`}
+                  className="series-chapter-create"
+                  title="新建章节"
+                  aria-label="新建章节"
+                >
+                  <SiteIcon name="fa-plus" variant="solid" className="series-chapter-create-icon" aria-hidden="true" />
+                  <span className="series-chapter-create-label">新建章节</span>
                 </Link>
               </div>
             </div>
@@ -426,18 +465,18 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
               <table className="chapter-table">
                 <thead>
                   <tr>
-                    <th style={{ width: "80px" }}>序号</th>
-                    <th style={{ width: "auto" }}>章节标题</th>
-                    <th style={{ width: "80px" }}>字数</th>
-                    <th style={{ width: "160px" }}>更新时间</th>
-                    <th style={{ width: "90px" }}>状态</th>
-                    <th style={{ width: "100px" }}>操作</th>
+                    <th>序号</th>
+                    <th>章节标题</th>
+                    <th>字数</th>
+                    <th>更新时间</th>
+                    <th>状态</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {chapters.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: "center", padding: "48px 0", color: "var(--color-text-light)", fontSize: "var(--font-size-base)" }}>
+                      <td colSpan={6} className="chapter-table-empty">
                         暂无章节数据，点击“新建章节”开始创作
                       </td>
                     </tr>
@@ -450,31 +489,15 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                           <td>
                             <span className="ch-title">
                               <Link href={`/read/${ch.id}`} target="_blank">
-                                {ch.chapter_title || ch.title || "无标题"}
+                                {getChapterDisplayTitle(ch)}
                               </Link>
                             </span>
-                            {ch.review_status === "rejected" && ch.review_reason && (
-                              <p className="text-xs text-red-500 mt-0.5" style={{ margin: "2px 0 0" }}>
-                                <SiteIcon name="fa-circle-exclamation" variant="solid" className="mr-1" />{normalizeModerationReason(ch.review_reason) || ch.review_reason}
-                              </p>
-                            )}
+                            {ch.review_status === "rejected" && ch.review_reason && <p className="chapter-review-reason"><SiteIcon name="fa-circle-exclamation" variant="solid" aria-hidden="true" />{normalizeModerationReason(ch.review_reason) || ch.review_reason}</p>}
                           </td>
                           <td><span className="ch-words">{ch.word_count?.toLocaleString() || 0}</span></td>
                           <td><span className="ch-time">{formatDateYmd(ch.updated_at || ch.created_at)}</span></td>
                           <td><span className={badge.className}>{badge.label}</span></td>
-                          <td>
-                            <div className="ch-actions">
-                              <Link href={`/create?editPost=${ch.id}`} className="ch-action-btn" title="编辑">
-                                <SiteIcon name="fa-action-edit" size={16} />
-                              </Link>
-                              <Link href={`/read/${ch.id}`} className="ch-action-btn" title="预览" target="_blank">
-                                <SiteIcon name="fa-action-preview-open" size={16} />
-                              </Link>
-                              <button className="ch-action-btn" title="删除" onClick={() => handleDeleteChapter(ch.id)}>
-                                <SiteIcon name="fa-action-delete" variant="outline" size={16} />
-                              </button>
-                            </div>
-                          </td>
+                          <td>{renderChapterActions(ch.id, "chapter-actions")}</td>
                         </tr>
                       );
                     })
@@ -482,6 +505,34 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                 </tbody>
               </table>
             </div>
+            {chapters.length === 0 ? (
+              <div className="chapter-mobile-empty">暂无章节数据，点击“新建章节”开始创作</div>
+            ) : (
+              <div className="chapter-mobile-list" aria-label="章节列表">
+                {sortedChapters.map((ch) => {
+                  const badge = getStatusBadge(ch);
+                  return (
+                    <article className="chapter-card" key={`mobile-${ch.id}`}>
+                      <div className="chapter-card-topline">
+                        <div className="chapter-card-heading">
+                          <span className="chapter-card-number">第{ch.chapter_number}章</span>
+                          <Link className="chapter-card-title" href={`/read/${ch.id}`} target="_blank">
+                            {getChapterDisplayTitle(ch)}
+                          </Link>
+                        </div>
+                        <span className={badge.className}>{badge.label}</span>
+                      </div>
+                      <div className="chapter-card-meta">
+                        <span className="chapter-card-time">更新时间 {formatDateYmd(ch.updated_at || ch.created_at)}</span>
+                        <span className="chapter-card-words">字数 {ch.word_count?.toLocaleString() || 0}</span>
+                      </div>
+                      {ch.review_status === "rejected" && ch.review_reason && <p className="chapter-review-reason"><SiteIcon name="fa-circle-exclamation" variant="solid" aria-hidden="true" />{normalizeModerationReason(ch.review_reason) || ch.review_reason}</p>}
+                      {renderChapterActions(ch.id, "chapter-card-actions")}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
         </div>

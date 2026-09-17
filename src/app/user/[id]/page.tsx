@@ -621,7 +621,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                           {series.tags && series.tags.length > 0 && (
                             <div className="card-tags has-overflow">
                               {series.tags.map((tag) => (
-                                <span key={tag} className="card-tag">{tag}</span>
+                                <span key={tag} className="tag tag--site site-card__tag">{tag}</span>
                               ))}
                             </div>
                           )}

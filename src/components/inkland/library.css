@@ -268,6 +268,30 @@
   outline: var(--ink-outline-none);
 }
 
+/* All work tags share the homepage tag contract, regardless of the card or
+   detail surface that renders them. */
+.tag.tag--site.site-card__tag {
+  display: inline-flex;
+  height: var(--ink-height-tag);
+  min-height: var(--ink-height-tag);
+  flex: 0 0 auto;
+  align-items: center;
+  padding: var(--ink-space-1) var(--ink-space-3);
+  border-radius: var(--ink-radius-xl);
+  color: var(--ink-muted);
+  background: var(--ink-surface-subtle);
+  font: var(--ink-font-site-tag);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tag.tag--site.site-card__tag:hover,
+.tag.tag--site.site-card__tag:focus-visible {
+  color: var(--ink-primary);
+  background: var(--ink-primary-bg);
+  outline: var(--ink-outline-none);
+}
+
 #page-home .site-card__feed-images-shell {
   position: relative;
   min-width: 0;
@@ -534,8 +558,7 @@
 /* 首页移动端布局：内容留 8px 侧边空间，继续阅读保持紧凑的左右排布。 */
 @media (max-width: 768px) {
   #navbar .navbar-inner {
-    padding-right: var(--ink-space-0);
-    padding-left: var(--ink-space-0);
+    padding-inline: 16px;
   }
 
   #page-home > .main-container {
@@ -788,7 +811,6 @@
   #page-tag .tag-history-card-grid .site-card__excerpt { font: var(--ink-font-card-body-mobile-square); -webkit-line-clamp: 2; }
   #page-tag .tag-history-card-grid .site-card--feed-serial .site-card__excerpt { -webkit-line-clamp: 3; }
   #page-tag .tag-history-card-grid .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 5; }
-  #page-tag .tag-history-card-grid .site-card__tag { min-height: var(--ink-height-card-meta); padding-inline: var(--ink-space-2); font: var(--ink-font-card-tag); }
   #page-tag .tag-history-card-grid .site-card__feed-images,
   #page-tag .tag-history-card-grid .site-card__feed-image { height: auto; min-height: 0; aspect-ratio: 4 / 5; }
   #page-tag .tag-history-card-grid .site-card__search-meta { min-height: var(--ink-height-card-meta); gap: var(--ink-size-2); }
@@ -1242,6 +1264,7 @@
 
 #page-profile .profile-card-device .site-card__tag {
   display: inline-flex;
+  height: var(--ink-height-tag);
   min-height: var(--ink-height-tag);
   flex: 0 0 auto;
   align-items: center;
@@ -1479,7 +1502,6 @@
   -webkit-line-clamp: 2;
 }
 #page-profile .profile-card-device--mobile-square .site-card__tags { margin-bottom: 0; }
-#page-profile .profile-card-device--mobile-square .site-card__tag { padding: 0 var(--ink-space-1); font: var(--ink-font-card-body-mobile-square); }
 #page-profile .profile-card-device--mobile-square .site-card__status { display: none; }
 #page-profile .profile-card-device--mobile-square .site-card__latest-chapter {
   display: inline-flex;
@@ -1987,7 +2009,7 @@
     text-decoration: none;
   }
   #page-history .history-card-device--mobile .site-card__tags { display: flex; min-width: 0; flex-wrap: nowrap; gap: var(--ink-size-2); margin: 0; overflow: hidden; }
-  #page-history .history-card-device--mobile .site-card__tag { min-width: 0; min-height: var(--ink-height-card-meta); flex: 0 0 auto; padding: var(--ink-space-0) var(--ink-space-2); overflow: hidden; border-radius: var(--ink-radius-xl); color: var(--ink-muted); background: var(--ink-surface-subtle); font: var(--ink-font-card-tag); text-overflow: ellipsis; white-space: nowrap; }
+  #page-history .history-card-device--mobile .site-card__tag { min-width: 0; height: var(--ink-height-tag); min-height: var(--ink-height-tag); flex: 0 0 auto; padding: var(--ink-space-1) var(--ink-space-3); overflow: hidden; border-radius: var(--ink-radius-xl); color: var(--ink-muted); background: var(--ink-surface-subtle); font: var(--ink-font-site-tag); text-overflow: ellipsis; white-space: nowrap; }
   #page-history .history-card-device--mobile .site-card__search-meta { gap: var(--ink-size-2); margin-top: 0; }
   #page-history .history-card-device--mobile .site-card__avatar-link,
   #page-history .history-card-device--mobile .site-card__avatar { width: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); height: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); flex-basis: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); }
