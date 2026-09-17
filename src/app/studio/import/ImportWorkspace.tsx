@@ -13,7 +13,7 @@ import mammoth from "mammoth";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
-import { cleanImportHeading, extractImportPreamble, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
+import { cleanImportHeading, extractImportPreamble, parseImportChapterHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
 import { clearImportBatch, loadImportBatch, saveImportBatch, type ImportBatchSnapshot } from "@/lib/importBatchStore";
 import { findImportDuplicate, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
 import { extractTextImportMetadata, normalizeImportedDescription, normalizeImportedTitle } from "@/lib/importMetadata";
@@ -388,9 +388,12 @@ function parseAo3Document(documentNode: Document, fallbackTitle: string): Ao3Doc
     if (!body) return;
     const content = normalizeContent(htmlToMarkdown(body.outerHTML));
     if (!content) return;
+    const sourceTitle = heading.textContent?.trim() || `${title} · 第${index + 1}章`;
+    const parsedHeading = parseImportChapterHeading(sourceTitle);
     chapters.push({
-      title: normalizeImportedTitle(heading.textContent?.trim() || `${title} · 第${index + 1}章`, `${title} · 第${index + 1}章`),
+      title: normalizeImportedTitle(sourceTitle, `${title} · 第${index + 1}章`),
       content,
+      number: parsedHeading.number,
     });
   });
 
@@ -520,10 +523,12 @@ async function parseEpub(file: File): Promise<ParsedFileResult> {
     if (isAo3Epub) continue;
     const heading = documentNode.querySelector("h1,h2,h3")?.textContent?.trim();
     const pageTitle = documentNode.querySelector("title")?.textContent?.trim();
-    const title = normalizeImportedTitle(heading || pageTitle || (chapterPaths.length === 1 ? bookTitle : `${bookTitle} · 第${index + 1}章`));
-    const content = removeLeadingMarkdownHeading(htmlToMarkdown(html), title);
+    const sourceHeading = heading || pageTitle || "";
+    const parsedHeading = parseImportChapterHeading(sourceHeading);
+    const title = normalizeImportedTitle(sourceHeading || (chapterPaths.length === 1 ? bookTitle : `${bookTitle} · 第${index + 1}章`));
+    const content = removeLeadingMarkdownHeading(htmlToMarkdown(html), sourceHeading || title);
     if (!content) continue;
-    chapters.push({ title, content });
+    chapters.push({ title, content, number: parsedHeading.number });
   }
   if (chapters.length === 0) throw new Error(`${file.name} 没有识别到可导入的章节`);
   const chapterContent = chapters.map((chapter) => `${chapter.title}\n\n${chapter.content}`).join("\n\n");
@@ -578,18 +583,21 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
     })];
   }
 
-  return Promise.all(plan.chapters.map((chapter, index) => makeParsedWork({
-    ...common,
-    title: chapter.title,
-    content: index === 0 && plan.descriptionCandidateAccepted
-      ? removeImportedPreamble(chapter.content, extractImportPreamble(plan.content))
-      : chapter.content,
-    sourceName: `${plan.fileName} · ${chapter.title}`,
-    groupMode: plan.mode,
-    groupName: plan.groupName.trim() || titleFromFileName(plan.fileName),
-    chapterNumber: plan.mode === "serial" ? (chapter.number || index + 1) : undefined,
-    chapterTitle: plan.mode === "serial" ? chapter.title : undefined,
-  })));
+  return Promise.all(plan.chapters.map((chapter, index) => {
+    const chapterTitle = plan.mode === "serial" ? parseImportChapterHeading(chapter.title).title : chapter.title;
+    return makeParsedWork({
+      ...common,
+      title: chapterTitle,
+      content: index === 0 && plan.descriptionCandidateAccepted
+        ? removeImportedPreamble(chapter.content, extractImportPreamble(plan.content))
+        : chapter.content,
+      sourceName: `${plan.fileName} · ${chapterTitle}`,
+      groupMode: plan.mode,
+      groupName: plan.groupName.trim() || titleFromFileName(plan.fileName),
+      chapterNumber: plan.mode === "serial" ? (chapter.number || index + 1) : undefined,
+      chapterTitle: plan.mode === "serial" ? chapterTitle : undefined,
+    });
+  }));
 }
 
 async function parseTextFile(file: File): Promise<ParsedFileResult> {
@@ -1476,9 +1484,10 @@ export default function ImportWorkspace() {
         }
         const isSerial = work.groupMode === "serial";
         const shouldUpdate = work.duplicateAction === "update" && work.duplicateMatch?.kind === "update";
+        const chapterTitle = isSerial ? parseImportChapterHeading(work.title.trim()).title : work.title.trim();
         const postData: Record<string, unknown> = {
           user_id: user.id,
-          title: work.title.trim(),
+          title: chapterTitle,
           content: work.content.trim(),
           word_count: countWords(work.content),
           status: publishMode === "publish" && isSerial ? "published" : "draft",
@@ -1490,7 +1499,7 @@ export default function ImportWorkspace() {
         if (work.groupName && work.groupMode !== "single") postData.series_name = work.groupName;
         if (isSerial) {
           postData.chapter_number = work.chapterNumber || 1;
-          postData.chapter_title = work.chapterTitle || work.title.trim();
+          postData.chapter_title = chapterTitle;
         }
         const { data: post, error: postError } = shouldUpdate
           ? await supabase.from("posts").update(postData).eq("id", work.duplicateMatch!.existingPostId).eq("user_id", user.id).select("id, review_status, status").single()

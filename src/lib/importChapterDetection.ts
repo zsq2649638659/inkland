@@ -14,6 +14,17 @@ export function cleanImportHeading(line: string) {
   return line.trim().replace(/^#{1,6}\s*/, "").trim();
 }
 
+export function parseImportChapterHeading(line: string): Pick<ImportChapter, "title" | "number"> {
+  const heading = cleanImportHeading(line);
+  const numberedHeading = heading.match(/^第\s*([零〇一二三四五六七八九十百千万两\d]+)\s*[章节卷回部篇集]/i);
+  const englishHeading = heading.match(/^chapter\s+([零〇一二三四五六七八九十百千万两\d]+)/i);
+  const matched = numberedHeading || englishHeading;
+  if (!matched) return { title: heading };
+
+  const title = heading.slice(matched[0].length).replace(/^[：:\s　\-—·]+/, "").trim();
+  return { title: title || "无标题", number: chineseNumberValue(matched[1]) };
+}
+
 function chineseNumberValue(value: string) {
   if (/^\d+$/.test(value)) return Number(value);
   const digits: Record<string, number> = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
@@ -42,12 +53,6 @@ function chineseNumberValue(value: string) {
   return total + section + digit || undefined;
 }
 
-function chapterNumberFromTitle(title: string) {
-  const matched = title.match(/^第\s*([零〇一二三四五六七八九十百千万两\d]+)\s*[章节卷回部篇集]/i)
-    || title.match(/^chapter\s+([零〇一二三四五六七八九十百千万两\d]+)/i);
-  return matched ? chineseNumberValue(matched[1]) : undefined;
-}
-
 export function extractImportPreamble(content: string) {
   const lines = normalizeChapterContent(content).split("\n");
   const headings = lines
@@ -68,10 +73,11 @@ export function splitImportChapters(content: string): ImportChapter[] {
     const nextIndex = headings[index + 1]?.index ?? lines.length;
     const beforeFirst = index === 0 ? lines.slice(0, heading.index).join("\n").trim() : "";
     const body = lines.slice(heading.index + 1, nextIndex).join("\n").trim();
+    const parsedHeading = parseImportChapterHeading(heading.title);
     return {
       title: heading.title,
       content: normalizeChapterContent([beforeFirst, body].filter(Boolean).join("\n\n")),
-      number: chapterNumberFromTitle(heading.title),
+      number: parsedHeading.number,
     };
   }).filter((chapter) => chapter.content);
 }
