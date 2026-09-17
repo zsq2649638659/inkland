@@ -542,6 +542,10 @@ export default function ReviewDetailClient({ pendingCount, post, version, previo
     return finding.status === "confirmed" ? "confirmed" : finding.status === "dismissed" ? "dismissed" : "suggested";
   };
 
+  // 管理员人工标记的 source 为 admin；批量确认只处理自动审核产生的标记。
+  const machineFindings = findings.filter((finding) => finding.source !== "admin");
+  const pendingMachineFindings = machineFindings.filter((finding) => statusOf(finding) !== "confirmed");
+
   const toggleConfirm = (finding: Finding) => {
     setConfirmedIds((prev) => prev.includes(finding.id) ? prev.filter((id) => id !== finding.id) : [...prev, finding.id]);
     setDismissedIds((prev) => prev.filter((id) => id !== finding.id));
@@ -550,6 +554,14 @@ export default function ReviewDetailClient({ pendingCount, post, version, previo
   const toggleDismiss = (finding: Finding) => {
     setDismissedIds((prev) => prev.includes(finding.id) ? prev.filter((id) => id !== finding.id) : [...prev, finding.id]);
     setConfirmedIds((prev) => prev.filter((id) => id !== finding.id));
+  };
+
+  const confirmAllMachineFindings = () => {
+    const machineFindingIds = machineFindings.map((finding) => finding.id);
+    if (!machineFindingIds.length) return;
+    const machineFindingIdSet = new Set(machineFindingIds);
+    setConfirmedIds((prev) => [...new Set([...prev, ...machineFindingIds])]);
+    setDismissedIds((prev) => prev.filter((id) => !machineFindingIdSet.has(id)));
   };
 
   const scrollTo = (finding: Finding) => {
@@ -944,7 +956,19 @@ export default function ReviewDetailClient({ pendingCount, post, version, previo
           <section className="admin-detail-panel">
             <div className="admin-panel-title-row">
               <h2>机审标记 · 人工核对</h2>
-              <span>{findings.length} 项</span>
+              <div className="admin-finding-title-actions">
+                {!isReadOnly && machineFindings.length > 0 ? (
+                  <button
+                    className="admin-finding-confirm-all"
+                    type="button"
+                    disabled={busy || pendingMachineFindings.length === 0}
+                    onClick={confirmAllMachineFindings}
+                  >
+                    {pendingMachineFindings.length > 0 ? "确认全部机审标记" : "已全部确认"}
+                  </button>
+                ) : null}
+                <span>{findings.length} 项</span>
+              </div>
             </div>
             {findings.length ? (
               <div className="admin-finding-list admin-mark-list">
