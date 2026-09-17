@@ -191,6 +191,9 @@
 .admin-review-detail-page .admin-finding-item { gap:5px; padding:9px 10px; border-radius:7px; }
 .admin-review-detail-page .admin-finding-item.is-confirmed,
 .admin-review-detail-page .admin-manual-findings .admin-finding-item.is-confirmed { border-color:var(--line); background:var(--track); }
+.admin-review-detail-page .admin-finding-title-actions { display:flex; align-items:center; gap:6px; min-width:0; }
+.admin-review-detail-page .admin-finding-confirm-all { min-height:28px; padding:4px 8px; border:1px solid var(--coral); border-radius:6px; background:var(--coral-soft); color:var(--coral-ink); font-size:10px; font-weight:700; white-space:nowrap; }
+.admin-review-detail-page .admin-finding-confirm-all:hover:not(:disabled) { background:var(--coral); color:#fff; }
 .admin-review-detail-page .admin-issue-buttons { grid-template-columns:1fr 1fr; gap:8px; }
 .admin-review-detail-page .admin-issue-buttons button { min-height:38px; padding:8px 9px; border-radius:7px; font-size:10px; line-height:1.35; }
 .admin-review-detail-page .admin-reject-panel .admin-panel-title-row span { background:var(--warn); color:#fff; }
