@@ -10,9 +10,9 @@ import SchedulePicker from "@/components/inkland/SchedulePicker";
 import { InputHistoryPopover, useInputHistory } from "@/components/inkland/InputHistoryPopover";
 import type { InputHistoryField } from "@/lib/inputHistory";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/image";
 import { renderSafeMarkdown } from "@/lib/markdown";
@@ -546,7 +546,7 @@ function PublishHeader({
 
 // ============ 主组件 ============
 
-export default function CreatePage({ initialView = "select" }: { initialView?: ViewType }) {
+function CreatePageContent({ initialView = "select" }: { initialView?: ViewType }) {
   const supabase = createClient();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -558,6 +558,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   // ---- 处理 URL 参数 ----
   useEffect(() => {
+    let cancelled = false;
     const params = new URLSearchParams(window.location.search);
     const editSeries = params.get("editSeries");
     const editPost = params.get("editPost");
@@ -572,6 +573,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
       setSeriesNameFromUrl(seriesName);
       const initChapter = async () => {
         const { data: { user } } = await supabase.auth.getUser();
+        if (cancelled) return;
         if (!user) { setInitDone(true); return; }
         // 计算下一个章节号
         const { data: chapters } = await supabase
@@ -582,6 +584,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           .eq("post_type", "serial")
           .order("chapter_number", { ascending: false })
           .limit(1);
+        if (cancelled) return;
         const nextNum = chapters && chapters.length > 0
           ? ((chapters[0] as Record<string, unknown>).chapter_number as number) + 1
           : 1;
@@ -599,6 +602,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           .select("id, title, content, author_note, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility, pending_review_status, pending_review_reason, pending_version_id, published_version_number")
           .eq("id", editPost)
           .single();
+        if (cancelled) return;
         if (loadError?.message.includes("author_note")) {
           const fallback = await supabase
             .from("posts")
@@ -607,6 +611,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             .single();
           data = fallback.data ? { ...fallback.data, author_note: null } : null;
           loadError = fallback.error;
+          if (cancelled) return;
         }
         if (loadError || !data) {
           setErrorMsg(`加载作品失败：${loadError?.message || "未找到该作品"}`);
@@ -623,6 +628,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               .select("title, content, author_note, series_name, chapter_number, chapter_title, word_count, published_at, post_type, visibility")
               .eq("id", pendingVersionId)
               .maybeSingle();
+            if (cancelled) return;
             if (versionData) {
               p = { ...p, ...(versionData as unknown as Record<string, unknown>) };
             }
@@ -655,6 +661,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 .gt("chapter_number", 0)
                 .order("chapter_number", { ascending: false })
                 .limit(1);
+              if (cancelled) return;
               const latestNumber = previousChapters?.[0]?.chapter_number as number | undefined;
               editingChapterNumber = (latestNumber || 0) + 1;
             }
@@ -674,6 +681,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               .order("created_at", { ascending: false })
               .limit(1)
               .maybeSingle();
+            if (cancelled) return;
             setReviewIssueSummary(summarizeReviewIssues(rejectionNotice?.metadata));
           }
           if (pendingReviewStatus === "rejected") {
@@ -696,6 +704,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               const privateMatch = storedUrl.match(/^private:\/\/private-post-images\/(.+)$/);
               if (privateMatch) {
                 const { data: signedData } = await supabase.storage.from("private-post-images").createSignedUrl(privateMatch[1], 3600);
+                if (cancelled) return;
                 previewUrl = signedData?.signedUrl || storedUrl;
               }
               existingImages.push({ name: match[1], url: previewUrl, storedUrl });
@@ -718,6 +727,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             .from("post_tags")
             .select("tags(name)")
             .eq("post_id", editPost);
+          if (cancelled) return;
           if (ptData) {
             const existingTags = (ptData as Array<{ tags: { name: string }[] | { name: string } | null }>)
               .map((pt) => {
@@ -730,10 +740,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           }
         }
       };
-      loadPost().finally(() => setInitDone(true));
+      loadPost().finally(() => {
+        if (!cancelled) setInitDone(true);
+      });
     } else {
       setInitDone(true);
     }
+    return () => { cancelled = true; };
   }, []);
 
   // ---- 通用字段 ----
@@ -2115,4 +2128,15 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   }
 
   return null;
+}
+
+export default function CreatePage(props: { initialView?: ViewType }) {
+  const searchParams = useSearchParams();
+  const contentKey = `${props.initialView || "select"}:${searchParams.toString()}`;
+
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-paper" role="status">加载中...</div>}>
+      <CreatePageContent key={contentKey} {...props} />
+    </Suspense>
+  );
 }
