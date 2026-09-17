@@ -17,6 +17,7 @@ import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import ImageLightbox from "@/components/ImageLightbox";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import type { Post, Comment } from "@/lib/types";
 import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
 
@@ -51,6 +52,7 @@ function isPlaceholderTitle(title?: string) {
 export default function PostCard({ post }: PostCardProps) {
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
+  const dialog = useAppDialog();
   const supabase = useMemo(() => createClient(), []);
 
   const [showComment, setShowComment] = useState(false);
@@ -68,6 +70,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
   const [imageAspectRatios, setImageAspectRatios] = useState<Record<number, number>>({});
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [moderationModal, setModerationModal] = useState<
     | { mode: "report"; targetType: "post" | "comment"; targetId: string }
     | { mode: "block"; userId: string }
@@ -136,6 +139,18 @@ export default function PostCard({ post }: PostCardProps) {
     if (!user) { goToLogin(); return; }
     if (blockedUserId === user.id) return;
     setModerationModal({ mode: "block", userId: blockedUserId });
+  };
+
+  const deletePost = async () => {
+    if (!user || user.id !== post.user_id) return;
+    if (!await dialog.confirm({ title: "删除作品", message: `确定要删除《${post.title || "未命名作品"}》吗？删除后无法恢复。`, confirmLabel: "删除作品", variant: "danger" })) return;
+    const { error } = await supabase.from("posts").delete().eq("id", post.id).eq("user_id", user.id);
+    if (error) {
+      await dialog.alert({ title: "删除失败", message: error.message, variant: "danger" });
+      return;
+    }
+    setCardMenuOpen(false);
+    setDeleted(true);
   };
 
   const submitModeration = async (reason: string, details?: string) => {
@@ -330,6 +345,8 @@ export default function PostCard({ post }: PostCardProps) {
     router.push(`/read/${post.id}`);
   };
 
+  if (deleted) return null;
+
   return (
     <article
       className={`site-card site-card--feed ${isImageCard ? "site-card--feed-image" : "site-card--feed-single"}`}
@@ -375,6 +392,7 @@ export default function PostCard({ post }: PostCardProps) {
               <div className="card-more-menu">
                 {user?.id !== post.user_id && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
                 <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button>
+                {user?.id === post.user_id && <button onClick={() => void deletePost()}><SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" /> 删除</button>}
               </div>
             )}
           </div>

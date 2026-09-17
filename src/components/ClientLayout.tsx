@@ -27,9 +27,9 @@ function BackToTop() {
       type="button"
       aria-label="回到顶部"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      className={`back-to-top${visible ? " show" : ""}`}
+      className={`floating-btn floating-backtop back-to-top${visible ? " show" : ""}`}
     >
-      <SiteIcon name="fa-arrow-up" variant="solid" aria-hidden="true" />
+      <SiteIcon name="fa-detail-back-to-top" size={22} aria-hidden="true" />
     </button>
   );
 }

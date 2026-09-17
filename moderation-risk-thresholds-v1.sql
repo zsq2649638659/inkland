@@ -492,9 +492,9 @@ BEGIN
       paragraph_index, start_offset, end_offset, quoted_text, details, metadata
     )
     SELECT
-      review_case_id, 'keyword', category, severity, location_type, field_name,
-      paragraph_index, start_offset, end_offset, quoted_text, details, metadata
-    FROM pg_temp.tmp_post_moderation_findings;
+      review_case_id, 'keyword', f.category, f.severity, f.location_type, f.field_name,
+      f.paragraph_index, f.start_offset, f.end_offset, f.quoted_text, f.details, f.metadata
+    FROM pg_temp.tmp_post_moderation_findings AS f;
 
     UPDATE public.moderation_rules mr
     SET hit_count = mr.hit_count + h.hit_count, last_hit_at = NOW()
