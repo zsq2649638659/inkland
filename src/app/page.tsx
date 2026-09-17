@@ -347,18 +347,20 @@ export default function HomePage() {
 
         {/* V2: content area */}
         <div className="content-area">
-          {/* V2: sticky tabs inside content area */}
-          <div className="tabs-wrapper">
-            <div className="tabs-inner">
-              {tabs.map((t) => (
-                <button
-                  key={t.key}
-                  className={`tab-btn ${tab === t.key ? "active" : ""}`}
-                  onClick={() => handleTabChange(t.key)}
-                >
-                  {t.label}
-                </button>
-              ))}
+          {/* V2: homepage tabs stay together as one fixed shell below the navbar. */}
+          <div className="tabs-wrapper tabs-wrapper--home">
+            <div className="tabs-wrapper--home-surface">
+              <div className="tabs-inner">
+                {tabs.map((t) => (
+                  <button
+                    key={t.key}
+                    className={`tab-btn ${tab === t.key ? "active" : ""}`}
+                    onClick={() => handleTabChange(t.key)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
