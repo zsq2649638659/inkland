@@ -39,15 +39,6 @@ function isReportNotification(notification: NotificationLinkInput): boolean {
   return content.includes("举报") && /(受理|处理|举报对象|举报内容)/.test(content);
 }
 
-function reviewIssueQuery(notification: NotificationLinkInput): string {
-  const issues = notification.metadata?.issues;
-  if (!Array.isArray(issues)) return "";
-  const firstIssue = issues.find((issue) => issue && typeof issue === "object") as { id?: unknown } | undefined;
-  return typeof firstIssue?.id === "string" && firstIssue.id
-    ? `&reviewIssue=${encodeURIComponent(firstIssue.id)}`
-    : "";
-}
-
 export function getNotificationLink(notification: NotificationLinkInput): string | null {
   const direct = localPath(notification.link_url) || localPath(notification.metadata?.action_url);
   const template = notification.template_key || "";
@@ -85,7 +76,7 @@ export function getNotificationLink(notification: NotificationLinkInput): string
   }
 
   if (template === "post_review_rejected" || (notification.content || "").includes("未通过本次审核")) {
-    if (notification.post_id) return `/create?editPost=${encodeURIComponent(notification.post_id)}${reviewIssueQuery(notification)}`;
+    if (notification.post_id) return `/create?editPost=${encodeURIComponent(notification.post_id)}`;
     if (direct) return direct;
   }
 
@@ -105,7 +96,7 @@ export function getNotificationLink(notification: NotificationLinkInput): string
     notification.post_id &&
     (template === "post_review_rejected" || (notification.content || "").includes("未通过本次审核"))
   ) {
-    return `/create?editPost=${encodeURIComponent(notification.post_id)}${reviewIssueQuery(notification)}`;
+    return `/create?editPost=${encodeURIComponent(notification.post_id)}`;
   }
 
   if (notification.type === "system") {

@@ -14,6 +14,7 @@ import InlineCommentPanel from "@/components/InlineCommentPanel";
 import ModerationReasonModal from "@/components/ModerationReasonModal";
 import CenteredToast from "@/components/CenteredToast";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import { useAppDialog } from "@/components/AppDialogProvider";
 import type { Comment } from "@/lib/types";
 import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
@@ -55,6 +56,7 @@ function stripMarkdown(content?: string): string {
 export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const supabase = createClient();
   const { user, profile, loading: authLoading } = useAuth();
+  const dialog = useAppDialog();
   const router = useRouter();
 
   const [following, setFollowing] = useState(false);
@@ -66,6 +68,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [moderationModal, setModerationModal] = useState<
     | { mode: "report"; targetType: "post" | "comment"; targetId: string }
     | { mode: "block"; userId: string }
@@ -106,6 +109,18 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     if (!user) { goToLogin(); return; }
     if (blockedUserId === user.id) return;
     setModerationModal({ mode: "block", userId: blockedUserId });
+  };
+
+  const deleteChapter = async () => {
+    if (!user || user.id !== data.authorId) return;
+    if (!await dialog.confirm({ title: "删除章节", message: `确定要删除“第${data.chapterNumber}章 ${data.chapterTitle || "无标题"}”吗？删除后无法恢复。`, confirmLabel: "删除章节", variant: "danger" })) return;
+    const { error } = await supabase.from("posts").delete().eq("id", data.chapterId).eq("user_id", user.id);
+    if (error) {
+      await dialog.alert({ title: "删除失败", message: error.message, variant: "danger" });
+      return;
+    }
+    setCardMenuOpen(false);
+    setDeleted(true);
   };
 
   const submitModeration = async (reason: string, details?: string) => {
@@ -214,6 +229,8 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     }
   };
 
+  if (deleted) return null;
+
   const submitComment = async () => {
     if (!commentText.trim() || !user) return;
     const blocked = await assertCanComment();
@@ -291,6 +308,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
               <div className="card-more-menu">
                 {user?.id !== data.authorId && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
                 <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button>
+                {user?.id === data.authorId && <button onClick={() => void deleteChapter()}><SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" /> 删除</button>}
               </div>
             )}
           </div>

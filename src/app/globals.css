@@ -3561,35 +3561,15 @@ p {
   transform: translateX(14px);
 }
 
-#page-create.publish-article-page .create-notice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-}
-
-#page-create.publish-article-page .create-notice-success {
-  border: 1px solid rgba(59, 155, 123, 0.25);
-  background: rgba(59, 155, 123, 0.08);
-  color: #2f8065;
-}
-
-#page-create.publish-article-page .create-notice-error {
-  border: 1px solid rgba(220, 75, 75, 0.25);
-  background: rgba(220, 75, 75, 0.08);
-  color: #c24141;
-}
-
 #page-create .review-rejection-banner {
-  margin-bottom: 24px;
-  padding: 14px 16px;
-  border: 1px solid rgba(220, 75, 75, 0.35);
-  border-radius: 12px;
-  background: linear-gradient(180deg, #fff8f6, #fff3f1);
-  color: #9c3333;
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  margin: 0;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--color-card);
+  color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -3598,117 +3578,159 @@ p {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
-  font-size: 15px;
-  color: #b23b3b;
+  color: var(--danger);
+  font-size: 16px;
+  line-height: 1.4;
 }
 
-#page-create .review-rejection-head i { color: #e05252; }
+#page-create .review-rejection-toggle {
+  display: none;
+  margin-left: auto;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
 
-#page-create .review-rejection-reason { margin: 0 0 8px; color: #8f3434; }
+#page-create .review-rejection-content {
+  display: grid;
+  gap: 16px;
+}
+
+#page-create .review-rejection-icon {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: 10px;
+  color: #e05252;
+  background: #fff0ee;
+}
+
+#page-create .review-rejection-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+#page-create .review-rejection-reason {
+  margin: 0;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
 
 #page-create .review-rejection-note {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
-  margin: 0 0 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px dashed rgba(220, 75, 75, 0.3);
-  color: #a04a4a;
-  font-size: 12px;
-}
-
-#page-create .review-issues {
-  margin-top: 10px;
-  border-top: 1px solid rgba(220, 75, 75, 0.18);
-  padding-top: 10px;
-}
-
-#page-create .review-issues-title {
-  margin-bottom: 8px;
-  font-weight: 600;
-  color: #9c3333;
-}
-
-#page-create .review-issues-list {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
   margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-#page-create .review-issue-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(220, 75, 75, 0.16);
-  flex-wrap: wrap;
-}
-
-#page-create .review-issue-index {
-  flex: 0 0 auto;
-  min-width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #e05252;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-#page-create .review-issue-field {
-  font-weight: 600;
-  color: #8f3434;
-  white-space: nowrap;
-}
-
-#page-create .review-issue-pos {
-  color: #b36666;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-#page-create .review-issue-quote {
-  color: #6b4b4b;
-  background: rgba(224, 82, 82, 0.08);
-  border-radius: 5px;
-  padding: 1px 6px;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-#page-create .review-issue-details {
+  padding: 10px 12px;
+  border-radius: 10px;
   color: #a04a4a;
+  background: #fff8f6;
   font-size: 12px;
-  overflow-wrap: anywhere;
 }
 
-#page-create .review-issue-locate {
-  margin-left: auto;
+#page-create .review-rejection-note svg {
   flex: 0 0 auto;
-  padding: 4px 10px;
-  border: 1px solid rgba(220, 75, 75, 0.35);
-  border-radius: 999px;
-  background: #fff;
-  color: #b23b3b;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  margin-top: 2px;
 }
 
-#page-create .review-issue-locate:hover {
-  background: #b23b3b;
-  color: #fff;
+/* Rejected-work context sits beside the full editor on desktop. */
+#page-create .publish-editor-layout {
+  width: 100%;
+}
+
+#page-create .publish-editor-layout.has-review-rejection {
+  display: grid;
+  width: min(900px, calc(100% - 32px));
+  grid-template-columns: minmax(0, 600px) 280px;
+  gap: 20px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+#page-create .publish-editor-layout.has-review-rejection > .publish-form,
+#page-create .publish-editor-layout.has-review-rejection > .chapter-container {
+  min-width: 0;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+#page-create .review-rejection-aside {
+  position: sticky;
+  top: calc(var(--navbar-height, 64px) + 20px);
+  width: 280px;
+  margin-top: 32px;
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  #page-create .publish-editor-layout.has-review-rejection {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  #page-create .review-rejection-aside {
+    position: fixed;
+    inset: 0;
+    z-index: var(--ink-z-popover, 20);
+    width: auto;
+    margin: 0;
+    padding: 0 0 env(safe-area-inset-bottom);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  #page-create .review-rejection-aside .review-rejection-banner {
+    --review-rejection-collapsed-height: 72px;
+    flex: 0 1 auto;
+    width: 100%;
+    max-height: min(72dvh, 560px);
+    overflow-y: auto;
+    border-radius: var(--ink-radius-md) var(--ink-radius-md) 0 0;
+    box-shadow: var(--ink-shadow-lg);
+    pointer-events: auto;
+    animation: review-rejection-sheet-enter 220ms ease both;
+    transform: translateY(0);
+    transition: transform 220ms ease;
+    will-change: transform;
+  }
+
+  @keyframes review-rejection-sheet-enter {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  #page-create .review-rejection-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #page-create .review-rejection-aside.is-collapsed .review-rejection-banner {
+    transform: translateY(calc(100% - var(--review-rejection-collapsed-height)));
+  }
+
+  #page-create .review-rejection-aside.is-collapsed .review-rejection-content {
+    display: none;
+  }
+
+  #page-create .publish-editor-layout.has-review-rejection > .publish-form,
+  #page-create .publish-editor-layout.has-review-rejection > .chapter-container {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 #page-create .review-pending-banner {
@@ -7511,11 +7533,32 @@ p {
     box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
   }
 
+  .back-to-top {
+    box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
+  }
+
+  .back-to-top:hover {
+    background: var(--color-card, #FFFFFF);
+    color: var(--color-text-light, #999999);
+    transform: none;
+    box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
+  }
+
   [data-theme="dark"] .detail-mobile-floating-actions .floating-btn {
     box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
   }
 
   [data-theme="dark"] .detail-mobile-floating-actions .detail-mobile-backtop:hover {
+    background: var(--color-card, #252525);
+    color: var(--color-text-light, #777777);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
+  }
+
+  [data-theme="dark"] .back-to-top {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
+  }
+
+  [data-theme="dark"] .back-to-top:hover {
     background: var(--color-card, #252525);
     color: var(--color-text-light, #777777);
     box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
@@ -14785,21 +14828,9 @@ p {
 /* ===== 一键回到顶部 ===== */
 .back-to-top {
   position: fixed;
-  right: 20px;
-  bottom: 24px;
+  right: 12px;
+  bottom: 20px;
   z-index: 11000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--color-border, #E5E5E5);
-  border-radius: 50%;
-  background: var(--color-card, #FFFFFF);
-  color: var(--color-primary, #F26B5B);
-  font-size: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
-  cursor: pointer;
   opacity: 0;
   visibility: hidden;
   transform: translateY(12px);
@@ -14813,7 +14844,10 @@ p {
 }
 
 .back-to-top:hover {
-  background: var(--color-primary-bg, #FDE8E7);
+  background: var(--color-primary, #F26B5B);
+  color: #fff;
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(242, 107, 91, 0.3);
 }
 
 /* ===== 加载更多 / 已加载全部 ===== */
@@ -17788,4 +17822,58 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   border-radius: var(--ink-radius-xs, 4px);
   font: var(--ink-font-site-tag);
   line-height: 20px;
+}
+
+/* Mobile publish footer keeps the actions above the guidelines and aligned
+   to the trailing edge, even when the shared action contract is loaded later. */
+@media (max-width: 767px) {
+  #page-create.publish-article-page .publish-footer {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: var(--ink-space-3);
+  }
+
+  #page-create.publish-article-page .publish-actions {
+    width: fit-content;
+    max-width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+  }
+
+  #page-create.publish-article-page .publish-actions > :is(button, a) {
+    width: 100px !important;
+    min-width: 100px !important;
+    max-width: 100px !important;
+    flex: 0 0 100px !important;
+  }
+
+  #page-create.publish-article-page .publish-guidelines {
+    min-width: 0;
+    flex: 1 1 0;
+    align-self: center;
+    justify-content: flex-start;
+    font-size: 14px !important;
+    line-height: 1.5;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  #page-create.publish-article-page .publish-guidelines-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  body:has(#page-create .review-rejection-aside:not(.is-collapsed)) .back-to-top {
+    bottom: calc(min(72dvh, 560px) + 20px + env(safe-area-inset-bottom));
+  }
+
+  body:has(#page-create .review-rejection-aside.is-collapsed) .back-to-top {
+    bottom: calc(72px + 20px + env(safe-area-inset-bottom));
+  }
 }

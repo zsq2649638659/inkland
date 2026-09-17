@@ -193,7 +193,7 @@ BEGIN
     v_segment_lower := lower(segment_text);
 
     FOR rule_row IN
-      SELECT cand.rule_id, cand.pattern, cand.category, cand.severity,
+      SELECT cand.rule_id AS id, cand.pattern, cand.category, cand.severity,
              cand.risk_level, cand.min_hits
       FROM pg_temp.tmp_post_moderation_rule_candidates cand
       WHERE position(lower(cand.pattern) IN v_segment_lower) > 0
@@ -277,7 +277,7 @@ BEGIN
         END;
 
         FOR rule_row IN
-          SELECT cand.rule_id, cand.pattern, cand.category, cand.severity,
+          SELECT cand.rule_id AS id, cand.pattern, cand.category, cand.severity,
                  cand.risk_level, cand.min_hits
           FROM pg_temp.tmp_post_moderation_rule_candidates cand
           WHERE position(lower(cand.pattern) IN v_segment_lower) > 0
@@ -390,9 +390,9 @@ BEGIN
       paragraph_index, start_offset, end_offset, quoted_text, details, metadata
     )
     SELECT
-      review_case_id, 'keyword', category, severity, location_type, field_name,
-      paragraph_index, start_offset, end_offset, quoted_text, details, metadata
-    FROM pg_temp.tmp_post_moderation_findings;
+      review_case_id, 'keyword', f.category, f.severity, f.location_type, f.field_name,
+      f.paragraph_index, f.start_offset, f.end_offset, f.quoted_text, f.details, f.metadata
+    FROM pg_temp.tmp_post_moderation_findings AS f;
 
     UPDATE public.moderation_rules mr
     SET hit_count = mr.hit_count + h.hit_count, last_hit_at = NOW()
@@ -587,7 +587,7 @@ BEGIN
 
   IF segment_text <> '' THEN
     FOR rule_row IN
-      SELECT cand.rule_id, cand.pattern, cand.category, cand.severity,
+      SELECT cand.rule_id AS id, cand.pattern, cand.category, cand.severity,
              cand.risk_level, cand.min_hits
       FROM pg_temp.tmp_series_moderation_rule_candidates cand
       WHERE position(lower(cand.pattern) IN v_segment_lower) > 0

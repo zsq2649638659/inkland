@@ -43,6 +43,62 @@ function submissionErrorMessage(error: { message?: string }, fallback: string) {
   return fallback;
 }
 
+type ReviewIssueSummary = {
+  keywords: string[];
+  hasMoreKeywords: boolean;
+  issueCount: number;
+  categories: string[];
+  hasMoreCategories: boolean;
+};
+
+function summarizeReviewIssues(metadata: unknown): ReviewIssueSummary | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const rawIssues = (metadata as { issues?: unknown }).issues;
+  if (!Array.isArray(rawIssues)) return null;
+  const issues = rawIssues.filter((issue): issue is Record<string, unknown> => Boolean(issue) && typeof issue === "object");
+  if (issues.length === 0) return null;
+
+  const categoryLabels: Record<string, string> = {
+    adult: "色情、淫秽与低俗",
+    hentai: "色情、淫秽与低俗",
+    porn: "色情、淫秽与低俗",
+    sexy: "色情、淫秽与低俗",
+    keyword: "违规词命中",
+  };
+  const keywords = Array.from(new Set(issues
+    .map((issue) => typeof issue.quoted_text === "string" ? issue.quoted_text.trim() : "")
+    .filter(Boolean)));
+  const categories = Array.from(new Set(issues
+    .map((issue) => {
+      const category = typeof issue.category === "string" ? issue.category.trim() : "";
+      if (!category) return "";
+      return categoryLabels[category.toLowerCase()] || normalizeModerationReason(category) || category.replaceAll("_", " ");
+    })
+    .filter(Boolean)));
+
+  return {
+    keywords: keywords.slice(0, 4),
+    hasMoreKeywords: keywords.length > 4,
+    issueCount: issues.length,
+    categories,
+    hasMoreCategories: categories.length > 2,
+  };
+}
+
+function reviewIssueSummaryText(summary: ReviewIssueSummary): string {
+  const keywordText = summary.keywords.length > 0
+    ? `“${summary.keywords.join("、")}”${summary.hasMoreKeywords ? "等" : ""}违规词汇`
+    : "已标记内容";
+  const categoryText = summary.categories.length > 0
+    ? `${summary.categories.slice(0, 2).join("、")}${summary.hasMoreCategories ? "等" : ""}`
+    : "相关内容";
+  return `检查到${keywordText}共${summary.issueCount}处违规内容，涉及${categoryText}，`;
+}
+
+function normalizeReviewReasonForComparison(value: string | null | undefined): string {
+  return normalizeModerationReason(value).replace(/[。！？；：，、,.!?;:]+$/g, "").trim();
+}
+
 // ============ 类型定义 ============
 
 type ViewType = "select" | "text" | "image" | "series-create" | "series-detail" | "chapter-create";
@@ -76,19 +132,6 @@ interface UploadedImage {
   path?: string;
   file?: File;
   localScreening?: Promise<LocalImageScreening>;
-}
-
-interface ReviewIssue {
-  id?: string;
-  category?: string | null;
-  field_name?: string | null;
-  location_type?: string | null;
-  paragraph_index?: number | null;
-  start_offset?: number | null;
-  end_offset?: number | null;
-  image_index?: number | null;
-  quoted_text?: string | null;
-  details?: string | null;
 }
 
 function privateImageMarker(path: string) {
@@ -584,20 +627,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               p = { ...p, ...(versionData as unknown as Record<string, unknown>) };
             }
           }
-          // 最近一次打回通知里附带的问题清单（含 OCR 图片内文字定位）。
-          const { data: rejectionNotices } = await supabase
-            .from("notifications")
-            .select("metadata")
-            .eq("template_key", "post_review_rejected")
-            .eq("related_entity_id", editPost)
-            .order("created_at", { ascending: false })
-            .limit(20);
-          const noticeMeta = ((rejectionNotices || []) as Array<{ metadata?: unknown }>)
-            .map((notice) => notice.metadata as { issues?: ReviewIssue[] } | null)
-            .find((metadata) => metadata?.issues?.some((issue) => issue.id === new URLSearchParams(window.location.search).get("reviewIssue")))
-            || ((rejectionNotices || [])[0]?.metadata as { issues?: ReviewIssue[] } | null);
-          if (noticeMeta?.issues?.length) setReviewIssues(noticeMeta.issues);
-
           const savedPublishedAt = (p.published_at as string) || null;
           setTitle(p.title as string || "");
           setVisibility(p.visibility === "followers_only" || p.visibility === "private" ? p.visibility : "public");
@@ -635,6 +664,18 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
           const pendingReviewStatus = (p.pending_review_status as string) || null;
           setPendingReviewStatus(pendingReviewStatus);
           setPublishedVersionNumber((p.published_version_number as number) ?? null);
+          setReviewIssueSummary(null);
+          if (pendingReviewStatus === "rejected" || p.review_status === "rejected") {
+            const { data: rejectionNotice } = await supabase
+              .from("notifications")
+              .select("metadata")
+              .eq("template_key", "post_review_rejected")
+              .eq("related_entity_id", editPost)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            setReviewIssueSummary(summarizeReviewIssues(rejectionNotice?.metadata));
+          }
           if (pendingReviewStatus === "rejected") {
             const pendingReason = (p.pending_review_reason as string) || (p.review_reason as string) || "未提供原因";
             setReviewRejectionReason(normalizeModerationReason(pendingReason) || pendingReason);
@@ -751,21 +792,14 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const [reviewRejectionReason, setReviewRejectionReason] = useState<string | null>(null);
   const [pendingReviewStatus, setPendingReviewStatus] = useState<string | null>(null);
   const [publishedVersionNumber, setPublishedVersionNumber] = useState<number | null>(null);
-  const [reviewIssues, setReviewIssues] = useState<ReviewIssue[]>([]);
-  const [reviewIssueFocusId, setReviewIssueFocusId] = useState<string | null>(null);
+  const [reviewIssueSummary, setReviewIssueSummary] = useState<ReviewIssueSummary | null>(null);
+  const [reviewRejectionCollapsed, setReviewRejectionCollapsed] = useState(false);
   const [editingPostSeriesName, setEditingPostSeriesName] = useState<string | null>(null);
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
   const [authorNote, setAuthorNote] = useState("");
   const [chapterTitleMode, setChapterTitleMode] = useState<"numbered" | "free">("numbered");
   const [chapterNumberOverride, setChapterNumberOverride] = useState<number | null>(null);
-  useEffect(() => {
-    const reviewIssue = new URLSearchParams(window.location.search).get("reviewIssue");
-    if (!reviewIssue) return;
-    const timer = window.setTimeout(() => setReviewIssueFocusId(reviewIssue), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   const wordCount = editor.content.replace(/\s/g, "").length;
   const [recommendedTags, setRecommendedTags] = useState<string[]>([]);
 
@@ -1007,11 +1041,6 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   const renderNotice = () => (
     <>
-      {errorMsg && (
-        <div className="create-notice create-notice-error" role="alert">
-          <SiteIcon name="fa-circle-exclamation" variant="solid" /> {errorMsg}
-        </div>
-      )}
       {successMsg && (
         <div className="create-success-overlay" role="status">
           <div className="create-success-dialog">
@@ -1426,23 +1455,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   const renderError = () =>
     errorMsg && (
       <div className="create-form-error" role="alert">
-        <span className="create-form-error-icon"><SiteIcon name="fa-circle-exclamation" variant="solid" /></span>
+        <span className="create-form-error-icon"><SiteIcon name="fa-circle-exclamation" variant="solid" size={16} aria-hidden="true" /></span>
         <span className="create-form-error-copy">
           <strong>还不能发布</strong>
           <span>{errorMsg}</span>
         </span>
       </div>
     );
-
-  useEffect(() => {
-    if (!initDone || !reviewIssueFocusId || reviewIssues.length === 0) return;
-    const timer = window.setTimeout(() => {
-      const issueItem = Array.from(document.querySelectorAll<HTMLElement>(".review-issue-item"))
-        .find((item) => item.dataset.reviewIssueId === reviewIssueFocusId);
-      issueItem?.querySelector<HTMLButtonElement>(".review-issue-locate")?.click();
-    }, 120);
-    return () => window.clearTimeout(timer);
-  }, [initDone, reviewIssueFocusId, reviewIssues]);
 
   if (!initDone) {
     return (
@@ -1454,99 +1473,49 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
 
   // ============ 审核未通过提示 ============
 
-  const fieldLabel = (field?: string | null) => {
-    switch (field) {
-      case "title": return "标题";
-      case "content": return "正文";
-      case "author_note": return "作者的话";
-      case "image_ocr": return "图片中的文字";
-      case "image": return "图片";
-      default: return "作品内容";
-    }
-  };
-
-  const locateReviewIssue = (issue: ReviewIssue) => {
-    const field = issue.field_name || (issue.location_type === "image" || issue.location_type === "image_ocr" ? "image_ocr" : "content");
-    const scrollTo = (el: Element | null, focus = false) => {
-      if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      if (focus && el instanceof HTMLElement) el.focus({ preventScroll: true });
-      el.animate?.(
-        [
-          { outline: "2px solid #ef4444", outlineOffset: "2px" },
-          { outline: "2px solid transparent", outlineOffset: "2px" },
-        ],
-        { duration: 1600, easing: "ease-out" },
-      );
-    };
-
-    if (field === "title") {
-      if (view === "image") scrollTo(document.getElementById("imageTitle"), true);
-      else if (view === "chapter-create") scrollTo(document.getElementById("chapterTitle"), true);
-      else scrollTo(document.getElementById("articleTitle"), true);
-      return;
-    }
-    if (field === "author_note") {
-      scrollTo(document.getElementById("chapterAuthorNote"), true);
-      return;
-    }
-    if (field === "image" || field === "image_ocr") {
-      if (view !== "image") setView("image");
-      window.setTimeout(() => {
-        const grid = document.querySelector<HTMLElement>("#page-create .image-grid");
-        const index = issue.image_index ?? 0;
-        scrollTo(grid?.querySelectorAll<HTMLElement>(".image-grid-item")?.[index] || grid);
-      }, 80);
-      return;
-    }
-    // 正文 / 图片说明
-    if (view === "image") {
-      scrollTo(document.getElementById("imageDescription"), true);
-      return;
-    }
-    scrollTo(document.querySelector<HTMLElement>("#page-create .editor-content"));
-  };
+  const reasonRepeatsCategory = Boolean(reviewIssueSummary?.categories.some(
+    (category) => normalizeReviewReasonForComparison(category) === normalizeReviewReasonForComparison(reviewRejectionReason),
+  ));
 
   const renderRejectionBanner = () =>
     reviewRejectionReason && (
       <div className="review-rejection-banner" role="alert">
         <div className="review-rejection-head">
-          <SiteIcon name="fa-circle-exclamation" variant="solid" aria-hidden="true" />
+          <span className="review-rejection-icon"><SiteIcon name="fa-circle-exclamation" variant="solid" aria-hidden="true" /></span>
           <strong>作品未通过审核</strong>
+          <button
+            type="button"
+            className="review-rejection-toggle"
+            aria-expanded={!reviewRejectionCollapsed}
+            aria-controls="review-rejection-content"
+            aria-label={reviewRejectionCollapsed ? "展开审核退回说明" : "收起审核退回说明"}
+            onClick={() => setReviewRejectionCollapsed((collapsed) => !collapsed)}
+          >
+            <SiteIcon name={reviewRejectionCollapsed ? "fa-chevron-up" : "fa-chevron-down"} variant="solid" aria-hidden="true" />
+          </button>
         </div>
-        <p className="review-rejection-reason">{reviewRejectionReason}</p>
-        {publishedVersionNumber != null && (
-          <p className="review-rejection-note">
-            <SiteIcon name="fa-circle-info" variant="solid" aria-hidden="true" />
-            旧版本仍公开可见，不会受到影响；修改并重新提交后，通过审核的新版本才会替换旧版本。
+        <div id="review-rejection-content" className="review-rejection-content">
+          <p className="review-rejection-reason">
+            {!reasonRepeatsCategory && <>{reviewRejectionReason}<br /></>}
+            {reviewIssueSummary ? reviewIssueSummaryText(reviewIssueSummary) : ""}
+            请依据社区公约与发布规范内容，修改作品内容，修改完成后重新发布。
           </p>
-        )}
-        {reviewIssues.length > 0 && (
-          <div className="review-issues">
-            <div className="review-issues-title">本次标记的问题（{reviewIssues.length}）</div>
-            <ul className="review-issues-list">
-              {reviewIssues.map((issue, index) => (
-                <li key={issue.id || index} className="review-issue-item" data-review-issue-id={issue.id || undefined}>
-                  <span className="review-issue-index">{index + 1}</span>
-                  <span className="review-issue-field">{fieldLabel(issue.field_name)}</span>
-                  {issue.location_type === "paragraph" && issue.paragraph_index != null && (
-                    <span className="review-issue-pos">第 {issue.paragraph_index} 段</span>
-                  )}
-                  {issue.image_index != null && (
-                    <span className="review-issue-pos">第 {issue.image_index + 1} 张图</span>
-                  )}
-                  {issue.quoted_text && <span className="review-issue-quote">「{issue.quoted_text}」</span>}
-                  {issue.details && <span className="review-issue-details">{issue.details}</span>}
-                  <button type="button" className="review-issue-locate" onClick={() => locateReviewIssue(issue)}>
-                    <SiteIcon name="fa-crosshairs" variant="solid" aria-hidden="true" /> 定位
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {publishedVersionNumber != null && (
+            <div className="review-rejection-note">
+              <SiteIcon name="fa-circle-info" variant="solid" aria-hidden="true" />
+              <span>旧版本仍公开可见，不会受到影响；修改并重新提交后，通过审核的新版本才会替换旧版本。</span>
+            </div>
+          )}
+        </div>
       </div>
     );
+
+  const renderReviewRejectionAside = () =>
+    reviewRejectionReason ? (
+      <aside className={`review-rejection-aside${reviewRejectionCollapsed ? " is-collapsed" : ""}`}>
+        {renderRejectionBanner()}
+      </aside>
+    ) : null;
 
   const renderPendingReviewBanner = () =>
     pendingReviewStatus === "pending" && (
@@ -1615,9 +1584,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   if (view === "text") {
     return (
       <main id="page-create" className="publish-page publish-article-page">
-        <div className="publish-form">
+        <div className={`publish-editor-layout${reviewRejectionReason ? " has-review-rejection" : ""}`}>
+          <div className="publish-form">
             {renderNotice()}
-            {renderRejectionBanner()}
             {renderPendingReviewBanner()}
             <div className="form-section">
               <Input
@@ -1704,7 +1673,7 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
             {errorMsg && !successMsg && renderError()}
 
             <div className="publish-footer">
-              <Link href="/guidelines" className="publish-guidelines"><SiteIcon name="fa-shield-halved" variant="solid" /> 社区公约与发布规范</Link>
+              <Link href="/guidelines" className="publish-guidelines"><SiteIcon name="fa-shield-halved" variant="solid" /><span className="publish-guidelines-label">社区公约与发布规范</span></Link>
               <div className="publish-actions">
                 <button type="button" className="article-draft-button" onClick={handleSaveDraft} disabled={submitting || uploadingImage}>
                   {submitting && <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />}
@@ -1716,6 +1685,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 </button>
               </div>
             </div>
+          </div>
+          {renderReviewRejectionAside()}
         </div>
       </main>
     );
@@ -1725,9 +1696,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
   if (view === "image") {
     return (
       <div id="page-create" className="publish-page publish-article-page min-h-screen bg-paper">
-        <div className="publish-form">
+        <div className={`publish-editor-layout${reviewRejectionReason ? " has-review-rejection" : ""}`}>
+          <div className="publish-form">
             {renderNotice()}
-            {renderRejectionBanner()}
             {renderPendingReviewBanner()}
 
             {/* 作品标题 */}
@@ -1875,10 +1846,13 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
               }}
             />
 
+            {renderError()}
+
             {/* Footer */}
             <div className="publish-footer">
               <Link href="/guidelines" className="publish-guidelines">
-                <SiteIcon name="fa-shield-halved" variant="solid" /> 社区公约与发布规范
+                <SiteIcon name="fa-shield-halved" variant="solid" />
+                <span className="publish-guidelines-label">社区公约与发布规范</span>
               </Link>
               <div className="publish-actions">
                 <button type="button" className="article-draft-button" onClick={handleSaveImageDraft} disabled={submitting || uploadingImage}>
@@ -1891,6 +1865,8 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 </button>
               </div>
             </div>
+          </div>
+          {renderReviewRejectionAside()}
         </div>
       </div>
     );
@@ -2036,9 +2012,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
     return (
       <div className="min-h-screen bg-paper publish-article-page chapter-create-page" id="page-create">
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-        <main className="chapter-container">
-          {renderRejectionBanner()}
-          {renderPendingReviewBanner()}
+        <div className={`publish-editor-layout${reviewRejectionReason ? " has-review-rejection" : ""}`}>
+          <main className="chapter-container">
+            {renderPendingReviewBanner()}
           {targetSeriesName && (
             <div className="serial-info-card">
               <div className="serial-info-body">
@@ -2131,7 +2107,9 @@ export default function CreatePage({ initialView = "select" }: { initialView?: V
                 </button>
               </div>
             </div>
-        </main>
+          </main>
+          {renderReviewRejectionAside()}
+        </div>
       </div>
     );
   }
