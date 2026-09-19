@@ -108,6 +108,7 @@ function sortPosts(posts: SearchPost[], sortBy: SortFilter): SearchPost[] {
 
 function SearchContent() {
   const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
   const initialQuery = searchParams.get("q") || "";
   const initialType = parseSearchFilter(searchParams.get("type"));
   const supabase = createClient();
@@ -140,6 +141,50 @@ function SearchContent() {
     { key: "works", label: "作品" },
     { key: "posts", label: "正文" },
   ];
+
+  // Next.js preserves the client component while only the search params
+  // change. Keep the controlled search state aligned with URL navigation,
+  // including the Navbar's "查看全部结果" link.
+  useEffect(() => {
+    const nextQuery = searchParams.get("q") || "";
+    const nextType = parseSearchFilter(searchParams.get("type"));
+    const nextWorkType = parseWorkType(searchParams.get("workType"));
+    const nextSeriesStatus = parseSeriesStatus(searchParams.get("seriesStatus"));
+    const nextSortBy = parseSort(searchParams.get("sort"));
+
+    if (
+      inputValue === nextQuery &&
+      activeFilter === nextType &&
+      workType === nextWorkType &&
+      seriesStatus === nextSeriesStatus &&
+      sortBy === nextSortBy
+    ) {
+      return;
+    }
+
+    requestIdRef.current += 1;
+    // The URL is an external navigation source; mirror it into the
+    // controlled form state before the debounced search runs.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setInputValue(nextQuery);
+    setActiveFilter(nextType);
+    setWorkType(nextWorkType);
+    setSeriesStatus(nextSeriesStatus);
+    setSortBy(nextSortBy);
+    setDraftWorkType(nextWorkType);
+    setDraftSeriesStatus(nextSeriesStatus);
+    setDraftSortBy(nextSortBy);
+    setMobileFilterOpen(false);
+    setTitlePosts([]);
+    setContentPosts([]);
+    setTags([]);
+    setUsers([]);
+    setLoading(false);
+    setHasSearched(Boolean(nextQuery));
+  // Search params are the external source of truth; local edits update the
+  // URL in the search effect below and should not be overwritten in between.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParamsString]);
 
   const syncSearchUrl = (overrides: { query?: string; type?: SearchFilter } = {}) => {
     const url = new URL(window.location.href);

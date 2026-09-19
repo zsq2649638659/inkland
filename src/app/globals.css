@@ -18299,6 +18299,21 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   flex-direction: column;
 }
 
+/* Keep the authenticated Navbar inside the 320px narrow-screen viewport.
+   Preserve the 44px menu target while giving the compact create action and
+   the two controls enough room to sit beside the wordmark. */
+@media (max-width: 360px) {
+  #navbar .navbar-right {
+    gap: 12px;
+  }
+
+  #navbar .btn-create {
+    width: 100px !important;
+    min-width: 100px !important;
+    padding-inline: 8px !important;
+  }
+}
+
 /* The page background and the sticky tab surface must use the same dark-mode
    token. The older .bg-paper override used a different #121212 value. */
 [data-theme="dark"] #page-home.bg-paper {
