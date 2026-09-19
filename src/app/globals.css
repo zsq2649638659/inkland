@@ -18281,6 +18281,15 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   }
 }
 
+/* Keep the first visible search component level with the sidebar. The
+   sidebar intentionally starts one tablet spacing below the navbar; use it
+   as the alignment baseline whenever the sidebar is visible. */
+@media (min-width: 700px) {
+  #page-search-shell > .main-container > .content-area {
+    padding-top: var(--spacing-md);
+  }
+}
+
 /* Responsive interaction audit: preserve the existing visual scale while
    giving every homepage control a reliable 44px touch target. */
 :is(.btn-mobile-menu, .card-more-btn, #page-home .site-card__more) {
