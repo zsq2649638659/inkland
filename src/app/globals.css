@@ -8834,7 +8834,9 @@ p {
   #page-search .work-sort-stat { margin-left: 0; }
 }
 
-@media (max-width: 1024px) {
+/* The sidebar tablet shell still has enough width for the three search
+   selectors. Switch to the drawer only when the page is actually narrow. */
+@media (max-width: 700px) {
   #page-search .studio-filter-composition { display: none; }
   #page-search .search-mobile-filter-bar { display: flex; gap: var(--ink-gap-compact); width: 100%; }
   #page-search .search-filter-drawer-backdrop { position: fixed; inset: 0; z-index: var(--ink-z-modal); display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
