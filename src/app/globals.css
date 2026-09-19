@@ -18309,7 +18309,8 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   box-sizing: border-box;
 }
 
-#page-home .sidebar .sidebar-stat-link {
+#page-home .sidebar .sidebar-stat-link,
+#page-search-shell .sidebar .sidebar-stat-link {
   display: inline-flex;
   min-width: 44px;
   min-height: 44px;
