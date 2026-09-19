@@ -68,6 +68,7 @@ export default function PostCard({ post }: PostCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
+  const [imageSourceOverrides, setImageSourceOverrides] = useState<Record<number, string>>({});
   const [imageAspectRatios, setImageAspectRatios] = useState<Record<number, number>>({});
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -338,6 +339,63 @@ export default function PostCard({ post }: PostCardProps) {
     setSubmitting(false);
   };
 
+  const submitReply = async (parentId: string, content: string, replyToName: string) => {
+    if (!user || !content.trim()) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      setToastMessage(blocked);
+      return;
+    }
+    const storedContent = `@${replyToName} ${content.trim()}`;
+    const { data, error } = await supabase
+      .from("comments")
+      .insert({ post_id: post.id, user_id: user.id, parent_id: parentId, content: storedContent })
+      .select("id, content, created_at, user_id, parent_id")
+      .single();
+    if (error || !data) {
+      setToastMessage("回复发布失败，请稍后重试。");
+      return;
+    }
+    setComments((prev) => [...prev, {
+      id: data.id as string,
+      post_id: post.id,
+      user_id: user.id,
+      content: storedContent,
+      created_at: data.created_at as string,
+      parent_id: parentId,
+      paragraph_index: null,
+      author: { nickname: profile?.nickname || user.email?.split("@")[0] || "我", avatar_url: profile?.avatar_url || null },
+    }]);
+    setCommentCount((count) => count + 1);
+  };
+
+  const deleteComment = async (commentId: string) => {
+    if (!user) return;
+    if (!await dialog.confirm({ title: "删除评论", message: "确定要删除这条评论吗？删除后无法恢复。", confirmLabel: "删除评论", variant: "danger" })) return;
+    const childIds = comments.filter((comment) => comment.parent_id === commentId).map((comment) => comment.id);
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("user_id", user.id);
+    if (error) {
+      setToastMessage(error?.message || "删除失败：评论可能已被删除，或当前账号没有删除权限。");
+      return;
+    }
+    const { data: remaining, error: verifyError } = await supabase
+      .from("comments")
+      .select("id")
+      .eq("id", commentId)
+      .maybeSingle();
+    if (verifyError || remaining) {
+      setToastMessage(verifyError?.message || "删除失败：评论仍然存在，请稍后重试。");
+      return;
+    }
+    const removedIds = new Set([commentId, ...childIds]);
+    setComments((items) => items.filter((comment) => !removedIds.has(comment.id)));
+    setCommentCount((count) => Math.max(0, count - removedIds.size));
+  };
+
   const navigateCard = (event: MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("a, button, input, textarea, select")) return;
@@ -381,16 +439,16 @@ export default function PostCard({ post }: PostCardProps) {
         </div>
 
         <div className="site-card__header-actions">
-          {user?.id !== post.user_id && (
-            <button className={`site-card__follow${following ? " site-card__follow--followed" : ""}`} onClick={toggleFollow} disabled={authLoading || followLoading}>
-              {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
-            </button>
-          )}
           <div className="card-more-wrap" ref={cardMenuRef}>
             <button className="site-card__more" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
             {cardMenuOpen && (
               <div className="card-more-menu">
-                {user?.id !== post.user_id && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
+                {user?.id !== post.user_id && (
+                  <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }} disabled={authLoading || followLoading}>
+                    <SiteIcon name={following ? "fa-user-minus" : "fa-user-plus"} variant="outline" hoverVariant="solid" />
+                    {following ? "取消关注" : followLoading ? "..." : "关注"}
+                  </button>
+                )}
                 <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", post.id); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button>
                 {user?.id === post.user_id && <button onClick={() => void deletePost()}><SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" /> 删除</button>}
               </div>
@@ -429,7 +487,7 @@ export default function PostCard({ post }: PostCardProps) {
             {allImages.map((img, i) => (
               <button key={i} type="button" className="site-card__feed-image" onClick={() => { setActiveImageDot(i); setLightboxOpen(true); }} aria-label={`查看第${i + 1}张图片`}>
                 <img
-                  src={getThumbnailUrl(img, { width: 400, height: 300, resize: "cover" })}
+                  src={imageSourceOverrides[i] || getThumbnailUrl(img, { width: 400, height: 300, resize: "cover" })}
                   alt=""
                   loading={i === 0 ? "eager" : "lazy"}
                   decoding="async"
@@ -441,7 +499,14 @@ export default function PostCard({ post }: PostCardProps) {
                       setImageAspectRatios((current) => ({ ...current, [i]: image.naturalWidth / image.naturalHeight }));
                     }
                   }}
-                  onError={() => setFailedImages(prev => new Set(prev).add(i))}
+                  onError={() => {
+                    const thumbnail = getThumbnailUrl(img, { width: 400, height: 300, resize: "cover" });
+                    if (thumbnail !== img && imageSourceOverrides[i] !== img) {
+                      setImageSourceOverrides((current) => ({ ...current, [i]: img }));
+                      return;
+                    }
+                    setFailedImages(prev => new Set(prev).add(i));
+                  }}
                   className={`${loadedImages.has(i) ? "loaded" : ""}${failedImages.has(i) ? " load-error" : ""}`}
                 />
               </button>
@@ -516,6 +581,8 @@ export default function PostCard({ post }: PostCardProps) {
           submitting={submitting}
           onCommentTextChange={setCommentText}
           onSubmit={submitComment}
+          onReply={submitReply}
+          onDelete={deleteComment}
           onClose={() => setShowComment(false)}
           onReport={(commentId, commentUserId) => void reportTarget("comment", commentId, commentUserId)}
           onBlock={(commentUserId) => void blockUser(commentUserId)}

@@ -14,46 +14,61 @@ function SB({ className = "", style }: { className?: string; style: CSSPropertie
 
 /* ================= 首页 / 信息流卡片 ================= */
 
-/** 信息流卡片骨架 —— 精确匹配 PostCard / SerialPostCard 的 .card 结构 */
-function SkeletonFeedCard({ withImage = false }: { withImage?: boolean }) {
+type HomeSkeletonVariant = "single" | "image" | "serial";
+
+/** 首页信息流骨架 —— 保留真实作品卡片的内容结构，复用组件库的占位色与辉光动画 */
+function HomeSkeletonCard({ variant }: { variant: HomeSkeletonVariant }) {
   return (
-    <article className="card" aria-hidden="true">
-      {/* card-header：头像 + 作者信息 + 关注按钮/更多 */}
-      <div className="card-header">
-        <div className="card-avatar">
+    <article className={`site-card site-card--feed site-card--feed-${variant === "serial" ? "serial" : variant === "image" ? "image" : "single"} home-feed-skeleton-card`} aria-hidden="true">
+      <div className="site-card__header">
+        <div className="home-feed-skeleton-avatar">
           <span className="sk-circle" style={{ width: "100%", height: "100%" }} />
         </div>
-        <div className="card-author-info">
+        <div className="site-card__author home-feed-skeleton-author">
           <SB style={{ width: 96, height: 14 }} />
           <SB style={{ width: 52, height: 12, marginTop: 6 }} />
         </div>
-        <div className="card-header-actions">
-          <span className="sk-pill" style={{ width: 72, height: 26, flexShrink: 0 }} />
-          <span className="sk-circle" style={{ width: 32, height: 32, flexShrink: 0 }} />
+        <div className="site-card__header-actions">
+          <span className="sk-circle" style={{ width: 32, height: 32 }} />
         </div>
       </div>
-      {/* card-title */}
-      <SB style={{ width: "62%", height: 22, marginBottom: 14 }} />
-      {/* card-excerpt（3 行） */}
-      <SB style={{ width: "100%", height: 15 }} />
-      <SB style={{ width: "88%", height: 15, marginTop: 8 }} />
-      <SB style={{ width: "70%", height: 15, marginTop: 8 }} />
-      {/* 图片带（部分卡片有图） */}
-      {withImage && (
-        <div className="card-image-strip">
-          <div className="sk-img" style={{ width: "100%", height: 220 }} />
+
+      <div className="home-feed-skeleton-copy">
+        <SB style={{ width: "62%", height: 22 }} />
+        <div className="home-feed-skeleton-excerpt">
+          <SB style={{ width: "100%", height: 15 }} />
+          <SB style={{ width: "88%", height: 15 }} />
+        </div>
+      </div>
+
+      {variant === "image" && (
+        <div className="site-card__feed-images-shell home-feed-skeleton-media-shell">
+          <div className="home-feed-skeleton-media sk-img" />
         </div>
       )}
-      {/* card-tags */}
-      <div className="card-tags" style={{ marginBottom: 14, marginTop: 14 }}>
-        <span className="sk-pill" style={{ width: 56, height: 24, flexShrink: 0 }} />
-        <span className="sk-pill" style={{ width: 64, height: 24, flexShrink: 0 }} />
-        <span className="sk-pill" style={{ width: 48, height: 24, flexShrink: 0 }} />
-      </div>
-      {/* card-actions：喜欢 / 评论 / 收藏 / 分享 */}
-      <div className="card-actions">
+
+      {variant === "serial" && (
+        <div className="site-card__serial-inner home-feed-skeleton-serial-inner">
+          <SB style={{ width: "58%", height: 18 }} />
+          <SB style={{ width: "92%", height: 14 }} />
+          <div className="site-card__tags">
+            <span className="sk-pill" style={{ width: 56, height: 24 }} />
+            <span className="sk-pill" style={{ width: 64, height: 24 }} />
+          </div>
+        </div>
+      )}
+
+      {variant !== "serial" && (
+        <div className="site-card__tags">
+          <span className="sk-pill" style={{ width: 56, height: 24 }} />
+          <span className="sk-pill" style={{ width: 64, height: 24 }} />
+          <span className="sk-pill" style={{ width: 48, height: 24 }} />
+        </div>
+      )}
+
+      <div className="site-card__actions home-feed-skeleton-actions">
         {[0, 1, 2, 3].map((n) => (
-          <SB key={n} style={{ width: 44, height: 16 }} />
+          <SB key={n} style={{ width: n === 3 ? 44 : 24, height: 16 }} />
         ))}
       </div>
     </article>
@@ -64,10 +79,10 @@ function SkeletonFeedCard({ withImage = false }: { withImage?: boolean }) {
 export function SkeletonFeed() {
   return (
     <div className="feed-skeleton" role="status" aria-label="内容加载中，请稍候" aria-busy="true">
-      <SkeletonFeedCard withImage />
-      <SkeletonFeedCard />
-      <SkeletonFeedCard withImage />
-      <SkeletonFeedCard />
+      <HomeSkeletonCard variant="image" />
+      <HomeSkeletonCard variant="single" />
+      <HomeSkeletonCard variant="serial" />
+      <HomeSkeletonCard variant="image" />
     </div>
   );
 }
@@ -76,11 +91,11 @@ export function SkeletonFeed() {
 export function SkeletonHome() {
   return (
     <div className="feed-skeleton" role="status" aria-label="首页加载中，请稍候" aria-busy="true">
-      <SkeletonFeedCard withImage />
-      <SkeletonFeedCard />
-      <SkeletonFeedCard withImage />
-      <SkeletonFeedCard />
-      <SkeletonFeedCard />
+      <HomeSkeletonCard variant="image" />
+      <HomeSkeletonCard variant="single" />
+      <HomeSkeletonCard variant="serial" />
+      <HomeSkeletonCard variant="image" />
+      <HomeSkeletonCard variant="single" />
     </div>
   );
 }

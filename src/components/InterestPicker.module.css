@@ -1,11 +1,16 @@
 .card {
-  width: min(100%, 760px);
+  width: min(100%, var(--ink-home-shell-max-width));
+  box-sizing: border-box;
   margin: 42px auto;
   padding: 32px;
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--color-card);
-  box-shadow: 0 12px 32px rgba(66, 47, 36, 0.06);
+  box-shadow: none;
+}
+
+.settingsCard {
+  width: min(100%, var(--ink-home-shell-max-width));
 }
 
 .heading {
@@ -23,9 +28,9 @@
 }
 
 .heading h1 {
-  margin: 8px 0 6px;
+  margin: 0 0 6px;
   color: var(--color-text);
-  font-family: var(--font-noto-serif), serif;
+  font-family: var(--font-family);
   font-size: clamp(24px, 4vw, 30px);
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -75,7 +80,7 @@
   align-items: center;
   padding: 0 16px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: var(--color-card);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
@@ -127,6 +132,11 @@
   margin-top: 30px;
 }
 
+.settingsActions {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .actionGroup {
   display: flex;
   align-items: center;
@@ -158,9 +168,9 @@
 }
 
 .primary {
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: #fff;
+  border: 0;
+  background: var(--color-primary) !important;
+  color: #fff !important;
 }
 
 .primary:hover {
@@ -182,8 +192,8 @@
 
 @media (max-width: 700px) {
   .card {
-    width: auto;
-    margin: 18px 14px;
+    width: calc(100% - (var(--spacing-md) * 2));
+    margin: 18px auto;
     padding: 22px 18px;
   }
 
@@ -223,6 +233,32 @@
 
   .skip {
     width: 100%;
+  }
+
+  .settingsActions {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .settingsActions > .skip,
+  .settingsActions > .actionGroup {
+    width: calc((100% - 8px) / 2) !important;
+    min-width: 0;
+    flex: 0 0 calc((100% - 8px) / 2) !important;
+  }
+
+  .settingsActions .primary {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Match the Navbar's 16px horizontal inset while the tablet Navbar still
+   carries its internal padding. At 901px and above the shared 920px shell
+   takes over, because that Navbar padding is removed there. */
+@media (min-width: 701px) and (max-width: 900px) {
+  .card {
+    width: calc(100% - (var(--spacing-md) * 2));
   }
 }
 

@@ -98,7 +98,7 @@ function singleCard(post: Post, mode: ProfileCardMode) {
 }
 
 function serialCard(series: ProfileSeriesCard, mode: ProfileCardMode) {
-  const seriesHref = `/series/${encodeURIComponent(series.name)}`;
+  const seriesHref = `/series/${encodeURIComponent(series.id)}`;
   const chapterHref = series.latestChapterId ? `/read/${series.latestChapterId}` : seriesHref;
   const statusClass = series.status === "completed" ? "tag--status-complete" : "tag--status-active";
   const chapterTitle = !series.latestChapterId

@@ -80,6 +80,7 @@ export default function HomePage() {
   const [latestReading, setLatestReading] = useState<ReadingHistoryRecord | null>(null);
   const latestPostTimeRef = useRef<string>("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const feedRequestRef = useRef(0);
 
   useEffect(() => {
     const syncTabFromUrl = () => setTab(readHomeTab());
@@ -201,6 +202,8 @@ export default function HomePage() {
   };
 
   const loadPosts = async (opts?: { force?: boolean }) => {
+    const requestId = ++feedRequestRef.current;
+    setRequestTimedOut(false);
     // 命中缓存：立即秒开（不闪骨架屏），后台照常静默刷新
     const cacheKey = user
       ? `${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}:${tab}`
@@ -226,6 +229,7 @@ export default function HomePage() {
     }
 
     const res = (await fetchFeed()) ?? (await loadFeed(supabase, { tab, userId: user?.id ?? null }));
+    if (requestId !== feedRequestRef.current) return;
     if (res.error) {
       setError(res.error);
       setPosts([]);
@@ -245,12 +249,15 @@ export default function HomePage() {
       setSerialCards(res.serialCards);
     }
     setHasNewPosts(false);
+    setRequestTimedOut(false);
     setLoading(false);
     writeFeedCache(cacheKey, res);
     updateLatestPostTime(res);
   };
 
   const loadFollowedTags = async () => {
+    const requestId = ++feedRequestRef.current;
+    setRequestTimedOut(false);
     // 切换到“关注标签”时要先进入加载态，避免旧的空数组被误判为空状态。
     setLoading(true);
     setError("");
@@ -267,6 +274,7 @@ export default function HomePage() {
       setLoading(false);
     }
     const res = (await fetchFeed()) ?? (await loadFeed(supabase, { tab: "myTags", userId: user.id }));
+    if (requestId !== feedRequestRef.current) return;
     if (res.error) {
       setError(res.error);
       setFollowedTags([]);
@@ -274,6 +282,7 @@ export default function HomePage() {
       return;
     }
     setFollowedTags(res.followedTags);
+    setRequestTimedOut(false);
     setLoading(false);
     writeFeedCache(cacheKey, res);
   };
@@ -323,7 +332,9 @@ export default function HomePage() {
       setRequestTimedOut(true);
       setLoading(false);
       setError("数据服务连接超时，请检查 Supabase 配置或网络后重试。");
-    }, 8000);
+    // 首页的测试账号需要额外的可见性与关系查询；给冷启动和跨区请求
+    // 留出足够时间，避免 8 秒时把仍在执行的请求误报成失败。
+    }, 20000);
     return () => window.clearTimeout(timeoutId);
   }, [waitingForFeed]);
   const sortedFeedItems = [

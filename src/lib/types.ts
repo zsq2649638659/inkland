@@ -25,6 +25,7 @@ export interface Post {
   rating?: "all" | "r15" | "r18";
   post_type?: "novel" | "illustration" | "comic" | "ramble" | "cosplay" | "other" | "serial" | "article";
   series_name?: string | null;
+  series_id?: string | null;
   chapter_number?: number | null;
   chapter_title?: string | null;
   author_note?: string | null;

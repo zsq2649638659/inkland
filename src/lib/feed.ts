@@ -155,7 +155,7 @@ export async function loadFeed(
   const seriesMetaNames = [...new Set([...bookmarkedSeriesNames, ...seriesNames])];
   const seriesMetaPromise = seriesMetaNames.length > 0
     ? withTestDataVisibility(
-      supabase.from("series").select("name, description, cover_url, tags, status, series_type").in("name", seriesMetaNames),
+      supabase.from("series").select("id, name, description, cover_url, tags, status, series_type").in("name", seriesMetaNames),
       includeTestData,
     )
     : Promise.resolve({ data: [] as unknown[] });
@@ -285,6 +285,7 @@ export async function loadFeed(
       chapterTitle: (chapter.title as string) || "无标题",
       chapterNumber: chapter.chapter_number as number,
       content: slimContent((chapter.content as string) || ""),
+      seriesId: (meta.id as string) || null,
       seriesName: sn,
       seriesDescription: (meta.description as string) || "",
       seriesCover: (meta.cover_url as string) || null,
@@ -454,11 +455,14 @@ async function normalizeRpcResult(
       if (s && typeof s.name === "string") seriesMeta.set(s.name as string, s);
     }
   }
-  if (seriesNames.some((n) => !seriesMeta.has(n))) {
+  // 旧版 RPC 可能只返回名称；即使名称已存在，也必须补查 id，
+  // 否则首页仍会生成 /series/连载名称，无法满足稳定的 ID 路径约定。
+  const seriesNamesMissingId = seriesNames.filter((name) => !seriesMeta.get(name)?.id);
+  if (seriesNamesMissingId.length > 0) {
     const { data: fetched } = await supabase
       .from("series")
-      .select("name, description, cover_url, tags, status, series_type")
-      .in("name", seriesNames.filter((n) => !seriesMeta.has(n)))
+      .select("id, name, description, cover_url, tags, status, series_type")
+      .in("name", seriesNamesMissingId)
       .eq("is_test_data", false);
     if (fetched) for (const s of fetched as RpcRow[]) seriesMeta.set(s.name as string, s);
   }
@@ -473,6 +477,7 @@ async function normalizeRpcResult(
       chapterTitle: chapter.title || "无标题",
       chapterNumber: chapter.chapter_number as number,
       content: slimContent((chapter.content as string) || ""),
+      seriesId: (meta.id as string) || null,
       seriesName: sn,
       seriesDescription: meta.description || "",
       seriesCover: meta.cover_url || null,

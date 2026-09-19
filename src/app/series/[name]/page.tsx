@@ -24,6 +24,7 @@ interface ChapterInfo {
 }
 
 interface SeriesInfo {
+  id: string;
   user_id: string;
   title: string;
   cover_url: string | null;
@@ -61,35 +62,45 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
 
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  // The series page first renders a skeleton and then replaces it with the
+  // loaded detail. On narrower viewports that layout shift can preserve the
+  // previous scroll anchor at the navbar height instead of the page top.
+  // Reset after the detail is ready so navigation from the home feed always
+  // starts at the beginning of the series page.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [decodedName, loading]);
+
   useEffect(() => {
     let active = true;
     const load = async () => {
       const includeTestData = includeTestDataForProfile(profile);
-      // 系列元数据和章节互不依赖，先并行发出，避免跨区域请求瀑布。
-      const [{ data: seriesData }, { data: chData }] = await Promise.all([
-        withTestDataVisibility(
-          supabase
-            .from("series")
-            .select("id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at")
-            .eq("name", decodedName),
-          includeTestData,
-        ).maybeSingle(),
-        withTestDataVisibility(
-          supabase
-            .from("posts")
-            .select("id, title, chapter_number, chapter_title, word_count, created_at, updated_at, user_id, status")
-            .eq("series_name", decodedName)
-            .eq("post_type", "serial")
-            .eq("status", "published")
-            .gt("chapter_number", 0)
-            .order("chapter_number", { ascending: true }),
-          includeTestData,
-        ),
-      ]);
+      const seriesSelect = "id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at";
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decodedName);
+      const initialSeriesResult = await withTestDataVisibility(
+        supabase
+          .from("series")
+          .select(seriesSelect)
+          .eq(isUuid ? "id" : "name", decodedName),
+        includeTestData,
+      ).maybeSingle();
+      const seriesData = initialSeriesResult.data;
+      const seriesRow = seriesData as unknown as Record<string, unknown> | null;
+      const resolvedSeriesName = (seriesRow?.name as string | undefined) || decodedName;
+      const { data: chData } = await withTestDataVisibility(
+        supabase
+          .from("posts")
+          .select("id, title, chapter_number, chapter_title, word_count, created_at, updated_at, user_id, status")
+          .eq("series_name", resolvedSeriesName)
+          .eq("post_type", "serial")
+          .eq("status", "published")
+          .gt("chapter_number", 0)
+          .order("chapter_number", { ascending: true }),
+        includeTestData,
+      );
 
       if (!active) return;
       const chapters = (chData || []) as unknown as Array<Record<string, unknown>>;
-      const seriesRow = seriesData as unknown as Record<string, unknown> | null;
       const firstChapter = chapters[0] || null;
       const authorId = (seriesRow?.user_id as string | undefined) || (firstChapter?.user_id as string | undefined);
 
@@ -113,8 +124,9 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
           }))];
         const totalWords = chapters.reduce((sum, chapter) => sum + ((chapter.word_count as number) || 0), 0);
         setSeriesInfo({
+          id: (seriesRow?.id as string) || "",
           user_id: authorId,
-          title: decodedName,
+          title: resolvedSeriesName,
           cover_url: (seriesRow?.cover_url as string) || (firstChapter?.cover_url as string) || null,
           description: (seriesRow?.description as string) || "",
           word_count: totalWords,
@@ -215,7 +227,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
   const seriesReadingRecords = visibleReadingHistory.filter((record) => {
     const snapshot = record.post;
     // 本地记录可能还没有关联的 post 快照，用当前目录中的章节 id 兜底识别。
-    return (snapshot?.series_name === decodedName && snapshot.post_type === "serial")
+    return (snapshot?.series_name === seriesInfo.title && snapshot.post_type === "serial")
       || chapters.some((chapter) => chapter.id === record.post_id);
   });
   const readChapterNumber = seriesReadingRecords.reduce((max, record) => {
@@ -243,30 +255,29 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
           <div className="hero-card">
             <div className="hero-title-row">
               <div className="hero-title-left">
-                <h1 className="hero-title">{decodedName}</h1>
+                <h1 className="hero-title">{seriesInfo.title}</h1>
                 <span className={`serial-badge ${seriesInfo.status === "completed" ? "completed" : ""}`}>
                   {seriesInfo.status === "ongoing" ? "连载中" : "已完结"}
                 </span>
               </div>
-              <div className="hero-actions">
+              <div className="series-hero-actions">
+                {user && !isOwner && (
+                  <div className="series-follow-action">
+                    <button
+                      className="hero-action-btn hero-action-btn--follow"
+                      onClick={handleFollow}
+                    >
+                      {isFollowing ? "已收藏" : "收藏连载"}
+                    </button>
+                  </div>
+                )}
                 {chapters.length > 0 && (
                   <Link href={`/read/${chapters[0]?.id}`} className="hero-action-btn primary">
                     开始阅读
                   </Link>
                 )}
-                {user && !isOwner && (
-                  <div className="series-follow-action">
-                    <button
-                      className={`hero-action-btn ${isFollowing ? "bookmarked" : "primary"}`}
-                      onClick={handleFollow}
-                    >
-                      {isFollowing ? "已收藏" : "收藏连载"}
-                    </button>
-                    <span className="series-follow-note">新章节会出现在首页“关注”内容中</span>
-                  </div>
-                )}
                 {isOwner && (
-                  <Link href={`/studio/series/${encodeURIComponent(decodedName)}`} className="hero-action-btn">
+                  <Link href={`/studio/series/${encodeURIComponent(seriesInfo.title)}`} className="hero-action-btn">
                     管理
                   </Link>
                 )}
@@ -282,23 +293,22 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                     <DefaultAvatar name={seriesInfo.author.nickname || "?"} />
                   )}
                 </Link>
+                <span className="hero-author-label">作者：</span>
                 <Link href={`/user/${seriesInfo.user_id}`} className="hero-author-name" style={{ textDecoration: "none" }}>
                   {seriesInfo.author.nickname}
                 </Link>
               </div>
               <span className="meta-sep">|</span>
               <span className="meta-item">
-                {seriesInfo.series_type === "fanfic" ? "同人" : "原创"}
-              </span>
-              <span className="meta-sep">|</span>
-              <span className="meta-item">
-                最近更新 <span>{lastChapter ? formatDateYmd(lastChapter.updated_at) : "暂无"}</span>
+                <span className="meta-label">最近更新</span>
+                <span>{lastChapter ? formatDateYmd(lastChapter.updated_at) : "暂无"}</span>
               </span>
               {lastChapter && (
                 <>
                   <span className="meta-sep">|</span>
                   <span className="meta-item">
-                    最新章 <span>{lastChapter.chapter_title || lastChapter.title || `第${lastChapter.chapter_number}章`}</span>
+                    <span className="meta-label">最新章</span>
+                    <span>{lastChapter.chapter_title || lastChapter.title || `第${lastChapter.chapter_number}章`}</span>
                   </span>
                 </>
               )}

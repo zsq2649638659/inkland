@@ -327,7 +327,7 @@ export default function IconRegistryPreviewPage() {
             <div className="icon-registry-grid" role="list">
               {group.names.map((name) => (
                 <article className="icon-registry-card" key={name} role="listitem">
-                  {group.id === "interaction" && inklandIconRegistry[name].supportsVariants ? (
+                  {inklandIconRegistry[name].supportsVariants ? (
                     <div className="icon-registry-preview icon-registry-preview--states" aria-label="描边和填充状态">
                       <span><SiteIcon name={name} variant="outline" size={24} /></span>
                       <span><SiteIcon name={name} variant="solid" size={24} /></span>
