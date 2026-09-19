@@ -1804,7 +1804,8 @@ p {
 }
 
 /* 首页与其他页面共用同一套侧栏宽度，避免从搜索返回首页时布局跳变。 */
-#page-home > .main-container {
+#page-home > .main-container,
+#page-search-shell > .main-container {
   justify-content: center;
   padding: var(--spacing-lg) 0;
 }
@@ -18030,7 +18031,8 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   }
 
   .main-container,
-  #page-home > .main-container {
+  #page-home > .main-container,
+  #page-search-shell > .main-container {
     max-width: 100%;
     gap: 0;
     padding: var(--spacing-md);
@@ -18046,7 +18048,8 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
     top: calc(var(--navbar-height) + var(--spacing-md));
   }
 
-  #page-home .sidebar {
+  #page-home .sidebar,
+  #page-search-shell .sidebar {
     top: calc(var(--navbar-height) + var(--spacing-md)) !important;
     margin-top: var(--spacing-md) !important;
   }
@@ -18137,19 +18140,22 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 
 /* Keep the homepage sidebar aligned with the first row of feed tabs at every
    desktop width, including the full sidebar layout above the tablet range. */
-#page-home .sidebar {
+#page-home .sidebar,
+#page-search-shell .sidebar {
   top: calc(var(--navbar-height) + var(--spacing-md)) !important;
   margin-top: var(--spacing-md) !important;
 }
 
 @media (min-width: 1025px) {
-  #page-home > .main-container {
+  #page-home > .main-container,
+  #page-search-shell > .main-container {
     max-width: min(100%, var(--ink-home-shell-max-width));
     justify-content: flex-start;
     gap: 20px;
   }
 
-  #page-home .content-area {
+  #page-home .content-area,
+  #page-search-shell .content-area {
     flex: 1 1 0;
     width: auto;
     max-width: none;
@@ -18163,7 +18169,8 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   }
 
   .main-container,
-  #page-home > .main-container {
+  #page-home > .main-container,
+  #page-search-shell > .main-container {
     max-width: min(100%, var(--ink-home-shell-max-width));
     justify-content: flex-start;
     gap: 20px;
@@ -18177,7 +18184,8 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
     overflow-y: auto;
   }
 
-  #page-home .sidebar {
+  #page-home .sidebar,
+  #page-search-shell .sidebar {
     top: calc(var(--navbar-height) + var(--spacing-md)) !important;
     margin-top: var(--spacing-md) !important;
   }
@@ -18248,7 +18256,8 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
    after the breakpoint overrides prevents each region from choosing a
    different width as the viewport crosses tablet and mobile sizes. */
 #navbar .navbar-inner,
-#page-home > .main-container {
+#page-home > .main-container,
+#page-search-shell > .main-container {
   width: min(100%, var(--ink-home-shell-max-width));
   max-width: var(--ink-home-shell-max-width);
   margin-inline: auto;
@@ -18265,7 +18274,8 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 /* At the icon-sidebar tablet widths, keep the page from touching the viewport
    while preserving a clear gutter between the sidebar and feed. */
 @media (min-width: 700px) and (max-width: 900px) {
-  #page-home > .main-container {
+  #page-home > .main-container,
+  #page-search-shell > .main-container {
     gap: 20px;
     padding-inline: var(--spacing-md) !important;
   }

@@ -817,7 +817,7 @@ function SearchContent() {
 
 export default function SearchPage() {
   return (
-    <div className="min-h-screen bg-paper pb-20 lg:pb-0">
+    <div id="page-search-shell" className="min-h-screen bg-paper pb-20 lg:pb-0">
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
