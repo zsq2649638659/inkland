@@ -18147,6 +18147,19 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 }
 
 @media (min-width: 1025px) {
+  .main-container:has(> .sidebar) {
+    max-width: min(100%, var(--ink-home-shell-max-width));
+    justify-content: flex-start;
+    gap: 20px;
+    padding-inline: 0;
+  }
+
+  .main-container:has(> .sidebar) > .content-area {
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+  }
+
   #page-home > .main-container,
   #page-search-shell > .main-container {
     max-width: min(100%, var(--ink-home-shell-max-width));
