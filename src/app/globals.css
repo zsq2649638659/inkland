@@ -18039,6 +18039,16 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
     padding-inline: 0 !important;
   }
 
+  .main-container:has(> .sidebar) {
+    padding-top: 0;
+    padding-bottom: var(--spacing-lg);
+  }
+
+  .main-container:has(> .sidebar) > .sidebar {
+    top: calc(var(--navbar-height) + var(--spacing-md));
+    margin-top: var(--spacing-md);
+  }
+
   .sidebar {
     display: block;
     width: 60px;
@@ -18152,12 +18162,19 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
     justify-content: flex-start;
     gap: 20px;
     padding-inline: 0;
+    padding-top: 0;
+    padding-bottom: var(--spacing-lg);
   }
 
   .main-container:has(> .sidebar) > .content-area {
     flex: 1 1 0;
     width: auto;
     max-width: none;
+  }
+
+  .main-container:has(> .sidebar) > .sidebar {
+    top: calc(var(--navbar-height) + var(--spacing-md));
+    margin-top: var(--spacing-md);
   }
 
   #page-home > .main-container,
@@ -18287,6 +18304,7 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 /* At the icon-sidebar tablet widths, keep the page from touching the viewport
    while preserving a clear gutter between the sidebar and feed. */
 @media (min-width: 700px) and (max-width: 900px) {
+  .main-container:has(> .sidebar),
   #page-home > .main-container,
   #page-search-shell > .main-container {
     gap: 20px;
