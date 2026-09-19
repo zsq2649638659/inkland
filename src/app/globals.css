@@ -18312,6 +18312,14 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   }
 }
 
+/* Profile keeps its own content spacing, but the outer sidebar shell uses the
+   same bottom inset as the homepage and search page. */
+@media (min-width: 700px) {
+  #page-profile .main-container {
+    padding-bottom: var(--spacing-lg);
+  }
+}
+
 /* Keep the first visible search component level with the sidebar. The
    sidebar intentionally starts one tablet spacing below the navbar; use it
    as the alignment baseline whenever the sidebar is visible. */
