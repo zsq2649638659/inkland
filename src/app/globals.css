@@ -8840,6 +8840,12 @@ p {
   #page-search .studio-filter-composition { display: none; }
   #page-search .search-mobile-filter-bar { display: flex; gap: var(--ink-gap-compact); width: 100%; }
   #page-search .search-filter-drawer-backdrop { position: fixed; inset: 0; z-index: var(--ink-z-modal); display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
+  #page-search .studio-filter-drawer-section .studio-filter-control {
+    width: 100px;
+    min-width: 100px;
+    flex: 0 0 100px;
+    padding-inline: 0;
+  }
 }
 
 /* 搜索页移动端 tabs 与个人空间保持同一高度，并将每个入口均分。 */
