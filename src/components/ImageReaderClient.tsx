@@ -104,8 +104,25 @@ export default function ImageReaderClient({ post, images: initialImages, initial
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   // Lightbox 状态
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [imageSourceOverrides, setImageSourceOverrides] = useState<Record<number, string>>({});
   const readingSaveTimerRef = useRef<number | null>(null);
   const readingRestoredRef = useRef(false);
+
+  // A failed/lazy image can change the document height during the first
+  // render. Reset the route position after that initial layout pass so a
+  // detail page opened from the home feed does not land one navbar-height
+  // below the top. A saved reading position is restored by the effect below
+  // after its async history lookup completes.
+  useEffect(() => {
+    const resetScroll = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    resetScroll();
+    const frame = window.requestAnimationFrame(resetScroll);
+    const timer = window.setTimeout(resetScroll, 0);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [post.id]);
 
   // 图片列表
   const images: ImageItem[] = initialImages || (post.images as string[] | undefined)?.map((url) => ({ url } as ImageItem)) || [];
@@ -649,11 +666,23 @@ export default function ImageReaderClient({ post, images: initialImages, initial
             {images.map((img, idx) => (
               <div key={idx} className="image-container" data-image-index={idx}>
                 <img
-                  src={img.url}
+                  src={imageSourceOverrides[idx] || img.url}
                   alt={`图片 ${idx + 1}`}
                   loading="lazy"
                   decoding="async"
                   onError={(event) => {
+                    const currentSource = imageSourceOverrides[idx] || img.url;
+                    try {
+                      const url = new URL(currentSource);
+                      const hasImageTransform = ["width", "height", "resize", "quality"].some((key) => url.searchParams.has(key));
+                      if (hasImageTransform) {
+                        ["width", "height", "resize", "quality"].forEach((key) => url.searchParams.delete(key));
+                        setImageSourceOverrides((current) => ({ ...current, [idx]: url.toString() }));
+                        return;
+                      }
+                    } catch {
+                      // The original URL may be a relative or provider-specific URL.
+                    }
                     event.currentTarget.replaceWith(Object.assign(document.createElement("span"), {
                       className: "image-load-error",
                       textContent: "图片加载失败",
@@ -671,6 +700,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
           <ChapterNav
             postType={post.post_type}
             seriesName={post.series_name}
+            seriesId={post.series_id}
             previous={prevChapter}
             next={nextChapter}
           />

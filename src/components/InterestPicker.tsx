@@ -83,10 +83,9 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
   if (!user) return null;
 
   return (
-    <section className={styles.card} aria-label="兴趣设置">
+    <section className={`${styles.card} ${pickerMode === "settings" ? styles.settingsCard : ""}`} aria-label="兴趣设置">
       <div className={styles.heading}>
         <div>
-          <span className={styles.eyebrow}>INKLAND DISCOVERY</span>
           <h1>{pickerMode === "settings" ? "兴趣偏好" : "选择你的兴趣"}</h1>
           <p>
             {pickerMode === "settings"
@@ -116,12 +115,12 @@ export default function InterestPicker({ mode = "onboarding" }: { mode?: PickerM
       {message && <p className={styles.error} role="alert">{message}</p>}
       {saved && <p className={styles.success} role="status">兴趣偏好已保存。</p>}
 
-      <div className={styles.actions}>
+      <div className={`${styles.actions} ${pickerMode === "settings" ? styles.settingsActions : ""}`}>
         <button className={styles.skip} disabled={saving} onClick={() => void finish(true)} type="button">
           {pickerMode === "settings" ? "清空偏好" : "跳过，先去逛逛"}
         </button>
         <div className={styles.actionGroup}>
-          <button className={styles.primary} disabled={saving} onClick={() => void finish()} type="button">
+          <button className={`${styles.primary} btn-publish`} disabled={saving} onClick={() => void finish()} type="button">
             {saving ? "保存中…" : pickerMode === "settings" ? "保存偏好" : "进入首页"}
           </button>
         </div>

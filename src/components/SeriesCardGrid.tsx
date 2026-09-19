@@ -35,7 +35,7 @@ export default function SeriesCardGrid({ series, showAuthor = false }: SeriesCar
     <div className="rounded-[16px] bg-card border border-rule overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group aspect-square">
       {/* 封面区 */}
       <Link
-        href={`/series/${encodeURIComponent(series.name)}`}
+        href={`/series/${encodeURIComponent(series.id)}`}
         className="block relative flex-1 min-h-0 overflow-hidden bg-rule no-underline"
       >
         {series.cover_url ? (

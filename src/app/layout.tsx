@@ -14,8 +14,8 @@ import "@/components/inkland/library.css";
 import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
-  title: "inkland — 同人创作社区",
-  description: "一个干净、无广告、尊重阅读体验的同人创作社区。支持图文创作、标签搜索、段评互动。",
+  title: "inkland — 低打扰创作社区",
+  description: "一个干净、无广告、尊重阅读体验的低打扰创作社区。支持图文创作、标签搜索、段评互动。",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   alternates: { canonical: "/" },
   icons: {
@@ -23,13 +23,13 @@ export const metadata: Metadata = {
     shortcut: "/favicon.svg",
   },
   openGraph: {
-    title: "inkland — 同人创作社区",
-    description: "一个干净、无广告、尊重阅读体验的同人创作社区。",
+    title: "inkland — 低打扰创作社区",
+    description: "一个干净、无广告、尊重阅读体验的低打扰创作社区。",
     type: "website",
     siteName: "inkland",
     locale: "zh_CN",
   },
-  twitter: { card: "summary_large_image", title: "inkland — 同人创作社区", description: "一个干净、无广告、尊重阅读体验的同人创作社区。" },
+  twitter: { card: "summary_large_image", title: "inkland — 低打扰创作社区", description: "一个干净、无广告、尊重阅读体验的低打扰创作社区。" },
   robots: { index: true, follow: true },
 };
 

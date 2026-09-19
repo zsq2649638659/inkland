@@ -24,6 +24,7 @@ export interface SerialPostCardData {
   chapterTitle: string;
   chapterNumber: number;
   content: string;
+  seriesId: string | null;
   seriesName: string;
   seriesDescription: string;
   seriesCover: string | null;
@@ -94,6 +95,9 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   }, [cardMenuOpen]);
 
   const plainExcerpt = useMemo(() => stripMarkdown(data.content), [data.content]);
+  const seriesHref = data.seriesId
+    ? `/series/${encodeURIComponent(data.seriesId)}`
+    : `/series/${encodeURIComponent(data.seriesName)}`;
 
   const goToLogin = () => {
     if (authLoading) return;
@@ -206,7 +210,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       setLoadingComments(true);
       const { data: raw } = await supabase
         .from("comments")
-        .select("id, content, created_at, user_id, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
+        .select("id, content, created_at, user_id, parent_id, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
         .eq("post_id", data.chapterId)
         .order("created_at", { ascending: false })
         .limit(5);
@@ -219,7 +223,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
             user_id: c.user_id as string,
             content: c.content as string,
             created_at: c.created_at as string,
-            parent_id: null,
+            parent_id: (c.parent_id as string | null) ?? null,
             paragraph_index: null,
             author: { nickname: author?.nickname || "匿名用户", avatar_url: author?.avatar_url || null },
           };
@@ -262,6 +266,63 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
     setSubmitting(false);
   };
 
+  const submitReply = async (parentId: string, content: string, replyToName: string) => {
+    if (!user || !content.trim()) return;
+    const blocked = await assertCanComment();
+    if (blocked) {
+      setToastMessage(blocked);
+      return;
+    }
+    const storedContent = `@${replyToName} ${content.trim()}`;
+    const { data: inserted, error } = await supabase
+      .from("comments")
+      .insert({ post_id: data.chapterId, user_id: user.id, parent_id: parentId, content: storedContent })
+      .select("id, content, created_at, user_id, parent_id")
+      .single();
+    if (error || !inserted) {
+      setToastMessage("回复发布失败，请稍后重试。");
+      return;
+    }
+    setComments((prev) => [...prev, {
+      id: inserted.id as string,
+      post_id: data.chapterId,
+      user_id: user.id,
+      content: storedContent,
+      created_at: inserted.created_at as string,
+      parent_id: parentId,
+      paragraph_index: null,
+      author: { nickname: profile?.nickname || user.email?.split("@")[0] || "我", avatar_url: profile?.avatar_url || null },
+    }]);
+    setCommentCount((count) => count + 1);
+  };
+
+  const deleteComment = async (commentId: string) => {
+    if (!user) return;
+    if (!await dialog.confirm({ title: "删除评论", message: "确定要删除这条评论吗？删除后无法恢复。", confirmLabel: "删除评论", variant: "danger" })) return;
+    const childIds = comments.filter((comment) => comment.parent_id === commentId).map((comment) => comment.id);
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("user_id", user.id);
+    if (error) {
+      setToastMessage(error?.message || "删除失败：评论可能已被删除，或当前账号没有删除权限。");
+      return;
+    }
+    const { data: remaining, error: verifyError } = await supabase
+      .from("comments")
+      .select("id")
+      .eq("id", commentId)
+      .maybeSingle();
+    if (verifyError || remaining) {
+      setToastMessage(verifyError?.message || "删除失败：评论仍然存在，请稍后重试。");
+      return;
+    }
+    const removedIds = new Set([commentId, ...childIds]);
+    setComments((items) => items.filter((comment) => !removedIds.has(comment.id)));
+    setCommentCount((count) => Math.max(0, count - removedIds.size));
+  };
+
   return (
     <article
       className="site-card site-card--feed site-card--feed-serial"
@@ -297,16 +358,16 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
         </div>
 
         <div className="site-card__header-actions">
-          {user?.id !== data.authorId && (
-            <button className={`site-card__follow${following ? " site-card__follow--followed" : ""}`} onClick={toggleFollow} disabled={followLoading}>
-              {user ? (following ? "已关注" : followLoading ? "..." : "+ 关注") : "+ 关注"}
-            </button>
-          )}
           <div className="card-more-wrap" ref={cardMenuRef}>
             <button className="site-card__more" onClick={() => setCardMenuOpen((open) => !open)} aria-label="作品更多操作" aria-expanded={cardMenuOpen}><SiteIcon name="fa-ellipsis-vertical" variant="solid" /></button>
             {cardMenuOpen && (
               <div className="card-more-menu">
-                {user?.id !== data.authorId && following && <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }}><span className="menu-item-icon" aria-hidden="true" />取消关注</button>}
+                {user?.id !== data.authorId && (
+                  <button onClick={() => { setCardMenuOpen(false); void toggleFollow(); }} disabled={followLoading}>
+                    <SiteIcon name={following ? "fa-user-minus" : "fa-user-plus"} variant="outline" hoverVariant="solid" />
+                    {following ? "取消关注" : followLoading ? "..." : "关注"}
+                  </button>
+                )}
                 <button onClick={() => { setCardMenuOpen(false); void reportTarget("post", data.chapterId); }}><SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" /> 举报</button>
                 {user?.id === data.authorId && <button onClick={() => void deleteChapter()}><SiteIcon name="fa-action-delete" variant="outline" hoverVariant="solid" /> 删除</button>}
               </div>
@@ -331,17 +392,25 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
         onClick={(event) => {
           const target = event.target as HTMLElement;
           if (target.closest("a, button, .site-card__status, .site-card__tag")) return;
-          router.push(`/series/${encodeURIComponent(data.seriesName)}`);
+          router.push(seriesHref);
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            router.push(`/series/${encodeURIComponent(data.seriesName)}`);
+            router.push(seriesHref);
           }
         }}
       >
         <div className="site-card__serial-heading">
-          <Link href={`/series/${encodeURIComponent(data.seriesName)}`} className="site-card__title-link">
+          <Link
+            href={seriesHref}
+            className="site-card__title-link"
+            onClick={(event) => {
+              event.stopPropagation();
+              event.preventDefault();
+              router.push(seriesHref);
+            }}
+          >
             <strong>{data.seriesName}</strong>
           </Link>
           <span className={`tag tag--status ${data.seriesStatus === "ongoing" ? "tag--status-active" : "tag--status-complete"} site-card__status`} onClick={(event) => event.stopPropagation()}>
@@ -382,6 +451,8 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
           submitting={submitting}
           onCommentTextChange={setCommentText}
           onSubmit={submitComment}
+          onReply={submitReply}
+          onDelete={deleteComment}
           onClose={() => setShowComment(false)}
           onReport={(commentId) => void reportTarget("comment", commentId)}
           onBlock={(commentUserId) => void blockUser(commentUserId)}

@@ -16,11 +16,12 @@ interface ChapterNavItem {
 interface ChapterNavProps {
   postType?: string;
   seriesName: string;
+  seriesId?: string | null;
   previous: ChapterNavItem | null;
   next: ChapterNavItem | null;
 }
 
-export default function ChapterNav({ postType, seriesName, previous, next }: ChapterNavProps) {
+export default function ChapterNav({ postType, seriesName, seriesId, previous, next }: ChapterNavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -57,7 +58,7 @@ export default function ChapterNav({ postType, seriesName, previous, next }: Cha
     return () => window.clearTimeout(timer);
   }, [pendingHref, pathname]);
 
-  const collectionHref = `/${postType === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName)}`;
+  const collectionHref = `/${postType === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesId || seriesName)}`;
   const isLoading = Boolean(pendingHref);
   const visibleProgress = pendingHref && pathname === pendingHref ? 100 : progress;
 

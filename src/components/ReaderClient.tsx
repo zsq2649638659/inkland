@@ -754,6 +754,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
             <ChapterNav
               postType={post.post_type}
               seriesName={post.series_name}
+              seriesId={post.series_id}
               previous={prevChapter}
               next={nextChapter}
             />

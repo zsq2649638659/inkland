@@ -89,7 +89,7 @@ begin
         left join public.post_stats s on s.id = p.id
       ) x), '[]'::json),
       'seriesMeta', coalesce((select json_agg(m) from (
-        select ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type, ss.is_test_data
+        select ss.id, ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type, ss.is_test_data
         from public.series ss
         where ss.name in (
           select distinct p.series_name from feed p
@@ -159,7 +159,7 @@ begin
         limit p_limit
       ) x), '[]'::json),
       'seriesMeta', coalesce((select json_agg(m) from (
-        select ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type, ss.is_test_data
+        select ss.id, ss.name, ss.description, ss.cover_url, ss.tags, ss.status, ss.series_type, ss.is_test_data
         from public.series ss
         where ss.name in (
           select distinct p.series_name from merged p

@@ -118,6 +118,10 @@ export default async function ReadPage({
 
   const p = posts[0] as Record<string, unknown>;
   const postType = p.post_type as string;
+  const seriesName = p.series_name as string | null;
+  const { data: seriesRow } = seriesName
+    ? await supabase.from("series").select("id").eq("name", seriesName).maybeSingle()
+    : { data: null };
   const isImagePost = postType === "illustration" || postType === "comic" || postType === "cosplay" || postType === "art";
   const initialAdjacentPromise = loadAdjacentChapters(
     supabase,
@@ -168,6 +172,7 @@ export default async function ReadPage({
     visibility: p.visibility === "followers_only" || p.visibility === "private" ? p.visibility : "public",
     word_count: p.word_count as number,
     series_name: p.series_name as string | null,
+    series_id: (seriesRow as { id?: string } | null)?.id || null,
     chapter_number: p.chapter_number as number | null,
     image_count: images.length,
     created_at: p.created_at as string,
