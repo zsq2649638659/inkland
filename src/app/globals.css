@@ -2614,8 +2614,8 @@ p {
 
 #page-notifications .segmented-tabs--notifications .notification-tab-count {
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: 4px;
+  right: 4px;
   z-index: 1;
 }
 
@@ -14942,9 +14942,19 @@ p {
   z-index: 100;
 }
 
-/* Mobile notification filters reserve a badge lane instead of letting the
- * count sit on top of the centered label. The strip can scroll internally at
- * very narrow widths, so the page itself never gains horizontal overflow. */
+/* Smaller screens use a compact badge while preserving a separate label lane.
+ * The strip can scroll internally at very narrow widths, so the page itself
+ * never gains horizontal overflow. */
+@media (max-width: 768px) {
+  #page-notifications .segmented-tabs--notifications .notification-tab-count {
+    min-width: 9px;
+    height: 9px;
+    padding: 0 2px;
+    border-radius: 5px;
+    font-size: 5px;
+  }
+}
+
 @media (max-width: 600px) {
   #page-notifications .segmented-tabs--notifications {
     justify-content: flex-start;
@@ -14975,14 +14985,14 @@ p {
   }
 
   #page-notifications .segmented-tabs--notifications .segmented-tab:has(.notification-tab-count) {
-    flex-basis: 55px;
-    min-width: 55px;
-    width: 55px;
-    padding: 8px 29px 8px 0;
+    flex-basis: 50px;
+    min-width: 50px;
+    width: 50px;
+    padding: 8px 0;
   }
 
   #page-notifications .segmented-tabs--notifications .notification-tab-count {
-    right: 8px;
+    right: 1px;
   }
 }
 
