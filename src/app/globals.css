@@ -14942,6 +14942,50 @@ p {
   z-index: 100;
 }
 
+/* Mobile notification filters reserve a badge lane instead of letting the
+ * count sit on top of the centered label. The strip can scroll internally at
+ * very narrow widths, so the page itself never gains horizontal overflow. */
+@media (max-width: 600px) {
+  #page-notifications .segmented-tabs--notifications {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-inline: 0;
+    scrollbar-width: none;
+  }
+
+  #page-notifications .segmented-tabs--notifications::-webkit-scrollbar {
+    display: none;
+  }
+
+  #page-notifications .segmented-tabs--notifications .segmented-tabs-left {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0;
+    width: max-content;
+  }
+
+  #page-notifications .segmented-tabs--notifications .segmented-tab {
+    box-sizing: border-box;
+    flex: 0 0 50px;
+    min-width: 50px;
+    width: 50px;
+    padding: 8px 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  #page-notifications .segmented-tabs--notifications .segmented-tab:has(.notification-tab-count) {
+    flex-basis: 55px;
+    min-width: 55px;
+    width: 55px;
+    padding: 8px 29px 8px 0;
+  }
+
+  #page-notifications .segmented-tabs--notifications .notification-tab-count {
+    right: 8px;
+  }
+}
+
 /* ===== 一键回到顶部 ===== */
 .back-to-top {
   position: fixed;
