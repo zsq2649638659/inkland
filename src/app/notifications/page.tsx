@@ -52,15 +52,26 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const filterType = readNotificationTab(searchParams);
+  const [filterType, setFilterType] = useState<NotificationType>(() => readNotificationTab(searchParams));
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadByType, setUnreadByType] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      setFilterType(readNotificationTab(new URLSearchParams(window.location.search)));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const handleFilterChange = (next: NotificationType) => {
+    if (next === filterType) return;
     const params = new URLSearchParams(window.location.search);
     params.set("tab", next);
-    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState(null, "", nextUrl);
+    setFilterType(next);
   };
 
   const showToast = useCallback((message: string) => {
@@ -528,7 +539,10 @@ export default function NotificationsPage() {
             <div className="page-title">
               我的消息
               {unreadCount > 0 && (
-                <span className="unread-badge">{formatNotificationCount(unreadCount)}</span>
+                <>
+                  <span className="unread-badge" aria-hidden="true" />
+                  <span className="sr-only">{formatNotificationCount(unreadCount)} 条未读消息</span>
+                </>
               )}
             </div>
             <button className="mark-all-read" onClick={markAllAsRead}>
@@ -545,10 +559,20 @@ export default function NotificationsPage() {
                   className={`segmented-tab ${filterType === tab.key ? "active" : ""}`}
                   onClick={() => handleFilterChange(tab.key)}
                   data-filter={tab.key}
+                  aria-label={
+                    (unreadByType[tab.key] || 0) > 0
+                      ? `${tab.label}，${formatNotificationCount(unreadByType[tab.key])} 条未读消息`
+                      : tab.label
+                  }
                 >
                   {tab.label}
                   {(unreadByType[tab.key] || 0) > 0 && (
-                    <span className="notification-tab-count">{formatNotificationCount(unreadByType[tab.key])}</span>
+                    <span
+                      className="notification-tab-count"
+                      aria-hidden="true"
+                    >
+                      {formatNotificationCount(unreadByType[tab.key])}
+                    </span>
                   )}
                 </button>
               ))}

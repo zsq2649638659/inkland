@@ -1390,14 +1390,13 @@ p {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  margin-left: 6px;
+  margin: 0;
   border-radius: 9px;
-  background: var(--color-primary, #F26B5B);
+  background: var(--ink-color-brand, var(--color-primary, #F26B5B));
   color: #fff;
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  vertical-align: middle;
 }
 .sidebar-skeleton-line,
 .sidebar-skeleton-icon {
@@ -2569,19 +2568,13 @@ p {
   background: var(--color-primary);
 }
 #page-notifications .unread-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 9999px;
-  line-height: 1;
-  margin-left: 8px;
+  display: block;
+  flex: 0 0 var(--ink-notification-unread-dot-size, 7px);
+  width: var(--ink-notification-unread-dot-size, 7px);
+  height: var(--ink-notification-unread-dot-size, 7px);
+  margin: 5px 0 0;
+  border-radius: 50%;
+  background: var(--ink-color-brand, var(--color-primary));
 }
 #page-notifications .mark-all-read {
   display: inline-flex;
@@ -2609,7 +2602,21 @@ p {
 }
 
 #page-notifications .page-title {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
   min-width: 0;
+}
+
+#page-notifications .segmented-tabs--notifications .segmented-tab {
+  position: relative;
+}
+
+#page-notifications .segmented-tabs--notifications .notification-tab-count {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
 }
 
 #page-notifications .mark-all-read:hover {
@@ -18328,12 +18335,23 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   }
 }
 
-/* Keep the first visible search component level with the sidebar. The
-   sidebar intentionally starts one tablet spacing below the navbar; use it
-   as the alignment baseline whenever the sidebar is visible. */
+/* The sidebar intentionally starts one spacing unit below the navbar. Keep
+   every sibling content area on that same baseline instead of aligning its
+   box to the top of the outer shell. This is shared by all pages that render
+   the HomeSidebar, not just the homepage and search page. */
 @media (min-width: 700px) {
+  .main-container:has(> .sidebar) {
+    align-items: flex-start;
+  }
+
+  .main-container:has(> .sidebar) > .content-area {
+    margin-top: var(--spacing-md);
+  }
+
+  /* Search used to compensate for the sidebar offset with inner padding.
+     The shared shell margin now owns the alignment, so avoid a double offset. */
   #page-search-shell > .main-container > .content-area {
-    padding-top: var(--spacing-md);
+    padding-top: 0;
   }
 }
 
