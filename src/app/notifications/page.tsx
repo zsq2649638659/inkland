@@ -4,7 +4,7 @@ import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
@@ -16,9 +16,8 @@ import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-da
 
 type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark" | "reply";
 
-const readNotificationTab = (): NotificationType => {
-  if (typeof window === "undefined") return "all";
-  const tab = new URLSearchParams(window.location.search).get("tab");
+const readNotificationTab = (searchParams?: { get: (name: string) => string | null }): NotificationType => {
+  const tab = searchParams?.get("tab") ?? (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab"));
   if (tab === "all" || tab === "comment" || tab === "like" || tab === "follow" || tab === "system" || tab === "bookmark" || tab === "reply") return tab;
   return "all";
 };
@@ -48,23 +47,17 @@ interface NotificationItem {
 export default function NotificationsPage() {
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, profile, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<NotificationType>("all");
+  const [loadError, setLoadError] = useState(false);
+  const filterType = readNotificationTab(searchParams);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadByType, setUnreadByType] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    const syncTabFromUrl = () => setFilterType(readNotificationTab());
-    syncTabFromUrl();
-    window.addEventListener("popstate", syncTabFromUrl);
-    return () => window.removeEventListener("popstate", syncTabFromUrl);
-  }, []);
-
   const handleFilterChange = (next: NotificationType) => {
-    setFilterType(next);
     const params = new URLSearchParams(window.location.search);
     params.set("tab", next);
     router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
@@ -131,6 +124,7 @@ export default function NotificationsPage() {
   async function loadNotifications() {
     if (!user) return;
     setLoading(true);
+    setLoadError(false);
 
     // actor 资料与作品标题通过 PostgREST 嵌套一次取回，
     // 替代原先「列表 → profiles → posts」3 轮串行跨区往返。
@@ -150,6 +144,8 @@ export default function NotificationsPage() {
 
     if (error) {
       console.error("Failed to load notifications:", error);
+      setNotifications([]);
+      setLoadError(true);
       setLoading(false);
       return;
     }
@@ -563,6 +559,20 @@ export default function NotificationsPage() {
           <div className="notification-panel">
             {loading ? (
               <SkeletonNotification />
+            ) : loadError ? (
+              <div className="empty-state notification-error-state" role="alert">
+                <div className="empty-illustration">
+                  <div className="empty-tag-ring">
+                    <div className="tag-ring-outer"></div>
+                    <div className="tag-ring-inner">
+                      <SiteIcon name="fa-circle-info" variant="solid" />
+                    </div>
+                  </div>
+                </div>
+                <div className="empty-title">消息加载失败</div>
+                <div className="empty-desc">暂时无法加载消息，请检查网络后重试</div>
+                <button className="empty-action" type="button" onClick={() => void loadNotifications()}>重试</button>
+              </div>
             ) : notifications.length === 0 ? (
               <div className="empty-state" style={{ display: "flex" }}>
                 <div className="empty-illustration">
