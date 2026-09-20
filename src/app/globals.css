@@ -18328,12 +18328,23 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   }
 }
 
-/* Keep the first visible search component level with the sidebar. The
-   sidebar intentionally starts one tablet spacing below the navbar; use it
-   as the alignment baseline whenever the sidebar is visible. */
+/* The sidebar intentionally starts one spacing unit below the navbar. Keep
+   every sibling content area on that same baseline instead of aligning its
+   box to the top of the outer shell. This is shared by all pages that render
+   the HomeSidebar, not just the homepage and search page. */
 @media (min-width: 700px) {
+  .main-container:has(> .sidebar) {
+    align-items: flex-start;
+  }
+
+  .main-container:has(> .sidebar) > .content-area {
+    margin-top: var(--spacing-md);
+  }
+
+  /* Search used to compensate for the sidebar offset with inner padding.
+     The shared shell margin now owns the alignment, so avoid a double offset. */
   #page-search-shell > .main-container > .content-area {
-    padding-top: var(--spacing-md);
+    padding-top: 0;
   }
 }
 
