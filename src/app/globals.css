@@ -3899,6 +3899,24 @@ p {
 .page-header { margin-bottom: 24px; }
 .page-title { font-size: 28px; font-weight: 700; color: var(--color-text); letter-spacing: -0.03em; line-height: 1.2; }
 .page-subtitle { font-size: 14px; color: var(--color-text-muted); margin-top: 6px; font-weight: 400; }
+.studio-error-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ink-space-4);
+  width: 100%;
+  padding: var(--ink-space-5);
+  border: var(--ink-border-width-thin) solid var(--ink-color-danger);
+  border-radius: var(--ink-radius-md);
+  color: var(--ink-danger);
+  background: var(--ink-danger-bg);
+}
+.studio-error-state-icon { display: inline-flex; width: var(--ink-size-10); height: var(--ink-size-10); align-items: center; justify-content: center; flex: 0 0 auto; }
+.studio-error-state-icon svg { width: var(--ink-size-10); height: var(--ink-size-10); }
+.studio-error-state-copy { min-width: 0; }
+.studio-error-state-copy h2 { margin: 0; color: var(--ink-text); font: var(--ink-font-title-sm); text-wrap: balance; }
+.studio-error-state-copy p { margin: var(--ink-space-1) 0 0; color: var(--ink-muted); font: var(--ink-font-card-excerpt); text-wrap: pretty; }
+.studio-error-state-action { flex: 0 0 auto; margin: 0; }
 .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
 .stat-card { background: var(--color-card); border-radius: var(--radius-lg); padding: 16px; position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.3s ease, box-shadow 0.3s ease; }
 .stat-card:active { transform: scale(0.97); }
@@ -15082,8 +15100,16 @@ p {
 /* ===== 加载更多 / 已加载全部 ===== */
 .card-load-more {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ink-gap-sm);
   justify-content: center;
   padding: 22px 0 6px;
+}
+
+.studio-load-more-status {
+  color: var(--ink-muted);
+  font: var(--ink-font-tag-meta);
 }
 
 .btn-load-more {
@@ -15108,6 +15134,18 @@ p {
 .load-more-end {
   font-size: 13px;
   color: var(--color-muted, #999999);
+}
+
+@media (max-width: 600px) {
+  .studio-error-state {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .studio-error-state-action {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }
 
 /* ===== 图片加载失败占位 ===== */

@@ -197,8 +197,8 @@ function StudioWorkCard({
   const excerpt = getExcerpt(work.content);
   const mobileType = isImage ? (displayTitle ? "image" : "image-empty") : isSeries ? "serial" : "single";
   const title = displayTitle || (isSeries ? work.series_name || "长篇连载" : "无标题");
-  const mobileTitle = isImage && !displayTitle ? "-" : title;
-  const mobileExcerpt = isImage ? (displayTitle ? excerpt || "-" : "-") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
+  const mobileTitle = isImage ? displayTitle : title;
+  const mobileExcerpt = isImage ? (displayTitle ? excerpt : "") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
   const latestChapterTitle = work.series_chapter_count ? `第${work.series_chapter_count}章` : "章节待发布";
   const workHref = isSeries && work.series_name
     ? `/studio/series/${encodeURIComponent(work.series_name)}`
@@ -268,15 +268,14 @@ function StudioWorkCard({
                   <h3 className="site-card__title">{title}</h3>
                 </Link>
               </div>
-            ) : (
+            ) : isImage && !displayTitle ? null : (
               <Link className="site-card__title-link" href={isImage ? `/read/${work.id}` : editHref} onClick={(event) => event.stopPropagation()}>
-                <h3 className="site-card__title">{isImage ? mobileTitle : title}</h3>
+                <h3 className="site-card__title">{mobileTitle}</h3>
               </Link>
             )}
-            {(!isImage || mobileType === "image") && (
+            {(!isImage || displayTitle) && (
               <p className={`site-card__excerpt${isSeries ? " site-card__serial-intro" : ""}`}>{isImage ? mobileExcerpt : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要")}</p>
             )}
-            {isImage && mobileType === "image-empty" && <p className="site-card__excerpt site-card__image-empty-excerpt">-</p>}
             {isSeries && (
               <Link className="tag tag--type tag--type-link site-card__latest-chapter" href={`${workHref}#chapter`} aria-label={`最新章节：${latestChapterTitle}`} onClick={(event) => event.stopPropagation()}>
                 <SiteIcon name="fa-long-serial" variant="solid" aria-hidden="true" />
@@ -324,6 +323,7 @@ export default function StudioPage() {
   const [works, setWorks] = useState<WorkItem[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesWorkItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string[]>>({});
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileDraftFilter, setMobileDraftFilter] = useState<FilterType>("all");
@@ -365,6 +365,7 @@ export default function StudioPage() {
   const loadWorks = async () => {
     if (!user) return;
     setLoading(true);
+    setLoadError(null);
 
     // 优先走服务端聚合路由（机房内拉取 posts+stats 并瘦身，客户端只下载轻量数据）；
     // 本地 dev 或路由异常时回落客户端直连。
@@ -401,8 +402,21 @@ export default function StudioPage() {
         // 避免批量导入的章节把 limit(50) 挤占并白拉回大量正文。
         .neq("post_type", "serial")
         .order("updated_at", { ascending: false });
-      const res = await q.limit(50);
-      if (!res.data) { setLoading(false); return; }
+      let res: { data: unknown[] | null; error: { message: string } | null };
+      try {
+        res = await q.limit(50);
+      } catch {
+        setWorks([]);
+        setLoadError("作品列表暂时无法加载，请重试。");
+        setLoading(false);
+        return;
+      }
+      if (res.error || !res.data) {
+        setWorks([]);
+        setLoadError("作品列表暂时无法加载，请重试。");
+        setLoading(false);
+        return;
+      }
       // 直连回落路径同样瘦身：卡片只消费摘要+图片，超长全文交给编辑器
       data = (res.data as unknown as Record<string, unknown>[]).map((p) => ({
         ...p,
@@ -753,6 +767,15 @@ export default function StudioPage() {
     window.dispatchEvent(new Event("inkland:stats-changed"));
   };
 
+  const retryLoadStudio = () => {
+    setBatchMode(false);
+    setSelectedIds(new Set());
+    invalidateClientCache(`studio-works:${user?.id || ""}`);
+    invalidateClientCache(`studio-series:${user?.id || ""}`);
+    void loadWorks();
+    void loadSeries();
+  };
+
   if (authLoading) {
     return <div className="min-h-screen bg-paper pb-20 lg:pb-0"><div className="main-container"><HomeSidebar /><div className="content-area"><SkeletonStudio /></div></div></div>;
   }
@@ -797,6 +820,20 @@ export default function StudioPage() {
             <h1 className="page-title">作品管理</h1>
             <p className="page-subtitle">管理你的作品、草稿和审核状态</p>
           </div>
+
+          {loadError ? (
+            <section className="studio-error-state" role="alert" aria-live="assertive">
+              <div className="studio-error-state-icon" aria-hidden="true">
+                <SiteIcon name="fa-circle-exclamation" variant="solid" />
+              </div>
+              <div className="studio-error-state-copy">
+                <h2>作品列表加载失败</h2>
+                <p>{loadError}</p>
+              </div>
+              <button type="button" className="empty-action studio-error-state-action" onClick={retryLoadStudio}>重试</button>
+            </section>
+          ) : (
+          <>
 
           {/* 统计卡片（使用未筛选数据，不受 type/status 筛选影响） */}
           <div className="stats-grid">
@@ -961,7 +998,8 @@ export default function StudioPage() {
             </div>
           )}
           {allWorks.length > 12 && (
-            <div className="card-load-more" ref={workLoadMoreRef}>
+            <div className="card-load-more" ref={workLoadMoreRef} aria-live="polite">
+              <span className="studio-load-more-status">已显示 {Math.min(shownWorks, allWorks.length)} / {allWorks.length} 项作品</span>
               {shownWorks < allWorks.length ? (
                 <button type="button" className="btn-load-more" onClick={() => setShownWorks((count) => count + 12)}>
                   <SiteIcon name="fa-chevron-down" variant="solid" aria-hidden="true" /> 加载更多
@@ -973,6 +1011,8 @@ export default function StudioPage() {
           )}
 
           <div className="page-footer">&copy; 2026 inkland. All rights reserved.</div>
+          </>
+          )}
           </>
           )}
         </div>
