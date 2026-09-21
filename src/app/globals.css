@@ -15011,7 +15011,12 @@ p {
   opacity: 0;
   visibility: hidden;
   transform: translateY(12px);
+  box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
   transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
+}
+
+[data-theme="dark"] .back-to-top {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
 }
 
 .back-to-top.show {
