@@ -199,6 +199,7 @@ function StudioWorkCard({
   const title = displayTitle || (isSeries ? work.series_name || "长篇连载" : "无标题");
   const mobileTitle = isImage ? displayTitle : title;
   const mobileExcerpt = isImage ? (displayTitle ? excerpt : "") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
+  const isRejected = work.review_status === "rejected" || work.status === "rejected";
   const latestChapterTitle = work.series_chapter_count ? `第${work.series_chapter_count}章` : "章节待发布";
   const workHref = isSeries && work.series_name
     ? `/studio/series/${encodeURIComponent(work.series_name)}`
@@ -206,7 +207,7 @@ function StudioWorkCard({
   const editHref = isSeries
     ? workHref
     : `/create?editPost=${work.id}`;
-  const editLabel = work.review_status === "rejected" && !isSeries ? "查看问题并修改" : "编辑";
+  const editLabel = isRejected && !isSeries ? "查看问题并修改" : "编辑";
   const publishedValue = work.published_at || work.updated_at || work.created_at;
 
   return (
@@ -299,7 +300,7 @@ function StudioWorkCard({
         </div>
 
         <div className="site-card__studio-mobile-management" role="group" aria-label={`${typeLabel}作品管理操作`}>
-          <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`编辑${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
+          <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`${editLabel}${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
           <button type="button" className="btn btn--small btn--round btn--theme-primary btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
         </div>
       </div>
@@ -332,7 +333,13 @@ export default function StudioPage() {
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shownWorks, setShownWorks] = useState(12);
+  const [studioSearchDraft, setStudioSearchDraft] = useState(searchQuery);
+  const studioSearchComposingRef = useRef(false);
   const workLoadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!studioSearchComposingRef.current) setStudioSearchDraft(searchQuery);
+  }, [searchQuery]);
 
   useEffect(() => {
     setShownWorks(12);
@@ -354,6 +361,42 @@ export default function StudioPage() {
 
     const query = nextParams.toString();
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  };
+
+  const commitStudioSearch = (value: string) => {
+    setStudioSearchDraft(value);
+    if (value !== searchQuery) updateStudioQuery({ searchQuery: value });
+  };
+
+  const handleStudioSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.currentTarget.value;
+    setStudioSearchDraft(value);
+    if (!studioSearchComposingRef.current && !(event.nativeEvent as InputEvent).isComposing) commitStudioSearch(value);
+  };
+
+  const handleStudioSearchCompositionStart = () => {
+    studioSearchComposingRef.current = true;
+  };
+
+  const handleStudioSearchCompositionEnd = (event: React.CompositionEvent<HTMLInputElement>) => {
+    studioSearchComposingRef.current = false;
+    commitStudioSearch(event.currentTarget.value);
+  };
+
+  const handleStudioSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && !studioSearchComposingRef.current) {
+      event.preventDefault();
+      commitStudioSearch(event.currentTarget.value);
+    }
+  };
+
+  const handleStudioSearchBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (!studioSearchComposingRef.current) commitStudioSearch(event.currentTarget.value);
+  };
+
+  const clearStudioSearch = () => {
+    studioSearchComposingRef.current = false;
+    commitStudioSearch("");
   };
 
   useEffect(() => {
@@ -818,7 +861,6 @@ export default function StudioPage() {
             <>
           <div className="page-header">
             <h1 className="page-title">作品管理</h1>
-            <p className="page-subtitle">管理你的作品、草稿和审核状态</p>
           </div>
 
           {loadError ? (
@@ -902,8 +944,8 @@ export default function StudioPage() {
                 <div className="filter-system-field filter-system-field--query">
                   <div className="profile-filter-search-shell">
                     <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                    <input className="form-control" type="search" value={searchQuery} onChange={(event) => updateStudioQuery({ searchQuery: event.target.value })} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
-                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => updateStudioQuery({ searchQuery: "" })}>
+                    <input className="form-control" type="search" value={studioSearchDraft} onChange={handleStudioSearchChange} onCompositionStart={handleStudioSearchCompositionStart} onCompositionEnd={handleStudioSearchCompositionEnd} onKeyDown={handleStudioSearchKeyDown} onBlur={handleStudioSearchBlur} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
+                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={clearStudioSearch}>
                       <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                     </button>
                   </div>
@@ -931,8 +973,8 @@ export default function StudioPage() {
                     <div className="filter-system-field filter-system-field--query">
                       <div className="profile-filter-search-shell">
                         <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => updateStudioQuery({ searchQuery: event.target.value })} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
-                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => updateStudioQuery({ searchQuery: "" })}>
+                        <input className="form-control" type="search" value={studioSearchDraft} onChange={handleStudioSearchChange} onCompositionStart={handleStudioSearchCompositionStart} onCompositionEnd={handleStudioSearchCompositionEnd} onKeyDown={handleStudioSearchKeyDown} onBlur={handleStudioSearchBlur} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
+                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={clearStudioSearch}>
                           <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                         </button>
                       </div>

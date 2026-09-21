@@ -1183,7 +1183,7 @@
 #page-studio .site-card__studio-actions .btn--theme-primary.btn--variant-base:focus-visible { background: var(--ink-button-primary-active-bg); border-color: transparent; }
 #page-studio .site-card__studio-mobile-management { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   #page-studio .works-card-grid { grid-template-columns: 1fr; gap: var(--ink-gap-inline); }
   #page-studio .work-card.site-card { min-height: 0; border-radius: var(--ink-radius-sm); box-shadow: var(--ink-shadow-none); }
   #page-studio .work-card.site-card:hover { box-shadow: var(--ink-shadow-none); }
@@ -1196,6 +1196,7 @@
   }
   #page-studio .site-card__studio-meta { display: none; }
   #page-studio .site-card__studio-mobile-main { grid-column: 1; display: grid; grid-template-columns: minmax(0, 25.6%) minmax(0, 1fr); align-items: stretch; gap: var(--ink-space-2); min-width: 0; }
+  #page-studio .site-card--feed-image .site-card__studio-mobile-main { grid-template-columns: clamp(84px, 22vw, 112px) minmax(0, 1fr); align-items: center; }
   #page-studio .site-card--feed-single .site-card__studio-mobile-main,
   #page-studio .site-card--feed-serial .site-card__studio-mobile-main { grid-template-columns: 1fr; }
   #page-studio .site-card__feed-images-shell {
@@ -1218,9 +1219,9 @@
   #page-studio .site-card__title { font: var(--ink-font-card-title-mobile-square); -webkit-line-clamp: 1; }
   #page-studio .site-card__excerpt { margin: 0; font: var(--ink-font-card-body-mobile-square); -webkit-line-clamp: 1; }
   #page-studio .site-card--feed-single .site-card__title-link { margin-bottom: 0; }
-  #page-studio .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 1; }
+  #page-studio .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 2; }
   #page-studio .site-card--feed-serial .site-card__serial-heading { margin: 0; }
-  #page-studio .site-card--feed-serial .site-card__serial-intro { display: none; }
+  #page-studio .site-card--feed-serial .site-card__serial-intro { display: -webkit-box; -webkit-line-clamp: 1; }
   #page-studio .site-card__latest-chapter { width: max-content; max-width: 100%; min-height: var(--ink-height-card-meta); align-self: flex-start; margin: 0; padding: var(--ink-space-1); font: var(--ink-font-tag-meta); }
   #page-studio .site-card__latest-chapter svg { width: var(--ink-size-14); height: var(--ink-size-14); flex-basis: var(--ink-size-14); }
   #page-studio .site-card__latest-chapter-label { display: none; }
