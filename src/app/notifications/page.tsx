@@ -14,11 +14,12 @@ import { getNotificationLink, type NotificationMetadata } from "@/lib/notificati
 import { filterVisibleNotifications, readNotificationPreferences } from "@/lib/notificationPreferences";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
-type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark" | "reply";
+type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark";
 
 const readNotificationTab = (searchParams?: { get: (name: string) => string | null }): NotificationType => {
   const tab = searchParams?.get("tab") ?? (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab"));
-  if (tab === "all" || tab === "comment" || tab === "like" || tab === "follow" || tab === "system" || tab === "bookmark" || tab === "reply") return tab;
+  if (tab === "reply") return "comment";
+  if (tab === "all" || tab === "comment" || tab === "like" || tab === "follow" || tab === "system" || tab === "bookmark") return tab;
   return "all";
 };
 
@@ -35,7 +36,6 @@ interface NotificationItem {
   related_entity_type?: string | null;
   related_entity_id?: string | null;
   link_url?: string | null;
-  report_post_id?: string | null;
   series_name?: string | null;
   metadata?: NotificationMetadata | null;
   // joined fields
@@ -59,10 +59,22 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "reply") {
+        params.set("tab", "comment");
+        window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+      }
       setFilterType(readNotificationTab(new URLSearchParams(window.location.search)));
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") !== "reply") return;
+    params.set("tab", "comment");
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }, []);
 
   const handleFilterChange = (next: NotificationType) => {
@@ -127,6 +139,9 @@ export default function NotificationsPage() {
     for (const item of visibleRows) {
       counts[item.type] = (counts[item.type] || 0) + 1;
     }
+    const commentUnread = (counts.comment || 0) + (counts.reply || 0);
+    if (commentUnread > 0) counts.comment = commentUnread;
+    delete counts.reply;
     counts.all = visibleRows.length;
     setUnreadByType(counts);
     setUnreadCount(visibleRows.length);
@@ -148,7 +163,9 @@ export default function NotificationsPage() {
 
     q = withTestDataVisibility(q, includeTestDataForProfile(profile));
     if (filterType !== "all") {
-      q = q.eq("type", filterType);
+      q = filterType === "comment"
+        ? q.in("type", ["comment", "reply"])
+        : q.eq("type", filterType);
     }
 
     const { data, error } = await q;
@@ -173,31 +190,6 @@ export default function NotificationsPage() {
       return;
     }
 
-    const reportCommentIds = Array.from(new Set(
-      visibleRaw
-        .filter((notification) =>
-          notification.type === "system" &&
-          (notification.template_key?.startsWith("report_") || (notification.content || "").includes("举报")) &&
-          (notification.related_entity_type === "comment" || notification.metadata?.target_type === "comment")
-        )
-        .map((notification) =>
-          notification.related_entity_type === "comment"
-            ? notification.related_entity_id
-            : notification.metadata?.target_id
-        )
-        .filter((id): id is string => Boolean(id))
-    ));
-    const reportPostByComment = new Map<string, string>();
-    if (reportCommentIds.length > 0) {
-      const { data: comments } = await supabase
-        .from("comments")
-        .select("id, post_id")
-        .in("id", reportCommentIds);
-      for (const comment of (comments || []) as Array<{ id: string; post_id: string | null }>) {
-        if (comment.post_id) reportPostByComment.set(comment.id, comment.post_id);
-      }
-    }
-
     const seriesIds = Array.from(new Set(
       visibleRaw
         .filter((notification) => notification.template_key === "series_review_rejected" && notification.related_entity_type === "series")
@@ -216,17 +208,11 @@ export default function NotificationsPage() {
     }
 
     const enriched = visibleRaw.map((n) => {
-      const reportCommentId = n.related_entity_type === "comment"
-        ? n.related_entity_id
-        : n.metadata?.target_type === "comment"
-          ? n.metadata.target_id
-          : null;
       return {
         ...n,
         actor_nickname: n.actor?.nickname || null,
         actor_avatar_url: n.actor?.avatar_url || null,
         post_title: n.post ? (n.post.title || "未知作品") : null,
-        report_post_id: reportCommentId ? reportPostByComment.get(reportCommentId) || null : null,
         series_name: n.related_entity_id ? seriesNameById.get(n.related_entity_id) || null : null,
       };
     });
@@ -242,10 +228,11 @@ export default function NotificationsPage() {
     setUnreadCount((prev) => Math.max(0, prev - 1));
     const notification = notifications.find((item) => item.id === id);
     if (notification) {
+      const tabKey = notification.type === "reply" ? "comment" : notification.type;
       setUnreadByType((prev) => ({
         ...prev,
         all: Math.max(0, (prev.all || 0) - 1),
-        [notification.type]: Math.max(0, (prev[notification.type] || 0) - 1),
+        [tabKey]: Math.max(0, (prev[tabKey] || 0) - 1),
       }));
     }
     await supabase.from("notifications").update({ read: true }).eq("id", id);
@@ -303,11 +290,9 @@ export default function NotificationsPage() {
   }
 
   const tabs: { key: NotificationType; label: string; icon: string }[] = [
-    { key: "all", label: "全部", icon: "fa-bell" },
     { key: "like", label: "点赞", icon: "fa-heart" },
     { key: "comment", label: "评论", icon: "fa-comment" },
     { key: "bookmark", label: "收藏", icon: "fa-bookmark" },
-    { key: "reply", label: "回复", icon: "fa-reply" },
     { key: "follow", label: "关注", icon: "fa-user-plus" },
     { key: "system", label: "系统", icon: "fa-circle-info" },
   ];
@@ -317,7 +302,7 @@ export default function NotificationsPage() {
       case "like": return "fa-heart";
       case "comment": return "fa-comment";
       case "bookmark": return "fa-bookmark";
-      case "reply": return "fa-reply";
+      case "reply": return "fa-comment";
       case "system": return "fa-circle-info";
       case "follow": return "fa-user-plus";
       default: return "fa-bell";
@@ -398,7 +383,17 @@ export default function NotificationsPage() {
   );
 
   const renderSystemDescription = (notification: NotificationItem) => {
-    const content = notification.content || "";
+    const rawContent = notification.content || "";
+    const [firstLine = "", ...remainingLines] = rawContent.split(/\r?\n/);
+    const firstLineText = firstLine.trim();
+    const template = notification.template_key || "";
+    const title = getNotificationTitle(notification);
+    const hasDuplicateHeading = firstLineText === title
+      || (template.startsWith("restriction_") && firstLineText === "功能限制")
+      || (template === "report_rule_reminder" && firstLineText === "举报规范提醒");
+    const content = hasDuplicateHeading
+      ? remainingLines.join("\n").replace(/^\s+/, "")
+      : rawContent;
     const activity = content.match(/「([^」]+)」/);
     const work = content.match(/《([^》]+)》/);
     const match = activity || work;
@@ -446,14 +441,8 @@ export default function NotificationsPage() {
   };
 
   const renderNotificationRow = (notification: NotificationItem) => {
-    const href = getNotificationLink(notification) || (
-      notification.type === "system"
-        ? (() => {
-            const activity = (notification.content || "").match(/「([^」]+)」/);
-            return activity ? `/search?q=${encodeURIComponent(activity[1])}` : null;
-          })()
-        : null
-    );
+    const href = getNotificationLink(notification);
+    const description = getNotificationDescription(notification);
     const rowClassName = `notification-list-item ${!notification.read ? "unread" : ""}`;
     const rowContent = (
       <>
@@ -465,7 +454,7 @@ export default function NotificationsPage() {
             <strong className="notification-list-title">{getNotificationTitle(notification)}</strong>
             <time className="notification-list-time" dateTime={notification.created_at}>{formatTime(notification.created_at)}</time>
           </span>
-          <span className="notification-list-description">{getNotificationDescription(notification)}</span>
+          {description ? <span className="notification-list-description">{description}</span> : null}
           {!notification.read && <span className="sr-only">未读</span>}
         </span>
       </>
@@ -538,12 +527,7 @@ export default function NotificationsPage() {
           <div className="page-header">
             <div className="page-title">
               我的消息
-              {unreadCount > 0 && (
-                <>
-                  <span className="unread-badge" aria-hidden="true" />
-                  <span className="sr-only">{formatNotificationCount(unreadCount)} 条未读消息</span>
-                </>
-              )}
+              {unreadCount > 0 && <span className="sr-only">{formatNotificationCount(unreadCount)} 条未读消息</span>}
             </div>
             <button className="mark-all-read" onClick={markAllAsRead}>
               全部标记为已读
@@ -551,31 +535,33 @@ export default function NotificationsPage() {
           </div>
 
           {/* 标签切换 */}
-          <div className="segmented-tabs segmented-tabs--notifications">
-            <div className="segmented-tabs-left">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  className={`segmented-tab ${filterType === tab.key ? "active" : ""}`}
-                  onClick={() => handleFilterChange(tab.key)}
-                  data-filter={tab.key}
-                  aria-label={
-                    (unreadByType[tab.key] || 0) > 0
-                      ? `${tab.label}，${formatNotificationCount(unreadByType[tab.key])} 条未读消息`
-                      : tab.label
-                  }
-                >
-                  {tab.label}
-                  {(unreadByType[tab.key] || 0) > 0 && (
-                    <span
-                      className="notification-tab-count"
-                      aria-hidden="true"
-                    >
-                      {formatNotificationCount(unreadByType[tab.key])}
-                    </span>
-                  )}
-                </button>
-              ))}
+          <div className="notification-tabs-sticky-shell">
+            <div className="segmented-tabs segmented-tabs--notifications">
+              <div className="segmented-tabs-left">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    className={`segmented-tab ${filterType === tab.key ? "active" : ""}`}
+                    onClick={() => handleFilterChange(tab.key)}
+                    data-filter={tab.key}
+                    aria-label={
+                      (unreadByType[tab.key] || 0) > 0
+                        ? `${tab.label}，${formatNotificationCount(unreadByType[tab.key])} 条未读消息`
+                        : tab.label
+                    }
+                  >
+                    {tab.label}
+                    {(unreadByType[tab.key] || 0) > 0 && (
+                      <span
+                        className="notification-tab-count"
+                        aria-hidden="true"
+                      >
+                        {formatNotificationCount(unreadByType[tab.key])}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -598,7 +584,7 @@ export default function NotificationsPage() {
                 <button className="empty-action" type="button" onClick={() => void loadNotifications()}>重试</button>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="empty-state" style={{ display: "flex" }}>
+              <div className="empty-state notification-empty-state" style={{ display: "flex" }}>
                 <div className="empty-illustration">
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
@@ -613,7 +599,7 @@ export default function NotificationsPage() {
             ) : (
               <div className="notification-list-stack" data-composition-contract="notification.list@0.1" data-composition-dependencies="List Icon Link Typography">
                 {filterType === "system"
-                  ? renderNotificationGroup(notifications, "通知中心系统消息", "系统通知")
+                  ? renderNotificationGroup(notifications, "通知中心系统消息")
                   : renderNotificationGroup(notifications, "通知中心消息")}
               </div>
             )}

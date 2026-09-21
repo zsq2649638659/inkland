@@ -1387,16 +1387,19 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  box-sizing: border-box;
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0;
   margin: 0;
-  border-radius: 9px;
+  border-radius: 7px;
   background: var(--ink-color-brand, var(--color-primary, #F26B5B));
   color: #fff;
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 700;
   line-height: 1;
+  white-space: nowrap;
 }
 .sidebar-skeleton-line,
 .sidebar-skeleton-icon {
@@ -2333,6 +2336,55 @@ p {
   color: var(--color-primary);
   opacity: 0.7;
 }
+/* Shared page/list empty-state visual: coral segmented ring, coral inner disc, white icon. */
+:is(.feed-empty-ring-outer, .tag-ring-outer) {
+  inset: 6px;
+  border: 0;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--color-primary) 0deg 8deg,
+    transparent 8deg 18deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
+  opacity: 1;
+}
+
+:is(.feed-empty-ring-inner, .tag-ring-inner) {
+  background: var(--color-primary);
+}
+
+:is(.feed-empty-ring-inner, .tag-ring-inner) svg {
+  width: 22px;
+  height: 22px;
+  color: #fff;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.feed-empty-ring-outer, .tag-ring-outer) {
+    animation: none;
+  }
+}
+
+/* Error states keep their retry semantics and do not present as content-empty states. */
+.notification-error-state .tag-ring-outer {
+  inset: 0;
+  border: 2px dashed var(--color-primary);
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+  opacity: 0.25;
+}
+.notification-error-state .tag-ring-inner {
+  background: var(--color-accent-light);
+}
+.notification-error-state .tag-ring-inner svg {
+  width: auto;
+  height: auto;
+  color: var(--color-primary);
+  opacity: 0.7;
+}
 .empty-title {
   font-size: 1.25rem;
   font-weight: 700;
@@ -2567,15 +2619,6 @@ p {
 #page-notifications .notification-item.unread .notification-timestamp::after {
   background: var(--color-primary);
 }
-#page-notifications .unread-badge {
-  display: block;
-  flex: 0 0 var(--ink-notification-unread-dot-size, 7px);
-  width: var(--ink-notification-unread-dot-size, 7px);
-  height: var(--ink-notification-unread-dot-size, 7px);
-  margin: 5px 0 0;
-  border-radius: 50%;
-  background: var(--ink-color-brand, var(--color-primary));
-}
 #page-notifications .mark-all-read {
   display: inline-flex;
   align-items: center;
@@ -2588,7 +2631,7 @@ p {
   background: none;
   border: none;
   cursor: pointer;
-  border-radius: 9999px;
+  border-radius: var(--radius-md);
   transition: all 0.2s ease;
   letter-spacing: -0.02em;
 }
@@ -2610,12 +2653,22 @@ p {
 
 #page-notifications .segmented-tabs--notifications .segmented-tab {
   position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}
+
+#page-notifications .segmented-tabs--notifications .segmented-tabs-left {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
 }
 
 #page-notifications .segmented-tabs--notifications .notification-tab-count {
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: 4px;
+  right: 4px;
   z-index: 1;
 }
 
@@ -2779,6 +2832,10 @@ p {
   background: var(--ink-notification-row-hover);
 }
 
+#page-notifications .notification-list-item--static {
+  cursor: default;
+}
+
 #page-notifications .notification-list-item:focus-visible {
   position: relative;
   z-index: 1;
@@ -2789,12 +2846,14 @@ p {
 
 #page-notifications .notification-list-icon {
   display: grid;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
   width: var(--ink-notification-icon-size);
   height: var(--ink-notification-icon-size);
   flex: 0 0 var(--ink-notification-icon-size);
   place-items: center;
   margin-top: var(--ink-notification-icon-offset-block);
-  border-radius: var(--ink-radius-circle);
+  border-radius: 50%;
   color: var(--notification-type-color, var(--ink-notification-system));
   background: color-mix(in srgb, var(--notification-type-color, var(--ink-notification-system)) var(--ink-notification-type-bg-mix), var(--ink-color-transparent));
   transition: transform var(--ink-notification-motion);
@@ -2805,6 +2864,9 @@ p {
 }
 
 #page-notifications .notification-list-icon svg {
+  display: block;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto;
   width: var(--ink-notification-icon-glyph-size);
   height: var(--ink-notification-icon-glyph-size);
 }
@@ -8067,7 +8129,7 @@ p {
   color: #E8E8E8;
 }
 [data-theme="dark"] .feed-empty-ring-inner {
-  background: rgba(242, 107, 91, 0.15);
+  background: var(--color-primary);
 }
 
 [data-theme="dark"] .tags-grid .tag-card-item {
@@ -12108,11 +12170,18 @@ p {
   min-height: 320px;
 }
 #page-series .chapter-empty-illustration { margin-bottom: 28px; }
-#page-series .chapter-empty-ring { position: relative; width: 90px; height: 90px; margin: 0 auto; }
+#page-series .chapter-empty-ring { position: relative; width: 100px; height: 100px; margin: 0 auto; }
 #page-series .chapter-ring-outer {
-  position: absolute; inset: 0; border-radius: 50%;
-  border: 2px dashed var(--color-primary, #F26B5B);
-  opacity: 0.25;
+  position: absolute; inset: 6px; border-radius: 50%;
+  border: 0;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--color-primary, #F26B5B) 0deg 8deg,
+    transparent 8deg 18deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
+  opacity: 1;
   animation: seriesRingSpin 20s linear infinite;
 }
 @keyframes seriesRingSpin {
@@ -12120,11 +12189,11 @@ p {
   to { transform: rotate(360deg); }
 }
 #page-series .chapter-ring-inner {
-  position: absolute; inset: 18px; border-radius: 50%;
-  background: var(--color-primary-light, #FDE8E5);
+  position: absolute; inset: 20px; border-radius: 50%;
+  background: var(--color-primary, #F26B5B);
   display: flex; align-items: center; justify-content: center;
 }
-#page-series .chapter-ring-inner i { font-size: 26px; color: var(--color-primary, #F26B5B); opacity: 0.7; }
+#page-series .chapter-ring-inner svg { width: 22px; height: 22px; color: #fff; opacity: 1; }
 #page-series .chapter-empty-title {
   font-size: 1.1rem; font-weight: 700; color: var(--color-text);
   margin-bottom: 8px; letter-spacing: -0.02em;
@@ -12206,6 +12275,8 @@ p {
   text-align: center;
 }
 
+#page-series .chapter-list-empty-illustration { display: flex; justify-content: center; margin-bottom: 16px; }
+#page-series .chapter-table-empty > span { display: block; }
 #page-series .chapter-review-reason {
   display: flex;
   align-items: center;
@@ -12218,6 +12289,10 @@ p {
 #page-series .chapter-review-reason svg { width: 13px; height: 13px; flex: 0 0 13px; }
 #page-series .chapter-mobile-list { display: none; }
 #page-series .chapter-mobile-empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #page-series .chapter-ring-outer { animation: none; }
+}
 
 /* Series page responsive */
 @media (max-width: 768px) {
@@ -12241,9 +12316,8 @@ p {
     padding: 0;
   }
   #page-series .chapter-empty-state { padding: 48px 0 36px; min-height: 260px; }
-  #page-series .chapter-empty-ring { width: 72px; height: 72px; }
-  #page-series .chapter-ring-inner { inset: 14px; }
-  #page-series .chapter-ring-inner i { font-size: 22px; }
+  #page-series .chapter-empty-ring { width: 100px; height: 100px; }
+  #page-series .chapter-ring-inner { inset: 20px; }
   #page-series .series-edit-actions { gap: var(--ink-space-2); }
   #page-series .series-edit-control { width: 100px; padding: 0 var(--ink-radius-sm); }
   #page-series .series-chapter-sort,
@@ -12254,6 +12328,7 @@ p {
   #page-series .series-chapter-create-icon { display: block; width: 16px; height: 16px; flex: 0 0 16px; }
   #page-series .chapter-table-wrapper { display: none; }
   #page-series .chapter-mobile-empty { display: block; padding: var(--spacing-xl) var(--spacing-md); color: var(--color-text-light); font-size: var(--font-size-base); text-align: center; }
+  #page-series .chapter-mobile-empty > span { display: block; }
   #page-series .chapter-mobile-list { display: grid; gap: var(--ink-space-3); padding: 0; }
   #page-series .chapter-card {
     display: flex;
@@ -14381,6 +14456,9 @@ p {
 #page-collection .card-image-dots span.active { background: #fff; opacity: 1; }
 #page-collection .card-series-badge { display: inline-flex; align-items: center; gap: 5px; width: fit-content; margin: 0 0 12px; padding: 3px 10px 3px 8px; border-radius: 6px; color: var(--color-primary); background: var(--color-primary-light); font-size: 11px; font-weight: 600; text-decoration: none; }
 #page-collection .card-series-badge:hover { color: #fff; background: var(--color-primary); }
+#page-collection .collection-empty-state { display: flex; min-height: 280px; flex-direction: column; align-items: center; justify-content: center; }
+#page-collection .collection-empty-state .empty-illustration { margin-bottom: 24px; }
+#page-collection .collection-empty-state .empty-desc { margin-bottom: 0; }
 #page-collection .collection-empty { padding: 56px 24px; border-radius: var(--radius-md); background: var(--color-card); color: var(--color-text-light); text-align: center; }
 @media (max-width: 900px) {
   #page-collection .collection-card-grid { grid-template-columns: repeat(2, 1fr); }
@@ -14520,6 +14598,9 @@ p {
 .chapter-static-preview-content .reader-content { color: inherit; font-family: var(--font-family); font-size: 18px; line-height: 1.85; }
 .chapter-static-author-note { margin-top: 32px; }
 .chapter-static-preview-empty { display: flex; min-height: calc(100vh - 64px); align-items: center; justify-content: center; padding: 24px; color: var(--color-text-muted); flex-direction: column; text-align: center; }
+.chapter-static-preview-empty .empty-illustration { margin-bottom: 24px; }
+.chapter-static-preview-empty h1 { margin: 0 0 10px; color: var(--color-text); font-size: 24px; font-weight: 700; }
+.chapter-static-preview-empty p { max-width: 320px; margin: 0 0 24px; line-height: 1.6; }
 
 @media (max-width: 768px) {
   #page-create.publish-series-page .series-genre-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
@@ -14936,10 +15017,57 @@ p {
 }
 
 /* 消息分类跟随列表吸顶，但始终与 navbar 保持 12px 间距。 */
-#page-notifications .segmented-tabs--notifications {
+#page-notifications .notification-tabs-sticky-shell {
   position: sticky;
-  top: calc(var(--navbar-height) + var(--ink-space-3));
+  top: var(--navbar-height);
   z-index: 100;
+  /* The shell is intentionally rectangular so the rounded tab strip cannot
+     expose scrolled content through its four corners. */
+  background: var(--color-bg-page);
+  margin-top: calc(-1 * var(--ink-space-3));
+  margin-bottom: calc(var(--ink-space-3) + 2px);
+  padding: var(--ink-space-3) 0;
+}
+
+#page-notifications .segmented-tabs--notifications {
+  margin-bottom: 0;
+}
+
+/* Narrow screens keep the notification strip internally scrollable while each
+ * tab remains the same width, so the labels do not jump between breakpoints. */
+@media (max-width: 600px) {
+  #page-notifications .segmented-tabs--notifications {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-inline: 6px;
+    box-sizing: border-box;
+    scrollbar-width: none;
+  }
+
+  #page-notifications .segmented-tabs--notifications::-webkit-scrollbar {
+    display: none;
+  }
+
+  #page-notifications .segmented-tabs--notifications .segmented-tabs-left {
+    display: flex;
+    flex: 0 0 max(100%, 350px);
+    gap: 0;
+    width: max(100%, 350px);
+  }
+
+  #page-notifications .segmented-tabs--notifications .segmented-tab {
+    box-sizing: border-box;
+    flex: 1 1 0;
+    min-width: 50px;
+    width: auto;
+    padding: 8px 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  #page-notifications .segmented-tabs--notifications .notification-tab-count {
+    right: 1px;
+  }
 }
 
 /* ===== 一键回到顶部 ===== */
@@ -14951,7 +15079,12 @@ p {
   opacity: 0;
   visibility: hidden;
   transform: translateY(12px);
+  box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
   transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
+}
+
+[data-theme="dark"] .back-to-top {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
 }
 
 .back-to-top.show {
@@ -18387,6 +18520,31 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
    Preserve the 44px menu target while giving the compact create action and
    the two controls enough room to sit beside the wordmark. */
 @media (max-width: 360px) {
+  /* Match the login mark when the full wordmark cannot coexist with the
+     compact create and menu controls in an extremely narrow viewport. */
+  #navbar .wordmark-logo {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    background-color: var(--color-primary, #F26B5B);
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  #navbar .wordmark-logo::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 26px;
+    height: 26px;
+    background: #fff;
+    mask: url('/logo-icon.svg') no-repeat center / contain;
+    -webkit-mask: url('/logo-icon.svg') no-repeat center / contain;
+    transform: translate(-50%, -50%);
+  }
+
   #navbar .navbar-right {
     gap: 12px;
   }

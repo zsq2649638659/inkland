@@ -31,7 +31,21 @@ export default function ChapterPreviewPage() {
   }, []);
 
   if (!preview) {
-    return <main className="chapter-static-preview-empty"><SiteIcon name="fa-file-lines" variant="outline" /><h1>暂无可预览的章节</h1><p>请返回章节编辑页，填写内容后再次点击预览。</p><button type="button" onClick={() => router.back()}>返回编辑</button></main>;
+    return (
+      <main className="chapter-static-preview-empty">
+        <div className="empty-illustration">
+          <div className="empty-tag-ring">
+            <div className="tag-ring-outer"></div>
+            <div className="tag-ring-inner">
+              <SiteIcon name="fa-file-lines" variant="solid" />
+            </div>
+          </div>
+        </div>
+        <h1>暂无可预览的章节</h1>
+        <p>请返回章节编辑页，填写内容后再次点击预览。</p>
+        <button type="button" onClick={() => router.back()}>返回编辑</button>
+      </main>
+    );
   }
 
   const displayTitle = preview.titleMode === "numbered"
