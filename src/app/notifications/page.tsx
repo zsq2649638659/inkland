@@ -584,7 +584,7 @@ export default function NotificationsPage() {
                 <button className="empty-action" type="button" onClick={() => void loadNotifications()}>重试</button>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="empty-state" style={{ display: "flex" }}>
+              <div className="empty-state notification-empty-state" style={{ display: "flex" }}>
                 <div className="empty-illustration">
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>

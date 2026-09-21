@@ -477,7 +477,15 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                   {chapters.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="chapter-table-empty">
-                        暂无章节数据，点击“新建章节”开始创作
+                        <div className="chapter-list-empty-illustration">
+                          <div className="empty-tag-ring">
+                            <div className="tag-ring-outer"></div>
+                            <div className="tag-ring-inner">
+                              <SiteIcon name="fa-file-lines" variant="solid" />
+                            </div>
+                          </div>
+                        </div>
+                        <span>暂无章节数据，点击“新建章节”开始创作</span>
                       </td>
                     </tr>
                   ) : (
@@ -506,7 +514,17 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
               </table>
             </div>
             {chapters.length === 0 ? (
-              <div className="chapter-mobile-empty">暂无章节数据，点击“新建章节”开始创作</div>
+              <div className="chapter-mobile-empty">
+                <div className="chapter-list-empty-illustration">
+                  <div className="empty-tag-ring">
+                    <div className="tag-ring-outer"></div>
+                    <div className="tag-ring-inner">
+                      <SiteIcon name="fa-file-lines" variant="solid" />
+                    </div>
+                  </div>
+                </div>
+                <span>暂无章节数据，点击“新建章节”开始创作</span>
+              </div>
             ) : (
               <div className="chapter-mobile-list" aria-label="章节列表">
                 {sortedChapters.map((ch) => {

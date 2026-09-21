@@ -128,7 +128,24 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   }
 
   if (!collection) {
-    return <div id="page-collection" className="min-h-screen bg-paper"><div className="collection-page-wrapper"><div className="collection-empty">未找到这个合集</div></div></div>;
+    return (
+      <div id="page-collection" className="min-h-screen bg-paper">
+        <div className="collection-page-wrapper">
+          <div className="collection-empty collection-empty-state">
+            <div className="empty-illustration">
+              <div className="empty-tag-ring">
+                <div className="tag-ring-outer"></div>
+                <div className="tag-ring-inner">
+                  <SiteIcon name="fa-layer-group" variant="solid" />
+                </div>
+              </div>
+            </div>
+            <h2 className="empty-title">未找到这个合集</h2>
+            <p className="empty-desc">合集可能已被删除，或者链接已经失效。</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -166,7 +183,18 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
           </div>
 
           {filteredPosts.length === 0 ? (
-            <div className="collection-empty">这个分类下还没有作品</div>
+            <div className="collection-empty collection-empty-state">
+              <div className="empty-illustration">
+                <div className="empty-tag-ring">
+                  <div className="tag-ring-outer"></div>
+                  <div className="tag-ring-inner">
+                    <SiteIcon name="fa-layer-group" variant="solid" />
+                  </div>
+                </div>
+              </div>
+              <h2 className="empty-title">这个分类下还没有作品</h2>
+              <p className="empty-desc">换一个分类，或者稍后再来看看。</p>
+            </div>
           ) : (
             <div className="collection-card-grid">
               {filteredPosts.map((post) => <PostTagCard key={post.id} post={post} />)}

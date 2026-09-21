@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { Post } from "@/lib/types";
+import SiteIcon from "@/components/SiteIcon";
 import ProfileWorkCard, { type ProfileCardMode, type ProfileSeriesCard } from "@/components/ProfileWorkCard";
 
 type FilterType = "all" | "single" | "image" | "series";
@@ -80,6 +81,14 @@ export default function ProfileCardCollection({
   if (!items.length) {
     return (
       <div className="empty-state profile-filter-empty">
+        <div className="empty-illustration">
+          <div className="empty-tag-ring">
+            <div className="tag-ring-outer"></div>
+            <div className="tag-ring-inner">
+              <SiteIcon name="fa-magnifying-glass" variant="solid" />
+            </div>
+          </div>
+        </div>
         <h2 className="empty-title">没有符合条件的作品</h2>
         <p className="empty-desc">换一个搜索词或筛选条件再试试。</p>
       </div>
