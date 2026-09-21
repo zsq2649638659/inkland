@@ -755,7 +755,20 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
               )}
               {(activeProfilePosts.length > 0 || activeProfileSeries.length > 0) ? (
                 <ProfileCardCollection posts={activeProfilePosts} series={activeProfileSeries} filter={activeProfileFilter} query={profileSearch} status={statusFilter} sort={sortMode} limit={shownProfileItems} mobileLayout={mobileCardLayout} />
-              ) : !loading ? <div className="empty-state"><h2 className="empty-title">这里还没有作品</h2><p className="empty-desc">发布或收藏作品后，会显示在这里。</p></div> : null}
+              ) : !loading ? (
+                <div className="empty-state">
+                  <div className="empty-illustration">
+                    <div className="empty-tag-ring">
+                      <div className="tag-ring-outer"></div>
+                      <div className="tag-ring-inner">
+                        <SiteIcon name="fa-feather-pointed" variant="solid" />
+                      </div>
+                    </div>
+                  </div>
+                  <h2 className="empty-title">这里还没有作品</h2>
+                  <p className="empty-desc">发布或收藏作品后，会显示在这里。</p>
+                </div>
+              ) : null}
             </>
           )}
 
@@ -810,6 +823,14 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                 </div>
               ) : activeRelationshipUsers.length === 0 ? (
                 <div className="empty-state relationship-filter-empty">
+                  <div className="empty-illustration">
+                    <div className="empty-tag-ring">
+                      <div className="tag-ring-outer"></div>
+                      <div className="tag-ring-inner">
+                        <SiteIcon name="fa-magnifying-glass" variant="solid" />
+                      </div>
+                    </div>
+                  </div>
                   <h2 className="empty-title">没有找到匹配的用户</h2>
                   <p className="empty-desc">试试其他昵称或简介关键词。</p>
                 </div>

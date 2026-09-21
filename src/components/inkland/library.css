@@ -508,12 +508,14 @@
 }
 
 /* 首页导航使用完整高度的 sticky 外壳，保持文档流并覆盖滚动内容。 */
-#page-home > .main-container {
+#page-home > .main-container,
+#page-search-shell > .main-container {
   padding-top: var(--ink-space-0);
   padding-bottom: var(--spacing-lg);
 }
 
-#page-home .sidebar {
+#page-home .sidebar,
+#page-search-shell .sidebar {
   top: calc(var(--navbar-height) + var(--spacing-lg));
   margin-top: var(--spacing-lg);
 }
@@ -597,11 +599,13 @@
     padding-inline: 16px;
   }
 
-  #page-home > .main-container {
+  #page-home > .main-container,
+  #page-search-shell > .main-container {
     padding: var(--ink-space-0);
   }
 
-  #page-home .content-area {
+  #page-home .content-area,
+  #page-search-shell .content-area {
     padding: 0 var(--ink-space-2);
   }
 
