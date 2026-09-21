@@ -14936,15 +14936,20 @@ p {
 }
 
 /* 消息分类跟随列表吸顶，但始终与 navbar 保持 12px 间距。 */
-#page-notifications .segmented-tabs--notifications {
+#page-notifications .notification-tabs-sticky-shell {
   position: sticky;
-  top: calc(var(--navbar-height) + var(--ink-space-3));
+  top: var(--navbar-height);
   z-index: 100;
-  /* Keep the 12px separation from the navbar, but mask scrolled content
-     through the gap and the lower edge of the sticky strip. */
-  box-shadow:
-    0 calc(-1 * var(--ink-space-3)) 0 var(--color-bg-page),
-    0 var(--ink-space-3) 0 var(--color-bg-page);
+  /* The shell is intentionally rectangular so the rounded tab strip cannot
+     expose scrolled content through its four corners. */
+  background: var(--color-bg-page);
+  margin-top: calc(-1 * var(--ink-space-3));
+  margin-bottom: calc(-1 * var(--ink-space-3));
+  padding: var(--ink-space-3) 0;
+}
+
+#page-notifications .segmented-tabs--notifications {
+  margin-bottom: 20px;
 }
 
 /* ===== 一键回到顶部 ===== */

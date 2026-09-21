@@ -551,31 +551,33 @@ export default function NotificationsPage() {
           </div>
 
           {/* 标签切换 */}
-          <div className="segmented-tabs segmented-tabs--notifications">
-            <div className="segmented-tabs-left">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  className={`segmented-tab ${filterType === tab.key ? "active" : ""}`}
-                  onClick={() => handleFilterChange(tab.key)}
-                  data-filter={tab.key}
-                  aria-label={
-                    (unreadByType[tab.key] || 0) > 0
-                      ? `${tab.label}，${formatNotificationCount(unreadByType[tab.key])} 条未读消息`
-                      : tab.label
-                  }
-                >
-                  {tab.label}
-                  {(unreadByType[tab.key] || 0) > 0 && (
-                    <span
-                      className="notification-tab-count"
-                      aria-hidden="true"
-                    >
-                      {formatNotificationCount(unreadByType[tab.key])}
-                    </span>
-                  )}
-                </button>
-              ))}
+          <div className="notification-tabs-sticky-shell">
+            <div className="segmented-tabs segmented-tabs--notifications">
+              <div className="segmented-tabs-left">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    className={`segmented-tab ${filterType === tab.key ? "active" : ""}`}
+                    onClick={() => handleFilterChange(tab.key)}
+                    data-filter={tab.key}
+                    aria-label={
+                      (unreadByType[tab.key] || 0) > 0
+                        ? `${tab.label}，${formatNotificationCount(unreadByType[tab.key])} 条未读消息`
+                        : tab.label
+                    }
+                  >
+                    {tab.label}
+                    {(unreadByType[tab.key] || 0) > 0 && (
+                      <span
+                        className="notification-tab-count"
+                        aria-hidden="true"
+                      >
+                        {formatNotificationCount(unreadByType[tab.key])}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
