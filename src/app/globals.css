@@ -18458,7 +18458,7 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
     position: relative;
     width: 40px;
     height: 40px;
-    border-radius: 16px;
+    border-radius: var(--radius-sm);
     background-color: var(--color-primary, #F26B5B);
     mask-image: none;
     -webkit-mask-image: none;
