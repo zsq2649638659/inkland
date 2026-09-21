@@ -1203,8 +1203,8 @@
 #page-studio .studio-mobile-management-actions { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: var(--ink-space-3); }
 
 @media (max-width: 767px) {
-  #page-studio .works-card-grid { grid-template-columns: 1fr; gap: var(--ink-gap-inline); }
-  #page-studio .work-card.site-card { min-height: 0; border-radius: var(--ink-radius-sm); box-shadow: var(--ink-shadow-none); }
+  #page-studio .works-card-grid { grid-template-columns: 1fr; grid-auto-rows: 118px; gap: var(--ink-gap-inline); }
+  #page-studio .work-card.site-card { height: 118px; min-height: 118px; border-radius: var(--ink-radius-sm); box-shadow: var(--ink-shadow-none); }
   #page-studio .work-card.site-card:hover { box-shadow: var(--ink-shadow-none); }
   #page-studio .work-card.site-card .card-body {
     display: grid;
@@ -1215,7 +1215,7 @@
   }
   #page-studio .site-card__studio-meta { display: none; }
   #page-studio .site-card__studio-mobile-main { grid-column: 1; display: grid; grid-template-columns: minmax(0, 25.6%) minmax(0, 1fr); align-items: stretch; gap: var(--ink-space-2); min-width: 0; }
-  #page-studio .site-card--feed-image .site-card__studio-mobile-main { grid-template-columns: clamp(84px, 22vw, 112px) minmax(0, 1fr); align-items: center; }
+  #page-studio .site-card--feed-image .site-card__studio-mobile-main { grid-template-columns: 84px minmax(0, 1fr); align-items: center; }
   #page-studio .site-card--feed-image .site-card__studio-image-preview { display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: var(--ink-space-2); align-self: start; }
   #page-studio .site-card--feed-image .site-card__studio-image-preview .site-card__feed-images-shell { margin-bottom: 0; }
   #page-studio .site-card--feed-single .site-card__studio-mobile-main,
@@ -1231,6 +1231,7 @@
     margin: 0;
     border-radius: var(--ink-radius-sm);
   }
+  #page-studio .site-card--feed-image .site-card__feed-images-shell { width: 84px; height: 84px; aspect-ratio: 1; }
   #page-studio .site-card__feed-images { height: 100%; min-height: 0; }
   #page-studio .site-card__feed-image { width: 100%; height: 100%; min-width: 100%; min-height: 0; aspect-ratio: auto; border-radius: var(--ink-radius-sm); }
   #page-studio .site-card__feed-image-overlay,
