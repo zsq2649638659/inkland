@@ -3924,8 +3924,8 @@ p {
 #page-studio .stat-card-icon--total { background: var(--ink-primary-bg); color: var(--ink-primary); }
 #page-studio .stat-card-icon--published { background: var(--ink-success-bg); color: var(--ink-success); }
 #page-studio .stat-card-icon--draft { background: var(--ink-warning-bg); color: var(--ink-warning); }
-#page-studio .stat-card-icon--rejected { background: var(--ink-danger-bg); color: var(--color-text-muted); }
-#page-studio .stat-card-icon--rejected svg { color: var(--color-text-muted); }
+#page-studio .stat-card-icon--rejected { background: var(--ink-danger-bg); color: var(--ink-danger); }
+#page-studio .stat-card-icon--rejected svg { color: var(--ink-danger); }
 .stat-card-number { font-size: 32px; font-weight: 700; letter-spacing: -0.04em; color: var(--color-text); line-height: 1; }
 .stat-card-label { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
 

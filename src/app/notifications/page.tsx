@@ -294,7 +294,7 @@ export default function NotificationsPage() {
     { key: "comment", label: "评论", icon: "fa-comment" },
     { key: "bookmark", label: "收藏", icon: "fa-bookmark" },
     { key: "follow", label: "关注", icon: "fa-user-plus" },
-    { key: "system", label: "系统", icon: "fa-circle-info" },
+    { key: "system", label: "系统", icon: "fa-circle-exclamation" },
   ];
 
   const getIconSvg = (type: string): InklandIconName => {
@@ -303,7 +303,7 @@ export default function NotificationsPage() {
       case "comment": return "fa-comment";
       case "bookmark": return "fa-bookmark";
       case "reply": return "fa-comment";
-      case "system": return "fa-circle-info";
+      case "system": return "fa-circle-exclamation";
       case "follow": return "fa-user-plus";
       default: return "fa-bell";
     }
@@ -575,7 +575,7 @@ export default function NotificationsPage() {
                   <div className="empty-tag-ring">
                     <div className="tag-ring-outer"></div>
                     <div className="tag-ring-inner">
-                      <SiteIcon name="fa-circle-info" variant="solid" />
+                      <SiteIcon name="fa-circle-exclamation" variant="solid" />
                     </div>
                   </div>
                 </div>

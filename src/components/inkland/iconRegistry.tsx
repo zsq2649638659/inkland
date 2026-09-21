@@ -12,7 +12,6 @@ export type InklandIconName =
   | "fa-bookmark"
   | "fa-reply"
   | "fa-user-plus"
-  | "fa-circle-info"
   | "fa-bars"
   | "fa-plus"
   | "fa-share-from-square"
@@ -78,9 +77,9 @@ export const inklandIconRegistry: Record<InklandIconName, InklandIconDefinition>
     { d: "M19 39H29", variant: "solid", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
     { d: "M24 34V44", variant: "solid", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: true },
-  "fa-circle-info": { viewBox: "0 0 48 48", paths: [
+  "fa-circle-exclamation": { viewBox: "0 0 48 48", paths: [
     { d: "M24 2C36.1503 2 46 11.8497 46 24C46 36.1503 36.1503 46 24 46C11.8497 46 2 36.1503 2 24C2 11.8497 11.8497 2 24 2ZM22.5 18C21.3954 18 20.5 18.8954 20.5 20C20.5 21.1046 21.3954 22 22.5 22V32H21C19.8954 32 19 32.8954 19 34C19 35.1046 19.8954 36 21 36H28C29.1046 36 30 35.1046 30 34C30 32.8954 29.1046 32 28 32H26.5V20C26.5 18.8954 25.6046 18 24.5 18H22.5ZM24 11C22.6193 11 21.5 12.1193 21.5 13.5C21.5 14.8807 22.6193 16 24 16C25.3807 16 26.5 14.8807 26.5 13.5C26.5 12.1193 25.3807 11 24 11Z", variant: "default", fill: "currentColor" },
-  ] },
+  ], supportsVariants: false },
   "fa-bars": { viewBox: "0 0 448 512", paths: [
     { "d": "M0 96C0 78.3 14.3 64 32 64l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 128C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 288c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32L32 448c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32 14.3 32 32z", "variant": "default", "fill": "currentColor" },
   ] },
@@ -104,11 +103,6 @@ export const inklandIconRegistry: Record<InklandIconName, InklandIconDefinition>
   "fa-circle-check": { viewBox: "0 0 48 48", paths: [
     { d: "M24 44C29.5228 44 34.5228 41.7614 38.1421 38.1421C41.7614 34.5228 44 29.5228 44 24C44 18.4772 41.7614 13.4772 38.1421 9.85786C34.5228 6.23858 29.5228 4 24 4C18.4772 4 13.4772 6.23858 9.85786 9.85786C6.23858 13.4772 4 18.4772 4 24C4 29.5228 6.23858 34.5228 9.85786 38.1421C13.4772 41.7614 18.4772 44 24 44Z", variant: "default", fill: "currentColor", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
     { d: "M16 24L22 30L34 18", variant: "default", fill: "none", stroke: "var(--ink-color-text-anti)", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
-  ], supportsVariants: false },
-  "fa-circle-exclamation": { viewBox: "0 0 48 48", paths: [
-    { d: "M24 44C29.5228 44 34.5228 41.7614 38.1421 38.1421C41.7614 34.5228 44 29.5228 44 24C44 18.4772 41.7614 13.4772 38.1421 9.85786C34.5228 6.23858 29.5228 4 24 4C18.4772 4 13.4772 6.23858 9.85786 9.85786C6.23858 6.23858 4 18.4772 4 24C4 29.5228 6.23858 34.5228 9.85786 38.1421C13.4772 41.7614 18.4772 44 24 44Z", variant: "default", fill: "#333", stroke: "#333", strokeWidth: "4", strokeLinejoin: "round" },
-    { d: "M24 37C25.3807 37 26.5 35.8807 26.5 34.5C26.5 33.1193 25.3807 32 24 32C22.6193 32 21.5 33.1193 21.5 34.5C21.5 35.8807 22.6193 37 24 37Z", variant: "default", fillRule: "evenodd", clipRule: "evenodd", fill: "#FFF" },
-    { d: "M24 12V28", variant: "default", fill: "none", stroke: "#FFF", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: false },
   "fa-triangle-exclamation": { viewBox: "0 0 512 512", paths: [
     { "d": "M256 0c14.7 0 28.2 8.1 35.2 21l216 400c6.7 12.4 6.4 27.4-.8 39.5S486.1 480 472 480L40 480c-14.1 0-27.2-7.4-34.4-19.5s-7.5-27.1-.8-39.5l216-400c7-12.9 20.5-21 35.2-21zm0 352a32 32 0 1 0 0 64 32 32 0 1 0 0-64zm0-192c-18.2 0-32.7 15.5-31.4 33.7l7.4 104c.9 12.5 11.4 22.3 23.9 22.3 12.6 0 23-9.7 23.9-22.3l7.4-104c1.3-18.2-13.1-33.7-31.4-33.7z", "variant": "default", "fill": "currentColor" },

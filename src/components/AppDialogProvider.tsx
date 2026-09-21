@@ -129,7 +129,7 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
             aria-describedby="app-dialog-message"
           >
             <div className="app-dialog-icon" aria-hidden="true">
-              <SiteIcon name={dialog.variant === "danger" ? "fa-trash-can" : dialog.variant === "success" ? "fa-circle-check" : "fa-circle-info"} variant="solid" />
+              <SiteIcon name={dialog.variant === "danger" ? "fa-trash-can" : dialog.variant === "success" ? "fa-circle-check" : "fa-circle-exclamation"} variant="solid" />
             </div>
             <h2 id="app-dialog-title">{dialog.title}</h2>
             <p id="app-dialog-message">{dialog.message}</p>

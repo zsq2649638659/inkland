@@ -1515,7 +1515,7 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
           </p>
           {publishedVersionNumber != null && (
             <div className="review-rejection-note">
-              <SiteIcon name="fa-circle-info" variant="solid" aria-hidden="true" />
+              <SiteIcon name="fa-circle-exclamation" variant="solid" aria-hidden="true" />
               <span>旧版本仍公开可见，不会受到影响；修改并重新提交后，通过审核的新版本才会替换旧版本。</span>
             </div>
           )}
