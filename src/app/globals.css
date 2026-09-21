@@ -14957,12 +14957,12 @@ p {
      expose scrolled content through its four corners. */
   background: var(--color-bg-page);
   margin-top: calc(-1 * var(--ink-space-3));
-  margin-bottom: calc(-1 * var(--ink-space-3));
+  margin-bottom: calc(var(--ink-space-3) + 2px);
   padding: var(--ink-space-3) 0;
 }
 
 #page-notifications .segmented-tabs--notifications {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 /* Narrow screens keep the notification strip internally scrollable while each
