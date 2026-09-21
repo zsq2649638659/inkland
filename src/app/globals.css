@@ -18452,6 +18452,31 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
    Preserve the 44px menu target while giving the compact create action and
    the two controls enough room to sit beside the wordmark. */
 @media (max-width: 360px) {
+  /* Match the login mark when the full wordmark cannot coexist with the
+     compact create and menu controls in an extremely narrow viewport. */
+  #navbar .wordmark-logo {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 16px;
+    background-color: var(--color-primary, #F26B5B);
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  #navbar .wordmark-logo::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 26px;
+    height: 26px;
+    background: #fff;
+    mask: url('/logo-icon.svg') no-repeat center / contain;
+    -webkit-mask: url('/logo-icon.svg') no-repeat center / contain;
+    transform: translate(-50%, -50%);
+  }
+
   #navbar .navbar-right {
     gap: 12px;
   }
