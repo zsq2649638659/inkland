@@ -36,7 +36,6 @@ interface NotificationItem {
   related_entity_type?: string | null;
   related_entity_id?: string | null;
   link_url?: string | null;
-  report_post_id?: string | null;
   series_name?: string | null;
   metadata?: NotificationMetadata | null;
   // joined fields
@@ -191,31 +190,6 @@ export default function NotificationsPage() {
       return;
     }
 
-    const reportCommentIds = Array.from(new Set(
-      visibleRaw
-        .filter((notification) =>
-          notification.type === "system" &&
-          (notification.template_key?.startsWith("report_") || (notification.content || "").includes("举报")) &&
-          (notification.related_entity_type === "comment" || notification.metadata?.target_type === "comment")
-        )
-        .map((notification) =>
-          notification.related_entity_type === "comment"
-            ? notification.related_entity_id
-            : notification.metadata?.target_id
-        )
-        .filter((id): id is string => Boolean(id))
-    ));
-    const reportPostByComment = new Map<string, string>();
-    if (reportCommentIds.length > 0) {
-      const { data: comments } = await supabase
-        .from("comments")
-        .select("id, post_id")
-        .in("id", reportCommentIds);
-      for (const comment of (comments || []) as Array<{ id: string; post_id: string | null }>) {
-        if (comment.post_id) reportPostByComment.set(comment.id, comment.post_id);
-      }
-    }
-
     const seriesIds = Array.from(new Set(
       visibleRaw
         .filter((notification) => notification.template_key === "series_review_rejected" && notification.related_entity_type === "series")
@@ -234,17 +208,11 @@ export default function NotificationsPage() {
     }
 
     const enriched = visibleRaw.map((n) => {
-      const reportCommentId = n.related_entity_type === "comment"
-        ? n.related_entity_id
-        : n.metadata?.target_type === "comment"
-          ? n.metadata.target_id
-          : null;
       return {
         ...n,
         actor_nickname: n.actor?.nickname || null,
         actor_avatar_url: n.actor?.avatar_url || null,
         post_title: n.post ? (n.post.title || "未知作品") : null,
-        report_post_id: reportCommentId ? reportPostByComment.get(reportCommentId) || null : null,
         series_name: n.related_entity_id ? seriesNameById.get(n.related_entity_id) || null : null,
       };
     });
@@ -322,7 +290,6 @@ export default function NotificationsPage() {
   }
 
   const tabs: { key: NotificationType; label: string; icon: string }[] = [
-    { key: "all", label: "全部", icon: "fa-bell" },
     { key: "like", label: "点赞", icon: "fa-heart" },
     { key: "comment", label: "评论", icon: "fa-comment" },
     { key: "bookmark", label: "收藏", icon: "fa-bookmark" },
@@ -416,7 +383,17 @@ export default function NotificationsPage() {
   );
 
   const renderSystemDescription = (notification: NotificationItem) => {
-    const content = notification.content || "";
+    const rawContent = notification.content || "";
+    const [firstLine = "", ...remainingLines] = rawContent.split(/\r?\n/);
+    const firstLineText = firstLine.trim();
+    const template = notification.template_key || "";
+    const title = getNotificationTitle(notification);
+    const hasDuplicateHeading = firstLineText === title
+      || (template.startsWith("restriction_") && firstLineText === "功能限制")
+      || (template === "report_rule_reminder" && firstLineText === "举报规范提醒");
+    const content = hasDuplicateHeading
+      ? remainingLines.join("\n").replace(/^\s+/, "")
+      : rawContent;
     const activity = content.match(/「([^」]+)」/);
     const work = content.match(/《([^》]+)》/);
     const match = activity || work;
@@ -464,14 +441,8 @@ export default function NotificationsPage() {
   };
 
   const renderNotificationRow = (notification: NotificationItem) => {
-    const href = getNotificationLink(notification) || (
-      notification.type === "system"
-        ? (() => {
-            const activity = (notification.content || "").match(/「([^」]+)」/);
-            return activity ? `/search?q=${encodeURIComponent(activity[1])}` : null;
-          })()
-        : null
-    );
+    const href = getNotificationLink(notification);
+    const description = getNotificationDescription(notification);
     const rowClassName = `notification-list-item ${!notification.read ? "unread" : ""}`;
     const rowContent = (
       <>
@@ -483,7 +454,7 @@ export default function NotificationsPage() {
             <strong className="notification-list-title">{getNotificationTitle(notification)}</strong>
             <time className="notification-list-time" dateTime={notification.created_at}>{formatTime(notification.created_at)}</time>
           </span>
-          <span className="notification-list-description">{getNotificationDescription(notification)}</span>
+          {description ? <span className="notification-list-description">{description}</span> : null}
           {!notification.read && <span className="sr-only">未读</span>}
         </span>
       </>
@@ -556,12 +527,7 @@ export default function NotificationsPage() {
           <div className="page-header">
             <div className="page-title">
               我的消息
-              {unreadCount > 0 && (
-                <>
-                  <span className="unread-badge" aria-hidden="true" />
-                  <span className="sr-only">{formatNotificationCount(unreadCount)} 条未读消息</span>
-                </>
-              )}
+              {unreadCount > 0 && <span className="sr-only">{formatNotificationCount(unreadCount)} 条未读消息</span>}
             </div>
             <button className="mark-all-read" onClick={markAllAsRead}>
               全部标记为已读
@@ -633,7 +599,7 @@ export default function NotificationsPage() {
             ) : (
               <div className="notification-list-stack" data-composition-contract="notification.list@0.1" data-composition-dependencies="List Icon Link Typography">
                 {filterType === "system"
-                  ? renderNotificationGroup(notifications, "通知中心系统消息", "系统通知")
+                  ? renderNotificationGroup(notifications, "通知中心系统消息")
                   : renderNotificationGroup(notifications, "通知中心消息")}
               </div>
             )}

@@ -1387,16 +1387,19 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 9px;
-  height: 9px;
-  padding: 0 2px;
+  box-sizing: border-box;
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0;
   margin: 0;
-  border-radius: 5px;
+  border-radius: 7px;
   background: var(--ink-color-brand, var(--color-primary, #F26B5B));
   color: #fff;
-  font-size: 5px;
+  font-size: 8px;
   font-weight: 700;
   line-height: 1;
+  white-space: nowrap;
 }
 .sidebar-skeleton-line,
 .sidebar-skeleton-icon {
@@ -2567,15 +2570,6 @@ p {
 #page-notifications .notification-item.unread .notification-timestamp::after {
   background: var(--color-primary);
 }
-#page-notifications .unread-badge {
-  display: block;
-  flex: 0 0 var(--ink-notification-unread-dot-size, 7px);
-  width: var(--ink-notification-unread-dot-size, 7px);
-  height: var(--ink-notification-unread-dot-size, 7px);
-  margin: 5px 0 0;
-  border-radius: 50%;
-  background: var(--ink-color-brand, var(--color-primary));
-}
 #page-notifications .mark-all-read {
   display: inline-flex;
   align-items: center;
@@ -2588,7 +2582,7 @@ p {
   background: none;
   border: none;
   cursor: pointer;
-  border-radius: 9999px;
+  border-radius: var(--radius-md);
   transition: all 0.2s ease;
   letter-spacing: -0.02em;
 }
@@ -2789,6 +2783,10 @@ p {
   background: var(--ink-notification-row-hover);
 }
 
+#page-notifications .notification-list-item--static {
+  cursor: default;
+}
+
 #page-notifications .notification-list-item:focus-visible {
   position: relative;
   z-index: 1;
@@ -2799,12 +2797,14 @@ p {
 
 #page-notifications .notification-list-icon {
   display: grid;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
   width: var(--ink-notification-icon-size);
   height: var(--ink-notification-icon-size);
   flex: 0 0 var(--ink-notification-icon-size);
   place-items: center;
   margin-top: var(--ink-notification-icon-offset-block);
-  border-radius: var(--ink-radius-circle);
+  border-radius: 50%;
   color: var(--notification-type-color, var(--ink-notification-system));
   background: color-mix(in srgb, var(--notification-type-color, var(--ink-notification-system)) var(--ink-notification-type-bg-mix), var(--ink-color-transparent));
   transition: transform var(--ink-notification-motion);
@@ -2815,6 +2815,9 @@ p {
 }
 
 #page-notifications .notification-list-icon svg {
+  display: block;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto;
   width: var(--ink-notification-icon-glyph-size);
   height: var(--ink-notification-icon-glyph-size);
 }
@@ -14968,7 +14971,8 @@ p {
   #page-notifications .segmented-tabs--notifications {
     justify-content: flex-start;
     overflow-x: auto;
-    padding-inline: 0;
+    padding-inline: 6px;
+    box-sizing: border-box;
     scrollbar-width: none;
   }
 

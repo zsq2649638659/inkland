@@ -483,7 +483,7 @@
   --ink-notification-like: #f26b5b;
   --ink-notification-comment: #3b82f6;
   --ink-notification-bookmark: #f59e0b;
-  --ink-notification-reply: #8b5cf6;
+  --ink-notification-reply: var(--ink-notification-comment);
   --ink-notification-follow: #10b981;
   --ink-notification-system: #6b7280;
   --ink-notification-type-bg-mix: 12%;
