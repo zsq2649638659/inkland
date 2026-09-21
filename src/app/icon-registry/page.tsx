@@ -35,7 +35,6 @@ const chineseLabels: Partial<Record<InklandIconName, string>> = {
   "fa-chevron-up": "向上收起",
   "fa-circle-check": "成功",
   "fa-circle-exclamation": "提示",
-  "fa-circle-info": "信息",
   "fa-circle-plus": "新增",
   "fa-circle-user": "用户（备用）",
   "fa-circle-xmark": "关闭",
@@ -169,7 +168,7 @@ const baseIconGroups: IconGroup[] = [
     description: "登录注册表单、密码可见性、认证状态与站内消息提示图标",
     names: [
       "fa-user", "fa-envelope", "fa-lock", "fa-eye", "fa-eye-slash", "fa-circle-check",
-      "fa-circle-exclamation", "fa-circle-info", "fa-circle-xmark", "fa-feather-pointed", "fa-sparkles", "fa-right-to-bracket",
+      "fa-circle-exclamation", "fa-circle-xmark", "fa-feather-pointed", "fa-sparkles", "fa-right-to-bracket",
       "fa-bell", "fa-heart", "fa-comment", "fa-bookmark", "fa-reply", "fa-user-plus",
     ],
   },
@@ -243,7 +242,7 @@ const baseIconGroups: IconGroup[] = [
     names: [
       "fa-arrow-left", "fa-arrow-right", "fa-arrow-up", "fa-arrow-down", "fa-arrow-rotate-right",
       "fa-chevron-down", "fa-angles-left", "fa-angles-right", "fa-chevron-left", "fa-chevron-right",
-      "fa-chevron-up", "fa-circle-check", "fa-circle-exclamation", "fa-circle-info",
+      "fa-chevron-up", "fa-circle-check", "fa-circle-exclamation",
       "fa-spinner", "fa-lock", "fa-xmark", "fa-check", "fa-hourglass-half",
     ],
   },

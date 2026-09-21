@@ -282,7 +282,7 @@ export default function LoginPage() {
   const statusIcon: Record<Exclude<StatusType, null>, InklandIconName> = {
     error: "fa-circle-exclamation",
     success: "fa-circle-check",
-    info: "fa-circle-info",
+    info: "fa-circle-exclamation",
   };
 
   const statusClass = {
@@ -322,7 +322,7 @@ export default function LoginPage() {
           {/* Status message — fixed height container, always renders to prevent layout shift */}
           <div className="auth-status-wrapper">
             <div className={`auth-status ${status.type ? statusClass[status.type] : "auth-status-hidden"}`}>
-              <SiteIcon name={status.type ? statusIcon[status.type] : "fa-circle-info"} variant="solid" />
+              <SiteIcon name={status.type ? statusIcon[status.type] : "fa-circle-exclamation"} variant="solid" />
               <span>{status.message || "\u00A0"}</span>
             </div>
           </div>

@@ -5,6 +5,7 @@ import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import { createClient } from "@/lib/supabase/browser";
@@ -19,6 +20,30 @@ import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cach
 type FilterType = "all" | "novel" | "illustration" | "serial";
 type StatusFilter = "all" | "published" | "draft" | "rejected";
 type SortType = "updated" | "created" | "popular";
+
+type StudioQueryState = {
+  filter: FilterType;
+  statusFilter: StatusFilter;
+  sortType: SortType;
+  searchQuery: string;
+};
+
+const studioFilterValues = ["all", "novel", "illustration", "serial"] as const;
+const studioStatusValues = ["all", "published", "draft", "rejected"] as const;
+const studioSortValues = ["updated", "created", "popular"] as const;
+
+const readStudioQueryState = (params: { get: (name: string) => string | null }): StudioQueryState => {
+  const type = params.get("type");
+  const status = params.get("status");
+  const sort = params.get("sort");
+
+  return {
+    filter: studioFilterValues.includes(type as FilterType) ? type as FilterType : "all",
+    statusFilter: studioStatusValues.includes(status as StatusFilter) ? status as StatusFilter : "all",
+    sortType: studioSortValues.includes(sort as SortType) ? sort as SortType : "updated",
+    searchQuery: params.get("q") || "",
+  };
+};
 
 interface WorkItem {
   id: string;
@@ -172,8 +197,8 @@ function StudioWorkCard({
   const excerpt = getExcerpt(work.content);
   const mobileType = isImage ? (displayTitle ? "image" : "image-empty") : isSeries ? "serial" : "single";
   const title = displayTitle || (isSeries ? work.series_name || "长篇连载" : "无标题");
-  const mobileTitle = isImage && !displayTitle ? "-" : title;
-  const mobileExcerpt = isImage ? (displayTitle ? excerpt || "-" : "-") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
+  const mobileTitle = isImage ? displayTitle : title;
+  const mobileExcerpt = isImage ? (displayTitle ? excerpt : "") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
   const latestChapterTitle = work.series_chapter_count ? `第${work.series_chapter_count}章` : "章节待发布";
   const workHref = isSeries && work.series_name
     ? `/studio/series/${encodeURIComponent(work.series_name)}`
@@ -181,7 +206,7 @@ function StudioWorkCard({
   const editHref = isSeries
     ? workHref
     : `/create?editPost=${work.id}`;
-  const editLabel = work.review_status === "rejected" && !isSeries ? "查看问题并修改" : "编辑";
+  const editLabel = "编辑";
   const publishedValue = work.published_at || work.updated_at || work.created_at;
 
   return (
@@ -193,14 +218,16 @@ function StudioWorkCard({
       data-studio-status={statusClass.replace("status-", "")}
       onClick={() => batchMode && onToggleSelect(work.id)}
     >
-      <Checkbox
-        as="span"
-        className="card-check"
-        checked={selected}
-        aria-label={`选择作品：${title}`}
-        onChange={() => onToggleSelect(work.id)}
-        onClick={(event) => event.stopPropagation()}
-      />
+      <div className="studio-card-selection-row">
+        <Checkbox
+          as="span"
+          className="card-check"
+          checked={selected}
+          aria-label={`选择作品：${title}`}
+          onChange={() => onToggleSelect(work.id)}
+          onClick={(event) => event.stopPropagation()}
+        />
+      </div>
       <div className="card-body">
         <div className="site-card__studio-meta">
           <span className="tag tag--type site-card__type">
@@ -214,27 +241,31 @@ function StudioWorkCard({
 
         <div className="site-card__studio-mobile-main">
           {isImage && (
-            <div className="site-card__feed-images-shell profile-square__image">
-              <div className="site-card__feed-images" aria-label={`共 ${imageUrls.length} 张图片`}>
-                <div className="site-card__feed-image" role={!imageUrls[0] ? "img" : undefined} aria-label={!imageUrls[0] ? "图片作品封面占位" : undefined}>
-                  {imageUrls[0] ? (
-                    <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
-                  ) : (
-                    <SiteIcon name="fa-image" variant="solid" aria-hidden="true" />
-                  )}
-                  {displayTitle && (
-                    <div className="site-card__feed-image-overlay">
-                      <Link className="site-card__title-link" href={`/read/${work.id}`} onClick={(event) => event.stopPropagation()}>
-                        <h3 className="site-card__title">{displayTitle}</h3>
-                      </Link>
-                      <p className="site-card__excerpt">{excerpt || "-"}</p>
-                    </div>
-                  )}
+            <div className="site-card__studio-image-preview">
+              <div className="site-card__feed-images-shell profile-square__image">
+                <div className="site-card__feed-images" aria-label={`共 ${imageUrls.length} 张图片`}>
+                  <div className="site-card__feed-image" role={!imageUrls[0] ? "img" : undefined} aria-label={!imageUrls[0] ? "图片作品封面占位" : undefined}>
+                    {imageUrls[0] ? (
+                      <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
+                    ) : (
+                      <SiteIcon name="fa-image" variant="solid" aria-hidden="true" />
+                    )}
+                    {displayTitle && (
+                      <div className="site-card__feed-image-overlay">
+                        <Link className="site-card__title-link" href={`/read/${work.id}`} onClick={(event) => event.stopPropagation()}>
+                          <h3 className="site-card__title">{displayTitle}</h3>
+                        </Link>
+                        <p className="site-card__excerpt">{excerpt || "-"}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {imageUrls.length > 1 && <span className="site-card__feed-image-count" aria-hidden="true"><span>{imageUrls.length}</span></span>}
               </div>
-              {imageUrls.length > 1 && <span className="site-card__feed-image-count" aria-hidden="true"><span>{imageUrls.length}</span></span>}
             </div>
           )}
+
+          {isImage && <time className="site-card__published-at site-card__published-at--image" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>}
 
           <div className="site-card__studio-mobile-copy">
             {isSeries ? (
@@ -243,15 +274,14 @@ function StudioWorkCard({
                   <h3 className="site-card__title">{title}</h3>
                 </Link>
               </div>
-            ) : (
+            ) : isImage && !displayTitle ? null : (
               <Link className="site-card__title-link" href={isImage ? `/read/${work.id}` : editHref} onClick={(event) => event.stopPropagation()}>
-                <h3 className="site-card__title">{isImage ? mobileTitle : title}</h3>
+                <h3 className="site-card__title">{mobileTitle}</h3>
               </Link>
             )}
-            {(!isImage || mobileType === "image") && (
+            {(!isImage || displayTitle) && (
               <p className={`site-card__excerpt${isSeries ? " site-card__serial-intro" : ""}`}>{isImage ? mobileExcerpt : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要")}</p>
             )}
-            {isImage && mobileType === "image-empty" && <p className="site-card__excerpt site-card__image-empty-excerpt">-</p>}
             {isSeries && (
               <Link className="tag tag--type tag--type-link site-card__latest-chapter" href={`${workHref}#chapter`} aria-label={`最新章节：${latestChapterTitle}`} onClick={(event) => event.stopPropagation()}>
                 <SiteIcon name="fa-long-serial" variant="solid" aria-hidden="true" />
@@ -259,7 +289,7 @@ function StudioWorkCard({
                 <span className="site-card__latest-chapter-title">{latestChapterTitle}</span>
               </Link>
             )}
-            <time className="site-card__published-at" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>
+            {!isImage && <time className="site-card__published-at" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>}
           </div>
         </div>
 
@@ -275,8 +305,18 @@ function StudioWorkCard({
         </div>
 
         <div className="site-card__studio-mobile-management" role="group" aria-label={`${typeLabel}作品管理操作`}>
-          <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`编辑${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
-          <button type="button" className="btn btn--small btn--round btn--theme-primary btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+          <div className="studio-mobile-management-actions">
+            <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`${editLabel}${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
+            <button type="button" className="btn btn--small btn--round btn--theme-primary btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+          </div>
+          <Checkbox
+            as="span"
+            className="card-check card-check--mobile"
+            checked={selected}
+            aria-label={`选择作品：${title}`}
+            onChange={() => onToggleSelect(work.id)}
+            onClick={(event) => event.stopPropagation()}
+          />
         </div>
       </div>
     </article>
@@ -292,14 +332,15 @@ export default function StudioPage() {
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
   const dialog = useAppDialog();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { filter, statusFilter, sortType, searchQuery } = readStudioQueryState(searchParams);
   const [works, setWorks] = useState<WorkItem[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesWorkItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string[]>>({});
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortType, setSortType] = useState<SortType>("updated");
-  const [searchQuery, setSearchQuery] = useState("");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileDraftFilter, setMobileDraftFilter] = useState<FilterType>("all");
   const [mobileDraftStatus, setMobileDraftStatus] = useState<StatusFilter>("all");
@@ -307,11 +348,71 @@ export default function StudioPage() {
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shownWorks, setShownWorks] = useState(12);
+  const [studioSearchDraft, setStudioSearchDraft] = useState(searchQuery);
+  const studioSearchComposingRef = useRef(false);
   const workLoadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!studioSearchComposingRef.current) setStudioSearchDraft(searchQuery);
+  }, [searchQuery]);
 
   useEffect(() => {
     setShownWorks(12);
   }, [filter, statusFilter, searchQuery, sortType]);
+
+  const updateStudioQuery = (updates: Partial<StudioQueryState>) => {
+    const current = readStudioQueryState(searchParams);
+    const nextState = { ...current, ...updates };
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (nextState.filter === "all") nextParams.delete("type");
+    else nextParams.set("type", nextState.filter);
+    if (nextState.statusFilter === "all") nextParams.delete("status");
+    else nextParams.set("status", nextState.statusFilter);
+    if (nextState.sortType === "updated") nextParams.delete("sort");
+    else nextParams.set("sort", nextState.sortType);
+    if (nextState.searchQuery) nextParams.set("q", nextState.searchQuery);
+    else nextParams.delete("q");
+
+    const query = nextParams.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  };
+
+  const commitStudioSearch = (value: string) => {
+    setStudioSearchDraft(value);
+    if (value !== searchQuery) updateStudioQuery({ searchQuery: value });
+  };
+
+  const handleStudioSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.currentTarget.value;
+    setStudioSearchDraft(value);
+    if (!studioSearchComposingRef.current && !(event.nativeEvent as InputEvent).isComposing) commitStudioSearch(value);
+  };
+
+  const handleStudioSearchCompositionStart = () => {
+    studioSearchComposingRef.current = true;
+  };
+
+  const handleStudioSearchCompositionEnd = (event: React.CompositionEvent<HTMLInputElement>) => {
+    studioSearchComposingRef.current = false;
+    commitStudioSearch(event.currentTarget.value);
+  };
+
+  const handleStudioSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && !studioSearchComposingRef.current) {
+      event.preventDefault();
+      commitStudioSearch(event.currentTarget.value);
+    }
+  };
+
+  const handleStudioSearchBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (!studioSearchComposingRef.current) commitStudioSearch(event.currentTarget.value);
+  };
+
+  const clearStudioSearch = () => {
+    studioSearchComposingRef.current = false;
+    commitStudioSearch("");
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -322,6 +423,7 @@ export default function StudioPage() {
   const loadWorks = async () => {
     if (!user) return;
     setLoading(true);
+    setLoadError(null);
 
     // 优先走服务端聚合路由（机房内拉取 posts+stats 并瘦身，客户端只下载轻量数据）；
     // 本地 dev 或路由异常时回落客户端直连。
@@ -358,8 +460,21 @@ export default function StudioPage() {
         // 避免批量导入的章节把 limit(50) 挤占并白拉回大量正文。
         .neq("post_type", "serial")
         .order("updated_at", { ascending: false });
-      const res = await q.limit(50);
-      if (!res.data) { setLoading(false); return; }
+      let res: { data: unknown[] | null; error: { message: string } | null };
+      try {
+        res = await q.limit(50);
+      } catch {
+        setWorks([]);
+        setLoadError("作品列表暂时无法加载，请重试。");
+        setLoading(false);
+        return;
+      }
+      if (res.error || !res.data) {
+        setWorks([]);
+        setLoadError("作品列表暂时无法加载，请重试。");
+        setLoading(false);
+        return;
+      }
       // 直连回落路径同样瘦身：卡片只消费摘要+图片，超长全文交给编辑器
       data = (res.data as unknown as Record<string, unknown>[]).map((p) => ({
         ...p,
@@ -609,10 +724,16 @@ export default function StudioPage() {
   };
 
   const applyMobileFilter = () => {
-    setFilter(mobileDraftFilter);
-    setStatusFilter(mobileDraftStatus);
-    setSortType(mobileDraftSort);
+    updateStudioQuery({
+      filter: mobileDraftFilter,
+      statusFilter: mobileDraftStatus,
+      sortType: mobileDraftSort,
+    });
     setMobileFilterOpen(false);
+  };
+
+  const resetStudioFilters = () => {
+    updateStudioQuery({ filter: "all", statusFilter: "all", sortType: "updated", searchQuery: "" });
   };
 
   const typeFilterOptions = typeFilters.map((item) => ({ value: item.key, label: item.label }));
@@ -620,9 +741,9 @@ export default function StudioPage() {
   const sortFilterOptions = sortOptions.map((item) => ({ value: item.key, label: item.label }));
   const renderFilterSelectors = (prefix: string) => (
     <>
-      <ProfileFilterSelect label="作品类型" id={`${prefix}-type-menu`} value={filter} options={typeFilterOptions} onChange={(value) => setFilter(value as FilterType)} />
-      <ProfileFilterSelect label="发布状态" id={`${prefix}-status-menu`} value={statusFilter} options={statusFilterOptions} onChange={(value) => setStatusFilter(value as StatusFilter)} />
-      <ProfileFilterSelect label="排序" id={`${prefix}-sort-menu`} value={sortType} options={sortFilterOptions} onChange={(value) => setSortType(value as SortType)} />
+      <ProfileFilterSelect label="作品类型" id={`${prefix}-type-menu`} value={filter} options={typeFilterOptions} onChange={(value) => updateStudioQuery({ filter: value as FilterType })} />
+      <ProfileFilterSelect label="发布状态" id={`${prefix}-status-menu`} value={statusFilter} options={statusFilterOptions} onChange={(value) => updateStudioQuery({ statusFilter: value as StatusFilter })} />
+      <ProfileFilterSelect label="排序" id={`${prefix}-sort-menu`} value={sortType} options={sortFilterOptions} onChange={(value) => updateStudioQuery({ sortType: value as SortType })} />
     </>
   );
 
@@ -642,6 +763,8 @@ export default function StudioPage() {
     if (isScheduled(w)) return "定时发布";
     return "草稿";
   };
+
+  const hasActiveStudioFilters = Boolean(searchQuery.trim() || filter !== "all" || statusFilter !== "all");
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -702,6 +825,15 @@ export default function StudioPage() {
     window.dispatchEvent(new Event("inkland:stats-changed"));
   };
 
+  const retryLoadStudio = () => {
+    setBatchMode(false);
+    setSelectedIds(new Set());
+    invalidateClientCache(`studio-works:${user?.id || ""}`);
+    invalidateClientCache(`studio-series:${user?.id || ""}`);
+    void loadWorks();
+    void loadSeries();
+  };
+
   if (authLoading) {
     return <div className="min-h-screen bg-paper pb-20 lg:pb-0"><div className="main-container"><HomeSidebar /><div className="content-area"><SkeletonStudio /></div></div></div>;
   }
@@ -742,6 +874,24 @@ export default function StudioPage() {
             <SkeletonStudio />
           ) : (
             <>
+          <div className="page-header">
+            <h1 className="page-title">作品管理</h1>
+          </div>
+
+          {loadError ? (
+            <section className="studio-error-state" role="alert" aria-live="assertive">
+              <div className="studio-error-state-icon" aria-hidden="true">
+                <SiteIcon name="fa-circle-exclamation" variant="solid" />
+              </div>
+              <div className="studio-error-state-copy">
+                <h2>作品列表加载失败</h2>
+                <p>{loadError}</p>
+              </div>
+              <button type="button" className="empty-action studio-error-state-action" onClick={retryLoadStudio}>重试</button>
+            </section>
+          ) : (
+          <>
+
           {/* 统计卡片（使用未筛选数据，不受 type/status 筛选影响） */}
           <div className="stats-grid">
             <div className="stat-card">
@@ -809,8 +959,8 @@ export default function StudioPage() {
                 <div className="filter-system-field filter-system-field--query">
                   <div className="profile-filter-search-shell">
                     <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                    <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
-                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                    <input className="form-control" type="search" value={studioSearchDraft} onChange={handleStudioSearchChange} onCompositionStart={handleStudioSearchCompositionStart} onCompositionEnd={handleStudioSearchCompositionEnd} onKeyDown={handleStudioSearchKeyDown} onBlur={handleStudioSearchBlur} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
+                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={clearStudioSearch}>
                       <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                     </button>
                   </div>
@@ -838,8 +988,8 @@ export default function StudioPage() {
                     <div className="filter-system-field filter-system-field--query">
                       <div className="profile-filter-search-shell">
                         <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
-                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                        <input className="form-control" type="search" value={studioSearchDraft} onChange={handleStudioSearchChange} onCompositionStart={handleStudioSearchCompositionStart} onCompositionEnd={handleStudioSearchCompositionEnd} onKeyDown={handleStudioSearchKeyDown} onBlur={handleStudioSearchBlur} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
+                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={clearStudioSearch}>
                           <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                         </button>
                       </div>
@@ -873,9 +1023,13 @@ export default function StudioPage() {
                   </div>
                 </div>
               </div>
-              <h2 className="empty-title">{searchQuery ? "没有找到匹配的作品" : "还没有任何作品"}</h2>
-              <p className="empty-desc">{searchQuery ? "换个关键词试试吧" : "创建你的第一个作品，开始创作之旅"}</p>
-              {!searchQuery && (
+              <h2 className="empty-title">{searchQuery.trim() ? "没有找到匹配的作品" : hasActiveStudioFilters ? "没有符合当前筛选条件的作品" : "还没有任何作品"}</h2>
+              <p className="empty-desc">{searchQuery.trim() ? "换个关键词试试吧" : hasActiveStudioFilters ? "调整筛选条件或查看全部作品" : "创建你的第一个作品，开始创作之旅"}</p>
+              {hasActiveStudioFilters ? (
+                <button type="button" className="empty-action" onClick={resetStudioFilters}>
+                  清除筛选
+                </button>
+              ) : (
                 <Link href="/create" className="empty-action">
                   创建作品
                 </Link>
@@ -901,7 +1055,8 @@ export default function StudioPage() {
             </div>
           )}
           {allWorks.length > 12 && (
-            <div className="card-load-more" ref={workLoadMoreRef}>
+            <div className="card-load-more" ref={workLoadMoreRef} aria-live="polite">
+              <span className="studio-load-more-status">已显示 {Math.min(shownWorks, allWorks.length)} / {allWorks.length} 项作品</span>
               {shownWorks < allWorks.length ? (
                 <button type="button" className="btn-load-more" onClick={() => setShownWorks((count) => count + 12)}>
                   <SiteIcon name="fa-chevron-down" variant="solid" aria-hidden="true" /> 加载更多
@@ -913,6 +1068,8 @@ export default function StudioPage() {
           )}
 
           <div className="page-footer">&copy; 2026 inkland. All rights reserved.</div>
+          </>
+          )}
           </>
           )}
         </div>
