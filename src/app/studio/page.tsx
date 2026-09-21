@@ -793,6 +793,11 @@ export default function StudioPage() {
             <SkeletonStudio />
           ) : (
             <>
+          <div className="page-header">
+            <h1 className="page-title">作品管理</h1>
+            <p className="page-subtitle">管理你的作品、草稿和审核状态</p>
+          </div>
+
           {/* 统计卡片（使用未筛选数据，不受 type/status 筛选影响） */}
           <div className="stats-grid">
             <div className="stat-card">
