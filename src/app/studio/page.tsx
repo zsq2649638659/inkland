@@ -218,14 +218,16 @@ function StudioWorkCard({
       data-studio-status={statusClass.replace("status-", "")}
       onClick={() => batchMode && onToggleSelect(work.id)}
     >
-      <Checkbox
-        as="span"
-        className="card-check"
-        checked={selected}
-        aria-label={`选择作品：${title}`}
-        onChange={() => onToggleSelect(work.id)}
-        onClick={(event) => event.stopPropagation()}
-      />
+      <div className="studio-card-selection-row">
+        <Checkbox
+          as="span"
+          className="card-check"
+          checked={selected}
+          aria-label={`选择作品：${title}`}
+          onChange={() => onToggleSelect(work.id)}
+          onClick={(event) => event.stopPropagation()}
+        />
+      </div>
       <div className="card-body">
         <div className="site-card__studio-meta">
           <span className="tag tag--type site-card__type">
@@ -302,8 +304,18 @@ function StudioWorkCard({
         </div>
 
         <div className="site-card__studio-mobile-management" role="group" aria-label={`${typeLabel}作品管理操作`}>
-          <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`${editLabel}${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
-          <button type="button" className="btn btn--small btn--round btn--theme-primary btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+          <div className="studio-mobile-management-actions">
+            <Link href={editHref} className="btn btn--small btn--round btn--theme-default btn--variant-outline" aria-label={`${editLabel}${typeLabel}作品`} onClick={(event) => event.stopPropagation()}>{editLabel}</Link>
+            <button type="button" className="btn btn--small btn--round btn--theme-primary btn--variant-outline" aria-label={`删除${typeLabel}作品`} onClick={(event) => { event.stopPropagation(); onDelete(work); }}>删除</button>
+          </div>
+          <Checkbox
+            as="span"
+            className="card-check card-check--mobile"
+            checked={selected}
+            aria-label={`选择作品：${title}`}
+            onChange={() => onToggleSelect(work.id)}
+            onClick={(event) => event.stopPropagation()}
+          />
         </div>
       </div>
     </article>
