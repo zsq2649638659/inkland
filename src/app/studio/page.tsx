@@ -262,9 +262,10 @@ function StudioWorkCard({
                 </div>
                 {imageUrls.length > 1 && <span className="site-card__feed-image-count" aria-hidden="true"><span>{imageUrls.length}</span></span>}
               </div>
-              <time className="site-card__published-at site-card__published-at--image" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>
             </div>
           )}
+
+          {isImage && <time className="site-card__published-at site-card__published-at--image" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>}
 
           <div className="site-card__studio-mobile-copy">
             {isSeries ? (
