@@ -985,6 +985,7 @@
 #page-studio .site-card__studio-meta .site-card__status.tag--rejected { color: var(--ink-danger); background: var(--ink-danger-bg); }
 
 #page-studio .site-card__studio-mobile-main { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; }
+#page-studio .site-card__studio-image-preview { min-width: 0; }
 #page-studio .site-card__studio-mobile-copy { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; }
 #page-studio .site-card--feed-image .site-card__studio-mobile-copy { display: none; }
 #page-studio .site-card__title-link { display: block; min-width: 0; color: inherit; text-decoration: none; cursor: pointer; }
@@ -1197,6 +1198,8 @@
   #page-studio .site-card__studio-meta { display: none; }
   #page-studio .site-card__studio-mobile-main { grid-column: 1; display: grid; grid-template-columns: minmax(0, 25.6%) minmax(0, 1fr); align-items: stretch; gap: var(--ink-space-2); min-width: 0; }
   #page-studio .site-card--feed-image .site-card__studio-mobile-main { grid-template-columns: clamp(84px, 22vw, 112px) minmax(0, 1fr); align-items: center; }
+  #page-studio .site-card--feed-image .site-card__studio-image-preview { display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: var(--ink-space-2); align-self: start; }
+  #page-studio .site-card--feed-image .site-card__studio-image-preview .site-card__feed-images-shell { margin-bottom: 0; }
   #page-studio .site-card--feed-single .site-card__studio-mobile-main,
   #page-studio .site-card--feed-serial .site-card__studio-mobile-main { grid-template-columns: 1fr; }
   #page-studio .site-card__feed-images-shell {
@@ -1225,7 +1228,8 @@
   #page-studio .site-card__latest-chapter { width: max-content; max-width: 100%; min-height: var(--ink-height-card-meta); align-self: flex-start; margin: 0; padding: var(--ink-space-1); font: var(--ink-font-tag-meta); }
   #page-studio .site-card__latest-chapter svg { width: var(--ink-size-14); height: var(--ink-size-14); flex-basis: var(--ink-size-14); }
   #page-studio .site-card__latest-chapter-label { display: none; }
-  #page-studio .site-card__published-at { display: block; }
+  #page-studio .site-card__published-at { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #page-studio .site-card--feed-image .site-card__published-at--image { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #page-studio .site-card__actions { padding-top: var(--ink-space-0); }
   #page-studio .site-card__actions,
   #page-studio .site-card__studio-actions { display: none; }
@@ -1236,9 +1240,9 @@
   #page-studio .site-card__studio-mobile-management .btn--variant-outline:hover,
   #page-studio .site-card__studio-mobile-management .btn--variant-outline:focus-visible { transform: translateY(-1px); outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
   #page-studio .site-card__studio-mobile-management .btn--theme-default.btn--variant-outline:hover,
-  #page-studio .site-card__studio-mobile-management .btn--theme-default.btn--variant-outline:focus-visible { color: var(--ink-button-default-color); background: var(--ink-button-default-bg); border-color: var(--ink-color-border-strong); }
+  #page-studio .site-card__studio-mobile-management .btn--theme-default.btn--variant-outline:focus-visible { color: var(--ink-button-default-color); background: var(--ink-button-default-bg); border-color: transparent; }
   #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline:hover,
-  #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline:focus-visible { color: var(--ink-button-primary-active-bg); background: var(--ink-button-outline-active-bg); border-color: var(--ink-button-primary-active-bg); }
+  #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline:focus-visible { color: var(--ink-button-primary-active-bg); background: var(--ink-button-outline-active-bg); border-color: transparent; }
 }
 
 /* 个人中心复用卡片库 Card Device Grid / Profile Mobile 契约。 */

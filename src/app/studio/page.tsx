@@ -199,7 +199,6 @@ function StudioWorkCard({
   const title = displayTitle || (isSeries ? work.series_name || "长篇连载" : "无标题");
   const mobileTitle = isImage ? displayTitle : title;
   const mobileExcerpt = isImage ? (displayTitle ? excerpt : "") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
-  const isRejected = work.review_status === "rejected" || work.status === "rejected";
   const latestChapterTitle = work.series_chapter_count ? `第${work.series_chapter_count}章` : "章节待发布";
   const workHref = isSeries && work.series_name
     ? `/studio/series/${encodeURIComponent(work.series_name)}`
@@ -207,7 +206,7 @@ function StudioWorkCard({
   const editHref = isSeries
     ? workHref
     : `/create?editPost=${work.id}`;
-  const editLabel = isRejected && !isSeries ? "查看问题并修改" : "编辑";
+  const editLabel = "编辑";
   const publishedValue = work.published_at || work.updated_at || work.created_at;
 
   return (
@@ -240,25 +239,28 @@ function StudioWorkCard({
 
         <div className="site-card__studio-mobile-main">
           {isImage && (
-            <div className="site-card__feed-images-shell profile-square__image">
-              <div className="site-card__feed-images" aria-label={`共 ${imageUrls.length} 张图片`}>
-                <div className="site-card__feed-image" role={!imageUrls[0] ? "img" : undefined} aria-label={!imageUrls[0] ? "图片作品封面占位" : undefined}>
-                  {imageUrls[0] ? (
-                    <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
-                  ) : (
-                    <SiteIcon name="fa-image" variant="solid" aria-hidden="true" />
-                  )}
-                  {displayTitle && (
-                    <div className="site-card__feed-image-overlay">
-                      <Link className="site-card__title-link" href={`/read/${work.id}`} onClick={(event) => event.stopPropagation()}>
-                        <h3 className="site-card__title">{displayTitle}</h3>
-                      </Link>
-                      <p className="site-card__excerpt">{excerpt || "-"}</p>
-                    </div>
-                  )}
+            <div className="site-card__studio-image-preview">
+              <div className="site-card__feed-images-shell profile-square__image">
+                <div className="site-card__feed-images" aria-label={`共 ${imageUrls.length} 张图片`}>
+                  <div className="site-card__feed-image" role={!imageUrls[0] ? "img" : undefined} aria-label={!imageUrls[0] ? "图片作品封面占位" : undefined}>
+                    {imageUrls[0] ? (
+                      <img src={getThumbnailUrl(imageUrls[0], { width: 400, height: 300, resize: "cover" })} alt="" loading="lazy" />
+                    ) : (
+                      <SiteIcon name="fa-image" variant="solid" aria-hidden="true" />
+                    )}
+                    {displayTitle && (
+                      <div className="site-card__feed-image-overlay">
+                        <Link className="site-card__title-link" href={`/read/${work.id}`} onClick={(event) => event.stopPropagation()}>
+                          <h3 className="site-card__title">{displayTitle}</h3>
+                        </Link>
+                        <p className="site-card__excerpt">{excerpt || "-"}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {imageUrls.length > 1 && <span className="site-card__feed-image-count" aria-hidden="true"><span>{imageUrls.length}</span></span>}
               </div>
-              {imageUrls.length > 1 && <span className="site-card__feed-image-count" aria-hidden="true"><span>{imageUrls.length}</span></span>}
+              <time className="site-card__published-at site-card__published-at--image" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>
             </div>
           )}
 
@@ -284,7 +286,7 @@ function StudioWorkCard({
                 <span className="site-card__latest-chapter-title">{latestChapterTitle}</span>
               </Link>
             )}
-            <time className="site-card__published-at" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>
+            {!isImage && <time className="site-card__published-at" dateTime={publishedValue}>发布时间：{formatStudioDateTime(publishedValue)}</time>}
           </div>
         </div>
 

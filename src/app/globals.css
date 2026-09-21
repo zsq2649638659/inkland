@@ -3925,6 +3925,7 @@ p {
 #page-studio .stat-card-icon--published { background: var(--ink-success-bg); color: var(--ink-success); }
 #page-studio .stat-card-icon--draft { background: var(--ink-warning-bg); color: var(--ink-warning); }
 #page-studio .stat-card-icon--rejected { background: var(--ink-danger-bg); color: var(--color-text-muted); }
+#page-studio .stat-card-icon--rejected svg { color: var(--color-text-muted); }
 .stat-card-number { font-size: 32px; font-weight: 700; letter-spacing: -0.04em; color: var(--color-text); line-height: 1; }
 .stat-card-label { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
 
@@ -9068,7 +9069,7 @@ p {
 #page-studio .studio-filter-drawer { width: 100%; padding: var(--ink-space-5); border-radius: var(--ink-radius-lg) var(--ink-radius-lg) 0 0; color: var(--ink-text); background: var(--ink-surface); box-shadow: var(--ink-shadow-lg); }
 #page-studio .studio-filter-drawer h2 { margin: var(--ink-space-0); font: var(--ink-font-title-sm); }
 #page-studio .studio-filter-drawer-actions { display: flex; justify-content: flex-end; gap: var(--ink-space-2); margin-top: var(--ink-space-5); }
-#page-studio .studio-filter-drawer-actions button { width: 100px; min-width: 100px; flex: 0 0 100px; min-height: var(--ink-button-medium-height); padding: 0; border: var(--ink-button-border-width) solid var(--ink-button-default-border); border-radius: var(--ink-button-border-radius); color: var(--ink-button-default-color); background: transparent; font: var(--ink-button-medium-font); cursor: pointer; }
+#page-studio .studio-filter-drawer-actions button { width: auto; min-width: 0; flex: 1 1 0; min-height: var(--ink-button-medium-height); padding: 0; border: var(--ink-button-border-width) solid var(--ink-button-default-border); border-radius: var(--ink-button-border-radius); color: var(--ink-button-default-color); background: transparent; font: var(--ink-button-medium-font); cursor: pointer; }
 #page-studio .studio-filter-drawer-actions button:hover,
 #page-studio .studio-filter-drawer-actions button:focus-visible { border-color: var(--ink-button-default-border); background: transparent; outline: var(--ink-outline-none); }
 #page-studio .studio-filter-drawer-actions .is-primary { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); }
@@ -17196,9 +17197,9 @@ img.load-error {
 
 @media (max-width: 767px) {
   #page-studio .studio-filter-drawer-actions:has(> button:nth-child(2):last-child) > button {
-    width: 100px !important;
-    min-width: 100px !important;
-    flex: 0 0 100px !important;
+    width: calc(50% - (var(--ink-space-2) / 2)) !important;
+    min-width: 0 !important;
+    flex: 1 1 0 !important;
     padding-inline: 0 !important;
   }
 }
