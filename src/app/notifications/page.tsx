@@ -14,11 +14,12 @@ import { getNotificationLink, type NotificationMetadata } from "@/lib/notificati
 import { filterVisibleNotifications, readNotificationPreferences } from "@/lib/notificationPreferences";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
-type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark" | "reply";
+type NotificationType = "all" | "comment" | "like" | "follow" | "system" | "bookmark";
 
 const readNotificationTab = (searchParams?: { get: (name: string) => string | null }): NotificationType => {
   const tab = searchParams?.get("tab") ?? (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab"));
-  if (tab === "all" || tab === "comment" || tab === "like" || tab === "follow" || tab === "system" || tab === "bookmark" || tab === "reply") return tab;
+  if (tab === "reply") return "comment";
+  if (tab === "all" || tab === "comment" || tab === "like" || tab === "follow" || tab === "system" || tab === "bookmark") return tab;
   return "all";
 };
 
@@ -59,10 +60,22 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "reply") {
+        params.set("tab", "comment");
+        window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+      }
       setFilterType(readNotificationTab(new URLSearchParams(window.location.search)));
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") !== "reply") return;
+    params.set("tab", "comment");
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }, []);
 
   const handleFilterChange = (next: NotificationType) => {
@@ -127,6 +140,9 @@ export default function NotificationsPage() {
     for (const item of visibleRows) {
       counts[item.type] = (counts[item.type] || 0) + 1;
     }
+    const commentUnread = (counts.comment || 0) + (counts.reply || 0);
+    if (commentUnread > 0) counts.comment = commentUnread;
+    delete counts.reply;
     counts.all = visibleRows.length;
     setUnreadByType(counts);
     setUnreadCount(visibleRows.length);
@@ -148,7 +164,9 @@ export default function NotificationsPage() {
 
     q = withTestDataVisibility(q, includeTestDataForProfile(profile));
     if (filterType !== "all") {
-      q = q.eq("type", filterType);
+      q = filterType === "comment"
+        ? q.in("type", ["comment", "reply"])
+        : q.eq("type", filterType);
     }
 
     const { data, error } = await q;
@@ -242,10 +260,11 @@ export default function NotificationsPage() {
     setUnreadCount((prev) => Math.max(0, prev - 1));
     const notification = notifications.find((item) => item.id === id);
     if (notification) {
+      const tabKey = notification.type === "reply" ? "comment" : notification.type;
       setUnreadByType((prev) => ({
         ...prev,
         all: Math.max(0, (prev.all || 0) - 1),
-        [notification.type]: Math.max(0, (prev[notification.type] || 0) - 1),
+        [tabKey]: Math.max(0, (prev[tabKey] || 0) - 1),
       }));
     }
     await supabase.from("notifications").update({ read: true }).eq("id", id);
@@ -307,7 +326,6 @@ export default function NotificationsPage() {
     { key: "like", label: "点赞", icon: "fa-heart" },
     { key: "comment", label: "评论", icon: "fa-comment" },
     { key: "bookmark", label: "收藏", icon: "fa-bookmark" },
-    { key: "reply", label: "回复", icon: "fa-reply" },
     { key: "follow", label: "关注", icon: "fa-user-plus" },
     { key: "system", label: "系统", icon: "fa-circle-info" },
   ];
@@ -317,7 +335,7 @@ export default function NotificationsPage() {
       case "like": return "fa-heart";
       case "comment": return "fa-comment";
       case "bookmark": return "fa-bookmark";
-      case "reply": return "fa-reply";
+      case "reply": return "fa-comment";
       case "system": return "fa-circle-info";
       case "follow": return "fa-user-plus";
       default: return "fa-bell";

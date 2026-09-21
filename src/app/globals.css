@@ -1387,14 +1387,14 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 9px;
+  height: 9px;
+  padding: 0 2px;
   margin: 0;
-  border-radius: 9px;
+  border-radius: 5px;
   background: var(--ink-color-brand, var(--color-primary, #F26B5B));
   color: #fff;
-  font-size: 10px;
+  font-size: 5px;
   font-weight: 700;
   line-height: 1;
 }
@@ -2610,12 +2610,22 @@ p {
 
 #page-notifications .segmented-tabs--notifications .segmented-tab {
   position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}
+
+#page-notifications .segmented-tabs--notifications .segmented-tabs-left {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
 }
 
 #page-notifications .segmented-tabs--notifications .notification-tab-count {
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: 4px;
+  right: 4px;
   z-index: 1;
 }
 
@@ -14950,6 +14960,42 @@ p {
 
 #page-notifications .segmented-tabs--notifications {
   margin-bottom: 20px;
+}
+
+/* Narrow screens keep the notification strip internally scrollable while each
+ * tab remains the same width, so the labels do not jump between breakpoints. */
+@media (max-width: 600px) {
+  #page-notifications .segmented-tabs--notifications {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-inline: 0;
+    scrollbar-width: none;
+  }
+
+  #page-notifications .segmented-tabs--notifications::-webkit-scrollbar {
+    display: none;
+  }
+
+  #page-notifications .segmented-tabs--notifications .segmented-tabs-left {
+    display: flex;
+    flex: 0 0 max(100%, 350px);
+    gap: 0;
+    width: max(100%, 350px);
+  }
+
+  #page-notifications .segmented-tabs--notifications .segmented-tab {
+    box-sizing: border-box;
+    flex: 1 1 0;
+    min-width: 50px;
+    width: auto;
+    padding: 8px 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  #page-notifications .segmented-tabs--notifications .notification-tab-count {
+    right: 1px;
+  }
 }
 
 /* ===== 一键回到顶部 ===== */
