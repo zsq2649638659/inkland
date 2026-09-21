@@ -14,10 +14,17 @@ function BackToTop() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 600);
+    const onScroll = () => {
+      const threshold = Math.min(600, Math.max(160, Math.round(window.innerHeight * 0.75)));
+      setVisible(window.scrollY > threshold);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
 
   if (pathname.startsWith("/read/")) return null;

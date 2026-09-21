@@ -5,6 +5,7 @@ import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import { createClient } from "@/lib/supabase/browser";
@@ -19,6 +20,30 @@ import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cach
 type FilterType = "all" | "novel" | "illustration" | "serial";
 type StatusFilter = "all" | "published" | "draft" | "rejected";
 type SortType = "updated" | "created" | "popular";
+
+type StudioQueryState = {
+  filter: FilterType;
+  statusFilter: StatusFilter;
+  sortType: SortType;
+  searchQuery: string;
+};
+
+const studioFilterValues = ["all", "novel", "illustration", "serial"] as const;
+const studioStatusValues = ["all", "published", "draft", "rejected"] as const;
+const studioSortValues = ["updated", "created", "popular"] as const;
+
+const readStudioQueryState = (params: { get: (name: string) => string | null }): StudioQueryState => {
+  const type = params.get("type");
+  const status = params.get("status");
+  const sort = params.get("sort");
+
+  return {
+    filter: studioFilterValues.includes(type as FilterType) ? type as FilterType : "all",
+    statusFilter: studioStatusValues.includes(status as StatusFilter) ? status as StatusFilter : "all",
+    sortType: studioSortValues.includes(sort as SortType) ? sort as SortType : "updated",
+    searchQuery: params.get("q") || "",
+  };
+};
 
 interface WorkItem {
   id: string;
@@ -292,14 +317,14 @@ export default function StudioPage() {
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
   const dialog = useAppDialog();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { filter, statusFilter, sortType, searchQuery } = readStudioQueryState(searchParams);
   const [works, setWorks] = useState<WorkItem[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesWorkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string[]>>({});
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortType, setSortType] = useState<SortType>("updated");
-  const [searchQuery, setSearchQuery] = useState("");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileDraftFilter, setMobileDraftFilter] = useState<FilterType>("all");
   const [mobileDraftStatus, setMobileDraftStatus] = useState<StatusFilter>("all");
@@ -312,6 +337,24 @@ export default function StudioPage() {
   useEffect(() => {
     setShownWorks(12);
   }, [filter, statusFilter, searchQuery, sortType]);
+
+  const updateStudioQuery = (updates: Partial<StudioQueryState>) => {
+    const current = readStudioQueryState(searchParams);
+    const nextState = { ...current, ...updates };
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (nextState.filter === "all") nextParams.delete("type");
+    else nextParams.set("type", nextState.filter);
+    if (nextState.statusFilter === "all") nextParams.delete("status");
+    else nextParams.set("status", nextState.statusFilter);
+    if (nextState.sortType === "updated") nextParams.delete("sort");
+    else nextParams.set("sort", nextState.sortType);
+    if (nextState.searchQuery) nextParams.set("q", nextState.searchQuery);
+    else nextParams.delete("q");
+
+    const query = nextParams.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -609,10 +652,16 @@ export default function StudioPage() {
   };
 
   const applyMobileFilter = () => {
-    setFilter(mobileDraftFilter);
-    setStatusFilter(mobileDraftStatus);
-    setSortType(mobileDraftSort);
+    updateStudioQuery({
+      filter: mobileDraftFilter,
+      statusFilter: mobileDraftStatus,
+      sortType: mobileDraftSort,
+    });
     setMobileFilterOpen(false);
+  };
+
+  const resetStudioFilters = () => {
+    updateStudioQuery({ filter: "all", statusFilter: "all", sortType: "updated", searchQuery: "" });
   };
 
   const typeFilterOptions = typeFilters.map((item) => ({ value: item.key, label: item.label }));
@@ -620,9 +669,9 @@ export default function StudioPage() {
   const sortFilterOptions = sortOptions.map((item) => ({ value: item.key, label: item.label }));
   const renderFilterSelectors = (prefix: string) => (
     <>
-      <ProfileFilterSelect label="作品类型" id={`${prefix}-type-menu`} value={filter} options={typeFilterOptions} onChange={(value) => setFilter(value as FilterType)} />
-      <ProfileFilterSelect label="发布状态" id={`${prefix}-status-menu`} value={statusFilter} options={statusFilterOptions} onChange={(value) => setStatusFilter(value as StatusFilter)} />
-      <ProfileFilterSelect label="排序" id={`${prefix}-sort-menu`} value={sortType} options={sortFilterOptions} onChange={(value) => setSortType(value as SortType)} />
+      <ProfileFilterSelect label="作品类型" id={`${prefix}-type-menu`} value={filter} options={typeFilterOptions} onChange={(value) => updateStudioQuery({ filter: value as FilterType })} />
+      <ProfileFilterSelect label="发布状态" id={`${prefix}-status-menu`} value={statusFilter} options={statusFilterOptions} onChange={(value) => updateStudioQuery({ statusFilter: value as StatusFilter })} />
+      <ProfileFilterSelect label="排序" id={`${prefix}-sort-menu`} value={sortType} options={sortFilterOptions} onChange={(value) => updateStudioQuery({ sortType: value as SortType })} />
     </>
   );
 
@@ -642,6 +691,8 @@ export default function StudioPage() {
     if (isScheduled(w)) return "定时发布";
     return "草稿";
   };
+
+  const hasActiveStudioFilters = Boolean(searchQuery.trim() || filter !== "all" || statusFilter !== "all");
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -809,8 +860,8 @@ export default function StudioPage() {
                 <div className="filter-system-field filter-system-field--query">
                   <div className="profile-filter-search-shell">
                     <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                    <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
-                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                    <input className="form-control" type="search" value={searchQuery} onChange={(event) => updateStudioQuery({ searchQuery: event.target.value })} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
+                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => updateStudioQuery({ searchQuery: "" })}>
                       <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                     </button>
                   </div>
@@ -838,8 +889,8 @@ export default function StudioPage() {
                     <div className="filter-system-field filter-system-field--query">
                       <div className="profile-filter-search-shell">
                         <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
-                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setSearchQuery("")}>
+                        <input className="form-control" type="search" value={searchQuery} onChange={(event) => updateStudioQuery({ searchQuery: event.target.value })} placeholder="搜索作品标题…" aria-label="作品管理搜索" />
+                        <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => updateStudioQuery({ searchQuery: "" })}>
                           <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                         </button>
                       </div>
@@ -873,9 +924,13 @@ export default function StudioPage() {
                   </div>
                 </div>
               </div>
-              <h2 className="empty-title">{searchQuery ? "没有找到匹配的作品" : "还没有任何作品"}</h2>
-              <p className="empty-desc">{searchQuery ? "换个关键词试试吧" : "创建你的第一个作品，开始创作之旅"}</p>
-              {!searchQuery && (
+              <h2 className="empty-title">{searchQuery.trim() ? "没有找到匹配的作品" : hasActiveStudioFilters ? "没有符合当前筛选条件的作品" : "还没有任何作品"}</h2>
+              <p className="empty-desc">{searchQuery.trim() ? "换个关键词试试吧" : hasActiveStudioFilters ? "调整筛选条件或查看全部作品" : "创建你的第一个作品，开始创作之旅"}</p>
+              {hasActiveStudioFilters ? (
+                <button type="button" className="empty-action" onClick={resetStudioFilters}>
+                  清除筛选
+                </button>
+              ) : (
                 <Link href="/create" className="empty-action">
                   创建作品
                 </Link>

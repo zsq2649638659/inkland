@@ -9087,6 +9087,20 @@ p {
   #page-studio .studio-batch-row--mobile .studio-batch-count { grid-column: 1 / -1; margin-right: 0; }
   #page-studio .studio-batch-row--mobile .studio-toolbar-action { min-width: 0; padding-inline: var(--ink-input-padding-inline-compact); }
 }
+
+/* The shared compact-button rule gives toolbar buttons a fixed mobile width.
+   Studio's four-action batch row must remain inside the available grid track,
+   including at the 320px narrow-screen breakpoint. */
+@media (max-width: 767px) {
+  #page-studio .studio-batch-row--mobile .studio-toolbar-action {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100%;
+    padding-inline: var(--ink-input-padding-inline-compact);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
 @media (max-width: 860px) and (min-width: 769px) {
   #page-profile .filter-system-composition-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #page-profile .filter-system-field--query { grid-column: 1 / -1; }
