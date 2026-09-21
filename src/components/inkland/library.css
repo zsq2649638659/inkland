@@ -1265,6 +1265,15 @@
   #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline:focus-visible { color: var(--ink-button-primary-active-bg); background: var(--ink-button-outline-active-bg); border-color: transparent; }
 }
 
+/* 700–767px 仍保留平板图标侧栏，因此作品列表保持两列；侧栏消失后
+   再在 699px 及以下切换为单列卡片。 */
+@media (min-width: 700px) and (max-width: 767px) {
+  #page-studio .works-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ink-gap-md);
+  }
+}
+
 /* 个人中心复用卡片库 Card Device Grid / Profile Mobile 契约。 */
 :is(#page-profile, #page-user) .profile-card-device {
   width: 100%;
