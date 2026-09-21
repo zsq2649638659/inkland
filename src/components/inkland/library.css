@@ -1253,7 +1253,7 @@
   #page-studio .site-card__studio-actions { display: none; }
   #page-studio .work-card.batch-mode .studio-card-selection-row { display: none; }
   #page-studio .site-card__studio-mobile-management { grid-column: 2; grid-row: 1; display: flex; width: max-content; max-width: 100%; align-items: center; gap: var(--ink-space-2); }
-  #page-studio .work-card.batch-mode .site-card__studio-mobile-management .card-check--mobile { position: relative; inset: auto; display: flex; width: 20px; height: 20px; flex: 0 0 20px; z-index: auto; }
+  #page-studio .work-card.batch-mode .site-card__studio-mobile-management .card-check--mobile { position: relative; inset: auto; display: flex; width: 20px; height: 20px; flex: 0 0 20px; align-self: flex-start; z-index: auto; }
   #page-studio .site-card__studio-mobile-management .btn { width: max-content; min-width: 0; min-height: var(--ink-button-extra-small-height); padding-inline: var(--ink-space-5); border-radius: var(--ink-radius-full); }
   #page-studio .site-card__studio-mobile-management .btn--theme-default.btn--variant-outline { color: var(--ink-button-default-color); background: var(--ink-surface); border-color: var(--ink-button-default-border); }
   #page-studio .site-card__studio-mobile-management .btn--theme-primary.btn--variant-outline { color: var(--ink-button-primary-border); background: var(--ink-surface); border-color: var(--ink-button-primary-border); }
