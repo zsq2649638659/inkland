@@ -15,7 +15,7 @@ import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-da
 
 interface Suggestion {
   name: string;
-  type: "tag" | "user" | "post" | "content";
+  type: "tag" | "user" | "post";
   subtitle?: string;
   id?: string;
 }
@@ -24,7 +24,6 @@ interface SuggestionResult {
   tags: Suggestion[];
   users: Suggestion[];
   posts: Suggestion[];
-  content: Suggestion[];
 }
 
 export default function Navbar() {
@@ -92,9 +91,8 @@ export default function Navbar() {
   const [tagSuggestions, setTagSuggestions] = useState<Suggestion[]>([]);
   const [userSuggestions, setUserSuggestions] = useState<Suggestion[]>([]);
   const [postSuggestions, setPostSuggestions] = useState<Suggestion[]>([]);
-  const [contentSuggestions, setContentSuggestions] = useState<Suggestion[]>([]);
   const [searching, setSearching] = useState(false);
-  const [activeFilterTab, setActiveFilterTab] = useState<"tags" | "users" | "works" | "content">("tags");
+  const [activeFilterTab, setActiveFilterTab] = useState<"tags" | "users" | "works">("tags");
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -102,7 +100,6 @@ export default function Navbar() {
         setTagSuggestions([]);
         setUserSuggestions([]);
         setPostSuggestions([]);
-        setContentSuggestions([]);
       }
     };
     document.addEventListener("mousedown", handleClick);
@@ -111,24 +108,22 @@ export default function Navbar() {
 
   const fetchSuggestions = useCallback(async (q: string) => {
     if (q.length < 1) {
-      setTagSuggestions([]); setUserSuggestions([]); setPostSuggestions([]); setContentSuggestions([]);
+      setTagSuggestions([]); setUserSuggestions([]); setPostSuggestions([]);
       return;
     }
     setSearching(true);
     const result = await getOrCreateClientCache<SuggestionResult>(
       `search-suggestions:${user?.id || "anon"}:${includeTestDataForProfile(profile) ? "test" : "public"}:${q.toLowerCase()}`,
       async () => {
-        const [blockedRes, tagsRes, usersRes, titleRes, contentRes] = await Promise.all([
+        const [blockedRes, tagsRes, usersRes, titleRes] = await Promise.all([
           user ? supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id) : Promise.resolve({ data: [] as unknown[] }),
           supabase.from("tags").select("id, name").ilike("name", `%${q}%`).limit(5),
           withTestDataVisibility(supabase.from("profiles").select("id, nickname, avatar_url").ilike("nickname", `%${q}%`).limit(5), includeTestDataForProfile(profile)),
           withTestDataVisibility(supabase.from("posts").select("id, title, user_id").ilike("title", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5), includeTestDataForProfile(profile)),
-          withTestDataVisibility(supabase.from("posts").select("id, title, content, user_id").ilike("content", `%${q}%`).eq("status", "published").order("created_at", { ascending: false }).limit(5), includeTestDataForProfile(profile)),
         ]);
         const blockedIds = new Set((blockedRes.data || []).map((row: Record<string, unknown>) => row.blocked_user_id as string));
         const users = (usersRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.id as string));
         const posts = (titleRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.user_id as string));
-        const content = (contentRes.data || []).filter((item: Record<string, unknown>) => !blockedIds.has(item.user_id as string));
         const tagRows = (tagsRes.data || []) as Array<{ id: string; name: string }>;
         const tagCountMap = new Map<string, number>();
         if (tagRows.length > 0) {
@@ -151,11 +146,6 @@ export default function Navbar() {
             .map((tag) => ({ name: tag.name, type: "tag" as const, subtitle: `${tagCountMap.get(tag.id) || 0} 篇` })),
           users: users.map((item: Record<string, unknown>) => ({ name: (item.nickname as string) || "匿名用户", type: "user" as const, id: item.id as string, subtitle: (item.avatar_url as string) || "" })),
           posts: posts.map((item: Record<string, unknown>) => ({ name: (item.title as string) || "无标题", type: "post" as const, id: item.id as string })),
-          content: content.map((item: Record<string, unknown>) => {
-            const rawContent = (item.content as string) || "";
-            const excerpt = rawContent.replace(/!\[.*?\]\(.*?\)/g, "").replace(/\[([^\]]*)\]\(.*?\)/g, "$1").replace(/[*_~`#>|-]/g, "").replace(/\n+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
-            return { name: (item.title as string) || "无标题", type: "content" as const, id: item.id as string, subtitle: excerpt ? `...${excerpt}...` : "" };
-          }),
         };
       },
       { ttlMs: 10_000, persist: true },
@@ -163,7 +153,6 @@ export default function Navbar() {
     setTagSuggestions(result.tags);
     setUserSuggestions(result.users);
     setPostSuggestions(result.posts);
-    setContentSuggestions(result.content);
     setSearching(false);
   }, [supabase, user, profile?.is_test_account]);
 
@@ -182,10 +171,10 @@ export default function Navbar() {
   const selectSuggestion = (s: Suggestion) => {
     if (s.type === "tag") router.push(`/tag/${encodeURIComponent(s.name)}`);
     else if (s.type === "user") router.push(`/user/${s.id}`);
-    else if (s.type === "post" || s.type === "content") router.push(`/read/${s.id}`);
+    else if (s.type === "post") router.push(`/read/${s.id}`);
   };
 
-  const hasAnyResults = tagSuggestions.length > 0 || userSuggestions.length > 0 || postSuggestions.length > 0 || contentSuggestions.length > 0;
+  const hasAnyResults = tagSuggestions.length > 0 || userSuggestions.length > 0 || postSuggestions.length > 0;
 
   return (
     <nav className={`navbar ${scrolled ? "scrolled" : ""}`} id="navbar">
@@ -218,7 +207,7 @@ export default function Navbar() {
               onFocus={() => { if (searchQuery) fetchSuggestions(searchQuery); }}
             />
             {searchQuery && (
-              <button type="button" className="navbar-search-clear" aria-label="清除全局搜索" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchQuery(""); setTagSuggestions([]); setUserSuggestions([]); setPostSuggestions([]); setContentSuggestions([]); }}>
+              <button type="button" className="navbar-search-clear" aria-label="清除全局搜索" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchQuery(""); setTagSuggestions([]); setUserSuggestions([]); setPostSuggestions([]); }}>
                 <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
               </button>
             )}
@@ -238,10 +227,6 @@ export default function Navbar() {
                     className={`search-dropdown-tab${activeFilterTab === "works" ? " active" : ""}`}
                     onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("works"); }}
                   ><SiteIcon name="fa-file-lines" variant="solid" /> 作品</button>
-                  <button
-                    className={`search-dropdown-tab${activeFilterTab === "content" ? " active" : ""}`}
-                    onMouseDown={(e) => { e.preventDefault(); setActiveFilterTab("content"); }}
-                  ><SiteIcon name="fa-align-left" variant="solid" /> 正文</button>
                 </div>
 
                 {/* Results */}
@@ -283,22 +268,12 @@ export default function Navbar() {
                     </button>
                   )) : <div className="search-dropdown-empty"><SiteIcon name="fa-file-lines" variant="solid" />无匹配作品</div>)}
 
-                  {/* Content */}
-                  {activeFilterTab === "content" && (contentSuggestions.length > 0 ? contentSuggestions.map((s) => (
-                    <button key={s.id} className="search-dropdown-item" onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}>
-                      <div className="search-dropdown-item-icon content"><SiteIcon name="fa-align-left" variant="solid" /></div>
-                      <div className="search-dropdown-item-body">
-                        <span className="search-dropdown-item-title">{s.name}</span>
-                        {s.subtitle && <span className="search-dropdown-item-subtitle">{s.subtitle}</span>}
-                      </div>
-                    </button>
-                  )) : <div className="search-dropdown-empty"><SiteIcon name="fa-align-left" variant="solid" />无匹配正文</div>)}
                 </div>
 
                 {/* Footer */}
                 <div className="search-dropdown-footer">
                   <Link
-                    href={`/search?q=${encodeURIComponent(searchQuery)}${activeFilterTab === "tags" ? "&type=tags" : activeFilterTab === "users" ? "&type=users" : activeFilterTab === "works" ? "&type=works" : "&type=posts"}`}
+                    href={`/search?q=${encodeURIComponent(searchQuery)}${activeFilterTab === "tags" ? "&type=tags" : activeFilterTab === "users" ? "&type=users" : "&type=works"}`}
                     onMouseDown={(e) => e.preventDefault()}
                   >查看全部结果 <SiteIcon name="fa-arrow-right" variant="solid" /></Link>
                 </div>

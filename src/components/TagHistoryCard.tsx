@@ -43,7 +43,7 @@ function authorMeta(post: Post) {
   );
 }
 
-export default function TagHistoryCard({ post }: { post: Post }) {
+export default function TagHistoryCard({ post, context = "tag" }: { post: Post; context?: "tag" | "search" }) {
   const title = post.title?.trim() || "无标题";
   const excerpt = plainText(post.content) || "暂无正文摘要";
   const isSerial = post.post_type === "serial";
@@ -56,7 +56,7 @@ export default function TagHistoryCard({ post }: { post: Post }) {
   const latestTitle = post.chapter_number ? `第${post.chapter_number}章 ${title}` : "章节待发布，敬请期待";
 
   return (
-    <article className={`site-card site-card--feed site-card--feed-${kind} site-card--tag-history-${kind}`} data-card-type={kind} aria-label={`标签详情${isSerial ? "长篇连载" : isImage ? "图片" : "单篇"}作品卡片`}>
+    <article className={`site-card site-card--feed site-card--feed-${kind} site-card--tag-history-${kind}`} data-card-type={kind} aria-label={`${context === "search" ? "搜索结果" : "标签详情"}${isSerial ? "长篇连载" : isImage ? "图片" : "单篇"}作品卡片`}>
       {isImage ? (
         <div className="site-card__feed-images-shell">
           <div className="site-card__feed-images">

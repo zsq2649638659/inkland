@@ -1,6 +1,5 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
-import type { InklandIconName } from "@/components/inkland/iconRegistry";
 
 import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -12,10 +11,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { SkeletonSearchResults } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
+import TagHistoryCard from "@/components/TagHistoryCard";
 import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
-type SearchFilter = "tags" | "users" | "works" | "posts";
+type SearchFilter = "tags" | "users" | "works";
 type WorkTypeFilter = "all" | "single" | "image" | "serial";
 type SeriesStatusFilter = "all" | "ongoing" | "completed";
 type SortFilter = "latest" | "hot" | "bookmarks";
@@ -41,7 +41,7 @@ const SEARCH_RESULT_LIMIT = 20;
 const SEARCH_SORT_CANDIDATE_LIMIT = 100;
 
 function parseSearchFilter(value: string | null): SearchFilter {
-  return value === "users" || value === "works" || value === "posts" ? value : "tags";
+  return value === "users" || value === "works" ? value : "tags";
 }
 
 function parseWorkType(value: string | null): WorkTypeFilter {
@@ -73,18 +73,15 @@ const SERIES_STATUS_OPTIONS: Array<{ value: SeriesStatusFilter; label: string }>
   { value: "completed", label: "已完结" },
 ];
 
-function getPostVisual(postType?: string): { icon: InklandIconName; kind: string; label: string } {
-  switch (postType) {
-    case "serial": return { label: "长篇连载", icon: "fa-book-open", kind: "series" };
-    case "illustration":
-    case "comic":
-    case "cosplay": return { label: "图片", icon: "fa-image", kind: "image" };
-    default: return { label: "单篇", icon: "fa-file-lines", kind: "single" };
-  }
-}
-
 function getPostHeat(post: SearchPost): number {
   return (post.like_count || 0) + (post.comment_count || 0) + (post.bookmark_count || 0);
+}
+
+function toSearchCardPost(post: SearchPost): Post {
+  return {
+    ...post,
+    status: post.post_type === "serial" && post.series_status === "completed" ? "draft" : "published",
+  };
 }
 
 function sortPosts(posts: SearchPost[], sortBy: SortFilter): SearchPost[] {
@@ -111,21 +108,22 @@ function SearchContent() {
   const searchParamsString = searchParams.toString();
   const initialQuery = searchParams.get("q") || "";
   const initialType = parseSearchFilter(searchParams.get("type"));
+  const initialWorkType = parseWorkType(searchParams.get("workType"));
+  const initialSeriesStatus = parseSeriesStatus(searchParams.get("seriesStatus"));
   const supabase = createClient();
   const { user, profile, loading: authLoading } = useAuth();
 
   const [inputValue, setInputValue] = useState(initialQuery);
   const [activeFilter, setActiveFilter] = useState<SearchFilter>(initialType);
-  const [workType, setWorkType] = useState<WorkTypeFilter>(parseWorkType(searchParams.get("workType")));
-  const [seriesStatus, setSeriesStatus] = useState<SeriesStatusFilter>(parseSeriesStatus(searchParams.get("seriesStatus")));
+  const [workType, setWorkType] = useState<WorkTypeFilter>(initialWorkType);
+  const [seriesStatus, setSeriesStatus] = useState<SeriesStatusFilter>(initialWorkType === "serial" ? initialSeriesStatus : "all");
   const [sortBy, setSortBy] = useState<SortFilter>(parseSort(searchParams.get("sort")));
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [draftWorkType, setDraftWorkType] = useState<WorkTypeFilter>(workType);
   const [draftSeriesStatus, setDraftSeriesStatus] = useState<SeriesStatusFilter>(seriesStatus);
   const [draftSortBy, setDraftSortBy] = useState<SortFilter>(sortBy);
-  // 作品（标题匹配）和正文（内容匹配）分开存储，不再混入标签关联作品
+  // 作品搜索仅匹配标题，不混入标签关联作品
   const [titlePosts, setTitlePosts] = useState<SearchPost[]>([]);
-  const [contentPosts, setContentPosts] = useState<Post[]>([]);
   const [tags, setTags] = useState<TagResult[]>([]);
   const [users, setUsers] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,7 +137,6 @@ function SearchContent() {
     { key: "tags", label: "标签" },
     { key: "users", label: "用户" },
     { key: "works", label: "作品" },
-    { key: "posts", label: "正文" },
   ];
 
   // Next.js preserves the client component while only the search params
@@ -149,7 +146,7 @@ function SearchContent() {
     const nextQuery = searchParams.get("q") || "";
     const nextType = parseSearchFilter(searchParams.get("type"));
     const nextWorkType = parseWorkType(searchParams.get("workType"));
-    const nextSeriesStatus = parseSeriesStatus(searchParams.get("seriesStatus"));
+    const nextSeriesStatus = nextWorkType === "serial" ? parseSeriesStatus(searchParams.get("seriesStatus")) : "all";
     const nextSortBy = parseSort(searchParams.get("sort"));
 
     if (
@@ -176,7 +173,6 @@ function SearchContent() {
     setDraftSortBy(nextSortBy);
     setMobileFilterOpen(false);
     setTitlePosts([]);
-    setContentPosts([]);
     setTags([]);
     setUsers([]);
     setLoading(false);
@@ -210,7 +206,6 @@ function SearchContent() {
     if (!query.trim() || !user) {
       if (rid !== requestIdRef.current) return;
       setTitlePosts([]);
-      setContentPosts([]);
       setTags([]);
       setUsers([]);
       setLoading(false);
@@ -265,10 +260,10 @@ function SearchContent() {
         .limit(refineWorks && sortBy !== "latest" ? SEARCH_SORT_CANDIDATE_LIMIT : SEARCH_RESULT_LIMIT);
     };
 
-    // 第一波并行：屏蔽关系 + 标签 + 用户 + 作品标题 + 正文。
-    // 作品筛选只作用于“作品”结果，正文搜索保留原有语义。
+    // 第一波并行：屏蔽关系 + 标签 + 用户 + 作品标题。
+    // 作品筛选只作用于“作品”结果。
     const titleQuery = makePostQuery("title", applyWorkRefine);
-    const [blockedRes, tagRes, userRes, titleRes, contentRes] = await Promise.all([
+    const [blockedRes, tagRes, userRes, titleRes] = await Promise.all([
       supabase.from("blocked_users").select("blocked_user_id").eq("user_id", user.id),
       supabase.from("tags").select("id, name").ilike("name", `%${q}%`).limit(20),
       withTestDataVisibility(
@@ -276,7 +271,6 @@ function SearchContent() {
         includeTestData,
       ),
       titleQuery || Promise.resolve({ data: [] as unknown[] }),
-      makePostQuery("content", false),
     ]);
 
     if (rid !== requestIdRef.current) return;
@@ -286,9 +280,6 @@ function SearchContent() {
     const visibleUsers = ((userRes.data || []) as UserResult[]).filter((item) => !blockedIds.has(item.id));
     const rawTitlePosts = ((titleRes.data || []) as unknown as SearchPost[])
       .filter((post) => !blockedIds.has(post.user_id || ""));
-    const visibleContentPosts = ((contentRes?.data || []) as unknown as Post[])
-      .filter((post) => !blockedIds.has(post.user_id || ""))
-      .map((post) => ({ ...post, content: slimContent(post.content || "") }));
 
     const serialNames = [...new Set(rawTitlePosts.filter((post) => post.post_type === "serial" && post.series_name).map((post) => post.series_name as string))];
     const seriesQuery = serialNames.length > 0
@@ -319,7 +310,6 @@ function SearchContent() {
     setTags([]);
     setUsers(visibleUsers);
     setTitlePosts(sortPosts(visibleTitlePosts, applyWorkRefine ? sortBy : "latest").slice(0, SEARCH_RESULT_LIMIT));
-    setContentPosts(visibleContentPosts);
     setLoading(false);
 
     if (tagRows.length === 0) return;
@@ -388,7 +378,6 @@ function SearchContent() {
   const clearResults = () => {
     requestIdRef.current += 1;
     setTitlePosts([]);
-    setContentPosts([]);
     setTags([]);
     setUsers([]);
     setLoading(false);
@@ -414,7 +403,7 @@ function SearchContent() {
 
   const handleWorkTypeChange = (nextType: WorkTypeFilter) => {
     setWorkType(nextType);
-    if (nextType === "single" || nextType === "image") setSeriesStatus("all");
+    if (nextType !== "serial") setSeriesStatus("all");
   };
 
   const openMobileFilter = () => {
@@ -426,11 +415,11 @@ function SearchContent() {
 
   const handleDraftWorkTypeChange = (nextType: WorkTypeFilter) => {
     setDraftWorkType(nextType);
-    if (nextType === "single" || nextType === "image") setDraftSeriesStatus("all");
+    if (nextType !== "serial") setDraftSeriesStatus("all");
   };
 
   const applyMobileFilter = () => {
-    const nextSeriesStatus = draftWorkType === "single" || draftWorkType === "image" ? "all" : draftSeriesStatus;
+    const nextSeriesStatus = draftWorkType === "serial" ? draftSeriesStatus : "all";
     setWorkType(draftWorkType);
     setSeriesStatus(nextSeriesStatus);
     setSortBy(draftSortBy);
@@ -454,6 +443,7 @@ function SearchContent() {
         id={`${prefix}-series-status-menu`}
         value={seriesStatus}
         options={seriesStatusFilterOptions}
+        disabled={workType !== "serial"}
         onChange={(value) => setSeriesStatus(value as SeriesStatusFilter)}
       />
       <ProfileFilterSelect
@@ -533,18 +523,15 @@ function SearchContent() {
   const tagCount = tags.length;
   const userCount = users.length;
   const workCount = titlePosts.length;
-  const postCount = contentPosts.length;
   const hasTagResults = tagCount > 0;
   const hasUserResults = userCount > 0;
   const hasWorkResults = workCount > 0;
-  const hasPostResults = postCount > 0;
 
   const currentHasResults = (() => {
     switch (activeFilter) {
       case "tags": return hasTagResults;
       case "users": return hasUserResults;
       case "works": return hasWorkResults;
-      case "posts": return hasPostResults;
       default: return false;
     }
   })();
@@ -650,21 +637,23 @@ function SearchContent() {
                       ))}
                     </div>
                   </div>
-                  <div className="studio-filter-drawer-section">
-                    <strong>连载状态</strong>
-                    <div>
-                      {seriesStatusFilterOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          className={`studio-filter-control${draftSeriesStatus === option.value ? " is-active" : ""}`}
-                          onClick={() => setDraftSeriesStatus(option.value)}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                  {draftWorkType === "serial" && (
+                    <div className="studio-filter-drawer-section">
+                      <strong>连载状态</strong>
+                      <div>
+                        {seriesStatusFilterOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`studio-filter-control${draftSeriesStatus === option.value ? " is-active" : ""}`}
+                            onClick={() => setDraftSeriesStatus(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="studio-filter-drawer-section">
                     <strong>排序</strong>
                     <div>
@@ -754,60 +743,14 @@ function SearchContent() {
 
             {activeFilter === "works" && hasWorkResults && (
               <div className="result-section" data-section="works">
-                <div className="work-list">
-                  {titlePosts.map((post) => {
-                    const raw = post as unknown as Record<string, unknown>;
-                    const author = raw.author as { nickname: string } | null;
-                    const visual = getPostVisual(post.post_type);
-                    const statLabel = sortBy === "hot" ? `热度 ${getPostHeat(post)}` : sortBy === "bookmarks" ? `收藏 ${post.bookmark_count || 0}` : "";
-                    return (
-                      <Link key={post.id} href={`/read/${post.id}`} className="work-item">
-                        <div className={`work-item-icon ${visual.kind}`}><SiteIcon name={visual.icon} variant="solid" /></div>
-                        <div className="work-info">
-                          <div className="work-title">{post.title}</div>
-                          <div className="work-meta">
-                            <span className="work-type-badge">{visual.label}</span>
-                            {post.post_type === "serial" && <span className={`work-status-badge${post.series_status === "completed" ? " completed" : ""}`}>{post.series_status === "completed" ? "已完结" : "连载中"}</span>}
-                            <span className="meta-dot"></span>
-                            <span>{post.word_count?.toLocaleString() || 0} 字</span>
-                            <span className="meta-dot"></span>
-                            <span>{author?.nickname || "匿名"}</span>
-                            {statLabel && <span className="work-sort-stat"><SiteIcon name={sortBy === "hot" ? "fa-fire" : "fa-bookmark"} variant="solid" />{statLabel}</span>}
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                <div className="tag-history-card-grid search-work-card-grid">
+                  {titlePosts.map((post) => (
+                    <TagHistoryCard key={post.id} post={toSearchCardPost(post)} context="search" />
+                  ))}
                 </div>
               </div>
             )}
 
-            {activeFilter === "posts" && hasPostResults && (
-              <div className="result-section" data-section="posts">
-                <div className="post-list">
-                  {contentPosts.map((post) => {
-                    const raw = post as unknown as Record<string, unknown>;
-                    const author = raw.author as { nickname: string } | null;
-                    const plainText = (post.content || "")
-                      .replace(/!\[.*?\]\(.*?\)/g, "")
-                      .replace(/\[([^\]]*)\]\(.*?\)/g, "$1")
-                      .replace(/[*_~`#>|-]/g, "")
-                      .replace(/\n+/g, " ")
-                      .replace(/\s+/g, " ")
-                      .trim();
-                    return (
-                      <Link key={post.id} href={`/read/${post.id}`} className="post-item">
-                        <div className="post-item-icon"><SiteIcon name="fa-file-lines" variant="solid" /></div>
-                        <div className="post-item-content">
-                          <div className="post-snippet">{plainText}</div>
-                          <div className="post-source"><SiteIcon name="fa-book" variant="solid" /><span>{post.title}</span><span>— {author?.nickname || "匿名"}</span></div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
