@@ -933,7 +933,7 @@
 #page-studio .work-card.site-card .card-body {
   display: flex;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
   padding: var(--ink-space-5);
