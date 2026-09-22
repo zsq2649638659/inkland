@@ -789,7 +789,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
 
           {!showFilters && (
             <div className="relationship-content">
-              <div className="relationship-toolbar">
+              <div className={`relationship-toolbar${relationshipBatchMode ? " is-batch-mode" : ""}`}>
                 <div className="filter-system-field filter-system-field--query relationship-search-field">
                   <div className="profile-filter-search-shell">
                     <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
