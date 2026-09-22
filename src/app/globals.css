@@ -10980,10 +10980,10 @@ p {
   #page-profile .user-cards-grid { grid-template-columns:1fr; }
 }
 
-/* Keep the search and single batch entry on one row when the mobile content
-   gutter can accommodate both controls. The three-button batch row remains
-   stacked below the search so its existing layout is unchanged. */
-@media (min-width: 400px) and (max-width: 768px) {
+/* Keep the search and single batch entry on one row across supported mobile
+   widths. The three-button batch row remains stacked below the search so its
+   existing layout is unchanged. */
+@media (min-width: 320px) and (max-width: 768px) {
   #page-profile .relationship-toolbar:not(.is-batch-mode) { flex-direction:row;align-items:center; }
   #page-profile .relationship-toolbar:not(.is-batch-mode) .relationship-search-field { width:auto;flex:1 1 auto; }
   #page-profile .relationship-toolbar:not(.is-batch-mode) .relationship-batch-toggle { width:auto;flex:0 0 auto; }
