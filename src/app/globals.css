@@ -10963,11 +10963,10 @@ p {
 #page-profile .user-card .user-action-popup-item.danger { color:var(--color-primary) }
 #page-profile .user-card .user-action-popup-item.danger:hover { background:var(--color-primary-light);color:var(--color-primary-hover) }
 #page-profile .user-card .btn-follow:disabled { cursor:not-allowed;opacity:var(--ink-opacity-disabled);transform:none; }
-@media (min-width: 1025px) {
+@media (min-width: 454px) {
   #page-profile .user-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 768px) {
-  #page-profile .user-cards-grid { grid-template-columns:1fr }
   #page-profile .section-header { flex-direction:column;align-items:flex-start }
   #page-profile .list-search-wrapper { width:100% }
   #page-profile .relationship-toolbar { flex-direction:column;align-items:stretch;gap:var(--ink-space-2); }
@@ -10975,6 +10974,10 @@ p {
   #page-profile .relationship-batch-toggle { width:100%; }
   #page-profile .relationship-batch-row { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--ink-space-2);width:100%; }
   #page-profile .relationship-batch-row .studio-toolbar-action { min-width:0;width:100%;padding-inline:var(--ink-input-padding-inline-compact); }
+}
+
+@media (max-width: 453px) {
+  #page-profile .user-cards-grid { grid-template-columns:1fr; }
 }
 
 /* Keep the search and single batch entry on one row when the mobile content
