@@ -10999,12 +10999,12 @@ p {
   }
 }
 
-/* At the narrowest width, give the identity block a full first row and move
-   card actions below it instead of compressing the nickname into a sliver. */
+/* At the narrowest width, keep the identity block and the overflow action on
+   one row; the relationship action itself remains available in the menu. */
 @media (max-width: 360px) {
-  #page-profile .user-card { flex-wrap:wrap;row-gap:var(--ink-space-2); }
+  #page-profile .user-card { flex-wrap:nowrap; }
   #page-profile .user-card > .no-underline { min-width:0; }
-  #page-profile .user-card .user-actions { flex:1 0 100%;width:100%;justify-content:flex-end; }
+  #page-profile .user-card .user-actions { flex:0 0 auto;width:auto;justify-content:flex-end; }
   #page-profile .user-card .btn-follow { display:none !important; }
   #page-profile .user-card .relationship-action-popup-item { display:flex; }
   #page-profile .user-card--selectable { flex-wrap:nowrap; }
