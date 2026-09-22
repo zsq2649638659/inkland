@@ -10943,7 +10943,7 @@ p {
 #page-profile .user-card-check { flex:0 0 20px; }
 #page-profile .relationship-filter-empty { min-height:220px; }
 #page-profile .user-cards-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--spacing-md);padding-bottom:var(--spacing-xl) }
-#page-profile .user-card { display:flex;align-items:center;gap:var(--spacing-md);padding:var(--spacing-md);background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
+#page-profile .user-card { display:flex;align-items:center;gap:8px;padding:16px 8px;background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
 #page-profile .user-card .user-avatar { width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:600;position:relative;overflow:hidden }
 #page-profile .user-card .user-avatar img { width:100%;height:100%;object-fit:cover;border-radius:50% }
 #page-profile .user-card .user-info { flex:1;min-width:0 }
@@ -10961,6 +10961,7 @@ p {
 #page-profile .user-card .user-action-popup { position:absolute;right:0;top:100%;margin-top:4px;z-index:50;background:var(--color-card);border-radius:var(--radius-md);box-shadow:0 4px 20px rgba(0,0,0,0.12);min-width:140px;overflow:visible;display:none }
 #page-profile .user-card .user-action-popup.show { display:block }
 #page-profile .user-card .user-action-popup-item { display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--color-text-muted);cursor:pointer;transition:all .15s ease;border:none;background:none;font-family:var(--font-family);width:100%;text-align:left }
+#page-profile .user-card .relationship-action-popup-item { display:none; }
 #page-profile .user-card .user-action-popup-item svg { width:16px;height:16px;flex-shrink:0 }
 #page-profile .user-card .user-action-popup-item:hover { background:var(--color-bg-secondary);color:var(--color-text) }
 #page-profile .user-card .user-action-popup-item.danger { color:var(--color-primary) }
@@ -11004,6 +11005,8 @@ p {
   #page-profile .user-card { flex-wrap:wrap;row-gap:var(--ink-space-2); }
   #page-profile .user-card > .no-underline { min-width:0; }
   #page-profile .user-card .user-actions { flex:1 0 100%;width:100%;justify-content:flex-end; }
+  #page-profile .user-card .btn-follow { display:none !important; }
+  #page-profile .user-card .relationship-action-popup-item { display:flex; }
   #page-profile .user-card--selectable { flex-wrap:nowrap; }
   #page-profile .user-card--selectable .user-actions { display:none; }
 }

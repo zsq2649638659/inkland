@@ -158,6 +158,15 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
           <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
         </button>
         <div className={`user-action-popup${moreOpen ? " show" : ""}`} ref={popupRef}>
+          <button
+            type="button"
+            className="user-action-popup-item relationship-action-popup-item"
+            disabled={relationshipActionLoading}
+            aria-busy={relationshipActionLoading}
+            onClick={() => { setMoreOpen(false); void handleRelationshipAction(); }}
+          >
+            <SiteIcon name={shouldUnfollow ? "fa-user-minus" : "fa-user-plus"} variant="outline" hoverVariant="solid" />{btnText}
+          </button>
           <button className="user-action-popup-item" onClick={handleBlock}>
             <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />屏蔽
           </button>
