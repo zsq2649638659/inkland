@@ -37,6 +37,7 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
   const [moreOpen, setMoreOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [relationshipActionLoading, setRelationshipActionLoading] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭popup
@@ -51,9 +52,26 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
     return () => document.removeEventListener("click", handler);
   }, [moreOpen]);
 
-  const handleUnfollow = async () => {
-    const { error } = await supabase.from("follows").delete().eq("follower_id", currentUserId).eq("following_id", user.id);
-    if (!error) onUpdate();
+  const handleRelationshipAction = async () => {
+    if (relationshipActionLoading) return;
+    const shouldUnfollow = isFollowingTab || Boolean(isFollowed);
+    setRelationshipActionLoading(true);
+    try {
+      const result = shouldUnfollow
+        ? await supabase.from("follows").delete().eq("follower_id", currentUserId).eq("following_id", user.id)
+        : await supabase.from("follows").insert({ follower_id: currentUserId, following_id: user.id });
+      if (result.error) throw result.error;
+      onUpdate();
+      dialog.toast(shouldUnfollow ? "已取消关注" : "已回关");
+    } catch (actionError) {
+      await dialog.alert({
+        title: shouldUnfollow ? "取消关注失败" : "回关失败",
+        message: actionError instanceof Error && actionError.message ? actionError.message : "请稍后重试。",
+        variant: "danger",
+      });
+    } finally {
+      setRelationshipActionLoading(false);
+    }
   };
 
   const handleBlock = async () => {
@@ -86,7 +104,8 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
   };
 
   // 按钮文字
-  const btnText = isFollowingTab ? "取消关注" : (isFollowed ? "取消关注" : "回关");
+  const shouldUnfollow = isFollowingTab || Boolean(isFollowed);
+  const btnText = relationshipActionLoading ? "处理中…" : shouldUnfollow ? "取消关注" : "回关";
 
   return (
     <div
@@ -126,7 +145,13 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
         </div>
       </Link>
       <div className="user-actions" onClick={(event) => event.stopPropagation()}>
-        <button className={`btn-follow${isFollowed || isFollowingTab ? " followed" : ""}`} onClick={handleUnfollow}>
+        <button
+          type="button"
+          className={`btn-follow${shouldUnfollow ? " followed" : ""}`}
+          disabled={relationshipActionLoading}
+          aria-busy={relationshipActionLoading}
+          onClick={() => void handleRelationshipAction()}
+        >
           {btnText}
         </button>
         <button className="btn-block" onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }} title="更多">

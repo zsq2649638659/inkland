@@ -200,6 +200,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   const [relationshipBatchMode, setRelationshipBatchMode] = useState(false);
   const [selectedRelationshipIds, setSelectedRelationshipIds] = useState<Set<string>>(new Set());
   const [relationshipBatchLoading, setRelationshipBatchLoading] = useState(false);
+  const [relationshipError, setRelationshipError] = useState("");
   const [tabLoading, setTabLoading] = useState(false);
   const [shownProfileItems, setShownProfileItems] = useState(12);
   const profileLoadMoreRef = useRef<HTMLDivElement>(null);
@@ -462,13 +463,15 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   const loadFollowing = async () => {
     if (!user) return;
     setTabLoading(true);
-    const { data: fData } = await supabase
-      .from("follows")
-      .select("following_id, created_at, profiles!follows_following_id_fkey(id, nickname, avatar_url, bio)")
-      .eq("follower_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (fData) {
+    setRelationshipError("");
+    try {
+      const { data: fData, error: queryError } = await supabase
+        .from("follows")
+        .select("following_id, created_at, profiles!follows_following_id_fkey(id, nickname, avatar_url, bio)")
+        .eq("follower_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (queryError) throw queryError;
       const users = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
         .filter((f) => f.profiles)
         .map((f) => ({
@@ -479,32 +482,36 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
         }));
       setFollowing(users);
       setFollowingIds(new Set(users.map((u) => u.id)));
-    } else {
+    } catch {
       setFollowing([]);
       setFollowingIds(new Set());
+      setRelationshipError("关注列表暂时无法加载，请重试。");
+    } finally {
+      setTabLoading(false);
     }
-    setTabLoading(false);
   };
 
   const loadFollowers = async () => {
     if (!user) return;
     setTabLoading(true);
+    setRelationshipError("");
     // 我的关注列表与粉丝列表互不依赖，并行取回（原实现串行两轮）
-    const [{ data: myFollowing }, { data: fData }] = await Promise.all([
-      supabase
-        .from("follows")
-        .select("following_id")
-        .eq("follower_id", user.id),
-      supabase
-        .from("follows")
-        .select("follower_id, created_at, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio)")
-        .eq("following_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50),
-    ]);
-    const myFollowingSet = new Set<string>((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
-    setFollowingIds(myFollowingSet);
-    if (fData) {
+    try {
+      const [{ data: myFollowing, error: followingError }, { data: fData, error: followerError }] = await Promise.all([
+        supabase
+          .from("follows")
+          .select("following_id")
+          .eq("follower_id", user.id),
+        supabase
+          .from("follows")
+          .select("follower_id, created_at, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio)")
+          .eq("following_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
+      if (followingError || followerError) throw followingError || followerError;
+      const myFollowingSet = new Set<string>((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
+      setFollowingIds(myFollowingSet);
       const users = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
         .filter((f) => f.profiles)
         .map((f) => ({
@@ -514,10 +521,18 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
           bio: f.profiles!.bio,
         }));
       setFollowers(users);
-    } else {
+    } catch {
+      setFollowingIds(new Set());
       setFollowers([]);
+      setRelationshipError("粉丝列表暂时无法加载，请重试。");
+    } finally {
+      setTabLoading(false);
     }
-    setTabLoading(false);
+  };
+
+  const retryRelationshipLoad = () => {
+    if (tab === "following") void loadFollowing();
+    else if (tab === "followers") void loadFollowers();
   };
 
   useEffect(() => {
@@ -800,14 +815,28 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                     <button type="button" className="studio-toolbar-action" disabled={relationshipBatchLoading || selectedRelationshipIds.size === 0} onClick={() => void handleRelationshipBatch()}>
                       {tab === "following" ? "批量取关" : "批量移除"}
                     </button>
-                    <button type="button" className="studio-toolbar-action" onClick={selectAllRelationships}>全选</button>
-                    <button type="button" className="studio-toolbar-action" onClick={() => { setRelationshipBatchMode(false); setSelectedRelationshipIds(new Set()); }}>取消</button>
+                    <button type="button" className="studio-toolbar-action" disabled={relationshipBatchLoading} onClick={selectAllRelationships}>全选</button>
+                    <button type="button" className="studio-toolbar-action" disabled={relationshipBatchLoading} onClick={() => { setRelationshipBatchMode(false); setSelectedRelationshipIds(new Set()); }}>取消</button>
                   </div>
                 )}
               </div>
 
               {tabLoading ? (
                 <SkeletonUserCardList />
+              ) : relationshipError ? (
+                <div className="empty-state relationship-error-state" role="alert">
+                  <div className="empty-illustration">
+                    <div className="empty-tag-ring">
+                      <div className="tag-ring-outer"></div>
+                      <div className="tag-ring-inner">
+                        <SiteIcon name="fa-circle-exclamation" variant="solid" />
+                      </div>
+                    </div>
+                  </div>
+                  <h2 className="empty-title">加载失败</h2>
+                  <p className="empty-desc">{relationshipError}</p>
+                  <button type="button" className="empty-action" onClick={retryRelationshipLoad}>重试</button>
+                </div>
               ) : activeRelationshipItems.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-illustration">
