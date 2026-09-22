@@ -10921,7 +10921,10 @@ p {
 #page-profile .list-search::placeholder { color:var(--color-text-light) }
 #page-profile .list-search:focus { box-shadow:0 0 0 3px rgba(242,107,91,0.08) }
 #page-profile .list-search-icon { position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--color-text-light);font-size:14px;pointer-events:none }
-#page-profile .relationship-toolbar { display:flex;align-items:center;justify-content:space-between;gap:var(--ink-gap-sm);margin-bottom:var(--ink-space-5); }
+#page-profile .relationship-toolbar { display:flex;align-items:center;justify-content:space-between;gap:var(--ink-gap-sm);margin-bottom:var(--ink-space-5);flex-wrap:nowrap; }
+#page-profile .relationship-toolbar:not(.is-batch-mode) { flex-direction:row; }
+#page-profile .relationship-toolbar:not(.is-batch-mode) .relationship-search-field { width:auto;flex:1 1 auto; }
+#page-profile .relationship-toolbar:not(.is-batch-mode) .relationship-batch-toggle { width:auto;flex:0 0 auto; }
 #page-profile .relationship-search-field { flex:1 1 0;min-width:0;max-width:none; }
 #page-profile .relationship-batch-toggle,
 #page-profile .relationship-batch-row .studio-toolbar-action { display:inline-flex;align-items:center;justify-content:center;gap:var(--ink-gap-compact);min-height:var(--ink-input-height-md);padding:0 var(--ink-input-padding-inline);border:var(--ink-button-border-width) solid transparent;border-radius:var(--ink-input-border-radius);color:var(--ink-text-secondary);background:var(--ink-surface);font:var(--ink-font-control);white-space:nowrap;cursor:pointer;transition:color var(--ink-motion-base) var(--ink-ease-standard),background var(--ink-motion-base) var(--ink-ease-standard),border-color var(--ink-motion-base) var(--ink-ease-standard); }
@@ -10940,14 +10943,14 @@ p {
 #page-profile .user-card-check { flex:0 0 20px; }
 #page-profile .relationship-filter-empty { min-height:220px; }
 #page-profile .user-cards-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--spacing-md);padding-bottom:var(--spacing-xl) }
-#page-profile .user-card { display:flex;align-items:center;gap:var(--spacing-md);padding:var(--spacing-lg);background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
+#page-profile .user-card { display:flex;align-items:center;gap:8px;padding:16px 8px;background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
 #page-profile .user-card .user-avatar { width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:600;position:relative;overflow:hidden }
 #page-profile .user-card .user-avatar img { width:100%;height:100%;object-fit:cover;border-radius:50% }
 #page-profile .user-card .user-info { flex:1;min-width:0 }
 #page-profile .user-card .user-name { font-size:15px;font-weight:600;letter-spacing:-0.02em;margin-bottom:2px;line-height:1.3;color:var(--color-text) }
 #page-profile .user-card .user-bio { font-size:13px;color:var(--color-text-muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.01em }
 #page-profile .user-card .user-actions { display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0 }
-#page-profile .user-card .btn-follow { min-width:0;min-height:var(--ink-button-small-height);padding:0 var(--ink-button-small-padding-horizontal);border:var(--ink-button-border-width) solid var(--ink-button-default-border);border-radius:var(--ink-button-border-radius);font:var(--ink-button-small-font);cursor:pointer;transition:color var(--ink-motion-base) var(--ink-ease-standard),background var(--ink-motion-base) var(--ink-ease-standard),border-color var(--ink-motion-base) var(--ink-ease-standard),transform var(--ink-motion-base) var(--ink-ease-standard);letter-spacing:normal;white-space:nowrap;color:var(--ink-button-default-color);background:var(--ink-surface);text-align:center }
+#page-profile .user-card .btn-follow { width:80px;max-width:80px;min-width:0;box-sizing:border-box;min-height:var(--ink-button-small-height);padding:0 var(--ink-button-small-padding-horizontal);border:var(--ink-button-border-width) solid var(--ink-button-default-border);border-radius:var(--ink-button-border-radius);font:var(--ink-button-small-font);cursor:pointer;transition:color var(--ink-motion-base) var(--ink-ease-standard),background var(--ink-motion-base) var(--ink-ease-standard),border-color var(--ink-motion-base) var(--ink-ease-standard),transform var(--ink-motion-base) var(--ink-ease-standard);letter-spacing:normal;white-space:nowrap;color:var(--ink-button-default-color);background:var(--ink-surface);text-align:center }
 #page-profile .user-card .btn-follow:hover,
 #page-profile .user-card .btn-follow:focus-visible { color:var(--ink-button-default-color);background:var(--ink-button-default-bg);border-color:var(--ink-color-border-strong);transform:translateY(-1px);box-shadow:var(--ink-shadow-none);outline:var(--ink-outline-focus);outline-offset:var(--ink-outline-offset-focus) }
 #page-profile .user-card .btn-follow.followed { color:var(--ink-button-default-color);background:var(--ink-surface);border-color:var(--ink-button-default-border) }
@@ -10958,19 +10961,54 @@ p {
 #page-profile .user-card .user-action-popup { position:absolute;right:0;top:100%;margin-top:4px;z-index:50;background:var(--color-card);border-radius:var(--radius-md);box-shadow:0 4px 20px rgba(0,0,0,0.12);min-width:140px;overflow:visible;display:none }
 #page-profile .user-card .user-action-popup.show { display:block }
 #page-profile .user-card .user-action-popup-item { display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--color-text-muted);cursor:pointer;transition:all .15s ease;border:none;background:none;font-family:var(--font-family);width:100%;text-align:left }
+#page-profile .user-card .relationship-action-popup-item { display:none; }
 #page-profile .user-card .user-action-popup-item svg { width:16px;height:16px;flex-shrink:0 }
 #page-profile .user-card .user-action-popup-item:hover { background:var(--color-bg-secondary);color:var(--color-text) }
 #page-profile .user-card .user-action-popup-item.danger { color:var(--color-primary) }
 #page-profile .user-card .user-action-popup-item.danger:hover { background:var(--color-primary-light);color:var(--color-primary-hover) }
+#page-profile .user-card .btn-follow:disabled { cursor:not-allowed;opacity:var(--ink-opacity-disabled);transform:none; }
+@media (min-width: 768px) {
+  #page-profile .user-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 @media (max-width: 768px) {
-  #page-profile .user-cards-grid { grid-template-columns:1fr }
   #page-profile .section-header { flex-direction:column;align-items:flex-start }
   #page-profile .list-search-wrapper { width:100% }
-  #page-profile .relationship-toolbar { flex-direction:column;align-items:stretch;gap:var(--ink-space-2); }
-  #page-profile .relationship-search-field { width:100%;max-width:none;flex-basis:auto; }
-  #page-profile .relationship-batch-toggle { width:100%; }
-  #page-profile .relationship-batch-row { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--ink-space-2);width:100%; }
+  #page-profile .relationship-toolbar.is-batch-mode { flex-direction:column;align-items:stretch;gap:var(--ink-space-2); }
+  #page-profile .relationship-toolbar.is-batch-mode .relationship-search-field { width:100%;max-width:none;flex-basis:auto; }
+  #page-profile .relationship-toolbar.is-batch-mode .relationship-batch-row { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--ink-space-2);width:100%; }
   #page-profile .relationship-batch-row .studio-toolbar-action { min-width:0;width:100%;padding-inline:var(--ink-input-padding-inline-compact); }
+}
+
+@media (max-width: 767px) {
+  #page-profile .user-cards-grid { grid-template-columns:1fr; }
+}
+
+/* Keep the search and single batch entry on one row at every supported width.
+   At mobile widths, the three-button batch row remains stacked below them. */
+
+/* Relationship controls need to override the legacy mobile button width rule.
+   Three equal tracks keep the batch actions inside the narrow content gutter. */
+@media (max-width: 768px) {
+  #page-profile .relationship-batch-row > .studio-toolbar-action {
+    width:auto !important;
+    min-width:0 !important;
+    max-width:none !important;
+    flex:1 1 0 !important;
+    justify-self:stretch;
+    box-sizing:border-box;
+  }
+}
+
+/* At the narrowest width, keep the identity block and the overflow action on
+   one row; the relationship action itself remains available in the menu. */
+@media (max-width: 360px) {
+  #page-profile .user-card { flex-wrap:nowrap; }
+  #page-profile .user-card > .no-underline { min-width:0; }
+  #page-profile .user-card .user-actions { flex:0 0 auto;width:auto;justify-content:flex-end; }
+  #page-profile .user-card .btn-follow { display:none !important; }
+  #page-profile .user-card .relationship-action-popup-item { display:flex; }
+  #page-profile .user-card--selectable { flex-wrap:nowrap; }
+  #page-profile .user-card--selectable .user-actions { display:none; }
 }
 
 /* ===== Profile Edit Page ===== */
