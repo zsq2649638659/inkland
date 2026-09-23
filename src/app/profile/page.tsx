@@ -3,7 +3,8 @@ import SiteIcon from "@/components/SiteIcon";
 
 // Personal center release marker: keeps the GitHub-to-Vercel deployment trigger explicit.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
@@ -13,10 +14,11 @@ import { useAuth } from "@/components/AuthProvider";
 import ProfileCardCollection from "@/components/ProfileCardCollection";
 import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import UserCard from "@/components/UserCard";
-import { SkeletonProfile, SkeletonUserCardList } from "@/components/Skeleton";
+import DefaultAvatar from "@/components/DefaultAvatar";
+import { SkeletonProfile, SkeletonUserCardList, SkeletonWorksGrid } from "@/components/Skeleton";
 import { slimContent } from "@/lib/feed";
 import type { Post } from "@/lib/types";
-import { getOrCreateClientCache } from "@/lib/client-cache";
+import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 type FilterType = "all" | "single" | "image" | "series";
 type TabType = "works" | "likes" | "bookmarks" | "following" | "followers";
@@ -69,6 +71,12 @@ interface FollowUser {
   bio: string | null;
 }
 
+type ProfileSummaryStats = {
+  following: number | null;
+  followers: number | null;
+  works: number | null;
+};
+
 // 判断帖子是否有图片
 const hasImages = (post: Post): boolean => {
   const cp = post as unknown as Record<string, unknown>;
@@ -99,12 +107,13 @@ const assembleSeriesInfo = async (
 
   let chapterDir = opts?.prefetchedChapters;
   if (!chapterDir) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("posts")
       .select("id, series_name, chapter_number, created_at")
       .in("series_name", names)
       .eq("post_type", "serial")
       .eq("status", "published");
+    if (error) throw error;
     chapterDir = (data as unknown as ChapterDirRow[]) || [];
   }
 
@@ -125,14 +134,15 @@ const assembleSeriesInfo = async (
   }
 
   // 第 2 波（并行）：所有章节统计（post_stats 已按章节聚合）+ 各系列最新一章标题/正文
-  const [{ data: stats }, { data: latestRows }] = await Promise.all([
+  const [{ data: stats, error: statsError }, { data: latestRows, error: latestError }] = await Promise.all([
     allChapterIds.length > 0
       ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", allChapterIds)
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
     latestIds.length > 0
       ? supabase.from("posts").select("id, title, content, chapter_number, created_at").in("id", latestIds)
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  if (statsError || latestError) throw statsError || latestError;
 
   const statsMap = new Map<string, { like: number; comment: number; bookmark: number }>();
   for (const s of (stats as unknown as Array<Record<string, unknown>>) || []) {
@@ -170,10 +180,11 @@ const assembleSeriesInfo = async (
 };
 
 export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: TabType }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const dialog = useAppDialog();
   const { user, profile, loading: authLoading } = useAuth();
+  const displayName = profile?.nickname || user?.email?.split("@")[0] || "用户";
   const [displayPosts, setDisplayPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -182,6 +193,12 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [profileSearch, setProfileSearch] = useState("");
+  const [profileUrlReady, setProfileUrlReady] = useState(false);
+  const [profileSummaryStats, setProfileSummaryStats] = useState<ProfileSummaryStats>({
+    following: null,
+    followers: null,
+    works: null,
+  });
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileDraftFilter, setMobileDraftFilter] = useState<FilterType>("all");
   const [mobileDraftStatus, setMobileDraftStatus] = useState<StatusFilter>("all");
@@ -206,17 +223,84 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   const profileLoadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const syncTabFromUrl = () => setTab(readProfileTab(defaultTab));
-    syncTabFromUrl();
-    window.addEventListener("popstate", syncTabFromUrl);
-    return () => window.removeEventListener("popstate", syncTabFromUrl);
+    const syncProfileStateFromUrl = () => {
+      setTab(readProfileTab(defaultTab));
+      if (defaultTab === "works") {
+        setProfileSearch(new URLSearchParams(window.location.search).get("q") || "");
+      }
+      setProfileUrlReady(true);
+    };
+    syncProfileStateFromUrl();
+    const handlePopState = () => {
+      syncProfileStateFromUrl();
+      setLoading(true);
+      setError("");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [defaultTab]);
 
+  useEffect(() => {
+    if (!profileUrlReady || defaultTab !== "works") return;
+    const url = new URL(window.location.href);
+    const query = profileSearch.trim();
+    if (query) url.searchParams.set("q", query);
+    else url.searchParams.delete("q");
+    const nextUrl = url.pathname + url.search + url.hash;
+    const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+    if (nextUrl !== currentUrl) window.history.replaceState(null, "", nextUrl);
+  }, [defaultTab, profileSearch, profileUrlReady]);
+
+  useEffect(() => {
+    if (!user || defaultTab !== "works") return;
+    let active = true;
+    const cacheKey = "sidebar-stats:" + user.id;
+    const loadStats = async () => {
+      try {
+        const nextStats = await getOrCreateClientCache<ProfileSummaryStats>(
+          cacheKey,
+          async () => {
+            const [{ count: followingCount }, { count: followersCount }, { data: publishedPosts }, { data: series }] = await Promise.all([
+              supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
+              supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
+              supabase.from("posts").select("id, review_status").eq("user_id", user.id).eq("status", "published").neq("post_type", "serial").neq("review_status", "rejected"),
+              supabase.from("series").select("name").eq("user_id", user.id),
+            ]);
+            const seriesCount = new Set(((series || []) as Array<{ name?: string | null }>).map((item) => item.name).filter(Boolean)).size;
+            return {
+              following: followingCount || 0,
+              followers: followersCount || 0,
+              works: (publishedPosts || []).length + seriesCount,
+            };
+          },
+          { ttlMs: 30_000, persist: true },
+        );
+        if (active) setProfileSummaryStats(nextStats);
+      } catch {
+        if (active) setProfileSummaryStats({ following: null, followers: null, works: null });
+      }
+    };
+    const handleStatsChanged = () => {
+      invalidateClientCache(cacheKey);
+      void loadStats();
+    };
+    void loadStats();
+    window.addEventListener("inkland:stats-changed", handleStatsChanged);
+    return () => {
+      active = false;
+      window.removeEventListener("inkland:stats-changed", handleStatsChanged);
+    };
+  }, [defaultTab, supabase, user]);
+
   const handleProfileTabChange = (next: TabType) => {
+    setLoading(true);
+    setError("");
     setTab(next);
     const params = new URLSearchParams(window.location.search);
     params.set("tab", next);
-    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+    if (profileSearch.trim()) params.set("q", profileSearch.trim());
+    else params.delete("q");
+    router.push(window.location.pathname + "?" + params.toString(), { scroll: false });
   };
 
   // 列表数据优先走服务端聚合路由（机房内拉取并瘦身，客户端只下载轻量数据）；
@@ -237,8 +321,6 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
 
   const loadPosts = async () => {
     if (!user) return;
-    setLoading(true);
-    setError("");
 
     let data: Post[] | null = await fetchProfilePosts("works");
     if (data === null) {
@@ -252,7 +334,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
         .order("created_at", { ascending: false })
         .limit(50);
       const { data: d, error: err } = await q;
-      if (err) { setError(`加载失败: ${err.message}`); setLoading(false); return; }
+      if (err) throw err;
       // 直连回落路径同样瘦身：卡片只消费摘要+图片，超长全文交给详情页
       data = ((d as unknown as Post[]) || []).map((p) => ({ ...p, content: slimContent(p.content || "") }));
     }
@@ -300,14 +382,13 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
     });
 
     setDisplayPosts(postsWithAuthor);
-    setLoading(false);
   };
 
   // 按系列名称加载系列信息（不限定 user_id，可用于加载喜欢的系列）
   const loadSeriesByName = async (seriesNames: string[]): Promise<SeriesInfo[]> => {
     if (seriesNames.length === 0) return [];
     // 系列元数据与章节目录（不含正文）互不依赖，并行取回
-    const [{ data }, { data: chapterDir }] = await Promise.all([
+    const [{ data, error: seriesError }, { data: chapterDir, error: chapterError }] = await Promise.all([
       supabase
         .from("series")
         .select("id, name, cover_url, description, series_type, tags, status, created_at")
@@ -321,6 +402,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
         .eq("status", "published"),
     ]);
 
+    if (seriesError || chapterError) throw seriesError || chapterError;
     if (!data) return [];
 
     const seen = new Set<string>();
@@ -338,14 +420,15 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
 
   const loadLikes = async () => {
     if (!user) return;
-    setLoading(true);
     let posts: Array<Post & { interaction_at?: string }> | null = await fetchProfilePosts("likes") as Array<Post & { interaction_at?: string }> | null;
     if (posts === null) {
-      const { data: likes } = await supabase.from("likes").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      const { data: likes, error: likesError } = await supabase.from("likes").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      if (likesError) throw likesError;
       if (likes && likes.length > 0) {
         const postIds = likes.map((l: Record<string, unknown>) => l.post_id as string);
         const interactionTimes = new Map<string, string>(likes.map((l: Record<string, unknown>) => [l.post_id as string, l.created_at as string]));
-        const { data: rawPosts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
+        const { data: rawPosts, error: postsError } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
+        if (postsError) throw postsError;
         posts = ((rawPosts as unknown as Post[]) || []).map((p) => ({
           ...p,
           content: slimContent(p.content || ""),
@@ -378,19 +461,19 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       setLikedPosts([]);
       setLikedSeriesList([]);
     }
-    setLoading(false);
   };
 
   const loadBookmarks = async () => {
     if (!user) return;
-    setLoading(true);
     let posts: Array<Post & { interaction_at?: string }> | null = await fetchProfilePosts("bookmarks") as Array<Post & { interaction_at?: string }> | null;
     if (posts === null) {
-      const { data: bms } = await supabase.from("bookmarks").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      const { data: bms, error: bookmarksError } = await supabase.from("bookmarks").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      if (bookmarksError) throw bookmarksError;
       if (bms && bms.length > 0) {
         const postIds = bms.map((b: Record<string, unknown>) => b.post_id as string);
         const interactionTimes = new Map<string, string>(bms.map((b: Record<string, unknown>) => [b.post_id as string, b.created_at as string]));
-        const { data: rawPosts } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
+        const { data: rawPosts, error: postsError } = await supabase.from("posts").select("id, title, content, cover_url, post_type, created_at, published_at, user_id, series_name, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)").in("id", postIds).eq("status", "published");
+        if (postsError) throw postsError;
         posts = ((rawPosts as unknown as Post[]) || []).map((p) => ({
           ...p,
           content: slimContent(p.content || ""),
@@ -423,14 +506,13 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       setBookmarkedPosts([]);
       setBookmarkedSeriesList([]);
     }
-    setLoading(false);
   };
 
   const loadSeries = async () => {
     if (!user) return;
     // 系列元数据与「我的已发布连载章节目录」互不依赖，并行取回；
     // 目录不含正文，直接交给 assembleSeriesInfo 复用，省一轮串行往返。
-    const [{ data }, { data: chapterDir }] = await Promise.all([
+    const [{ data, error: seriesError }, { data: chapterDir, error: chapterError }] = await Promise.all([
       supabase
         .from("series")
         .select("id, name, cover_url, description, series_type, tags, status, created_at")
@@ -444,19 +526,40 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
         .eq("status", "published"),
     ]);
 
-    if (data) {
-      const raw = data as unknown as SeriesInfo[];
-      const seen = new Set<string>();
-      const deduped = raw.filter((s) => {
-        if (seen.has(s.name)) return false;
-        seen.add(s.name);
-        return true;
-      });
+    if (seriesError || chapterError) throw seriesError || chapterError;
+    const raw = (data as unknown as SeriesInfo[]) || [];
+    const seen = new Set<string>();
+    const deduped = raw.filter((s) => {
+      if (seen.has(s.name)) return false;
+      seen.add(s.name);
+      return true;
+    });
 
-      // 批量组装：目录已预取，内部只剩「统计 + 最新一章」一波并行查询
-      setSeriesList(await assembleSeriesInfo(supabase, deduped, {
-        prefetchedChapters: (chapterDir as unknown as ChapterDirRow[]) || [],
-      }));
+    // 批量组装：目录已预取，内部只剩「统计 + 最新一章」一波并行查询
+    setSeriesList(await assembleSeriesInfo(supabase, deduped, {
+      prefetchedChapters: (chapterDir as unknown as ChapterDirRow[]) || [],
+    }));
+  };
+
+  const reloadProfileContent = async (targetTab: TabType) => {
+    if (!user) return;
+    try {
+      if (targetTab === "works") {
+        const results = await Promise.allSettled([loadPosts(), loadSeries()]);
+        const failedResult = results.find((result) => result.status === "rejected");
+        if (failedResult?.status === "rejected") throw failedResult.reason;
+      }
+      else if (targetTab === "likes") await loadLikes();
+      else if (targetTab === "bookmarks") await loadBookmarks();
+    } catch {
+      const label = targetTab === "likes"
+        ? "喜欢的作品"
+        : targetTab === "bookmarks"
+          ? "收藏的作品"
+          : "作品";
+      setError(label);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -537,9 +640,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
 
   useEffect(() => {
     if (!user) return;
-    if (tab === "works") { loadPosts(); loadSeries(); }
-    else if (tab === "likes") loadLikes();
-    else if (tab === "bookmarks") loadBookmarks();
+    if (tab === "works" || tab === "likes" || tab === "bookmarks") void reloadProfileContent(tab);
     else if (tab === "following") loadFollowing();
     else if (tab === "followers") loadFollowers();
   }, [user, tab]);
@@ -711,6 +812,40 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
+        <div className="page-header">
+          <h1 className="page-title">{relationshipPage ? "关注粉丝" : "我的空间"}</h1>
+        </div>
+        {defaultTab === "works" && (
+          <section className="profile-section profile-page-identity" aria-label="个人资料">
+            <div className="profile-identity">
+              <Link href="/profile" className="profile-avatar no-underline" aria-label="查看我的空间">
+                {profile?.avatar_url ? (
+                  <Image src={profile.avatar_url} alt="" width={80} height={80} sizes="80px" />
+                ) : (
+                  <DefaultAvatar name={displayName} />
+                )}
+              </Link>
+              <div className="profile-info">
+                <h2 className="profile-name" title={displayName}>{displayName}</h2>
+                <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
+              </div>
+            </div>
+            <div className="profile-stats" aria-label="个人统计">
+              <Link href="/relationships" className="profile-stat" aria-label="查看我的关注">
+                <span className="stat-value">{profileSummaryStats.following ?? "—"}</span>
+                <span className="profile-stat-label">关注</span>
+              </Link>
+              <Link href="/relationships/followers" className="profile-stat" aria-label="查看我的粉丝">
+                <span className="stat-value">{profileSummaryStats.followers ?? "—"}</span>
+                <span className="profile-stat-label">粉丝</span>
+              </Link>
+              <Link href="/profile?tab=works" className="profile-stat" aria-label="查看我的作品">
+                <span className="stat-value">{profileSummaryStats.works ?? "—"}</span>
+                <span className="profile-stat-label">作品</span>
+              </Link>
+            </div>
+          </section>
+        )}
         <div className="profile-primary-content">
           {showFilters ? (
             <div className="segmented-tabs segmented-tabs--profile-primary">
@@ -755,6 +890,15 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                 <ProfileFilterSelect label="排序" id="profile-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最近更新" }, { value: "created", label: "最近创建" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as SortMode)} />
               </div>
               <div className="profile-mobile-filter-bar">
+                <div className="filter-system-field profile-mobile-search">
+                  <div className="profile-filter-search-shell">
+                    <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                    <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                    <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setProfileSearch("")}>
+                      <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
                 <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(activeProfileFilter); setMobileDraftStatus(statusFilter); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter" variant="default" aria-hidden="true" /></button>
                 <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为单列列表"} aria-pressed={mobileCardLayout === "square"}><SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" /></button>
               </div>
@@ -768,9 +912,17 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                   </section>
                 </div>
               )}
-              {(activeProfilePosts.length > 0 || activeProfileSeries.length > 0) ? (
+              {loading ? (
+                <SkeletonWorksGrid count={6} />
+              ) : error ? (
+                <div className="profile-content-error" role="alert">
+                  <h2>{error}暂时无法加载</h2>
+                  <p>请检查网络连接后重试。</p>
+                  <button type="button" className="profile-filter-control is-active" onClick={() => { setLoading(true); setError(""); void reloadProfileContent(tab); }}>重试</button>
+                </div>
+              ) : (activeProfilePosts.length > 0 || activeProfileSeries.length > 0) ? (
                 <ProfileCardCollection posts={activeProfilePosts} series={activeProfileSeries} filter={activeProfileFilter} query={profileSearch} status={statusFilter} sort={sortMode} limit={shownProfileItems} mobileLayout={mobileCardLayout} />
-              ) : !loading ? (
+              ) : (
                 <div className="empty-state">
                   <div className="empty-illustration">
                     <div className="empty-tag-ring">
@@ -783,7 +935,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                   <h2 className="empty-title">这里还没有作品</h2>
                   <p className="empty-desc">发布或收藏作品后，会显示在这里。</p>
                 </div>
-              ) : null}
+              )}
             </>
           )}
 

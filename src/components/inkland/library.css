@@ -1612,6 +1612,10 @@
   box-shadow: var(--ink-shadow-none);
 }
 
+#page-profile .profile-card-device--mobile-square .site-card {
+  gap: var(--ink-gap-4);
+}
+
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card--feed-image .site-card__feed-images-shell {
   display: flex;
   min-height: 0;
@@ -1635,6 +1639,7 @@
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card__feed-image-overlay { border-radius: var(--ink-radius-xs); }
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card__title { font: var(--ink-font-card-title-mobile-square); }
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card__excerpt { font: var(--ink-font-card-body-mobile-square); -webkit-line-clamp: 4; }
+#page-profile .profile-card-device--mobile-square .site-card--feed-single .site-card__excerpt { margin: 0; }
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card--feed-serial .site-card__serial-intro {
   margin-bottom: var(--ink-space-0);
   -webkit-line-clamp: 2;
@@ -1648,6 +1653,10 @@
   margin-bottom: 0;
   padding: var(--ink-space-1);
   font: var(--ink-font-tag-meta);
+}
+#page-profile .profile-card-device--mobile-square .site-card__latest-chapter {
+  height: 22px;
+  min-height: 22px;
 }
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card__latest-chapter svg {
   width: var(--ink-size-14);
@@ -1666,9 +1675,15 @@
 }
 
 @media (max-width: 768px) {
-  :is(#page-profile, #page-user) .profile-card-device--pc { display: none; }
-  :is(#page-profile, #page-user) .profile-card-device--mobile-full.is-active,
-  :is(#page-profile, #page-user) .profile-card-device--mobile-square.is-active { display: block; }
+  #page-user .profile-card-device--pc { display: none; }
+  #page-user .profile-card-device--mobile-full.is-active,
+  #page-user .profile-card-device--mobile-square.is-active { display: block; }
+}
+
+@media (max-width: 575px) {
+  #page-profile .profile-card-device--pc { display: none; }
+  #page-profile .profile-card-device--mobile-full.is-active,
+  #page-profile .profile-card-device--mobile-square.is-active { display: block; }
 }
 
 /* 阅读历史：严格复用搜索框作品卡片的 Card Device PC / Mobile 契约。 */
