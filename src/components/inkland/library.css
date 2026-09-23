@@ -1612,6 +1612,10 @@
   box-shadow: var(--ink-shadow-none);
 }
 
+#page-profile .profile-card-device--mobile-square .site-card {
+  gap: var(--ink-gap-4);
+}
+
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card--feed-image .site-card__feed-images-shell {
   display: flex;
   min-height: 0;
@@ -1649,6 +1653,9 @@
   margin-bottom: 0;
   padding: var(--ink-space-1);
   font: var(--ink-font-tag-meta);
+}
+#page-profile .profile-card-device--mobile-square .site-card__latest-chapter {
+  min-height: 22px;
 }
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card__latest-chapter svg {
   width: var(--ink-size-14);
