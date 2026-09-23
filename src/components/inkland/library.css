@@ -1655,6 +1655,7 @@
   font: var(--ink-font-tag-meta);
 }
 #page-profile .profile-card-device--mobile-square .site-card__latest-chapter {
+  height: 22px;
   min-height: 22px;
 }
 :is(#page-profile, #page-user) .profile-card-device--mobile-square .site-card__latest-chapter svg {
