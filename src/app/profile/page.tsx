@@ -812,6 +812,9 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       <div className="main-container">
         <HomeSidebar />
         <div className="content-area">
+        <div className="page-header">
+          <h1 className="page-title">{relationshipPage ? "关注粉丝" : "我的空间"}</h1>
+        </div>
         {defaultTab === "works" && (
           <section className="profile-section profile-page-identity" aria-label="个人资料">
             <div className="profile-identity">
@@ -823,7 +826,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
                 )}
               </Link>
               <div className="profile-info">
-                <h1 className="profile-name" title={displayName}>{displayName}</h1>
+                <h2 className="profile-name" title={displayName}>{displayName}</h2>
                 <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
               </div>
             </div>

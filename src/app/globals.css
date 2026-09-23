@@ -9485,18 +9485,6 @@ p {
     align-items: flex-start;
   }
 
-  #page-profile .filter-system-composition-row { display: none; }
-  #page-profile .profile-mobile-filter-bar { display: flex; justify-content: space-between; gap: var(--ink-gap-compact); margin-bottom: var(--ink-space-3); }
-  #page-profile .profile-mobile-filter-button { min-height: var(--ink-height-control-md); flex: 1; border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); cursor: pointer; }
-  #page-profile .profile-mobile-filter-button.profile-mobile-icon-button { display: inline-grid; width: var(--ink-height-control-md); height: var(--ink-height-control-md); flex: 0 0 var(--ink-height-control-md); place-items: center; padding: 0; }
-  #page-profile .profile-mobile-icon-button svg { width: 15px; height: 15px; }
-  #page-profile .profile-mobile-filter-button[aria-pressed="true"] { border-color: transparent; color: var(--ink-text-secondary); background: var(--ink-surface); }
-  #page-profile .profile-filter-drawer-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
-  #page-profile .profile-filter-drawer { width: 100%; padding: var(--ink-space-5); border-radius: var(--ink-radius-lg) var(--ink-radius-lg) 0 0; color: var(--ink-text); background: var(--ink-surface); box-shadow: var(--ink-shadow-lg); }
-  #page-profile .profile-filter-drawer h2 { margin: var(--ink-space-0); font: var(--ink-font-title-sm); }
-  #page-profile .profile-filter-control { padding-inline: var(--ink-button-medium-padding-horizontal); }
-  #page-profile .profile-filter-drawer-actions { width: 100%; gap: var(--ink-space-2); }
-  #page-profile .profile-filter-drawer-actions button { width: 50%; flex: 1 1 50%; }
 }
 
 @media (max-width: 900px) {
@@ -9611,6 +9599,20 @@ p {
     min-width: 0;
     box-sizing: border-box;
   }
+}
+
+/* Personal-space card and filter mode switches only below the content width
+   needed by the desktop three-column filter row (544px + outer gutters). */
+@media (max-width: 575px) {
+  #page-profile .filter-system-composition-row { display: none; }
+  #page-profile .profile-mobile-filter-bar { display: flex; justify-content: space-between; gap: var(--ink-gap-compact); margin-bottom: var(--ink-space-3); }
+  #page-profile .profile-mobile-filter-button { min-height: var(--ink-height-control-md); flex: 1; border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); cursor: pointer; }
+  #page-profile .profile-mobile-filter-button.profile-mobile-icon-button { display: inline-grid; width: var(--ink-height-control-md); height: var(--ink-height-control-md); flex: 0 0 var(--ink-height-control-md); place-items: center; padding: 0; }
+  #page-profile .profile-mobile-icon-button svg { width: 15px; height: 15px; }
+  #page-profile .profile-mobile-filter-button[aria-pressed="true"] { border-color: transparent; color: var(--ink-text-secondary); background: var(--ink-surface); }
+  #page-profile .profile-filter-drawer-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
+  #page-profile .profile-filter-drawer { width: 100%; padding: var(--ink-space-5); border-radius: var(--ink-radius-lg) var(--ink-radius-lg) 0 0; color: var(--ink-text); background: var(--ink-surface); box-shadow: var(--ink-shadow-lg); }
+  #page-profile .profile-filter-drawer h2 { margin: var(--ink-space-0); font: var(--ink-font-title-sm); }
 }
 
 /* ===== Section Title (通用) ===== */
@@ -18234,6 +18236,18 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   #page-series .hero-stats-row .stat-sep {
     flex: 0 0 auto;
     margin: 0 var(--ink-space-2);
+  }
+}
+
+/* The profile drawer's eight filter choices and two actions keep a fixed
+   100px width, overriding the global equal-width two-button-row contract. */
+@media (max-width: 575px) {
+  #page-profile .profile-filter-drawer button {
+    width: 100px !important;
+    min-width: 100px !important;
+    max-width: 100px !important;
+    flex: 0 0 100px !important;
+    padding-inline: 0 !important;
   }
 }
 
