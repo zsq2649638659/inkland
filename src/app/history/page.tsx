@@ -40,6 +40,8 @@ export default function HistoryPage() {
   const { user, loading: authLoading } = useAuth();
   const [records, setRecords] = useState<ReadingHistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -48,7 +50,10 @@ export default function HistoryPage() {
     let active = true;
     const controller = new AbortController();
     void Promise.resolve().then(() => {
-      if (active) setLoading(true);
+      if (active) {
+        setLoading(true);
+        setSyncError(false);
+      }
     });
     const local = getLocalReadingHistory(user.id);
     void fetch("/api/reading-history", {
@@ -68,7 +73,10 @@ export default function HistoryPage() {
         setRecords(next.filter((record) => record.post_id));
       })
       .catch(() => {
-        if (active) setRecords(local);
+        if (active) {
+          setRecords(local);
+          setSyncError(true);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -77,14 +85,17 @@ export default function HistoryPage() {
       active = false;
       controller.abort();
     };
-  }, [user]);
+  }, [user, retryCount]);
 
-  if (authLoading || (user && loading)) {
+  if (authLoading || (user && loading && (retryCount === 0 || records.length === 0))) {
     return (
       <div className="min-h-screen bg-paper">
         <div className="main-container">
           <HomeSidebar />
           <main className="content-area">
+            <div className="page-header">
+              <h1 className="page-title">阅读历史</h1>
+            </div>
             <div className="settings-panel" role="status" aria-busy="true">正在加载阅读历史…</div>
           </main>
         </div>
@@ -98,6 +109,9 @@ export default function HistoryPage() {
         <div className="main-container">
           <HomeSidebar />
           <main className="content-area">
+            <div className="page-header">
+              <h1 className="page-title">阅读历史</h1>
+            </div>
             <EmptyState
               icon="fa-clock-rotate-left"
               title="登录后保存阅读历史"
@@ -116,14 +130,44 @@ export default function HistoryPage() {
       <div className="main-container">
         <HomeSidebar />
         <main className="content-area">
+          <div className="page-header">
+            <h1 className="page-title">阅读历史</h1>
+          </div>
+          {loading && records.length > 0 ? (
+            <div className="history-sync-notice" role="status" aria-live="polite">
+              <p>正在同步阅读历史…</p>
+            </div>
+          ) : syncError ? (
+            <div className="history-sync-notice" role="alert">
+              <p>
+                无法同步远程阅读历史。{records.length > 0
+                  ? "当前显示的是设备上的本地记录。"
+                  : "暂时无法确认是否有新的阅读记录。"}
+              </p>
+              <button
+                className="history-sync-retry"
+                type="button"
+                onClick={() => {
+                  setLoading(true);
+                  setSyncError(false);
+                  setRetryCount((count) => count + 1);
+                }}
+                disabled={loading}
+              >
+                重试同步
+              </button>
+            </div>
+          ) : null}
           {records.length === 0 ? (
-            <EmptyState
-              icon="fa-clock-rotate-left"
-              title="还没有阅读记录"
-              description="打开一篇作品后，Inkland 会自动记录最近阅读的位置。"
-              actionLabel="去发现作品"
-              actionHref="/search"
-            />
+            syncError ? null : (
+              <EmptyState
+                icon="fa-clock-rotate-left"
+                title="还没有阅读记录"
+                description="打开一篇作品后，Inkland 会自动记录最近阅读的位置。"
+                actionLabel="去发现作品"
+                actionHref="/search"
+              />
+            )
           ) : <HistoryCards records={records} />}
         </main>
       </div>

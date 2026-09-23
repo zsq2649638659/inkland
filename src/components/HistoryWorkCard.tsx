@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import SiteIcon from "@/components/SiteIcon";
 import LikeButton from "@/components/LikeButton";
 import { getThumbnailUrl } from "@/lib/image";
@@ -30,7 +31,6 @@ function formatLastRead(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "最近阅读";
   return date.toLocaleString("zh-CN", {
-    year: "numeric",
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -70,7 +70,7 @@ function searchMeta(record: ReadingHistoryRecord, mode: CardMode) {
   const likeCount = record.post?.like_count || 0;
   const avatarChar = Array.from(nickname)[0] || "?";
   return (
-    <div className={`site-card__search-meta${mode === "mobile" ? " site-card__search-meta--mobile" : ""}`} role="group" aria-label={`阅读历史：${positionLabel(record)}，${formatLastRead(record.last_read_at)}`}>
+    <div className={`site-card__search-meta${mode === "mobile" ? " site-card__search-meta--mobile" : ""}`}>
       <Link className="site-card__avatar-link" href={record.post?.user_id ? `/user/${record.post.user_id}` : "#"} aria-label={`查看${nickname}的作者主页`}>
         <span className="site-card__avatar" aria-hidden="true">
           <span>{avatarChar}</span>
@@ -87,13 +87,24 @@ function searchMeta(record: ReadingHistoryRecord, mode: CardMode) {
   );
 }
 
-function renderImage(record: ReadingHistoryRecord, mode: CardMode, title: string, excerpt: string, image: string | undefined, imageCount: number) {
+function renderImage(
+  record: ReadingHistoryRecord,
+  mode: CardMode,
+  title: string,
+  excerpt: string,
+  image: string | undefined,
+  imageCount: number,
+  imageFailed: boolean,
+  onImageError: () => void,
+) {
   const href = `/read/${record.post_id}`;
+  const imageUrl = image && !imageFailed ? getThumbnailUrl(image, { width: 720, height: mode === "mobile" ? 720 : 480, resize: "cover" }) : null;
   if (mode === "mobile") {
     return (
       <div className="site-card__search-mobile-core">
-        <Link href={href} className="profile-square__image" aria-label={`查看图片作品：${title}`}>
-          {image ? <img src={getThumbnailUrl(image, { width: 720, height: 720, resize: "cover" })} alt={title} loading="lazy" /> : <SiteIcon name="fa-image" variant="default" aria-hidden="true" />}
+        <Link href={href} className="profile-square__image">
+          {imageUrl ? <img src={imageUrl} alt="" loading="lazy" onError={onImageError} /> : <SiteIcon name="fa-image" variant="default" aria-hidden="true" />}
+          <span className="site-card__history-image-title">{title}</span>
         </Link>
       </div>
     );
@@ -102,7 +113,7 @@ function renderImage(record: ReadingHistoryRecord, mode: CardMode, title: string
     <div className="site-card__feed-images-shell">
       <div className="site-card__feed-images">
         <Link href={href} className="site-card__feed-image site-card__feed-image-link" aria-label={`查看图片作品：${title}`}>
-          {image ? <img src={getThumbnailUrl(image, { width: 720, height: 480, resize: "cover" })} alt={title} loading="lazy" /> : <SiteIcon name="fa-image" variant="default" aria-hidden="true" />}
+          {imageUrl ? <img src={imageUrl} alt="" loading="lazy" onError={onImageError} /> : <SiteIcon name="fa-image" variant="default" aria-hidden="true" />}
           <span className="site-card__feed-image-overlay">
             <strong className="site-card__title">{title}</strong>
             {excerpt && <span className="site-card__excerpt">{excerpt}</span>}
@@ -115,6 +126,7 @@ function renderImage(record: ReadingHistoryRecord, mode: CardMode, title: string
 }
 
 export default function HistoryWorkCard({ record, mode }: { record: ReadingHistoryRecord; mode: CardMode }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const post = record.post;
   const title = post?.title?.trim() || "已删除或暂不可见的作品";
   const excerpt = plainText(post?.content);
@@ -133,7 +145,7 @@ export default function HistoryWorkCard({ record, mode }: { record: ReadingHisto
   const seriesCompleted = post?.series_status === "completed";
 
   const body = isImage
-    ? renderImage(record, mode, title, excerpt, images[0], images.length)
+    ? renderImage(record, mode, title, excerpt, images[0], images.length, imageFailed, () => setImageFailed(true))
     : isSerial
       ? mode === "mobile" ? (
         <div className="site-card__search-mobile-core">
@@ -183,6 +195,10 @@ export default function HistoryWorkCard({ record, mode }: { record: ReadingHisto
     >
       {body}
       {tagLinks(tagsFor(post || { id: record.post_id }, kind), mode === "mobile")}
+      <div className="site-card__history-info" role="group" aria-label="阅读进度和最近阅读时间">
+        <span>{positionLabel(record)}</span>
+        <time dateTime={record.last_read_at}>{formatLastRead(record.last_read_at)}</time>
+      </div>
       {post ? searchMeta(record, mode) : <span className="site-card__search-unavailable">记录暂不可用</span>}
     </article>
   );
