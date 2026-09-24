@@ -28,32 +28,36 @@ function MobileDrawerContent() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [notificationCount, setNotificationCount] = useState(0);
   const supabase = useMemo(() => createClient(), []);
+  const includeTestData = includeTestDataForProfile(profile);
 
   useEffect(() => {
     if (!user) return;
+    let active = true;
     const notificationPreferences = readNotificationPreferences(user);
-    const cacheKey = `notification-count:${user.id}:${includeTestDataForProfile(profile) ? "test" : "public"}:${notificationPreferencesCacheKey(notificationPreferences)}`;
+    const cacheKey = `notification-count:${user.id}:${includeTestData ? "test" : "public"}:${notificationPreferencesCacheKey(notificationPreferences)}`;
     const cached = readClientCache<number>(cacheKey, 30_000, true);
-    if (cached !== undefined) setNotificationCount(cached);
+    if (cached !== undefined) queueMicrotask(() => { if (active) setNotificationCount(cached); });
     const fetchCount = () => {
       void getOrCreateClientCache(cacheKey, async () => {
         return fetchVisibleUnreadNotificationCount(
           supabase,
           user.id,
-          includeTestDataForProfile(profile),
+          includeTestData,
           notificationPreferences,
         );
-      }, { ttlMs: 30_000, persist: true }).then((count) => setNotificationCount(count));
+      }, { ttlMs: 30_000, persist: true }).then((count) => { if (active) setNotificationCount(count); });
     };
     if (cached === undefined) fetchCount();
     const timer = window.setInterval(fetchCount, 30_000);
     return () => {
+      active = false;
       window.clearInterval(timer);
     };
-  }, [user, profile?.is_test_account, supabase]);
+  }, [includeTestData, supabase, user]);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -101,6 +105,9 @@ function MobileDrawerContent() {
 
   const handleNav = (href: string) => {
     closeDrawer();
+    const navigationAttempt = new CustomEvent<string>("inkland:navigate", { detail: href, cancelable: true });
+    window.dispatchEvent(navigationAttempt);
+    if (navigationAttempt.defaultPrevented) return;
     router.push(href);
   };
 

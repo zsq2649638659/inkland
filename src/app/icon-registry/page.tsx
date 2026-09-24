@@ -107,6 +107,7 @@ const chineseLabels: Partial<Record<InklandIconName, string>> = {
   "fa-word-count": "字数",
   "fa-triangle-exclamation": "警告（旧）",
   "fa-user": "用户",
+  "fa-id-card": "身份证",
   "fa-user-check": "正确用户",
   "fa-user-circle": "用户头像（旧）",
   "fa-user-edit": "编辑姓名",
@@ -177,7 +178,7 @@ const baseIconGroups: IconGroup[] = [
     title: "用户相关",
     description: "个人资料、用户页、关注关系、账户安全与用户操作",
     names: [
-      "fa-user", "fa-user-plus", "fa-user-check", "fa-user-group", "fa-user-minus",
+      "fa-user", "fa-id-card", "fa-user-plus", "fa-user-check", "fa-user-group", "fa-user-minus",
       "fa-user-shield", "fa-users",
     ],
   },

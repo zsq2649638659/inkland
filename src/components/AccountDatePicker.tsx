@@ -28,6 +28,7 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
   const todayValue = useMemo(() => toDateValue(new Date()), []);
   const [open, setOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(value ? value.slice(0, 7) : toMonthValue(new Date()));
+  const [placement, setPlacement] = useState<"above" | "below">("below");
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,7 +57,15 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
   );
 
   function togglePicker() {
-    if (!open) setCalendarMonth(value ? value.slice(0, 7) : toMonthValue(new Date()));
+    if (!open) {
+      setCalendarMonth(value ? value.slice(0, 7) : toMonthValue(new Date()));
+      const bounds = pickerRef.current?.getBoundingClientRect();
+      if (bounds) {
+        const spaceAbove = bounds.top;
+        const spaceBelow = window.innerHeight - bounds.bottom;
+        setPlacement(spaceBelow >= 400 || spaceBelow >= spaceAbove ? "below" : "above");
+      }
+    }
     setOpen((current) => !current);
   }
 
@@ -86,7 +95,7 @@ export default function AccountDatePicker({ value, onChange }: AccountDatePicker
       </button>
 
       {open && (
-        <div className="account-calendar-popover" role="dialog" aria-label="选择出生日期">
+        <div className="account-calendar-popover" data-placement={placement} role="dialog" aria-label="选择出生日期">
           <div className="account-calendar-header">
             <button
               type="button"

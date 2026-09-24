@@ -202,6 +202,7 @@ export default function LoginPage() {
         password,
         options: {
           data: { username: nickname.trim() },
+          emailRedirectTo: new URL("/auth/confirm?flow=signup", window.location.origin).toString(),
         },
       }));
       ({ data, error } = result);
