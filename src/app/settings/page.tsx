@@ -71,6 +71,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordMessageKind, setPasswordMessageKind] = useState<"success" | "error" | "">("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(defaultNotificationPreferences);
   const [notificationMessage, setNotificationMessage] = useState("");
   const [notificationMessageKind, setNotificationMessageKind] = useState<"success" | "error" | "">("");
@@ -227,16 +228,19 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const handlePasswordChange = async () => {
     setPasswordMessage("");
     setPasswordMessageKind("");
-    if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
-      setPasswordMessageKind("error");
-      setPasswordMessage("请确认当前密码、新密码和确认密码填写正确；新密码至少 8 位。");
+    const nextFieldErrors = {
+      currentPassword: currentPassword ? "" : "请输入当前密码。",
+      newPassword: !newPassword ? "请输入新密码。" : newPassword.length < 8 ? "新密码至少需要 8 位。" : "",
+      confirmPassword: !confirmPassword ? "请再次输入新密码。" : newPassword !== confirmPassword ? "两次输入的新密码不一致。" : "",
+    };
+    setPasswordFieldErrors(nextFieldErrors);
+    if (Object.values(nextFieldErrors).some(Boolean)) {
       return;
     }
     setPasswordSaving(true);
     const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email || "", password: currentPassword });
     if (verifyError) {
-      setPasswordMessageKind("error");
-      setPasswordMessage("当前密码不正确，请检查后重试。");
+      setPasswordFieldErrors((current) => ({ ...current, currentPassword: "当前密码不正确，请检查后重试。" }));
       setPasswordSaving(false);
       return;
     }
@@ -247,6 +251,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setPasswordFieldErrors({ currentPassword: "", newPassword: "", confirmPassword: "" });
       await supabase.auth.signOut();
       router.replace("/login?reason=password-changed");
     }
@@ -319,18 +324,21 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
 
             <div className="settings-form-group">
               <label htmlFor="settings-current-password" className="settings-form-label">当前密码</label>
-              <input id="settings-current-password" name="settings-current-password" type="password" className="settings-form-input" placeholder="请输入当前密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+              <input id="settings-current-password" name="settings-current-password" type="password" className={`settings-form-input${passwordFieldErrors.currentPassword ? " error" : ""}`} placeholder="请输入当前密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.currentPassword)} aria-describedby={passwordFieldErrors.currentPassword ? "settings-current-password-error" : undefined} value={currentPassword} onChange={(e) => { setCurrentPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, currentPassword: "" })); }} />
+              {passwordFieldErrors.currentPassword && <span id="settings-current-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.currentPassword}</span>}
             </div>
 
             <div className="settings-form-group">
               <label htmlFor="settings-new-password" className="settings-form-label">新密码</label>
-              <input id="settings-new-password" name="settings-new-password" type="password" className="settings-form-input" placeholder="请输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-              <span className="settings-form-hint">至少 8 位，包含大小写字母和数字</span>
+              <input id="settings-new-password" name="settings-new-password" type="password" className={`settings-form-input${passwordFieldErrors.newPassword ? " error" : ""}`} placeholder="请输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.newPassword)} aria-describedby={passwordFieldErrors.newPassword ? "settings-new-password-error" : "settings-new-password-hint"} value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, newPassword: "", confirmPassword: "" })); }} />
+              {passwordFieldErrors.newPassword && <span id="settings-new-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.newPassword}</span>}
+              <span id="settings-new-password-hint" className="settings-form-hint">至少 8 位，包含大小写字母和数字</span>
             </div>
 
             <div className="settings-form-group">
               <label htmlFor="settings-confirm-password" className="settings-form-label">确认新密码</label>
-              <input id="settings-confirm-password" name="settings-confirm-password" type="password" className="settings-form-input" placeholder="请再次输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <input id="settings-confirm-password" name="settings-confirm-password" type="password" className={`settings-form-input${passwordFieldErrors.confirmPassword ? " error" : ""}`} placeholder="请再次输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.confirmPassword)} aria-describedby={passwordFieldErrors.confirmPassword ? "settings-confirm-password-error" : undefined} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, confirmPassword: "" })); }} />
+              {passwordFieldErrors.confirmPassword && <span id="settings-confirm-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.confirmPassword}</span>}
             </div>
 
             <div className="settings-form-actions">

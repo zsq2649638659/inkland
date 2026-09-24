@@ -16,6 +16,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  profileLoading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
+  profileLoading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -33,7 +35,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
   const userIdRef = useRef<string | null>(null);
+  const profileLoadedUserRef = useRef<string | null>(null);
 
   // 根据 user 拉取 profile（带异常保护）
   const fetchProfile = useCallback(async (userId: string) => {
@@ -55,9 +59,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userId = userIdRef.current;
     if (!userId) {
       setProfile(null);
+      setProfileLoading(false);
+      profileLoadedUserRef.current = null;
       return;
     }
-    setProfile(await fetchProfile(userId));
+    const wasProfileReady = profileLoadedUserRef.current === userId;
+    if (!wasProfileReady) setProfileLoading(true);
+    const nextProfile = await fetchProfile(userId);
+    setProfile(nextProfile);
+    profileLoadedUserRef.current = userId;
+    if (!wasProfileReady) setProfileLoading(false);
   }, [fetchProfile]);
 
   const readCachedProfile = (userId: string): UserProfile | null => {
@@ -91,29 +102,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 保留同一账号的会话状态，同时同步这份新对象，避免设置页继续显示旧值。
         setUser(u);
         if (active) setLoading(false);
+        if (profileLoadedUserRef.current !== u.id) {
+          if (active) setProfileLoading(true);
+          const nextProfile = await fetchProfile(u.id);
+          if (!active || version !== authStateVersion) return;
+          setProfile(nextProfile);
+          saveCachedProfile(u.id, nextProfile);
+          profileLoadedUserRef.current = u.id;
+          setProfileLoading(false);
+        } else if (active) {
+          setProfileLoading(false);
+        }
         return;
       }
       userIdRef.current = u?.id || null;
       setUser(u);
+      profileLoadedUserRef.current = null;
 
       if (!u) {
         if (active) {
           setProfile(null);
           setLoading(false);
+          setProfileLoading(false);
+          profileLoadedUserRef.current = null;
         }
         return;
       }
 
-      // 先解除全站页面对“资料查询”的等待；昵称/头像在后台更新。
-      // 这样刷新时页面数据请求可以和 profile 查询并行开始。
+      // 缓存可供页面先行显示，但需要等当前账号的实时资料查询完成后，
+      // 编辑表单才把该资料作为可编辑的初始值。
       const cachedProfile = readCachedProfile(u.id);
-      if (cachedProfile) setProfile(cachedProfile);
+      setProfile(cachedProfile);
+      if (active) setProfileLoading(true);
       if (active) setLoading(false);
 
       const nextProfile = await fetchProfile(u.id);
       if (!active || version !== authStateVersion) return;
       setProfile(nextProfile);
       saveCachedProfile(u.id, nextProfile);
+      profileLoadedUserRef.current = u.id;
+      setProfileLoading(false);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -138,6 +166,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setProfile(null);
       setLoading(false);
+      setProfileLoading(false);
+      profileLoadedUserRef.current = null;
     });
 
     return () => {
@@ -149,10 +179,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    profileLoadedUserRef.current = null;
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, profileLoading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

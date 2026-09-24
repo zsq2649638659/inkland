@@ -90,6 +90,7 @@ export default function AccountSettingsPanel() {
   const { user, profile } = useAuth();
   const [accountPreferences, setAccountPreferences] = useState<AccountPreferences>(defaultAccountPreferences);
   const [interests, setInterests] = useState<string[]>([]);
+  const [preferencesLoad, setPreferencesLoad] = useState<{ userId: string; error: boolean } | null>(null);
   const [copyrightLicense, setCopyrightLicense] = useState<CopyrightLicense>(defaultAccountPreferences.copyright_license);
   const [savingCopyright, setSavingCopyright] = useState(false);
   const [copyrightMessage, setCopyrightMessage] = useState("");
@@ -97,22 +98,30 @@ export default function AccountSettingsPanel() {
   const [copyrightOpen, setCopyrightOpen] = useState(false);
   const copyrightMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [coinInfoOpen, setCoinInfoOpen] = useState(false);
-  const [activity, setActivity] = useState<AccountActivity | null>(null);
+  const [activityResult, setActivityResult] = useState<{ userId: string; activity: AccountActivity } | null>(null);
   const copyrightSelectRef = useRef<HTMLDivElement>(null);
   const coinInfoRef = useRef<HTMLDivElement>(null);
+  const activity = user && activityResult?.userId === user.id ? activityResult.activity : null;
+  const preferencesLoading = Boolean(user && preferencesLoad?.userId !== user.id);
+  const preferencesError = Boolean(user && preferencesLoad?.userId === user.id && preferencesLoad.error);
 
   useEffect(() => {
     if (!user) return;
     let active = true;
     void (async () => {
-      const { data } = await supabase.auth.getUser();
-      const currentUser = data.user || user;
-      if (!active) return;
-      const nextPreferences = readAccountPreferences(currentUser);
-      const nextInterests = readInterestPreferences(currentUser)?.domains || [];
-      setAccountPreferences(nextPreferences);
-      setCopyrightLicense(nextPreferences.copyright_license);
-      setInterests(nextInterests);
+      try {
+        const { data } = await supabase.auth.getUser();
+        const currentUser = data.user || user;
+        if (!active) return;
+        const nextPreferences = readAccountPreferences(currentUser);
+        const nextInterests = readInterestPreferences(currentUser)?.domains || [];
+        setAccountPreferences(nextPreferences);
+        setCopyrightLicense(nextPreferences.copyright_license);
+        setInterests(nextInterests);
+        setPreferencesLoad({ userId: user.id, error: false });
+      } catch {
+        if (active) setPreferencesLoad({ userId: user.id, error: true });
+      }
     })();
     return () => { active = false; };
   }, [supabase, user]);
@@ -136,12 +145,15 @@ export default function AccountSettingsPanel() {
       const followingDates = ((followingRows || []) as Array<{ created_at?: string | null }>).map((row) => row.created_at);
       const bookmarkDates = ((bookmarkRows || []) as Array<{ created_at?: string | null }>).map((row) => row.created_at);
       const readingDates = ((readingRows || []) as Array<{ last_read_at?: string | null }>).map((row) => row.last_read_at);
-      setActivity({
-        publishedDays: countActivityDays(publishRows
-          .filter((row) => row.review_status !== "rejected")
-          .map((row) => row.published_at || row.created_at)),
-        readingDays: countActivityDays(readingDates),
-        engagementDays: countActivityDays([...followingDates, ...bookmarkDates]),
+      setActivityResult({
+        userId: user.id,
+        activity: {
+          publishedDays: countActivityDays(publishRows
+            .filter((row) => row.review_status !== "rejected")
+            .map((row) => row.published_at || row.created_at)),
+          readingDays: countActivityDays(readingDates),
+          engagementDays: countActivityDays([...followingDates, ...bookmarkDates]),
+        },
       });
     })();
     return () => { active = false; };
@@ -231,82 +243,102 @@ export default function AccountSettingsPanel() {
         </div>
       </div>
 
-      <section className="account-settings-section" aria-labelledby="account-basic-title">
-        <h3 id="account-basic-title" className="account-settings-section-title">基本信息</h3>
-        <div className="account-settings-profile-row">
+      <section className="account-settings-section account-settings-basic" aria-labelledby="account-basic-title">
+        <div className="account-settings-basic-heading">
+          <h3 id="account-basic-title" className="account-settings-section-title">基本信息</h3>
+          <p>账号资料与社区成长记录</p>
+        </div>
+
+        <div className="account-settings-identity">
           <div className="account-settings-profile">
             <div className="account-settings-avatar">
               {avatarUrl ? <Image src={avatarUrl} alt="当前头像" fill sizes="72px" unoptimized /> : <DefaultAvatar name={displayName} />}
             </div>
             <div className="account-settings-profile-copy">
               <div className="account-settings-profile-name">{displayName}</div>
-              <div className="account-settings-level-line">
-                <div className="account-settings-coin" ref={coinInfoRef}>
-                  <button
-                    type="button"
-                    className="account-settings-coin-trigger"
-                    aria-label={`当前余额 ${coinBalance}，查看获取方式和用途`}
-                    aria-expanded={coinInfoOpen}
-                    onClick={() => setCoinInfoOpen((current) => !current)}
-                  >
-                    <span className="account-settings-coin-logo" aria-hidden="true"><SiteIcon name="fa-droplet" variant="solid" /></span>
-                    <strong>{coinBalance}</strong>
-                  </button>
-                  <div className={`account-settings-tooltip account-settings-coin-tooltip${coinInfoOpen ? " open" : ""}`} role="tooltip">
-                    <strong>墨滴</strong>
-                    <div><b>获取方式</b><span>{coinWays.join("、")}</span></div>
-                    <div><b>可以做什么</b><span>{coinUses.join("，")}</span></div>
-                    <small>不可转赠、出售或兑换现金</small>
-                  </div>
-                </div>
-                <div
-                  className={`account-settings-level-progress${levelProgress > 0 ? " has-progress" : ""}`}
-                  role="progressbar"
-                  tabIndex={0}
-                  aria-label={`等级 LV.${experience.number}，经验值 ${experience.current} / ${experience.next}`}
-                  aria-valuemin={0}
-                  aria-valuemax={experience.next}
-                  aria-valuenow={experience.current}
-                >
-                  <span style={{ width: `${levelProgress}%` }} />
-                  <strong>LV.{experience.number}</strong>
-                  <div className="account-settings-tooltip account-settings-experience-tooltip" role="tooltip">
-                    <strong>经验值获取方式</strong>
-                    <p className="account-settings-experience-summary">累计经验 {experience.total} · 本级进度 {experience.current}/{experience.next}</p>
-                    <ul>
-                      {experienceRules.map(([label, value]) => <li key={label}><span>{label}</span><b>{value}</b></li>)}
-                    </ul>
-                  </div>
-                </div>
-                <span className="account-settings-experience-value">{experience.current}/{experience.next}</span>
-              </div>
+            </div>
+          </div>
+
+          <div className="account-settings-coin" ref={coinInfoRef}>
+            <button
+              type="button"
+              className="account-settings-coin-trigger"
+              aria-label={`当前墨滴余额 ${coinBalance}，查看获取方式和用途`}
+              aria-expanded={coinInfoOpen}
+              onClick={() => setCoinInfoOpen((current) => !current)}
+            >
+              <span className="account-settings-coin-logo" aria-hidden="true"><SiteIcon name="fa-droplet" variant="solid" /></span>
+              <span className="account-settings-coin-copy"><small>墨滴余额</small><strong>{coinBalance}</strong></span>
+              <SiteIcon name="fa-chevron-down" variant="solid" className="account-settings-coin-info" aria-hidden="true" />
+            </button>
+            <div className={`account-settings-tooltip account-settings-coin-tooltip${coinInfoOpen ? " open" : ""}`} role="tooltip">
+              <strong>墨滴</strong>
+              <div><b>获取方式</b><span>{coinWays.join("、")}</span></div>
+              <div><b>可以做什么</b><span>{coinUses.join("，")}</span></div>
+              <small>不可转赠、出售或兑换现金</small>
             </div>
           </div>
         </div>
-        <div className="account-settings-profile-fields">
-          <dl className="account-settings-list">
-            <div className="account-settings-row">
-              <dt>用户 ID</dt>
-              <dd className="account-settings-id">{user.id}</dd>
+
+        <div className="account-settings-experience">
+          {activity ? (
+            <>
+              <div className="account-settings-experience-heading">
+                <div><span className="account-settings-level-badge">LV.{experience.number}</span><strong>成长经验</strong></div>
+                <span>累计 {experience.total} 经验</span>
+              </div>
+              <div
+                className="account-settings-level-progress"
+                role="progressbar"
+                aria-label={`等级 LV.${experience.number}，经验值 ${experience.current} / ${experience.next}`}
+                aria-valuemin={0}
+                aria-valuemax={experience.next}
+                aria-valuenow={experience.current}
+              >
+                <span style={{ width: `${levelProgress}%` }} />
+              </div>
+              <div className="account-settings-experience-caption">
+                <span>{experience.number === levelBands[levelBands.length - 1].number ? "已达最高等级" : `距离 LV.${experience.number + 1}`}</span>
+                <strong>{experience.current} / {experience.next}</strong>
+              </div>
+              <details className="account-settings-experience-rules">
+                <summary>经验如何获得</summary>
+                <ul>
+                  {experienceRules.map(([label, value]) => <li key={label}><span>{label}</span><b>{value}</b></li>)}
+                </ul>
+              </details>
+            </>
+          ) : (
+            <div className="account-settings-experience-loading" role="status" aria-busy="true">
+              <span className="account-settings-skeleton-line" />
+              <span className="account-settings-skeleton-line account-settings-skeleton-track" />
+              <span>正在汇总成长记录…</span>
             </div>
-            <div className="account-settings-row account-settings-row-stacked">
-              <dt>账号简介</dt>
-              <dd>{profile?.bio || "未设置"}</dd>
-            </div>
-            <div className="account-settings-row">
-              <dt>性别</dt>
-              <dd>{genderLabels[accountPreferences.gender]}</dd>
-            </div>
-            <div className="account-settings-row">
-              <dt>出生日期</dt>
-              <dd>{formatBirthDate(accountPreferences.birth_date)}</dd>
-            </div>
-            <div className="account-settings-row">
-              <dt>绑定邮箱</dt>
-              <dd>{user.email || "未绑定"}</dd>
-            </div>
-          </dl>
+          )}
         </div>
+
+        <dl className="account-settings-list">
+          <div className="account-settings-row account-settings-row-id">
+            <dt>用户 ID</dt>
+            <dd className="account-settings-id">{user.id}</dd>
+          </div>
+          <div className="account-settings-row">
+            <dt>绑定邮箱</dt>
+            <dd>{user.email || "未绑定"}</dd>
+          </div>
+          <div className="account-settings-row account-settings-row-bio">
+            <dt>账号简介</dt>
+            <dd>{profile?.bio || "未设置"}</dd>
+          </div>
+          <div className="account-settings-row">
+            <dt>性别</dt>
+            <dd>{genderLabels[accountPreferences.gender]}</dd>
+          </div>
+          <div className="account-settings-row">
+            <dt>出生日期</dt>
+            <dd>{formatBirthDate(accountPreferences.birth_date)}</dd>
+          </div>
+        </dl>
       </section>
 
       <section className="account-settings-section" aria-labelledby="account-copyright-title">
@@ -371,7 +403,14 @@ export default function AccountSettingsPanel() {
           </div>
           <Link className="account-settings-help-link" href="/onboarding/interests?mode=settings">修改兴趣</Link>
         </div>
-        {interests.length > 0 ? (
+        {preferencesLoading ? (
+          <div className="account-settings-interest-loading" role="status" aria-busy="true">
+            <span className="account-settings-skeleton-line" />
+            <span>正在加载兴趣领域…</span>
+          </div>
+        ) : preferencesError ? (
+          <p className="account-settings-empty" role="status">兴趣领域暂时无法加载，请稍后刷新。</p>
+        ) : interests.length > 0 ? (
           <div className="account-settings-tags">
             {interests.map((interest) => <span className="card-tag" key={interest}>{interest}</span>)}
           </div>
