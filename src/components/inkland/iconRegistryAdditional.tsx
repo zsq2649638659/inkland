@@ -61,6 +61,7 @@ export type InklandAdditionalIconName =
   | "fa-hashtag"
   | "fa-hourglass-half"
   | "fa-house"
+  | "fa-id-card"
   | "fa-images"
   | "fa-italic"
   | "fa-link"
@@ -473,6 +474,13 @@ export const inklandAdditionalIconRegistry: Record<InklandAdditionalIconName, In
   "fa-user": { viewBox: "0 0 48 48", paths: [
     { d: "M24 4C28.4183 4 32 7.58172 32 12C32 16.4183 28.4183 20 24 20C19.5817 20 16 16.4183 16 12C16 7.58172 19.5817 4 24 4Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
     { d: "M42 44C42 34.0589 33.9411 26 24 26C14.0589 26 6 34.0589 6 44", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+  ], supportsVariants: false },
+  "fa-id-card": { viewBox: "0 0 48 48", paths: [
+    { d: "M6 8H42C43.1046 8 44 8.89543 44 10V38C44 39.1046 43.1046 40 42 40H6C4.89543 40 4 39.1046 4 38V10C4 8.89543 4.89543 8 6 8Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+    { d: "M17 25C19.2091 25 21 23.2091 21 21C21 18.7909 19.2091 17 17 17C14.7909 17 13 18.7909 13 21C13 23.2091 14.7909 25 17 25Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinejoin: "round" },
+    { d: "M23 31C23 27.6863 20.3137 25 17 25C13.6863 25 11 27.6863 11 31", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M28 20H36", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
+    { d: "M30 28H36", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },
   ], supportsVariants: false },
   "fa-user-check": { viewBox: "0 0 48 48", paths: [
     { d: "M24 4C28.4183 4 32 7.58172 32 12C32 16.4183 28.4183 20 24 20C19.5817 20 16 16.4183 16 12C16 7.58172 19.5817 4 24 4Z", variant: "default", fill: "none", stroke: "currentColor", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" },

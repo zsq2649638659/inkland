@@ -15,6 +15,11 @@ import { readAccountPreferences, saveAccountPreferences } from "@/lib/accountPre
 import { useRouter } from "next/navigation";
 
 const MAX_NICKNAME_LENGTH = 16;
+const MAX_BIO_LENGTH = 80;
+
+function limitBioLength(value: string | null | undefined) {
+  return Array.from(value || "").slice(0, MAX_BIO_LENGTH).join("");
+}
 
 type ProfileDraftBaseline = {
   nickname: string;
@@ -52,7 +57,8 @@ export default function ProfileEditForm() {
   const composingNicknameRef = useRef(false);
 
   const [nickname, setNickname] = useState(profile?.nickname || "");
-  const [bio, setBio] = useState(profile?.bio || "");
+  const [bio, setBio] = useState(limitBioLength(profile?.bio));
+  const [bioTouched, setBioTouched] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
   const [gender, setGender] = useState(readAccountPreferences(user).gender);
   const [birthDate, setBirthDate] = useState(readAccountPreferences(user).birth_date || "");
@@ -75,9 +81,10 @@ export default function ProfileEditForm() {
   const [emailValue, setEmailValue] = useState(user?.email || "");
 
   const nicknameLength = Array.from(nickname).length;
+  const bioLength = Array.from(bio).length;
   const hasUnsavedChanges = Boolean(user && hydratedUserId === user.id && (
     nickname.trim() !== baseline.nickname
-    || (bio.trim() || null) !== baseline.bio
+    || (bioTouched && (bio.trim() || null) !== baseline.bio)
     || (avatarUrl || null) !== baseline.avatar_url
     || gender !== baseline.gender
     || (birthDate || null) !== baseline.birth_date
@@ -92,7 +99,8 @@ export default function ProfileEditForm() {
     if (!user || profileLoading || hydratedUserRef.current === user.id) return;
     hydratedUserRef.current = user.id;
     setNickname(profile?.nickname || "");
-    setBio(profile?.bio || "");
+    setBio(limitBioLength(profile?.bio));
+    setBioTouched(false);
     setAvatarUrl(profile?.avatar_url || "");
     const accountPreferences = readAccountPreferences(user);
     setGender(accountPreferences.gender);
@@ -285,7 +293,7 @@ export default function ProfileEditForm() {
         return false;
       }
 
-      const normalizedBio = bio.trim() || null;
+      const normalizedBio = limitBioLength(bio.trim()) || null;
       const { error: updateErr } = await supabase
         .from("profiles")
         .update({
@@ -312,6 +320,7 @@ export default function ProfileEditForm() {
         avatar_url: avatarUrl || null,
       };
       setBaseline(nextBaseline);
+      setBioTouched(false);
       await refreshProfile();
 
       const currentAccountPreferences = readAccountPreferences(user);
@@ -340,7 +349,10 @@ export default function ProfileEditForm() {
 
       const emailChanged = normalizeEmail(trimmedEmail) !== nextBaseline.email;
       if (emailChanged) {
-        const { error: emailError } = await supabase.auth.updateUser({ email: trimmedEmail });
+        const { error: emailError } = await supabase.auth.updateUser(
+          { email: trimmedEmail },
+          { emailRedirectTo: new URL("/auth/confirm?flow=email-change", window.location.origin).toString() }
+        );
         if (emailError) {
           setErrorKind("error");
           setError(`邮箱修改失败：${emailError.message}`);
@@ -349,7 +361,7 @@ export default function ProfileEditForm() {
         nextBaseline = { ...nextBaseline, email: normalizeEmail(trimmedEmail) };
         setBaseline(nextBaseline);
         setEmailValue(trimmedEmail);
-        setSuccess("验证邮件已发送至新邮箱，请完成验证以更新绑定邮箱。");
+        setSuccess("验证邮件已发送，请按邮件提示完成验证后更换绑定邮箱。");
       } else {
         setSuccess("保存成功");
       }
@@ -366,7 +378,8 @@ export default function ProfileEditForm() {
 
   const handleCancel = () => {
     setNickname(baseline.nickname);
-    setBio(baseline.bio || "");
+    setBio(limitBioLength(baseline.bio));
+    setBioTouched(false);
     setAvatarUrl(baseline.avatar_url || "");
     setGender(baseline.gender);
     setBirthDate(baseline.birth_date || "");
@@ -415,13 +428,15 @@ export default function ProfileEditForm() {
       noValidate
     >
               {/* Avatar */}
+              <section className="profile-edit-module profile-edit-avatar-module" aria-label="头像">
               <div className="avatar-section">
+                <span className="field-label avatar-section-label">更换头像</span>
                 <div className="avatar-upload">
                   <div className="avatar-preview">
                     {avatarUrl ? (
                       <Image src={avatarUrl} alt="当前头像" fill sizes="80px" unoptimized />
                     ) : (
-                      <DefaultAvatar name={nickname || user?.email?.[0] || "?"} />
+                      <DefaultAvatar name={nickname || user?.email?.[0] || "?"} className="avatar-placeholder" />
                     )}
                   </div>
                   <div className="avatar-overlay" aria-hidden="true">
@@ -439,10 +454,12 @@ export default function ProfileEditForm() {
                   {uploading ? "正在压缩并上传..." : "点击更换头像，支持 PNG、JPEG、WebP，自动压缩"}
                 </span>
               </div>
+              </section>
 
               {/* Nickname */}
+              <section className="profile-edit-module profile-edit-identity-module" aria-label="昵称和简介">
               <div className="field-group">
-                <label htmlFor="profile-nickname" className="field-label">昵称（最多16字）</label>
+                <label htmlFor="profile-nickname" className="field-label">昵称</label>
                 <input
                   id="profile-nickname"
                   name="nickname"
@@ -478,17 +495,23 @@ export default function ProfileEditForm() {
                   name="bio"
                   className="field-textarea"
                   placeholder="简单介绍一下自己…"
-                  maxLength={200}
+                  maxLength={MAX_BIO_LENGTH * 2}
                   rows={4}
                   value={bio}
-                  onChange={(e) => setBio(e.target.value)}
+                  aria-describedby="profile-bio-count"
+                  onChange={(e) => {
+                    setBio(limitBioLength(e.target.value));
+                    setBioTouched(true);
+                  }}
                 ></textarea>
-                <div className={`char-count${bio.length > 200 ? " over" : ""}`}>
-                  {bio.length} / 200
+                <div id="profile-bio-count" className={`char-count${bioLength > MAX_BIO_LENGTH ? " over" : ""}`}>
+                  {bioLength} / {MAX_BIO_LENGTH}
                 </div>
               </div>
+              </section>
 
               {/* Personal details */}
+              <section className="profile-edit-module profile-edit-personal-module" aria-label="性别和出生日期">
               <div className="profile-personal-fields">
                 <div className="field-group">
                   <span className="field-label">性别</span>
@@ -513,8 +536,10 @@ export default function ProfileEditForm() {
                   <AccountDatePicker value={birthDate} onChange={setBirthDate} />
                 </div>
               </div>
+              </section>
 
               {/* Email */}
+              <section className="profile-edit-module profile-edit-email-module" aria-label="邮箱">
               <div className="field-group">
                 <label htmlFor="profile-email" className="field-label">邮箱</label>
                 <input
@@ -530,8 +555,9 @@ export default function ProfileEditForm() {
                   value={emailValue}
                   onChange={(event) => setEmailValue(event.target.value)}
                 />
-                <p className="profile-email-hint">修改邮箱后，需要通过验证邮件完成更换。</p>
+                <p className="profile-email-hint">保存后按验证邮件提示完成操作，验证通过后才会更新绑定邮箱。</p>
               </div>
+              </section>
 
               {/* Actions */}
               <div className="form-actions">
@@ -563,11 +589,11 @@ export default function ProfileEditForm() {
                     aria-labelledby="profile-unsaved-title"
                     aria-describedby="profile-unsaved-description"
                   >
-                    <h2 id="profile-unsaved-title">资料还没有保存</h2>
-                    <p id="profile-unsaved-description">离开前要保存你刚才修改的内容吗？</p>
+                    <h2 id="profile-unsaved-title">资料尚未保存</h2>
+                    <p id="profile-unsaved-description">离开前，要保存刚才的修改吗？</p>
                     <div className="profile-unsaved-actions">
                       <button type="button" className="profile-unsaved-discard" onClick={discardAndLeave} disabled={saving || uploading}>
-                        不保存，离开
+                        不保存离开
                       </button>
                       <button ref={stayButtonRef} type="button" className="profile-unsaved-stay" onClick={() => { pendingNavigationRef.current = null; setUnsavedDialogOpen(false); }}>
                         继续编辑

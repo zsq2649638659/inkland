@@ -280,6 +280,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
         <HomeSidebar />
 
         <div className="content-area">
+          {profileSettings && <div className="page-header"><h1 className="page-title">个人资料</h1></div>}
           {/* Tab Bar */}
           {tabs.length > 0 && (
             <div className="tabs-wrapper">
@@ -305,8 +306,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
 
           {/* ---- Panel: 编辑资料 ---- */}
           <section className="settings-panel" style={{ display: profileSettings && activeTab === "profile" ? "block" : "none" }}>
-            <h2 className="settings-panel-title">编辑资料</h2>
-            <p className="settings-panel-desc">修改你在 Inkland 展示的头像、昵称和个人简介。</p>
             <div id="page-profile-edit" className="profile-edit-content">
               <ProfileEditForm />
             </div>
@@ -319,26 +318,25 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
             onSubmit={(event) => { event.preventDefault(); void handlePasswordChange(); }}
             style={{ display: profileSettings && activeTab === "password" ? "block" : "none" }}
           >
-            <h2 className="settings-panel-title">修改密码</h2>
-            <p className="settings-panel-desc">请设置一个强密码，建议包含大小写字母、数字和特殊字符。</p>
+            <div className="profile-password-module">
+              <div className="settings-form-group">
+                <label htmlFor="settings-current-password" className="settings-form-label">当前密码</label>
+                <input id="settings-current-password" name="settings-current-password" type="password" className={`settings-form-input${passwordFieldErrors.currentPassword ? " error" : ""}`} placeholder="请输入当前密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.currentPassword)} aria-describedby={passwordFieldErrors.currentPassword ? "settings-current-password-error" : undefined} value={currentPassword} onChange={(e) => { setCurrentPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, currentPassword: "" })); }} />
+                {passwordFieldErrors.currentPassword && <span id="settings-current-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.currentPassword}</span>}
+              </div>
 
-            <div className="settings-form-group">
-              <label htmlFor="settings-current-password" className="settings-form-label">当前密码</label>
-              <input id="settings-current-password" name="settings-current-password" type="password" className={`settings-form-input${passwordFieldErrors.currentPassword ? " error" : ""}`} placeholder="请输入当前密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.currentPassword)} aria-describedby={passwordFieldErrors.currentPassword ? "settings-current-password-error" : undefined} value={currentPassword} onChange={(e) => { setCurrentPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, currentPassword: "" })); }} />
-              {passwordFieldErrors.currentPassword && <span id="settings-current-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.currentPassword}</span>}
-            </div>
+              <div className="settings-form-group">
+                <label htmlFor="settings-new-password" className="settings-form-label">新密码</label>
+                <input id="settings-new-password" name="settings-new-password" type="password" className={`settings-form-input${passwordFieldErrors.newPassword ? " error" : ""}`} placeholder="请输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.newPassword)} aria-describedby={passwordFieldErrors.newPassword ? "settings-new-password-error" : "settings-new-password-hint"} value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, newPassword: "", confirmPassword: "" })); }} />
+                {passwordFieldErrors.newPassword && <span id="settings-new-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.newPassword}</span>}
+                <span id="settings-new-password-hint" className="settings-form-hint">至少 8 位，包含大小写字母和数字</span>
+              </div>
 
-            <div className="settings-form-group">
-              <label htmlFor="settings-new-password" className="settings-form-label">新密码</label>
-              <input id="settings-new-password" name="settings-new-password" type="password" className={`settings-form-input${passwordFieldErrors.newPassword ? " error" : ""}`} placeholder="请输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.newPassword)} aria-describedby={passwordFieldErrors.newPassword ? "settings-new-password-error" : "settings-new-password-hint"} value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, newPassword: "", confirmPassword: "" })); }} />
-              {passwordFieldErrors.newPassword && <span id="settings-new-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.newPassword}</span>}
-              <span id="settings-new-password-hint" className="settings-form-hint">至少 8 位，包含大小写字母和数字</span>
-            </div>
-
-            <div className="settings-form-group">
-              <label htmlFor="settings-confirm-password" className="settings-form-label">确认新密码</label>
-              <input id="settings-confirm-password" name="settings-confirm-password" type="password" className={`settings-form-input${passwordFieldErrors.confirmPassword ? " error" : ""}`} placeholder="请再次输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.confirmPassword)} aria-describedby={passwordFieldErrors.confirmPassword ? "settings-confirm-password-error" : undefined} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, confirmPassword: "" })); }} />
-              {passwordFieldErrors.confirmPassword && <span id="settings-confirm-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.confirmPassword}</span>}
+              <div className="settings-form-group">
+                <label htmlFor="settings-confirm-password" className="settings-form-label">确认新密码</label>
+                <input id="settings-confirm-password" name="settings-confirm-password" type="password" className={`settings-form-input${passwordFieldErrors.confirmPassword ? " error" : ""}`} placeholder="请再次输入新密码" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" aria-invalid={Boolean(passwordFieldErrors.confirmPassword)} aria-describedby={passwordFieldErrors.confirmPassword ? "settings-confirm-password-error" : undefined} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setPasswordFieldErrors((current) => ({ ...current, confirmPassword: "" })); }} />
+                {passwordFieldErrors.confirmPassword && <span id="settings-confirm-password-error" className="settings-field-error" role="alert">{passwordFieldErrors.confirmPassword}</span>}
+              </div>
             </div>
 
             <div className="settings-form-actions">

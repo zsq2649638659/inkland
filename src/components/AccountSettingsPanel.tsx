@@ -18,6 +18,7 @@ import {
 } from "@/lib/accountPreferences";
 import { copyrightPolicyMap, copyrightPolicyOptions } from "@/lib/copyrightPolicy";
 import { readInterestPreferences } from "@/lib/interestPreferences";
+import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 type AccountActivity = {
   publishedDays: number;
@@ -25,6 +26,13 @@ type AccountActivity = {
   engagementDays: number;
 };
 
+type SidebarStats = {
+  following: number | null;
+  followers: number | null;
+  works: number | null;
+};
+
+const emptySidebarStats: SidebarStats = { following: null, followers: null, works: null };
 const fallbackActivity: AccountActivity = {
   publishedDays: 0,
   readingDays: 0,
@@ -68,16 +76,12 @@ function countActivityDays(values: Array<string | null | undefined>) {
   return new Set(values.map(calendarDay).filter((value): value is string => Boolean(value))).size;
 }
 
-const experienceRules = [
-  ["每日登录", "+2 经验"],
-  ["阅读作品", "+2 经验"],
-  ["收藏或关注作品", "+2 经验"],
-  ["发布审核通过的作品", "+10 经验"],
-] as const;
-
 const coinBalance = 0;
-const coinWays = ["完成每日任务（每日有上限）", "参与 Inkland 社区活动"];
-const coinUses = ["给喜欢的作品表达支持", "参与平台后续开放的社区活动"];
+const dailyRewardTasks = [
+  ["每日登录", "+1"],
+  ["每日阅读一篇作品", "+1"],
+  ["每日收藏一篇作品", "+1"],
+] as const;
 
 function formatBirthDate(value: string | null) {
   if (!value) return "未设置";
@@ -97,11 +101,11 @@ export default function AccountSettingsPanel() {
   const [copyrightMessageKind, setCopyrightMessageKind] = useState<"success" | "error" | "">("");
   const [copyrightOpen, setCopyrightOpen] = useState(false);
   const copyrightMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [coinInfoOpen, setCoinInfoOpen] = useState(false);
   const [activityResult, setActivityResult] = useState<{ userId: string; activity: AccountActivity } | null>(null);
+  const [sidebarStatsResult, setSidebarStatsResult] = useState<{ userId: string; stats: SidebarStats } | null>(null);
   const copyrightSelectRef = useRef<HTMLDivElement>(null);
-  const coinInfoRef = useRef<HTMLDivElement>(null);
   const activity = user && activityResult?.userId === user.id ? activityResult.activity : null;
+  const sidebarStats = user && sidebarStatsResult?.userId === user.id ? sidebarStatsResult.stats : emptySidebarStats;
   const preferencesLoading = Boolean(user && preferencesLoad?.userId !== user.id);
   const preferencesError = Boolean(user && preferencesLoad?.userId === user.id && preferencesLoad.error);
 
@@ -124,6 +128,42 @@ export default function AccountSettingsPanel() {
       }
     })();
     return () => { active = false; };
+  }, [supabase, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const loadStats = async () => {
+      try {
+        const stats = await getOrCreateClientCache<SidebarStats>(`sidebar-stats:${user.id}`, async () => {
+          const [{ count: followingCount }, { count: followersCount }, { data: publishedPosts }, { data: series }] = await Promise.all([
+            supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
+            supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
+            supabase.from("posts").select("id, review_status").eq("user_id", user.id).eq("status", "published").neq("post_type", "serial").neq("review_status", "rejected"),
+            supabase.from("series").select("name").eq("user_id", user.id),
+          ]);
+          const seriesCount = new Set(((series || []) as Array<{ name?: string | null }>).map((item) => item.name).filter(Boolean)).size;
+          return {
+            following: followingCount || 0,
+            followers: followersCount || 0,
+            works: (publishedPosts || []).length + seriesCount,
+          };
+        }, { ttlMs: 30_000, persist: true });
+        if (active) setSidebarStatsResult({ userId: user.id, stats });
+      } catch {
+        if (active) setSidebarStatsResult({ userId: user.id, stats: emptySidebarStats });
+      }
+    };
+    void loadStats();
+    const handleStatsChanged = () => {
+      invalidateClientCache(`sidebar-stats:${user.id}`);
+      void loadStats();
+    };
+    window.addEventListener("inkland:stats-changed", handleStatsChanged);
+    return () => {
+      active = false;
+      window.removeEventListener("inkland:stats-changed", handleStatsChanged);
+    };
   }, [supabase, user]);
 
   useEffect(() => {
@@ -164,20 +204,12 @@ export default function AccountSettingsPanel() {
       if (!copyrightSelectRef.current?.contains(event.target as Node)) setCopyrightOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setCopyrightOpen(false);
-        setCoinInfoOpen(false);
-      }
-    };
-    const closeCoinInfo = (event: MouseEvent) => {
-      if (!coinInfoRef.current?.contains(event.target as Node)) setCoinInfoOpen(false);
+      if (event.key === "Escape") setCopyrightOpen(false);
     };
     document.addEventListener("mousedown", closeCopyrightSelect);
-    document.addEventListener("mousedown", closeCoinInfo);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       document.removeEventListener("mousedown", closeCopyrightSelect);
-      document.removeEventListener("mousedown", closeCoinInfo);
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, []);
@@ -189,10 +221,11 @@ export default function AccountSettingsPanel() {
   if (!user) return null;
 
   const displayName = profile?.nickname || user.user_metadata?.username || user.email?.split("@")[0] || "用户";
+  const displayBio = profile?.bio || "";
   const avatarUrl = profile?.avatar_url || "";
   const selectedCopyright = copyrightPolicyMap[copyrightLicense] || copyrightPolicyOptions[0];
   const experience = deriveExperience(activity || fallbackActivity);
-  const levelProgress = Math.min(100, Math.round((experience.current / experience.next) * 100));
+  const experienceProgress = activity ? Math.min(100, Math.round((experience.current / Math.max(1, experience.next)) * 100)) : 0;
 
   function clearCopyrightMessageTimer() {
     if (copyrightMessageTimerRef.current) {
@@ -235,106 +268,96 @@ export default function AccountSettingsPanel() {
   }
 
   return (
-    <section className="settings-panel account-settings-panel" aria-labelledby="account-settings-title">
-      <div className="account-settings-heading">
-        <div>
-          <h2 id="account-settings-title" className="settings-panel-title">账号设置</h2>
-          <p className="settings-panel-desc">管理账号资料、版权偏好和兴趣领域。</p>
-        </div>
-      </div>
-
-      <section className="account-settings-section account-settings-basic" aria-labelledby="account-basic-title">
-        <div className="account-settings-basic-heading">
-          <h3 id="account-basic-title" className="account-settings-section-title">基本信息</h3>
-          <p>账号资料与社区成长记录</p>
-        </div>
-
-        <div className="account-settings-identity">
-          <div className="account-settings-profile">
-            <div className="account-settings-avatar">
-              {avatarUrl ? <Image src={avatarUrl} alt="当前头像" fill sizes="72px" unoptimized /> : <DefaultAvatar name={displayName} />}
-            </div>
-            <div className="account-settings-profile-copy">
-              <div className="account-settings-profile-name">{displayName}</div>
-            </div>
+    <section className="settings-panel account-settings-panel" aria-label="账号设置">
+      <section className="account-settings-section account-settings-basic" aria-label="基本信息">
+        <div className="account-settings-profile-layout">
+          <div className="account-settings-avatar">
+            {avatarUrl ? <Image src={avatarUrl} alt="当前头像" fill sizes="88px" unoptimized /> : <DefaultAvatar name={displayName} />}
           </div>
 
-          <div className="account-settings-coin" ref={coinInfoRef}>
-            <button
-              type="button"
-              className="account-settings-coin-trigger"
-              aria-label={`当前墨滴余额 ${coinBalance}，查看获取方式和用途`}
-              aria-expanded={coinInfoOpen}
-              onClick={() => setCoinInfoOpen((current) => !current)}
+          <div className="account-settings-profile-copy">
+            <div className="account-settings-profile-name">{displayName}</div>
+            <div className="account-settings-profile-bio">{displayBio || "未设置"}</div>
+          </div>
+
+          <div className="sidebar-user-stats account-settings-profile-stats" aria-label="关注、粉丝和作品数量">
+            <Link href="/relationships" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
+              <div className="sidebar-stat-value">{sidebarStats.following ?? "—"}</div>
+              <div className="sidebar-stat-label">关注</div>
+            </Link>
+            <Link href="/relationships/followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
+              <div className="sidebar-stat-value">{sidebarStats.followers ?? "—"}</div>
+              <div className="sidebar-stat-label">粉丝</div>
+            </Link>
+            <Link href="/profile" className="sidebar-stat sidebar-stat-link" aria-label="查看我的作品">
+              <div className="sidebar-stat-value">{sidebarStats.works ?? "—"}</div>
+              <div className="sidebar-stat-label">作品</div>
+            </Link>
+          </div>
+        </div>
+
+        <hr className="account-settings-divider" />
+
+        <div className="account-settings-profile-metrics" aria-label="墨滴与等级">
+          <div className="account-settings-profile-metric" role="group" aria-label={`墨滴 ${coinBalance}`}>
+            <span className="account-settings-coin-logo" aria-hidden="true"><SiteIcon name="fa-droplet" variant="solid" /></span>
+            <span className="account-settings-profile-metric-copy"><span>墨滴</span><strong>{coinBalance}</strong></span>
+          </div>
+          <div className="account-settings-profile-metric" role="group" aria-label={`等级 ${activity ? `LV.${experience.number}` : "汇总中"}`}>
+            <span className="account-settings-level-logo" aria-hidden="true"><Image src="/icons/level.svg" alt="" width={15} height={15} unoptimized /></span>
+            <span className="account-settings-profile-metric-copy"><span>等级</span><strong>{activity ? `LV.${experience.number}` : "汇总中"}</strong></span>
+          </div>
+        </div>
+
+        <section className="account-settings-experience" aria-label="个人经验进度">
+          <div className="account-settings-experience-heading">
+            <strong>经验进度</strong>
+            <span>{activity ? `${experience.current}/${experience.next}` : "—/—"}</span>
+          </div>
+          <div className="account-settings-experience-track-row">
+            <div
+              className={`account-settings-level-progress${experienceProgress > 0 ? " has-progress" : ""}`}
+              role="progressbar"
+              aria-label="当前等级经验进度"
+              aria-valuemin={0}
+              aria-valuemax={experience.next}
+              aria-valuenow={activity ? experience.current : 0}
             >
-              <span className="account-settings-coin-logo" aria-hidden="true"><SiteIcon name="fa-droplet" variant="solid" /></span>
-              <span className="account-settings-coin-copy"><small>墨滴余额</small><strong>{coinBalance}</strong></span>
-              <SiteIcon name="fa-chevron-down" variant="solid" className="account-settings-coin-info" aria-hidden="true" />
-            </button>
-            <div className={`account-settings-tooltip account-settings-coin-tooltip${coinInfoOpen ? " open" : ""}`} role="tooltip">
-              <strong>墨滴</strong>
-              <div><b>获取方式</b><span>{coinWays.join("、")}</span></div>
-              <div><b>可以做什么</b><span>{coinUses.join("，")}</span></div>
-              <small>不可转赠、出售或兑换现金</small>
+              <span style={{ width: `${experienceProgress}%` }} />
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="account-settings-experience">
-          {activity ? (
-            <>
-              <div className="account-settings-experience-heading">
-                <div><span className="account-settings-level-badge">LV.{experience.number}</span><strong>成长经验</strong></div>
-                <span>累计 {experience.total} 经验</span>
-              </div>
-              <div
-                className="account-settings-level-progress"
-                role="progressbar"
-                aria-label={`等级 LV.${experience.number}，经验值 ${experience.current} / ${experience.next}`}
-                aria-valuemin={0}
-                aria-valuemax={experience.next}
-                aria-valuenow={experience.current}
-              >
-                <span style={{ width: `${levelProgress}%` }} />
-              </div>
-              <div className="account-settings-experience-caption">
-                <span>{experience.number === levelBands[levelBands.length - 1].number ? "已达最高等级" : `距离 LV.${experience.number + 1}`}</span>
-                <strong>{experience.current} / {experience.next}</strong>
-              </div>
-              <details className="account-settings-experience-rules">
-                <summary>经验如何获得</summary>
-                <ul>
-                  {experienceRules.map(([label, value]) => <li key={label}><span>{label}</span><b>{value}</b></li>)}
-                </ul>
-              </details>
-            </>
-          ) : (
-            <div className="account-settings-experience-loading" role="status" aria-busy="true">
-              <span className="account-settings-skeleton-line" />
-              <span className="account-settings-skeleton-line account-settings-skeleton-track" />
-              <span>正在汇总成长记录…</span>
-            </div>
-          )}
-        </div>
+        <section className="account-settings-rule-group account-settings-coin-rule-group" aria-labelledby="account-coin-rules-title">
+          <h4 className="account-settings-rule-title" id="account-coin-rules-title">墨滴如何获得</h4>
+          <ul className="account-settings-coin-task-list">
+            {dailyRewardTasks.map(([label, reward]) => <li key={label}><b>{reward}</b><span>{label}</span></li>)}
+          </ul>
+        </section>
+
+        <section className="account-settings-rule-group account-settings-experience-rule-group" aria-labelledby="account-experience-rules-title">
+          <h4 className="account-settings-rule-title" id="account-experience-rules-title">经验如何获得</h4>
+          <ul className="account-settings-experience-rule-list">
+            {dailyRewardTasks.map(([label, reward]) => <li key={label}><b>{reward}</b><span>{label}</span></li>)}
+          </ul>
+        </section>
+
+        <hr className="account-settings-divider account-settings-details-divider" />
 
         <dl className="account-settings-list">
           <div className="account-settings-row account-settings-row-id">
-            <dt>用户 ID</dt>
+            <dt>ID</dt>
             <dd className="account-settings-id">{user.id}</dd>
           </div>
-          <div className="account-settings-row">
-            <dt>绑定邮箱</dt>
+          <div className="account-settings-row account-settings-row-email">
+            <dt>邮箱</dt>
             <dd>{user.email || "未绑定"}</dd>
           </div>
-          <div className="account-settings-row account-settings-row-bio">
-            <dt>账号简介</dt>
-            <dd>{profile?.bio || "未设置"}</dd>
-          </div>
-          <div className="account-settings-row">
+          <div className="account-settings-row account-settings-row-gender">
             <dt>性别</dt>
             <dd>{genderLabels[accountPreferences.gender]}</dd>
           </div>
-          <div className="account-settings-row">
+          <div className="account-settings-row account-settings-row-birth">
             <dt>出生日期</dt>
             <dd>{formatBirthDate(accountPreferences.birth_date)}</dd>
           </div>
