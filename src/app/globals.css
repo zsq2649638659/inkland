@@ -4758,11 +4758,12 @@ p {
 
 /* Auth status messages */
 .auth-status-wrapper {
-  height: 66px;
+  min-height: 66px;
   margin-bottom: 2px;
 }
 .auth-status {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
@@ -4783,6 +4784,28 @@ p {
   font-size: 16px;
   margin-top: 1px;
   flex-shrink: 0;
+}
+.auth-status > span {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.auth-status-action {
+  flex: 0 0 auto;
+  margin: 0 0 0 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.auth-status-action:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 .auth-status-error {
   background: #FEF2F2;
