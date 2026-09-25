@@ -11548,36 +11548,41 @@ p {
   animation: toastSlideIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .settings-status-icon {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 0;
-  background: transparent;
-  color: var(--ink-success);
-  font-size: 20px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F26B5B, #E85D4A);
+  color: #fff;
+  font-size: 13px;
   flex-shrink: 0;
-  box-shadow: none;
-  animation: none;
+  box-shadow: 0 2px 8px rgba(242,107,91,0.25);
+  animation: toastIconPop 0.4s 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .settings-status-text {
   min-width:0;
   font-size: 14px;
   font-weight: 500;
-  color: var(--ink-success);
+  color: #C0392B;
   letter-spacing: -0.01em;
   line-height: 1.4;
   overflow-wrap:anywhere;
 }
-.settings-status.settings-status-warning .settings-status-icon,
-.settings-status.settings-status-warning .settings-status-text { color:var(--ink-warning); }
-.settings-status.settings-status-error .settings-status-icon,
-.settings-status.settings-status-error .settings-status-text { color:var(--ink-danger); }
+.settings-status.settings-status-warning .settings-status-icon { background:linear-gradient(135deg,#E6A23C,#D88A16); }
+.settings-status.settings-status-warning .settings-status-text { color:#9A6800; }
+.settings-status.settings-status-error .settings-status-icon { background:linear-gradient(135deg,#D96259,#B8443B); }
+.settings-status.settings-status-error .settings-status-text { color:#B84B42; }
 @keyframes toastSlideIn {
   from { opacity: 0; transform: translateY(-8px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes toastIconPop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
 /* Dark mode for profile edit page */
 [data-theme="dark"] #page-profile-edit .form-card { background:#242424 }
 [data-theme="dark"] #page-profile-edit .field-input,
@@ -11600,7 +11605,7 @@ p {
 [data-theme="dark"] #page-profile-edit .avatar-preview { background:#2A2A2A }
 [data-theme="dark"] #page-profile-edit .page-title { color:#E8E8E8 }
 [data-theme="dark"] #page-profile-edit .field-label { color:#E8E8E8 }
-[data-theme="dark"] .settings-status-text { color:var(--ink-success) }
+[data-theme="dark"] .settings-status-text { color:#F5A09A }
 [data-theme="dark"] .settings-status.settings-status-warning .settings-status-text { color:#F0C36A }
 [data-theme="dark"] .settings-status.settings-status-error .settings-status-text { color:#F09B94 }
 
@@ -19264,7 +19269,7 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   height:20px;
   border-radius:0;
   background:transparent;
-  color:var(--ink-success);
+  color:var(--color-primary-hover);
   box-shadow:none;
   animation:none;
 }
