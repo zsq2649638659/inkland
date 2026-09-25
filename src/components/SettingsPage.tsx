@@ -12,6 +12,7 @@ import { getPublicProfileBios } from "@/lib/profile-privacy";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import AccountSettingsPanel from "@/components/AccountSettingsPanel";
 import UserCard from "@/components/UserCard";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import SettingsStatus from "@/components/SettingsStatus";
 import {
   defaultNotificationPreferences,
@@ -37,7 +38,6 @@ type PrivacyPreferences = {
   allow_follows: boolean;
   comment_permission: InteractionPermission;
   reply_permission: InteractionPermission;
-  message_permission: InteractionPermission;
 };
 
 const defaultPrivacyPreferences: PrivacyPreferences = {
@@ -49,7 +49,6 @@ const defaultPrivacyPreferences: PrivacyPreferences = {
   allow_follows: true,
   comment_permission: "everyone",
   reply_permission: "everyone",
-  message_permission: "everyone",
 };
 
 const interactionPermissionOptions: Array<{ value: InteractionPermission; label: string }> = [
@@ -187,7 +186,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               allow_follows: result.data?.allow_follows ?? defaultPrivacyPreferences.allow_follows,
               comment_permission: result.data?.comment_permission ?? defaultPrivacyPreferences.comment_permission,
               reply_permission: result.data?.reply_permission ?? defaultPrivacyPreferences.reply_permission,
-              message_permission: result.data?.message_permission ?? defaultPrivacyPreferences.message_permission,
             });
           }
           setPrivacyLoadedUserId(user.id);
@@ -535,7 +533,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
           {/* ---- Panel: 通知设置 ---- */}
           <div className="settings-panel settings-surface-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "notifications" ? "block" : "none" }}>
             <h2 className="settings-panel-title">通知设置</h2>
-            {isLocalPreview && <p className="settings-local-preview-note" role="note">本地预览模式：开关可交互，但不会写入账号或数据库。</p>}
 
             {notificationPreferenceTypes.map((type: NotificationPreferenceType) => {
               const option = notificationPreferenceLabels[type];
@@ -570,7 +567,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
           {/* ---- Panel: 隐私设置 ---- */}
           <div className="settings-panel settings-surface-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "privacy" ? "block" : "none" }}>
             <h2 className="settings-panel-title">隐私设置</h2>
-            {isLocalPreview && <p className="settings-local-preview-note" role="note">本地预览模式：开关可交互，但不会写入账号或数据库。</p>}
             <div aria-live="polite" aria-busy={privacyLoading}>
               {privacyLoading || !privacyReady ? (
                 <p className="settings-toggle-desc" role="status">正在加载隐私设置…</p>
@@ -604,23 +600,21 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
                   {([
                     ["comment_permission", "谁可以评论我的作品", "设置其他人能否在你的作品下发表评论。"],
                     ["reply_permission", "谁可以回复我的评论", "设置其他人能否回复你发布的评论。"],
-                    ["message_permission", "谁可以给我发私信", "站内私信功能尚未开放；此设置保存后会在私信功能接入时生效。"],
                   ] as const).map(([key, label, description]) => (
                     <div className="settings-toggle-row settings-choice-row" key={key}>
                       <div className="settings-toggle-copy">
                         <div className="settings-toggle-label">{label}</div>
                         <div className="settings-toggle-desc">{description}</div>
                       </div>
-                      <select
-                        className="settings-form-select settings-choice-select"
-                        aria-label={label}
-                        value={privacyPreferences[key]}
-                        onChange={(event) => setPrivacyPreferences((current) => ({ ...current, [key]: event.target.value as InteractionPermission }))}
-                      >
-                        {interactionPermissionOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
+                      <div className="settings-choice-select">
+                        <ProfileFilterSelect
+                          label={label}
+                          value={privacyPreferences[key]}
+                          options={interactionPermissionOptions}
+                          id={`settings-privacy-${key}`}
+                          onChange={(value) => setPrivacyPreferences((current) => ({ ...current, [key]: value as InteractionPermission }))}
+                        />
+                      </div>
                     </div>
                   ))}
                   <div className="settings-form-actions settings-privacy-actions">

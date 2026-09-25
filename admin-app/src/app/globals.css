@@ -1873,7 +1873,7 @@
   padding:2px;
   border:0;
   border-radius:999px;
-  background:var(--faint);
+  background:var(--ink-color-bg-component-active, #d4cec8);
 }
 .admin-rule-switch i { width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .18s ease; }
 .admin-rule-switch.is-on { background:var(--coral); }
