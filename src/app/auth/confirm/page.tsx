@@ -313,7 +313,9 @@ export default function AuthConfirmPage() {
         : confirmationIssue === "link-used-or-expired" && flow === "signup"
           ? "验证链接可能已被邮件安全扫描提前访问，或已经过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
           : flow === "email-change"
-            ? "验证链接无效或已过期。请回到编辑资料重新提交邮箱，再使用最新的验证邮件。"
+            ? confirmationIssue === "link-used-or-expired"
+              ? "邮箱验证链接可能已被邮件安全扫描提前访问，或已经过期。请回到编辑资料重新提交邮箱，并在新页面点击确认。"
+              : "邮箱验证暂未完成。请回到编辑资料重新提交邮箱，再使用最新的验证邮件。"
             : "验证链接无效或已过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
       : flow === "email-change"
         ? isPending
