@@ -11243,6 +11243,8 @@ p {
 .profile-edit-loading-mark { width:26px;height:26px;border:3px solid var(--color-border);border-top-color:var(--color-primary);border-radius:50%;animation:profile-loading-spin .9s linear infinite; }
 @keyframes profile-loading-spin { to { transform:rotate(360deg); } }
 .profile-email-hint { margin:7px 0 0;color:var(--color-text-light);font-size:12px;line-height:1.6; }
+.profile-email-password-field { margin-top:14px; }
+.profile-email-password-error { display:block;margin-top:7px;color:var(--color-primary);font-size:12px;line-height:1.5; }
 .profile-email-pending { display:flex;align-items:flex-start;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-top:7px; }
 .profile-email-pending .profile-email-hint { flex:1 1 280px;margin:0; }
 .profile-email-resend { flex:0 0 auto;padding:0;border:0;background:transparent;color:var(--color-primary);font:inherit;font-size:12px;font-weight:600;line-height:1.6;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;cursor:pointer; }
