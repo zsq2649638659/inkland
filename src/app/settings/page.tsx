@@ -7,9 +7,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
-import DefaultAvatar from "@/components/DefaultAvatar";
+import { getPublicProfileBios } from "@/lib/profile-privacy";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import AccountSettingsPanel from "@/components/AccountSettingsPanel";
+import UserCard from "@/components/UserCard";
 import SettingsStatus from "@/components/SettingsStatus";
 import {
   defaultNotificationPreferences,
@@ -21,11 +22,25 @@ import {
   type NotificationPreferences,
 } from "@/lib/notificationPreferences";
 
-type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "about" | "contact";
+type SettingsTab = "account" | "profile" | "password" | "blocked" | "notifications" | "privacy" | "about" | "contact";
 export type SettingsSection = "privacy" | "profile" | "about" | "contact";
 
+type PrivacyPreferences = {
+  show_gender: boolean;
+  show_profile_info: boolean;
+  show_likes: boolean;
+  show_bookmarks: boolean;
+};
+
+const defaultPrivacyPreferences: PrivacyPreferences = {
+  show_gender: false,
+  show_profile_info: true,
+  show_likes: false,
+  show_bookmarks: false,
+};
+
 function parseSettingsTab(value: string | null): SettingsTab | null {
-  return value === "account" || value === "profile" || value === "password" || value === "blocked" || value === "notifications" || value === "about" || value === "contact"
+  return value === "account" || value === "profile" || value === "password" || value === "blocked" || value === "notifications" || value === "privacy" || value === "about" || value === "contact"
     ? value
     : null;
 }
@@ -35,12 +50,12 @@ const profileSettingsTabKeys: SettingsTab[] = ["account", "profile", "password"]
 const siteContactEmail = "inkland@163.com";
 
 type BlockedUserRow = { id: string; blocked_user_id: string; created_at: string };
-type BlockedProfileRow = { id: string; nickname: string | null; bio: string | null };
+type BlockedProfileRow = { id: string; nickname: string | null; avatar_url: string | null; show_profile_info: boolean };
 
 function isTabForSection(tab: SettingsTab | null, section: SettingsSection): tab is SettingsTab {
   if (!tab) return false;
   if (section === "profile") return profileSettingsTabKeys.includes(tab);
-  if (section === "privacy") return tab === "blocked" || tab === "notifications";
+  if (section === "privacy") return tab === "blocked" || tab === "notifications" || tab === "privacy";
   return tab === section;
 }
 
@@ -49,6 +64,11 @@ function defaultTabForSection(section: SettingsSection): SettingsTab {
   if (section === "about") return "about";
   if (section === "contact") return "contact";
   return "blocked";
+}
+
+function SettingsPageTitle({ section }: { section: SettingsSection }) {
+  const title = section === "privacy" ? "设置和隐私" : section === "profile" ? "个人资料" : null;
+  return title ? <div className="page-header"><h1 className="page-title">{title}</h1></div> : null;
 }
 
 function SettingsPageContent({ section }: { section: SettingsSection }) {
@@ -63,7 +83,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [feedbackTypeOpen, setFeedbackTypeOpen] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const feedbackSelectRef = useRef<HTMLDivElement>(null);
-  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; blockedUserId: string; name: string; bio: string }>>([]);
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; blockedUserId: string; name: string; avatarUrl: string | null; bio: string | null; showProfileInfo: boolean }>>([]);
   const [blockedLoading, setBlockedLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -76,10 +96,18 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [notificationMessage, setNotificationMessage] = useState("");
   const [notificationMessageKind, setNotificationMessageKind] = useState<"success" | "error" | "">("");
   const [notificationSaving, setNotificationSaving] = useState(false);
+  const [privacyPreferences, setPrivacyPreferences] = useState<PrivacyPreferences>(defaultPrivacyPreferences);
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [privacyLoadError, setPrivacyLoadError] = useState(false);
+  const [privacyLoadedUserId, setPrivacyLoadedUserId] = useState<string | null>(null);
+  const [privacySaving, setPrivacySaving] = useState(false);
+  const [privacyMessage, setPrivacyMessage] = useState("");
+  const [privacyMessageKind, setPrivacyMessageKind] = useState<"success" | "error" | "">("");
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
   const requestedTab = parseSettingsTab(searchParams.get("tab"));
   const activeTab = isTabForSection(requestedTab, section) ? requestedTab : defaultTabForSection(section);
+  const privacyReady = Boolean(user && privacyLoadedUserId === user.id);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -98,6 +126,50 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   }, [user]);
 
   useEffect(() => {
+    if (!user || section !== "privacy") return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      if (!active) return;
+      setPrivacyLoading(true);
+      setPrivacyLoadError(false);
+      setPrivacyMessage("");
+      setPrivacyMessageKind("");
+      void (async () => {
+        try {
+          const result = await supabase
+            .from("profiles")
+            .select("show_gender, show_profile_info, show_likes, show_bookmarks")
+            .eq("id", user.id)
+            .maybeSingle() as unknown as { data: Partial<PrivacyPreferences> | null; error: { message: string } | null };
+          if (!active) return;
+          if (result.error) {
+            setPrivacyLoadError(true);
+            setPrivacyMessageKind("error");
+            setPrivacyMessage("隐私设置加载失败，请刷新页面重试。若问题持续，请联系支持。");
+          } else {
+            setPrivacyPreferences({
+              show_gender: result.data?.show_gender ?? defaultPrivacyPreferences.show_gender,
+              show_profile_info: result.data?.show_profile_info ?? defaultPrivacyPreferences.show_profile_info,
+              show_likes: result.data?.show_likes ?? defaultPrivacyPreferences.show_likes,
+              show_bookmarks: result.data?.show_bookmarks ?? defaultPrivacyPreferences.show_bookmarks,
+            });
+          }
+          setPrivacyLoadedUserId(user.id);
+        } catch {
+          if (!active) return;
+          setPrivacyLoadError(true);
+          setPrivacyMessageKind("error");
+          setPrivacyMessage("隐私设置加载失败，请刷新页面重试。若问题持续，请联系支持。");
+          setPrivacyLoadedUserId(user.id);
+        } finally {
+          if (active) setPrivacyLoading(false);
+        }
+      })();
+    }, 0);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [section, supabase, user]);
+
+  useEffect(() => {
     if (!user || section !== "privacy" || activeTab !== "blocked") return;
     let active = true;
     void Promise.resolve().then(() => {
@@ -112,10 +184,12 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
       const blockedRows = (blocked || []) as BlockedUserRow[];
       const ids = blockedRows.map((row) => row.blocked_user_id);
       const { data: profiles } = ids.length
-        ? await supabase.from("profiles").select("id, nickname, bio").in("id", ids)
+        ? await supabase.from("profiles").select("id, nickname, avatar_url, show_profile_info").in("id", ids)
         : { data: [] };
       if (!active) return;
       const profileRows = (profiles || []) as BlockedProfileRow[];
+      const bios = await getPublicProfileBios(supabase, profileRows.map((profile) => profile.id));
+      if (!active) return;
       const profileMap = new Map(profileRows.map((item) => [item.id, item]));
       setBlockedUsers(blockedRows.map((row) => {
         const blockedProfile = profileMap.get(row.blocked_user_id);
@@ -124,7 +198,9 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
           id: row.id,
           blockedUserId: row.blocked_user_id,
           name,
-          bio: `屏蔽于 ${new Date(row.created_at).toLocaleDateString("zh-CN")}`,
+          avatarUrl: blockedProfile?.avatar_url || null,
+          bio: blockedProfile ? bios.get(blockedProfile.id) || null : null,
+          showProfileInfo: blockedProfile?.show_profile_info ?? true,
         };
       }));
       setBlockedLoading(false);
@@ -142,9 +218,10 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
     ]
     : moreSettings
       ? []
-      : [
+        : [
         { key: "blocked", label: "屏蔽管理" },
         { key: "notifications", label: "通知设置" },
+        { key: "privacy", label: "隐私设置" },
       ];
 
   const getTabHref = (tab: SettingsTab) => {
@@ -158,6 +235,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
         <div className="main-container">
           <HomeSidebar />
           <div className="content-area">
+            <SettingsPageTitle section={section} />
             <div className="feed-empty-state" role="status" aria-busy="true">
               <span className="auth-spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
               <p className="feed-empty-desc">正在确认登录状态…</p>
@@ -175,6 +253,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
         <div className="main-container">
           <HomeSidebar />
           <div className="content-area">
+            <SettingsPageTitle section={section} />
             <div className="feed-empty-state">
               <div className="feed-empty-illustration">
                 <div className="feed-empty-tag-ring">
@@ -218,11 +297,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
     setFeedbackText("");
     setFeedbackSubmitting(false);
     setTimeout(() => setFeedbackSuccess(""), 3000);
-  };
-
-    const unblockUser = async (blocked: { id: string }) => {
-    const { error } = await supabase.from("blocked_users").delete().eq("id", blocked.id);
-    if (!error) setBlockedUsers((items) => items.filter((item) => item.id !== blocked.id));
   };
 
   const handlePasswordChange = async () => {
@@ -274,13 +348,32 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
     setNotificationSaving(false);
   };
 
+  const handlePrivacyPreferencesSave = async () => {
+    if (!user || !privacyReady || privacyLoadError || privacySaving || privacyLoading) return;
+    setPrivacySaving(true);
+    setPrivacyMessage("");
+    setPrivacyMessageKind("");
+    const { error } = await supabase
+      .from("profiles")
+      .update(privacyPreferences)
+      .eq("id", user.id);
+    if (error) {
+      setPrivacyMessageKind("error");
+      setPrivacyMessage("隐私设置保存失败，请稍后重试。若问题持续，请联系支持。");
+    } else {
+      setPrivacyMessageKind("success");
+      setPrivacyMessage("保存成功");
+    }
+    setPrivacySaving(false);
+  };
+
   return (
     <div id="page-settings" className="min-h-screen bg-paper pb-20 lg:pb-0">
       <div className="main-container">
         <HomeSidebar />
 
         <div className="content-area">
-          {profileSettings && <div className="page-header"><h1 className="page-title">个人资料</h1></div>}
+          <SettingsPageTitle section={section} />
           {/* Tab Bar */}
           {tabs.length > 0 && (
             <div className="tabs-wrapper">
@@ -353,14 +446,15 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
           <div className="settings-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "blocked" ? "block" : "none" }}>
             <div className="user-cards-grid">
               {blockedLoading ? <p className="text-sm text-muted">正在加载…</p> : blockedUsers.map((u) => (
-                <div className="user-card" key={u.id}>
-                  <div className="user-avatar"><DefaultAvatar name={u.name} /></div>
-                  <div className="user-info">
-                    <div className="user-name">{u.name}</div>
-                    <div className="user-bio">{u.bio}</div>
-                  </div>
-                  <button className="btn-unblock" onClick={() => void unblockUser(u)}>取消屏蔽</button>
-                </div>
+                <UserCard
+                  key={u.id}
+                  user={{ id: u.blockedUserId, nickname: u.name, avatar_url: u.avatarUrl, bio: u.bio, show_profile_info: u.showProfileInfo }}
+                  currentUserId={user.id}
+                  isFollowingTab={false}
+                  variant="blocked"
+                  blockedRecordId={u.id}
+                  onUpdate={() => setBlockedUsers((items) => items.filter((item) => item.id !== u.id))}
+                />
               ))}
             </div>
             {!blockedLoading && blockedUsers.length === 0 && (
@@ -380,9 +474,8 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
           </div>
 
           {/* ---- Panel: 通知设置 ---- */}
-          <div className="settings-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "notifications" ? "block" : "none" }}>
+          <div className="settings-panel settings-surface-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "notifications" ? "block" : "none" }}>
             <h2 className="settings-panel-title">通知设置</h2>
-            <p className="settings-panel-desc">只显示你希望接收的站内消息；设置会同步到当前账号。</p>
 
             {notificationPreferenceTypes.map((type: NotificationPreferenceType) => {
               const option = notificationPreferenceLabels[type];
@@ -411,6 +504,48 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               <button type="button" className="settings-btn-save" onClick={() => void handleNotificationPreferencesSave()} disabled={notificationSaving}>
                 {notificationSaving ? "保存中…" : "保存设置"}
               </button>
+            </div>
+          </div>
+
+          {/* ---- Panel: 隐私设置 ---- */}
+          <div className="settings-panel settings-surface-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "privacy" ? "block" : "none" }}>
+            <h2 className="settings-panel-title">隐私设置</h2>
+            <div aria-live="polite" aria-busy={privacyLoading}>
+              {privacyLoading || !privacyReady ? (
+                <p className="settings-toggle-desc" role="status">正在加载隐私设置…</p>
+              ) : privacyLoadError ? (
+                <SettingsStatus kind="error" message={privacyMessage} />
+              ) : (
+                <>
+                  {([
+                    ["show_gender", "显示性别", "在公开个人主页显示你在资料编辑中选择的性别；选择“保密”时不会显示。"],
+                    ["show_profile_info", "显示个人简介", "控制公开个人主页中的简介展示。昵称和头像仍用于识别你的账号。"],
+                    ["show_likes", "显示喜欢", "允许访客查看你点过喜欢的公开作品。"],
+                    ["show_bookmarks", "显示收藏", "允许访客查看你收藏的公开作品。"],
+                  ] as const).map(([key, label, description]) => (
+                    <div className="settings-toggle-row" key={key}>
+                      <div className="settings-toggle-copy">
+                        <div className="settings-toggle-label">{label}</div>
+                        <div className="settings-toggle-desc">{description}</div>
+                      </div>
+                      <label className="settings-toggle-switch" aria-label={label}>
+                        <input
+                          type="checkbox"
+                          checked={privacyPreferences[key]}
+                          onChange={(event) => setPrivacyPreferences((current) => ({ ...current, [key]: event.target.checked }))}
+                        />
+                        <span className="settings-toggle-slider"></span>
+                      </label>
+                    </div>
+                  ))}
+                  <div className="settings-form-actions settings-privacy-actions">
+                    {privacyMessage && <SettingsStatus kind={privacyMessageKind === "error" ? "error" : "success"} message={privacyMessage} />}
+                    <button type="button" className="settings-btn-save" onClick={() => void handlePrivacyPreferencesSave()} disabled={privacySaving}>
+                      {privacySaving ? "保存中…" : "保存设置"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

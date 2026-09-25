@@ -42,13 +42,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 根据 user 拉取 profile（带异常保护）
   const fetchProfile = useCallback(async (userId: string) => {
     try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("nickname, avatar_url, bio, external_link, is_test_account")
-        .eq("id", userId)
-        .single();
+      const [{ data }, { data: bioRows }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("nickname, avatar_url, external_link, is_test_account")
+          .eq("id", userId)
+          .single(),
+        supabase.rpc("get_public_profile_bios", { p_user_ids: [userId] }),
+      ]);
+      const bioRow = Array.isArray(bioRows)
+        ? bioRows.find((entry: { profile_id: string; bio: unknown }) => entry.profile_id === userId)
+        : null;
       return data
-        ? { nickname: data.nickname, avatar_url: data.avatar_url, bio: data.bio, external_link: data.external_link, is_test_account: data.is_test_account === true }
+        ? { nickname: data.nickname, avatar_url: data.avatar_url, bio: typeof bioRow?.bio === "string" ? bioRow.bio : null, external_link: data.external_link, is_test_account: data.is_test_account === true }
         : null;
     } catch {
       return null;

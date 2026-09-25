@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -19,12 +19,14 @@ import { assertCanInteract } from "@/lib/userRestrictions";
 import { assembleSeriesInfo } from "@/lib/seriesInfo";
 import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
+import { getPublicProfileBios } from "@/lib/profile-privacy";
 
 interface FollowUser {
   id: string;
   nickname: string;
   avatar_url: string | null;
   bio: string | null;
+  show_profile_info: boolean;
 }
 
 interface SeriesInfo {
@@ -49,6 +51,7 @@ interface SeriesInfo {
 
 type ProfileFilterType = "all" | "single" | "image" | "series";
 type ProfileSortMode = "latest" | "hot";
+type PublicActivityTab = "likes" | "bookmarks";
 
 const profileWorkFilters: Array<{ key: ProfileFilterType; label: string }> = [
   { key: "all", label: "全部" },
@@ -67,7 +70,16 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const dialog = useAppDialog();
   const [posts, setPosts] = useState<Post[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesInfo[]>([]);
-  const [profile, setProfile] = useState<{ nickname: string; avatar_url: string | null; bio: string | null } | null>(null);
+  const [profile, setProfile] = useState<{
+    nickname: string;
+    avatar_url: string | null;
+    bio: string | null;
+    show_gender: boolean;
+    show_profile_info: boolean;
+    show_likes: boolean;
+    show_bookmarks: boolean;
+    gender: "male" | "female" | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -78,6 +90,10 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [mobileDraftFilter, setMobileDraftFilter] = useState<ProfileFilterType>("all");
   const [mobileDraftSort, setMobileDraftSort] = useState<ProfileSortMode>("latest");
   const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
+  const [activityPosts, setActivityPosts] = useState<Post[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState(false);
+  const [activityRetryKey, setActivityRetryKey] = useState(0);
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [following, setFollowing] = useState<FollowUser[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
@@ -87,60 +103,70 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [blockDialogMessage, setBlockDialogMessage] = useState("");
   const [blockBusy, setBlockBusy] = useState(false);
   const [blockTargetId, setBlockTargetId] = useState<string | null>(null);
+  const profileLoaded = Boolean(profile);
+  const profileActivityVisible = activeTab === "likes" ? Boolean(profile?.show_likes) : activeTab === "bookmarks" ? Boolean(profile?.show_bookmarks) : false;
+  const includeTestDataForViewer = includeTestDataForProfile(currentProfile);
 
   const isOwnProfile = currentUser?.id === id;
 
-  useEffect(() => {
-    if (activeTab === "followers") loadFollowers();
-    else if (activeTab === "following") loadFollowing();
-  }, [activeTab, id, currentProfile?.is_test_account]);
-
-  const loadFollowers = async () => {
+  const loadFollowers = useCallback(async () => {
     setTabLoading(true);
     const { data: fData } = await supabase
       .from("follows")
-      .select("follower_id, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio, is_test_account)")
+      .select("follower_id, profiles!follows_follower_id_fkey(id, nickname, avatar_url, show_profile_info, is_test_account)")
       .eq("following_id", id)
       .limit(50);
     if (fData) {
-      const users = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
-        .filter((f) => f.profiles && (includeTestDataForProfile(currentProfile) || !(f.profiles as { is_test_account?: boolean }).is_test_account))
-        .map((f) => ({
+      const rows = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean } | null }>)
+        .filter((f) => f.profiles && (includeTestDataForViewer || !(f.profiles as { is_test_account?: boolean }).is_test_account))
+      const bios = await getPublicProfileBios(supabase, rows.map((f) => f.profiles!.id));
+      const users = rows.map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
           avatar_url: f.profiles!.avatar_url,
-          bio: f.profiles!.bio,
+          bio: bios.get(f.profiles!.id) || null,
+          show_profile_info: f.profiles!.show_profile_info,
         }));
       setFollowers(users);
     }
     setTabLoading(false);
-  };
+  }, [id, includeTestDataForViewer, supabase]);
 
-  const loadFollowing = async () => {
+  const loadFollowing = useCallback(async () => {
     setTabLoading(true);
     const { data: fData } = await supabase
       .from("follows")
-      .select("following_id, profiles!follows_following_id_fkey(id, nickname, avatar_url, bio, is_test_account)")
+      .select("following_id, profiles!follows_following_id_fkey(id, nickname, avatar_url, show_profile_info, is_test_account)")
       .eq("follower_id", id)
       .limit(50);
     if (fData) {
-      const users = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
-        .filter((f) => f.profiles && (includeTestDataForProfile(currentProfile) || !(f.profiles as { is_test_account?: boolean }).is_test_account))
-        .map((f) => ({
+      const rows = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean } | null }>)
+        .filter((f) => f.profiles && (includeTestDataForViewer || !(f.profiles as { is_test_account?: boolean }).is_test_account))
+      const bios = await getPublicProfileBios(supabase, rows.map((f) => f.profiles!.id));
+      const users = rows.map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
           avatar_url: f.profiles!.avatar_url,
-          bio: f.profiles!.bio,
+          bio: bios.get(f.profiles!.id) || null,
+          show_profile_info: f.profiles!.show_profile_info,
         }));
       setFollowing(users);
     }
     setTabLoading(false);
-  };
+  }, [id, includeTestDataForViewer, supabase]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (activeTab === "followers") void loadFollowers();
+      else if (activeTab === "following") void loadFollowing();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, loadFollowers, loadFollowing]);
 
   useEffect(() => {
     const load = async () => {
-      const includeTestData = includeTestDataForProfile(currentProfile);
-      let profileQuery = supabase.from("profiles").select("nickname, avatar_url, bio").eq("id", id);
+      const includeTestData = includeTestDataForViewer;
+      let profileQuery = supabase.from("profiles").select("nickname, avatar_url, show_gender, show_profile_info, show_likes, show_bookmarks").eq("id", id);
       if (!includeTestData) profileQuery = profileQuery.eq("is_test_account", false);
       const profilePromise = profileQuery.single();
       const postsPromise = withTestDataVisibility(
@@ -162,7 +188,23 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         postsPromise,
         seriesPromise,
       ]);
-      if (prof) setProfile(prof as { nickname: string; avatar_url: string | null; bio: string | null });
+      if (prof) {
+        const profileData = prof as {
+          nickname: string;
+          avatar_url: string | null;
+          show_gender: boolean;
+          show_profile_info: boolean;
+          show_likes: boolean;
+          show_bookmarks: boolean;
+        };
+        const bios = await getPublicProfileBios(supabase, [id]);
+        let gender: "male" | "female" | null = null;
+        if (profileData.show_gender) {
+          const { data: publicGender } = await supabase.rpc("get_public_profile_gender", { p_user_id: id });
+          gender = publicGender === "male" || publicGender === "female" ? publicGender : null;
+        }
+        setProfile({ ...profileData, bio: bios.get(id) || null, gender });
+      }
 
       if (rawData) {
         const rawArr = rawData as unknown as Record<string, unknown>[];
@@ -267,7 +309,87 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       setLoading(false);
     };
     load();
-  }, [id, supabase, currentUser, currentProfile?.is_test_account, isOwnProfile]);
+  }, [id, supabase, currentUser, includeTestDataForViewer, isOwnProfile]);
+
+  useEffect(() => {
+    if (activeTab !== "likes" && activeTab !== "bookmarks") return;
+    if (!profileLoaded) return;
+    const sourceTable: PublicActivityTab = activeTab;
+    if (!profileActivityVisible) return;
+
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setActivityLoading(true);
+      setActivityError(false);
+    });
+    void (async () => {
+      const { data: interactions, error: interactionError } = await supabase
+        .from(sourceTable)
+        .select("post_id, created_at")
+        .eq("user_id", id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (interactionError) throw interactionError;
+      const interactionRows = (interactions || []) as Array<{ post_id: string; created_at: string }>;
+      const postIds = interactionRows.map((row) => row.post_id).filter(Boolean);
+      if (!postIds.length) {
+        if (active) setActivityPosts([]);
+        return;
+      }
+
+      const { data: rawPosts, error: postError } = await withTestDataVisibility(
+        supabase
+          .from("posts")
+          .select("id, title, content, word_count, post_type, created_at, published_at, series_name, chapter_number, cover_url, user_id, post_tags(tags(name)), author:profiles!posts_user_id_fkey(nickname, avatar_url)")
+          .in("id", postIds)
+          .eq("status", "published"),
+        includeTestDataForViewer,
+      );
+      if (postError) throw postError;
+      const orderedRows = ((rawPosts || []) as unknown as Array<Record<string, unknown>>)
+        .sort((left, right) => postIds.indexOf(left.id as string) - postIds.indexOf(right.id as string));
+      const { data: stats } = orderedRows.length
+        ? await supabase
+          .from("post_stats")
+          .select("id, like_count, comment_count, bookmark_count")
+          .in("id", orderedRows.map((post) => post.id as string))
+        : { data: [] };
+      const statsMap = new Map<string, { like_count: number; comment_count: number; bookmark_count: number }>();
+      for (const stat of (stats || []) as Array<Record<string, unknown>>) {
+        statsMap.set(stat.id as string, {
+          like_count: (stat.like_count as number) || 0,
+          comment_count: (stat.comment_count as number) || 0,
+          bookmark_count: (stat.bookmark_count as number) || 0,
+        });
+      }
+      const formatted: Post[] = orderedRows.map((post) => {
+        const tags = (post.post_tags as Array<{ tags: { name: string } | null }> | undefined)?.map((item) => item.tags?.name).filter(Boolean) || [];
+        const author = post.author as { nickname: string; avatar_url: string | null } | null;
+        const postStats = statsMap.get(post.id as string) || { like_count: 0, comment_count: 0, bookmark_count: 0 };
+        return {
+          id: post.id as string,
+          title: (post.title as string) || "无标题",
+          content: slimContent((post.content as string) || ""),
+          cover_url: post.cover_url as string | null,
+          word_count: post.word_count as number,
+          created_at: post.created_at as string,
+          published_at: post.published_at as string | null,
+          user_id: post.user_id as string,
+          series_name: post.series_name as string | null,
+          chapter_number: post.chapter_number as number | null,
+          post_type: post.post_type as Post["post_type"],
+          tags,
+          author: { nickname: author?.nickname || "匿名用户", avatar_url: author?.avatar_url },
+          ...postStats,
+        } as Post;
+      });
+      if (active) setActivityPosts(formatted);
+    })()
+      .catch(() => { if (active) setActivityError(true); })
+      .finally(() => { if (active) setActivityLoading(false); });
+    return () => { active = false; };
+  }, [activeTab, activityRetryKey, id, includeTestDataForViewer, profileActivityVisible, profileLoaded, supabase]);
 
   const handleFollow = async () => {
     if (!currentUser) return;
@@ -363,7 +485,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   };
 
   const displayName = profile?.nickname || "匿名用户";
-  const avatarChar = profile?.nickname?.[0] || "?";
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -394,7 +515,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             </div>
             <div className="profile-info">
               <h1 className="profile-name">{displayName}</h1>
-              <p className="profile-bio">{profile?.bio || "这个人很懒，什么都没写"}</p>
+              {profile?.show_profile_info && <p className="profile-bio">{profile.bio || "这个人很懒，什么都没写"}</p>}
+              {profile?.gender && <p className="profile-gender">{profile.gender === "male" ? "男" : "女"}</p>}
             </div>
           </div>
           {!isOwnProfile && currentUser && (
@@ -444,6 +566,14 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           )}
         </section>
 
+        <div className="tabs-wrapper user-public-tabs" aria-label="个人主页内容">
+          <div className="tabs-inner">
+            <Link href={`/user/${id}`} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
+            {profile?.show_likes && <Link href={`/user/${id}?tab=likes`} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>喜欢</Link>}
+            {profile?.show_bookmarks && <Link href={`/user/${id}?tab=bookmarks`} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>收藏</Link>}
+          </div>
+        </div>
+
         {/* ─── Followers / Following Tab ─── */}
         {(activeTab === "followers" || activeTab === "following") && (
           <div>
@@ -466,7 +596,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-warm">{u.nickname}</div>
-                        {u.bio && <div className="text-xs text-muted truncate">{u.bio}</div>}
+                        {u.show_profile_info && u.bio && <div className="text-xs text-muted truncate">{u.bio}</div>}
                       </div>
                       <SiteIcon name="fa-chevron-right" variant="solid" className="text-xs text-muted" />
                     </Link>
@@ -505,9 +635,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         {/* ─── Works Section ─── */}
         {activeTab !== "followers" && activeTab !== "following" && (
           <>
-            <h2 className="section-title">作品列表</h2>
+            <h2 className="section-title">{activeTab === "likes" ? "喜欢的作品" : activeTab === "bookmarks" ? "收藏的作品" : "作品列表"}</h2>
 
-            <div className="filter-system-composition-row user-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+            {activeTab === "works" && <div className="filter-system-composition-row user-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
               <div className="filter-system-field filter-system-field--query">
                 <div className="profile-filter-search-shell">
                   <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
@@ -519,13 +649,13 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               </div>
               <ProfileFilterSelect label="作品类型" id="user-filter-type-menu" value={filterType} options={profileWorkFilters.map((item) => ({ value: item.key, label: item.key === "all" ? "所有作品" : item.label }))} onChange={(value) => setFilterType(value as ProfileFilterType)} />
               <ProfileFilterSelect label="排序" id="user-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最新发布" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as ProfileSortMode)} />
-            </div>
+            </div>}
 
-            <div className="profile-mobile-filter-bar">
+            {activeTab === "works" && <div className="profile-mobile-filter-bar">
               <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(filterType); setMobileDraftSort(sortMode); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter" variant="default" aria-hidden="true" /></button>
               <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为单列列表"} aria-pressed={mobileCardLayout === "square"}><SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" /></button>
-            </div>
-            {mobileFilterOpen && (
+            </div>}
+            {activeTab === "works" && mobileFilterOpen && (
               <div className="profile-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
                 <section className="profile-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选作品" onClick={(event) => event.stopPropagation()}>
                   <h2>筛选作品</h2>
@@ -535,7 +665,21 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                 </section>
               </div>
             )}
-            <ProfileCardCollection posts={posts} series={seriesList} filter={filterType} query={profileSearch} status="all" sort={sortMode} limit={50} mobileLayout={mobileCardLayout} />
+            {activeTab === "works" ? (
+              <ProfileCardCollection posts={posts} series={seriesList} filter={filterType} query={profileSearch} status="all" sort={sortMode} limit={50} mobileLayout={mobileCardLayout} />
+            ) : activeTab !== "likes" && activeTab !== "bookmarks" ? (
+              <ProfileCardCollection posts={posts} series={seriesList} filter={filterType} query={profileSearch} status="all" sort={sortMode} limit={50} mobileLayout={mobileCardLayout} />
+            ) : !(activeTab === "likes" ? profile?.show_likes : profile?.show_bookmarks) ? (
+              <div className="user-activity-state" role="status"><EmptyState icon="fa-eye-slash" title="此用户未公开该列表" /></div>
+            ) : activityLoading ? (
+              <p className="text-sm text-muted text-center py-8" role="status">正在加载…</p>
+            ) : activityError ? (
+              <div className="user-activity-state" role="alert"><p>列表暂时加载失败，请重试。</p><button type="button" onClick={() => setActivityRetryKey((value) => value + 1)}>重试</button></div>
+            ) : activityPosts.length ? (
+              <ProfileCardCollection posts={activityPosts} series={[]} filter="all" query="" status="all" sort="latest" limit={50} mobileLayout={mobileCardLayout} />
+            ) : (
+              <div className="user-activity-state" role="status"><EmptyState icon={activeTab === "likes" ? "fa-heart" : "fa-bookmark"} title={activeTab === "likes" ? "还没有公开喜欢的作品" : "还没有公开收藏的作品"} /></div>
+            )}
           </>
         )}
         <div className={`modal-overlay${blockDialog ? " active" : ""}`} onClick={() => { if (!blockBusy) setBlockDialog(null); }}>

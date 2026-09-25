@@ -19,6 +19,7 @@ import { SkeletonProfile, SkeletonUserCardList, SkeletonWorksGrid } from "@/comp
 import { slimContent } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
+import { getPublicProfileBios } from "@/lib/profile-privacy";
 
 type FilterType = "all" | "single" | "image" | "series";
 type TabType = "works" | "likes" | "bookmarks" | "following" | "followers";
@@ -69,6 +70,7 @@ interface FollowUser {
   nickname: string;
   avatar_url: string | null;
   bio: string | null;
+  show_profile_info: boolean;
 }
 
 type ProfileSummaryStats = {
@@ -570,18 +572,20 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
     try {
       const { data: fData, error: queryError } = await supabase
         .from("follows")
-        .select("following_id, created_at, profiles!follows_following_id_fkey(id, nickname, avatar_url, bio)")
+        .select("following_id, created_at, profiles!follows_following_id_fkey(id, nickname, avatar_url, show_profile_info)")
         .eq("follower_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
       if (queryError) throw queryError;
-      const users = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
+      const rows = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean } | null }>)
         .filter((f) => f.profiles)
-        .map((f) => ({
+      const bios = await getPublicProfileBios(supabase, rows.map((f) => f.profiles!.id));
+      const users = rows.map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
           avatar_url: f.profiles!.avatar_url,
-          bio: f.profiles!.bio,
+          bio: bios.get(f.profiles!.id) || null,
+          show_profile_info: f.profiles!.show_profile_info,
         }));
       setFollowing(users);
       setFollowingIds(new Set(users.map((u) => u.id)));
@@ -607,7 +611,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
           .eq("follower_id", user.id),
         supabase
           .from("follows")
-          .select("follower_id, created_at, profiles!follows_follower_id_fkey(id, nickname, avatar_url, bio)")
+          .select("follower_id, created_at, profiles!follows_follower_id_fkey(id, nickname, avatar_url, show_profile_info)")
           .eq("following_id", user.id)
           .order("created_at", { ascending: false })
           .limit(50),
@@ -615,13 +619,15 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       if (followingError || followerError) throw followingError || followerError;
       const myFollowingSet = new Set<string>((myFollowing || []).map((f: Record<string, unknown>) => f.following_id as string));
       setFollowingIds(myFollowingSet);
-      const users = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; bio: string | null } | null }>)
+      const rows = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean } | null }>)
         .filter((f) => f.profiles)
-        .map((f) => ({
+      const bios = await getPublicProfileBios(supabase, rows.map((f) => f.profiles!.id));
+      const users = rows.map((f) => ({
           id: f.profiles!.id,
           nickname: f.profiles!.nickname,
           avatar_url: f.profiles!.avatar_url,
-          bio: f.profiles!.bio,
+          bio: bios.get(f.profiles!.id) || null,
+          show_profile_info: f.profiles!.show_profile_info,
         }));
       setFollowers(users);
     } catch {
