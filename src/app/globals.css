@@ -17754,6 +17754,16 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   margin-right: auto;
 }
 
+.account-settings-copyright-actions .settings-status {
+  order: 1;
+  flex: 0 1 auto;
+}
+
+.account-settings-copyright-actions .settings-btn-save {
+  order: 2;
+  flex-shrink: 0;
+}
+
 #page-settings .settings-form-actions {
   justify-content: flex-end;
 }
