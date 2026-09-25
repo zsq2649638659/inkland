@@ -11644,7 +11644,7 @@ p {
 
 /* Panel */
 .settings-panel { animation: settingsFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-.settings-surface-panel { padding:24px;background:var(--color-card); }
+.settings-surface-panel { padding:22px 24px 20px;border:0;border-radius:18px;background:var(--color-card);box-shadow:none; }
 @keyframes settingsFadeIn { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:translateY(0) } }
 .settings-panel-title { font-size:18px;font-weight:700;color:var(--color-text);margin-bottom:6px;letter-spacing:-0.01em }
 .settings-panel-desc { font-size:13px;color:var(--color-text-muted);margin-bottom:24px;line-height:1.6 }
@@ -11984,7 +11984,7 @@ p {
 /* Settings page responsive */
 @media (max-width: 768px) {
   #page-settings .content-area { padding-bottom:40px }
-  #page-settings .settings-surface-panel { padding:16px; }
+  #page-settings .settings-surface-panel { padding:20px; }
   #page-settings .settings-toggle-row { gap:12px; }
   #page-settings .settings-choice-row { align-items:flex-start;flex-direction:column;gap:8px; }
   #page-settings .settings-choice-select { flex:0 0 auto;width:100%;max-width:none; }
@@ -12010,6 +12010,7 @@ p {
 }
 
 @media (max-width: 600px) {
+  #page-settings .settings-surface-panel { padding:16px;border-radius:16px; }
   .account-settings-basic { padding:16px 15px 14px;border-radius:15px; }
   .account-settings-basic-heading { align-items:flex-start;flex-direction:column;gap:4px;margin-bottom:12px; }
   .account-settings-basic .account-settings-identity { align-items:flex-start;gap:8px;padding:13px 0 15px; }

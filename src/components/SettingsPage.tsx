@@ -532,8 +532,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
 
           {/* ---- Panel: 通知设置 ---- */}
           <div className="settings-panel settings-surface-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "notifications" ? "block" : "none" }}>
-            <h2 className="settings-panel-title">通知设置</h2>
-
             {notificationPreferenceTypes.map((type: NotificationPreferenceType) => {
               const option = notificationPreferenceLabels[type];
               return (
@@ -566,7 +564,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
 
           {/* ---- Panel: 隐私设置 ---- */}
           <div className="settings-panel settings-surface-panel" style={{ display: !profileSettings && !moreSettings && activeTab === "privacy" ? "block" : "none" }}>
-            <h2 className="settings-panel-title">隐私设置</h2>
             <div aria-live="polite" aria-busy={privacyLoading}>
               {privacyLoading || !privacyReady ? (
                 <p className="settings-toggle-desc" role="status">正在加载隐私设置…</p>
