@@ -20,6 +20,7 @@ import ImageLightbox from "@/components/ImageLightbox";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import type { Post, Comment } from "@/lib/types";
 import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
+import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 
 interface PostCardProps {
   post: Post;
@@ -208,7 +209,8 @@ export default function PostCard({ post }: PostCardProps) {
       const { error } = await supabase
         .from("follows")
         .insert({ follower_id: user.id, following_id: post.user_id });
-      if (!error) setFollowing(true);
+      if (error) setToastMessage(getSettingsPrivacyErrorMessage(error) || "关注失败，请稍后重试。");
+      else setFollowing(true);
     }
     setFollowLoading(false);
   };
@@ -335,6 +337,8 @@ export default function PostCard({ post }: PostCardProps) {
         post_id: post.id,
         content: commentText.trim(),
       });
+    } else if (error) {
+      setToastMessage(getSettingsPrivacyErrorMessage(error) || "评论发布失败，请稍后重试。");
     }
     setSubmitting(false);
   };
@@ -353,7 +357,7 @@ export default function PostCard({ post }: PostCardProps) {
       .select("id, content, created_at, user_id, parent_id")
       .single();
     if (error || !data) {
-      setToastMessage("回复发布失败，请稍后重试。");
+      setToastMessage(getSettingsPrivacyErrorMessage(error) || "回复发布失败，请稍后重试。");
       return;
     }
     setComments((prev) => [...prev, {

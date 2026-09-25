@@ -19,7 +19,7 @@ import { assertCanInteract } from "@/lib/userRestrictions";
 import { assembleSeriesInfo } from "@/lib/seriesInfo";
 import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
-import { getPublicProfileBios } from "@/lib/profile-privacy";
+import { getPublicProfileBios, getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 
 interface FollowUser {
   id: string;
@@ -78,6 +78,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     show_profile_info: boolean;
     show_likes: boolean;
     show_bookmarks: boolean;
+    show_follow_lists: boolean;
+    allow_follows: boolean;
     gender: "male" | "female" | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,65 +110,61 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const includeTestDataForViewer = includeTestDataForProfile(currentProfile);
 
   const isOwnProfile = currentUser?.id === id;
+  const relationshipListsVisible = isOwnProfile || profile?.show_follow_lists === true;
 
   const loadFollowers = useCallback(async () => {
-    setTabLoading(true);
-    const { data: fData } = await supabase
-      .from("follows")
-      .select("follower_id, profiles!follows_follower_id_fkey(id, nickname, avatar_url, show_profile_info, is_test_account)")
-      .eq("following_id", id)
-      .limit(50);
-    if (fData) {
-      const rows = (fData as unknown as Array<{ follower_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean } | null }>)
-        .filter((f) => f.profiles && (includeTestDataForViewer || !(f.profiles as { is_test_account?: boolean }).is_test_account))
-      const bios = await getPublicProfileBios(supabase, rows.map((f) => f.profiles!.id));
-      const users = rows.map((f) => ({
-          id: f.profiles!.id,
-          nickname: f.profiles!.nickname,
-          avatar_url: f.profiles!.avatar_url,
-          bio: bios.get(f.profiles!.id) || null,
-          show_profile_info: f.profiles!.show_profile_info,
-        }));
-      setFollowers(users);
+    if (!relationshipListsVisible) {
+      setTabLoading(false);
+      return;
     }
+    setTabLoading(true);
+    const { data: fData } = await supabase.rpc("get_public_follow_list", { p_user_id: id, p_direction: "followers" });
+    const rows = (fData || []) as Array<{ profile_id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean; is_test_account: boolean }>;
+    const visibleRows = rows.filter((row) => includeTestDataForViewer || !row.is_test_account);
+    const bios = await getPublicProfileBios(supabase, visibleRows.map((row) => row.profile_id));
+    setFollowers(visibleRows.map((row) => ({
+      id: row.profile_id,
+      nickname: row.nickname,
+      avatar_url: row.avatar_url,
+      bio: bios.get(row.profile_id) || null,
+      show_profile_info: row.show_profile_info,
+    })));
     setTabLoading(false);
-  }, [id, includeTestDataForViewer, supabase]);
+  }, [id, includeTestDataForViewer, relationshipListsVisible, supabase]);
 
   const loadFollowing = useCallback(async () => {
-    setTabLoading(true);
-    const { data: fData } = await supabase
-      .from("follows")
-      .select("following_id, profiles!follows_following_id_fkey(id, nickname, avatar_url, show_profile_info, is_test_account)")
-      .eq("follower_id", id)
-      .limit(50);
-    if (fData) {
-      const rows = (fData as unknown as Array<{ following_id: string; profiles: { id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean } | null }>)
-        .filter((f) => f.profiles && (includeTestDataForViewer || !(f.profiles as { is_test_account?: boolean }).is_test_account))
-      const bios = await getPublicProfileBios(supabase, rows.map((f) => f.profiles!.id));
-      const users = rows.map((f) => ({
-          id: f.profiles!.id,
-          nickname: f.profiles!.nickname,
-          avatar_url: f.profiles!.avatar_url,
-          bio: bios.get(f.profiles!.id) || null,
-          show_profile_info: f.profiles!.show_profile_info,
-        }));
-      setFollowing(users);
+    if (!relationshipListsVisible) {
+      setTabLoading(false);
+      return;
     }
+    setTabLoading(true);
+    const { data: fData } = await supabase.rpc("get_public_follow_list", { p_user_id: id, p_direction: "following" });
+    const rows = (fData || []) as Array<{ profile_id: string; nickname: string; avatar_url: string | null; show_profile_info: boolean; is_test_account: boolean }>;
+    const visibleRows = rows.filter((row) => includeTestDataForViewer || !row.is_test_account);
+    const bios = await getPublicProfileBios(supabase, visibleRows.map((row) => row.profile_id));
+    setFollowing(visibleRows.map((row) => ({
+      id: row.profile_id,
+      nickname: row.nickname,
+      avatar_url: row.avatar_url,
+      bio: bios.get(row.profile_id) || null,
+      show_profile_info: row.show_profile_info,
+    })));
     setTabLoading(false);
-  }, [id, includeTestDataForViewer, supabase]);
+  }, [id, includeTestDataForViewer, relationshipListsVisible, supabase]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (activeTab === "followers") void loadFollowers();
+      if ((activeTab === "followers" || activeTab === "following") && !relationshipListsVisible) setTabLoading(false);
+      else if (activeTab === "followers") void loadFollowers();
       else if (activeTab === "following") void loadFollowing();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [activeTab, loadFollowers, loadFollowing]);
+  }, [activeTab, loadFollowers, loadFollowing, relationshipListsVisible]);
 
   useEffect(() => {
     const load = async () => {
       const includeTestData = includeTestDataForViewer;
-      let profileQuery = supabase.from("profiles").select("nickname, avatar_url, show_gender, show_profile_info, show_likes, show_bookmarks").eq("id", id);
+      let profileQuery = supabase.from("profiles").select("nickname, avatar_url, show_gender, show_profile_info, show_likes, show_bookmarks, show_follow_lists, allow_follows").eq("id", id);
       if (!includeTestData) profileQuery = profileQuery.eq("is_test_account", false);
       const profilePromise = profileQuery.single();
       const postsPromise = withTestDataVisibility(
@@ -196,6 +194,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           show_profile_info: boolean;
           show_likes: boolean;
           show_bookmarks: boolean;
+          show_follow_lists: boolean;
+          allow_follows: boolean;
         };
         const bios = await getPublicProfileBios(supabase, [id]);
         let gender: "male" | "female" | null = null;
@@ -400,6 +400,11 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         setIsFollowing(false);
       }
     } else {
+      if (profile?.allow_follows === false) {
+        dialog.toast("该用户暂不接受新的关注。", "danger");
+        setFollowLoading(false);
+        return;
+      }
       const blocked = await assertCanInteract();
       if (blocked) {
         setFollowLoading(false);
@@ -409,6 +414,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       const { error } = await supabase.from("follows").insert({ follower_id: currentUser.id, following_id: id });
       if (!error) {
         setIsFollowing(true);
+      } else {
+        dialog.toast(getSettingsPrivacyErrorMessage(error) || "关注失败，请稍后重试。", "danger");
       }
     }
     setFollowLoading(false);
@@ -524,12 +531,14 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               <button
                 className={`btn-follow ${isFollowing ? "btn-follow-outline" : "btn-follow-primary"}`}
                 onClick={handleFollow}
-                disabled={followLoading}
+                disabled={followLoading || (!isFollowing && profile?.allow_follows === false)}
               >
                 {followLoading ? (
                   <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />
                 ) : isFollowing ? (
                   <><SiteIcon name="fa-check" variant="solid" /> 已关注</>
+                ) : profile?.allow_follows === false ? (
+                  <>暂不接受关注</>
                 ) : (
                   <><SiteIcon name="fa-plus" variant="solid" /> 关注</>
                 )}
@@ -577,7 +586,11 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         {/* ─── Followers / Following Tab ─── */}
         {(activeTab === "followers" || activeTab === "following") && (
           <div>
-            {tabLoading ? (
+            {!relationshipListsVisible ? (
+              <div className="text-center py-12" role="status">
+                <EmptyState icon="fa-user-shield" title="该用户暂未公开关注和粉丝列表" />
+              </div>
+            ) : tabLoading ? (
               <p className="text-sm text-muted text-center py-8">加载中...</p>
             ) : (activeTab === "followers" ? followers : following).length === 0 ? (
               <div className="text-center py-12">

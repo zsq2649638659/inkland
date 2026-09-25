@@ -12,6 +12,7 @@ import { useAppDialog } from "@/components/AppDialogProvider";
 import { assertCanInteract } from "@/lib/userRestrictions";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 import { loadReadingHistory, type ReadingHistoryRecord } from "@/lib/readingHistory";
+import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 
 interface ChapterInfo {
   id: string;
@@ -191,8 +192,9 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
         dialog.toast(blocked, "danger");
         return;
       }
-      await supabase.from("follows").insert({ follower_id: user.id, following_id: seriesInfo.user_id });
-      setIsFollowing(true);
+      const { error } = await supabase.from("follows").insert({ follower_id: user.id, following_id: seriesInfo.user_id });
+      if (error) dialog.toast(getSettingsPrivacyErrorMessage(error) || "关注失败，请稍后重试。", "danger");
+      else setIsFollowing(true);
     }
   };
 
