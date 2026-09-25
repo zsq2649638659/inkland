@@ -17770,9 +17770,12 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 #page-user .user-activity-state { display:grid;justify-items:center;gap:12px;text-align:center; }
 #page-user .user-activity-state > button { padding:8px 16px;border:1px solid var(--color-border);border-radius:var(--radius-full);background:var(--color-card);color:var(--color-text);font:inherit;cursor:pointer; }
 
-/* Blocked users are intentionally a single vertical list. */
-#page-settings .user-cards-grid {
-  grid-template-columns: 1fr;
+/* Blocked users use the same responsive card grid as following and followers. */
+@media (min-width: 768px) {
+  #page-settings .user-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  #page-settings .user-cards-grid { grid-template-columns: 1fr; }
 }
 
 /* Profile form actions are a regular two-button group, not a card action
