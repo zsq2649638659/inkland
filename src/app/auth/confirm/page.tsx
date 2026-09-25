@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 
 type ConfirmationFlow = "signup" | "email-change";
 type ConfirmationState = "checking" | "awaiting" | "success" | "pending" | "error";
-type ConfirmationIssue = "link-used-or-expired" | "exchange-failed" | "unknown";
+type ConfirmationIssue = "link-used-or-expired" | "exchange-failed" | "verification-failed" | "unknown";
 type PendingEmailConfirmation = {
   flow: ConfirmationFlow;
   tokenHash: string;
@@ -29,17 +29,31 @@ function isConfirmationFlow(value: string | null): value is ConfirmationFlow {
   return value === "signup" || value === "email-change";
 }
 
+function isExpiredAuthError(error: { code?: string; message?: string } | null) {
+  return /otp_expired|expired|invalid/i.test(`${error?.code || ""} ${error?.message || ""}`);
+}
+
+function getAuthErrorCode(error: { code?: string; status?: number } | null) {
+  return error?.code?.trim() || (error?.status ? `HTTP_${error.status}` : "VERIFY_FAILED");
+}
+
 function cleanConfirmationUrl(
   flow: ConfirmationFlow,
   result: ConfirmationState,
-  issue?: ConfirmationIssue
+  issue?: ConfirmationIssue,
+  errorCode?: string
 ) {
   const cleanUrl = new URL("/auth/confirm", window.location.origin);
   cleanUrl.searchParams.set("flow", flow);
   window.history.replaceState(
     {
       ...(window.history.state || {}),
-      inklandEmailConfirmation: { flow, result, ...(issue ? { issue } : {}) },
+      inklandEmailConfirmation: {
+        flow,
+        result,
+        ...(issue ? { issue } : {}),
+        ...(errorCode ? { errorCode } : {}),
+      },
     },
     "",
     `${cleanUrl.pathname}${cleanUrl.search}`
@@ -79,6 +93,7 @@ export default function AuthConfirmPage() {
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingEmailConfirmation | null>(null);
   const [confirmationIssue, setConfirmationIssue] = useState<ConfirmationIssue>("unknown");
+  const [confirmationErrorCode, setConfirmationErrorCode] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -101,6 +116,7 @@ export default function AuthConfirmPage() {
         flow?: string;
         result?: string;
         issue?: ConfirmationIssue;
+        errorCode?: string;
       } | undefined;
       const previousResult = storedConfirmation?.flow === currentFlow
         ? storedConfirmation.result
@@ -109,6 +125,7 @@ export default function AuthConfirmPage() {
         const pending = readPendingConfirmation();
         if (pending?.flow === currentFlow) {
           setPendingConfirmation(pending);
+          setConfirmationErrorCode(storedConfirmation?.errorCode ?? "");
           setResult("awaiting");
         } else {
           cleanConfirmationUrl(currentFlow, "error", "unknown");
@@ -119,7 +136,10 @@ export default function AuthConfirmPage() {
       }
       if (previousResult === "success" || previousResult === "pending" || previousResult === "error") {
         setResult(previousResult);
-        if (previousResult === "error") setConfirmationIssue(storedConfirmation?.issue ?? "unknown");
+        if (previousResult === "error") {
+          setConfirmationIssue(storedConfirmation?.issue ?? "unknown");
+          setConfirmationErrorCode(storedConfirmation?.errorCode ?? "");
+        }
         if (previousResult !== "error") {
           const { data } = await supabase.auth.getUser();
           if (active) setConfirmedUser(data.user);
@@ -131,15 +151,20 @@ export default function AuthConfirmPage() {
         const errorCode = query.get("error_code") || "";
         const errorDescription = query.get("error_description") || "";
         const looksExpired = /otp_expired|expired|invalid/i.test(`${errorCode} ${errorDescription}`);
-        const issue = looksExpired ? "link-used-or-expired" : "unknown";
+        const issue = looksExpired
+          ? "link-used-or-expired"
+          : errorCode || errorDescription
+            ? "verification-failed"
+            : "unknown";
         setConfirmationIssue(issue);
-        cleanConfirmationUrl(currentFlow, "error", issue);
+        setConfirmationErrorCode(errorCode || (errorDescription ? "SUPABASE_REDIRECT_ERROR" : ""));
+        cleanConfirmationUrl(currentFlow, "error", issue, errorCode || undefined);
         if (active) setResult("error");
         return;
       }
 
       let confirmedUserResult: User | null = null;
-      let authError: { message: string } | null = null;
+      let authError: { message: string; code?: string; status?: number } | null = null;
 
       const code = query.get("code");
       const tokenHash = query.get("token_hash");
@@ -182,9 +207,15 @@ export default function AuthConfirmPage() {
       }
 
       if (authError) {
-        const issue = code ? "exchange-failed" : "link-used-or-expired";
+        const issue = code
+          ? "exchange-failed"
+          : isExpiredAuthError(authError)
+            ? "link-used-or-expired"
+            : "verification-failed";
+        const errorCode = getAuthErrorCode(authError);
         setConfirmationIssue(issue);
-        cleanConfirmationUrl(currentFlow, "error", issue);
+        setConfirmationErrorCode(errorCode);
+        cleanConfirmationUrl(currentFlow, "error", issue, errorCode);
         if (active) setResult("error");
         return;
       }
@@ -196,7 +227,8 @@ export default function AuthConfirmPage() {
       if (!confirmedUserResult) {
         const issue = code ? "exchange-failed" : "unknown";
         setConfirmationIssue(issue);
-        cleanConfirmationUrl(currentFlow, "error", issue);
+        setConfirmationErrorCode("MISSING_USER");
+        cleanConfirmationUrl(currentFlow, "error", issue, "MISSING_USER");
         if (active) setResult("error");
         return;
       }
@@ -231,6 +263,7 @@ export default function AuthConfirmPage() {
   const completeManualConfirmation = async () => {
     if (!pendingConfirmation || result !== "awaiting") return;
     setResult("checking");
+    setConfirmationErrorCode("");
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.verifyOtp({
@@ -240,8 +273,15 @@ export default function AuthConfirmPage() {
       if (error || !data.user) {
         clearPendingConfirmation();
         setPendingConfirmation(null);
-        setConfirmationIssue("link-used-or-expired");
-        cleanConfirmationUrl(pendingConfirmation.flow, "error", "link-used-or-expired");
+        const issue = error
+          ? isExpiredAuthError(error)
+            ? "link-used-or-expired"
+            : "verification-failed"
+          : "verification-failed";
+        const errorCode = error ? getAuthErrorCode(error) : "MISSING_USER";
+        setConfirmationIssue(issue);
+        setConfirmationErrorCode(errorCode);
+        cleanConfirmationUrl(pendingConfirmation.flow, "error", issue, errorCode);
         setFlow(pendingConfirmation.flow);
         setResult("error");
         return;
@@ -258,12 +298,11 @@ export default function AuthConfirmPage() {
       setConfirmedUser(data.user);
       setResult(confirmationResult);
     } catch {
-      clearPendingConfirmation();
-      setPendingConfirmation(null);
-      setConfirmationIssue("unknown");
-      cleanConfirmationUrl(pendingConfirmation.flow, "error", "unknown");
+      setConfirmationIssue("verification-failed");
+      setConfirmationErrorCode("NETWORK_OR_CLIENT_ERROR");
+      cleanConfirmationUrl(pendingConfirmation.flow, "awaiting", undefined, "NETWORK_OR_CLIENT_ERROR");
       setFlow(pendingConfirmation.flow);
-      setResult("error");
+      setResult("awaiting");
     }
   };
 
@@ -306,15 +345,19 @@ export default function AuthConfirmPage() {
   const message = result === "checking"
     ? "请稍候，完成后会告诉你下一步。"
     : result === "awaiting"
-      ? "为防止邮件安全扫描提前使用验证链接，请点击下方按钮完成邮箱验证。"
+      ? confirmationErrorCode
+        ? `刚才的验证请求未能完成（${confirmationErrorCode}）。请检查网络后重试。`
+        : "为防止邮件安全扫描提前使用验证链接，请点击下方按钮完成邮箱验证。"
     : isError
       ? confirmationIssue === "exchange-failed" && flow === "signup"
-        ? "邮箱链接已通过验证，但当前浏览器未能完成登录。请返回登录页，用注册时设置的密码继续。"
+          ? "邮箱链接已通过验证，但当前浏览器未能完成登录。请返回登录页，用注册时设置的密码继续。"
         : confirmationIssue === "link-used-or-expired" && flow === "signup"
           ? "验证链接可能已被邮件安全扫描提前访问，或已经过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
           : flow === "email-change"
             ? confirmationIssue === "link-used-or-expired"
-              ? "邮箱验证链接可能已被邮件安全扫描提前访问，或已经过期。请回到编辑资料重新提交邮箱，并在新页面点击确认。"
+              ? "这个验证链接已被使用、失效或过期。请回到编辑资料点击“重新发送验证邮件”，并只使用最新收到的邮件。"
+              : confirmationIssue === "verification-failed"
+                ? `验证服务未完成这次邮箱更换${confirmationErrorCode ? `（错误代码：${confirmationErrorCode}）` : ""}。请把错误代码告诉我们，再重新发送最新验证邮件。`
               : "邮箱验证暂未完成。请回到编辑资料重新提交邮箱，再使用最新的验证邮件。"
             : "验证链接无效或已过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
       : flow === "email-change"

@@ -78,7 +78,8 @@ export default function ProfileEditForm() {
   const [revisionStatus, setRevisionStatus] = useState<string | null>(null);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
-  const [emailValue, setEmailValue] = useState(user?.email || "");
+  const [pendingEmail, setPendingEmail] = useState(user?.new_email || "");
+  const [emailValue, setEmailValue] = useState(user?.new_email || user?.email || "");
 
   const nicknameLength = Array.from(nickname).length;
   const bioLength = Array.from(bio).length;
@@ -88,7 +89,10 @@ export default function ProfileEditForm() {
     || (avatarUrl || null) !== baseline.avatar_url
     || gender !== baseline.gender
     || (birthDate || null) !== baseline.birth_date
-    || normalizeEmail(emailValue) !== baseline.email
+    || (
+      normalizeEmail(emailValue) !== baseline.email
+      && normalizeEmail(emailValue) !== normalizeEmail(pendingEmail)
+    )
   ));
 
   useLayoutEffect(() => {
@@ -105,7 +109,9 @@ export default function ProfileEditForm() {
     const accountPreferences = readAccountPreferences(user);
     setGender(accountPreferences.gender);
     setBirthDate(accountPreferences.birth_date || "");
-    setEmailValue(user.email || "");
+    const requestedEmail = user.new_email || "";
+    setPendingEmail(requestedEmail);
+    setEmailValue(requestedEmail || user.email || "");
     setBaseline({
       nickname: profile?.nickname || "",
       bio: profile?.bio || null,
@@ -347,9 +353,12 @@ export default function ProfileEditForm() {
         setRevisionStatus("submitted");
       }
 
-      const emailChanged = normalizeEmail(trimmedEmail) !== nextBaseline.email;
+      const normalizedEmail = normalizeEmail(trimmedEmail);
+      const currentEmail = normalizeEmail(user?.email || nextBaseline.email);
+      const normalizedPendingEmail = normalizeEmail(pendingEmail);
+      const emailChanged = normalizedEmail !== currentEmail && normalizedEmail !== normalizedPendingEmail;
       if (emailChanged) {
-        const { error: emailError } = await supabase.auth.updateUser(
+        const { data: emailUpdateData, error: emailError } = await supabase.auth.updateUser(
           { email: trimmedEmail },
           { emailRedirectTo: new URL("/auth/confirm?flow=email-change", window.location.origin).toString() }
         );
@@ -358,10 +367,12 @@ export default function ProfileEditForm() {
           setError(`邮箱修改失败：${emailError.message}`);
           return false;
         }
-        nextBaseline = { ...nextBaseline, email: normalizeEmail(trimmedEmail) };
-        setBaseline(nextBaseline);
+        const requestedEmail = emailUpdateData.user?.new_email || trimmedEmail;
+        setPendingEmail(requestedEmail);
         setEmailValue(trimmedEmail);
-        setSuccess("验证邮件已发送，请按邮件提示完成验证后更换绑定邮箱。");
+        setSuccess("验证邮件已发送；当前绑定邮箱尚未更改，请完成邮件确认后再查看结果。");
+      } else if (pendingEmail) {
+        setSuccess(`资料已保存。邮箱更换为 ${pendingEmail} 仍待验证；当前绑定邮箱尚未更改。`);
       } else {
         setSuccess("保存成功");
       }
@@ -376,6 +387,31 @@ export default function ProfileEditForm() {
     }
   };
 
+  const handleResendEmailVerification = async () => {
+    if (!pendingEmail || saving) return;
+    setSaving(true);
+    setError("");
+    setErrorKind("");
+    setSuccess("");
+    try {
+      const { error: emailError } = await supabase.auth.updateUser(
+        { email: pendingEmail },
+        { emailRedirectTo: new URL("/auth/confirm?flow=email-change", window.location.origin).toString() }
+      );
+      if (emailError) {
+        setErrorKind("error");
+        setError(`重新发送验证邮件失败：${emailError.message}`);
+        return;
+      }
+      setSuccess("验证邮件已重新发送。请只使用最新邮件中的确认链接。");
+    } catch {
+      setErrorKind("error");
+      setError("重新发送验证邮件失败，请检查网络后重试。");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleCancel = () => {
     setNickname(baseline.nickname);
     setBio(limitBioLength(baseline.bio));
@@ -383,7 +419,7 @@ export default function ProfileEditForm() {
     setAvatarUrl(baseline.avatar_url || "");
     setGender(baseline.gender);
     setBirthDate(baseline.birth_date || "");
-    setEmailValue(baseline.email);
+    setEmailValue(pendingEmail || baseline.email);
     setError("");
     setErrorKind("");
     setSuccess("");
@@ -555,7 +591,23 @@ export default function ProfileEditForm() {
                   value={emailValue}
                   onChange={(event) => setEmailValue(event.target.value)}
                 />
-                <p className="profile-email-hint">保存后按验证邮件提示完成操作，验证通过后才会更新绑定邮箱。</p>
+                {pendingEmail ? (
+                  <div className="profile-email-pending" aria-live="polite">
+                    <p className="profile-email-hint">
+                      当前绑定邮箱：{user?.email || baseline.email}。待验证新邮箱：{pendingEmail}；确认完成后才会更新。
+                    </p>
+                    <button
+                      type="button"
+                      className="profile-email-resend"
+                      onClick={() => void handleResendEmailVerification()}
+                      disabled={saving}
+                    >
+                      {saving ? "发送中…" : "重新发送验证邮件"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="profile-email-hint">保存后按验证邮件提示完成操作，验证通过后才会更新绑定邮箱。</p>
+                )}
               </div>
               </section>
 
