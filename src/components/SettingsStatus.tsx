@@ -1,3 +1,5 @@
+import SiteIcon from "@/components/SiteIcon";
+
 type SettingsStatusKind = "success" | "warning" | "error";
 
 type SettingsStatusProps = {
@@ -11,7 +13,7 @@ export default function SettingsStatus({ kind, message }: SettingsStatusProps) {
     : kind === "warning"
       ? "fa-circle-exclamation"
       : "fa-circle-xmark";
-  const statusClass = kind === "success" ? "" : ` settings-status-${kind}`;
+  const statusClass = ` settings-status-${kind}`;
 
   return (
     <div className={`settings-status${statusClass}`} role={kind === "success" ? "status" : "alert"}>
@@ -22,4 +24,3 @@ export default function SettingsStatus({ kind, message }: SettingsStatusProps) {
     </div>
   );
 }
-import SiteIcon from "@/components/SiteIcon";
