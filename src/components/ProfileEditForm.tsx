@@ -5,6 +5,7 @@ import Radio from "@/components/inkland/Radio";
 import { useEffect, useLayoutEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/browser";
+import { createClient as createPasswordVerifierClient } from "@supabase/supabase-js";
 import { useAuth } from "@/components/AuthProvider";
 import { compressImage } from "@/lib/image";
 import DefaultAvatar from "@/components/DefaultAvatar";
@@ -34,6 +35,31 @@ type PendingNavigation = { href: string; replace: boolean };
 
 function normalizeEmail(value: string | null | undefined) {
   return value?.trim().toLowerCase() || "";
+}
+
+async function verifyCurrentPassword(email: string, password: string, expectedUserId: string) {
+  const verifier = createPasswordVerifierClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+
+  try {
+    const { data, error } = await verifier.auth.signInWithPassword({ email, password });
+    if (error) return { valid: false as const, reason: "invalid" as const };
+    if (data.user?.id !== expectedUserId) return { valid: false as const, reason: "different-account" as const };
+    return { valid: true as const };
+  } catch {
+    return { valid: false as const, reason: "unavailable" as const };
+  } finally {
+    await verifier.auth.signOut({ scope: "local" }).catch(() => undefined);
+  }
 }
 
 const genderOptions = [
@@ -80,6 +106,8 @@ export default function ProfileEditForm() {
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [pendingEmail, setPendingEmail] = useState(user?.new_email || "");
   const [emailValue, setEmailValue] = useState(user?.new_email || user?.email || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const nicknameLength = Array.from(nickname).length;
   const bioLength = Array.from(bio).length;
@@ -286,6 +314,11 @@ export default function ProfileEditForm() {
       return false;
     }
 
+    const normalizedEmail = normalizeEmail(trimmedEmail);
+    const currentEmail = normalizeEmail(user.email || baseline.email);
+    const normalizedPendingEmail = normalizeEmail(pendingEmail);
+    const emailChanged = normalizedEmail !== currentEmail && normalizedEmail !== normalizedPendingEmail;
+
     setSaving(true);
     setError("");
     setErrorKind("");
@@ -297,6 +330,11 @@ export default function ProfileEditForm() {
         setErrorKind("error");
         setError(blocked);
         return false;
+      }
+
+      if (emailChanged) {
+        const verified = await verifyEmailChangePassword();
+        if (!verified) return false;
       }
 
       const normalizedBio = limitBioLength(bio.trim()) || null;
@@ -353,10 +391,6 @@ export default function ProfileEditForm() {
         setRevisionStatus("submitted");
       }
 
-      const normalizedEmail = normalizeEmail(trimmedEmail);
-      const currentEmail = normalizeEmail(user?.email || nextBaseline.email);
-      const normalizedPendingEmail = normalizeEmail(pendingEmail);
-      const emailChanged = normalizedEmail !== currentEmail && normalizedEmail !== normalizedPendingEmail;
       if (emailChanged) {
         const { data: emailUpdateData, error: emailError } = await supabase.auth.updateUser(
           { email: trimmedEmail },
@@ -370,6 +404,8 @@ export default function ProfileEditForm() {
         const requestedEmail = emailUpdateData.user?.new_email || trimmedEmail;
         setPendingEmail(requestedEmail);
         setEmailValue(trimmedEmail);
+        setCurrentPassword("");
+        setPasswordError("");
         setSuccess("验证邮件已发送；当前绑定邮箱尚未更改，请完成邮件确认后再查看结果。");
       } else if (pendingEmail) {
         setSuccess(`资料已保存。邮箱更换为 ${pendingEmail} 仍待验证；当前绑定邮箱尚未更改。`);
@@ -394,6 +430,8 @@ export default function ProfileEditForm() {
     setErrorKind("");
     setSuccess("");
     try {
+      const verified = await verifyEmailChangePassword();
+      if (!verified) return;
       const { error: emailError } = await supabase.auth.updateUser(
         { email: pendingEmail },
         { emailRedirectTo: new URL("/auth/confirm?flow=email-change", window.location.origin).toString() }
@@ -403,6 +441,8 @@ export default function ProfileEditForm() {
         setError(`重新发送验证邮件失败：${emailError.message}`);
         return;
       }
+      setCurrentPassword("");
+      setPasswordError("");
       setSuccess("验证邮件已重新发送。请只使用最新邮件中的确认链接。");
     } catch {
       setErrorKind("error");
@@ -410,6 +450,40 @@ export default function ProfileEditForm() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const verifyEmailChangePassword = async () => {
+    if (!currentPassword) {
+      const message = "更换邮箱前请输入当前密码。";
+      setPasswordError(message);
+      setErrorKind("warning");
+      setError(message);
+      return false;
+    }
+
+    setPasswordError("");
+    const verification = await verifyCurrentPassword(user.email || "", currentPassword, user.id);
+    if (!verification.valid) {
+      const message = verification.reason === "different-account"
+        ? "当前登录账号已变化，请重新登录后再更换邮箱。"
+        : verification.reason === "unavailable"
+          ? "暂时无法验证当前密码，请检查网络后重试。"
+          : "当前密码不正确，请检查后重试。";
+      setPasswordError(message);
+      setErrorKind("error");
+      setError(message);
+      return false;
+    }
+
+    const { data, error: sessionError } = await supabase.auth.getUser();
+    if (sessionError || data.user?.id !== user.id) {
+      const message = "登录状态已变化，请重新登录后再更换邮箱。";
+      setPasswordError(message);
+      setErrorKind("error");
+      setError(message);
+      return false;
+    }
+    return true;
   };
 
   const handleCancel = () => {
@@ -420,6 +494,8 @@ export default function ProfileEditForm() {
     setGender(baseline.gender);
     setBirthDate(baseline.birth_date || "");
     setEmailValue(pendingEmail || baseline.email);
+    setCurrentPassword("");
+    setPasswordError("");
     setError("");
     setErrorKind("");
     setSuccess("");
@@ -589,7 +665,11 @@ export default function ProfileEditForm() {
                   autoComplete="email"
                   required
                   value={emailValue}
-                  onChange={(event) => setEmailValue(event.target.value)}
+                  onChange={(event) => {
+                    setEmailValue(event.target.value);
+                    setCurrentPassword("");
+                    setPasswordError("");
+                  }}
                 />
                 {pendingEmail ? (
                   <div className="profile-email-pending" aria-live="polite">
@@ -609,6 +689,32 @@ export default function ProfileEditForm() {
                   <p className="profile-email-hint">保存后按验证邮件提示完成操作，验证通过后才会更新绑定邮箱。</p>
                 )}
               </div>
+              {(pendingEmail || normalizeEmail(emailValue) !== normalizeEmail(user.email || baseline.email)) && (
+                <div className="field-group profile-email-password-field">
+                  <label htmlFor="profile-email-current-password" className="field-label">当前密码</label>
+                  <input
+                    id="profile-email-current-password"
+                    name="profile-email-current-password"
+                    type="password"
+                    className={`field-input${passwordError ? " error" : ""}`}
+                    autoComplete="current-password"
+                    aria-invalid={Boolean(passwordError)}
+                    aria-describedby={passwordError ? "profile-email-password-error" : "profile-email-password-hint"}
+                    value={currentPassword}
+                    onChange={(event) => {
+                      setCurrentPassword(event.target.value);
+                      setPasswordError("");
+                      setError("");
+                      setErrorKind("");
+                    }}
+                  />
+                  {passwordError ? (
+                    <span id="profile-email-password-error" className="profile-email-password-error" role="alert">{passwordError}</span>
+                  ) : (
+                    <p id="profile-email-password-hint" className="profile-email-hint">更换邮箱前用于确认当前账号身份。</p>
+                  )}
+                </div>
+              )}
               </section>
 
               {/* Actions */}
