@@ -270,15 +270,13 @@ export default function AuthConfirmPage() {
         token_hash: pendingConfirmation.tokenHash,
         type: pendingConfirmation.type,
       });
-      if (error || !data.user) {
+      if (error) {
         clearPendingConfirmation();
         setPendingConfirmation(null);
-        const issue = error
-          ? isExpiredAuthError(error)
-            ? "link-used-or-expired"
-            : "verification-failed"
+        const issue = isExpiredAuthError(error)
+          ? "link-used-or-expired"
           : "verification-failed";
-        const errorCode = error ? getAuthErrorCode(error) : "MISSING_USER";
+        const errorCode = getAuthErrorCode(error);
         setConfirmationIssue(issue);
         setConfirmationErrorCode(errorCode);
         cleanConfirmationUrl(pendingConfirmation.flow, "error", issue, errorCode);
@@ -289,6 +287,23 @@ export default function AuthConfirmPage() {
 
       clearPendingConfirmation();
       setPendingConfirmation(null);
+      if (!data.user && pendingConfirmation.flow === "email-change") {
+        // Supabase returns a successful no-user response after the first of two secure email confirmations.
+        cleanConfirmationUrl(pendingConfirmation.flow, "pending");
+        setFlow(pendingConfirmation.flow);
+        setResult("pending");
+        return;
+      }
+      if (!data.user) {
+        const errorCode = "MISSING_USER";
+        setConfirmationIssue("verification-failed");
+        setConfirmationErrorCode(errorCode);
+        cleanConfirmationUrl(pendingConfirmation.flow, "error", "verification-failed", errorCode);
+        setFlow(pendingConfirmation.flow);
+        setResult("error");
+        return;
+      }
+
       const confirmationResult: ConfirmationState = pendingConfirmation.flow === "email-change"
         && Boolean(data.user.new_email)
         ? "pending"
@@ -340,7 +355,7 @@ export default function AuthConfirmPage() {
     : isError
       ? "邮箱验证未完成"
       : flow === "email-change"
-        ? isPending ? "本次邮箱验证已完成" : "绑定邮箱已更新"
+        ? isPending ? "此邮箱已确认，还需确认另一邮箱" : "绑定邮箱已更新"
         : "注册邮箱验证成功";
   const message = result === "checking"
     ? "请稍候，完成后会告诉你下一步。"
@@ -362,7 +377,7 @@ export default function AuthConfirmPage() {
             : "验证链接无效或已过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
       : flow === "email-change"
         ? isPending
-          ? "为保护账号安全，若你还收到另一封确认邮件，也需要完成其中的验证；全部确认后新邮箱才会生效。"
+          ? "这封邮件的验证已通过。请在另一邮箱（通常是原绑定邮箱）中完成另一封确认邮件；两边确认后，新邮箱才会生效。"
           : "新邮箱已验证，并已成为当前账号的绑定邮箱。"
         : "账号已激活，可以进入 Inkland 继续使用。";
   const actionLabel = result === "checking"
