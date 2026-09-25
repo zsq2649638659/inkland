@@ -1,4 +1,4 @@
-import { SettingsSectionPage } from "@/app/settings/page";
+import { SettingsSectionPage } from "@/components/SettingsPage";
 
 export default function AboutPage() {
   return <SettingsSectionPage section="about" />;

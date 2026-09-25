@@ -18,6 +18,7 @@ import { assertCanComment, assertCanInteract } from "@/lib/userRestrictions";
 import SiteDialog, { useSiteDialog } from "@/components/SiteDialog";
 import type { Comment, Post } from "@/lib/types";
 import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
+import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 import "@/app/home-lightbox.css";
 
 interface ImageLightboxProps {
@@ -134,6 +135,7 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
     const query = supabase.from("follows");
     const result = following ? await query.delete().eq("follower_id", user.id).eq("following_id", authorId) : await query.insert({ follower_id: user.id, following_id: authorId });
     if (!result.error) setFollowing(!following);
+    else setToast(getSettingsPrivacyErrorMessage(result.error) || "关注失败，请稍后重试。");
   };
 
   const submitComment = async () => {
@@ -149,6 +151,8 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
     if (!error && data) {
       setComments((items) => [{ id: data.id as string, post_id: post.id, user_id: user.id, parent_id: null, paragraph_index: null, content: text, created_at: data.created_at as string, author: { nickname: profile?.nickname || "我", avatar_url: profile?.avatar_url || null } }, ...items]);
       setCommentText(""); setCommentCount((value) => value + 1);
+    } else if (error) {
+      setToast(getSettingsPrivacyErrorMessage(error) || "评论发布失败，请稍后重试。");
     }
     setSubmitting(false);
   };
@@ -165,6 +169,8 @@ export default function ImageLightbox({ post, images, initialIndex = 0, onClose 
     if (!error && data) {
       setComments((items) => [...items, { id: data.id as string, post_id: post.id, user_id: user.id, parent_id: parentId, paragraph_index: null, content: storedContent, created_at: data.created_at as string, author: { nickname: profile?.nickname || "我", avatar_url: profile?.avatar_url || null } }]);
       setCommentCount((value) => value + 1);
+    } else if (error) {
+      setToast(getSettingsPrivacyErrorMessage(error) || "回复发布失败，请稍后重试。");
     }
   };
 

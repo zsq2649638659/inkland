@@ -22,6 +22,7 @@ import { isSafeExternalImageUrl, renderSafeInlineMarkdown, renderSafeMarkdown } 
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 import { loadReadingHistory, saveReadingHistory } from "@/lib/readingHistory";
+import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 import DetailFloatingActions from "@/components/DetailFloatingActions";
 import ChapterNav from "@/components/ChapterNav";
 
@@ -359,6 +360,8 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
         post_id: post.id,
         content: commentText.trim(),
       });
+    } else {
+      showToast(getSettingsPrivacyErrorMessage(error) || "评论发布失败，请稍后重试。");
     }
     setCommentLoading(false);
   };
@@ -1083,6 +1086,8 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                                     post_id: post.id,
                                     content: replyText.trim(),
                                   });
+                                } else {
+                                  showToast(getSettingsPrivacyErrorMessage(error) || "回复发布失败，请稍后重试。");
                                 }
                                 setCommentLoading(false);
                               }}

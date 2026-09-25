@@ -15,11 +15,14 @@ interface FollowUser {
   nickname: string;
   avatar_url: string | null;
   bio: string | null;
+  show_profile_info?: boolean;
 }
 
 interface UserCardProps {
   user: FollowUser;
   currentUserId: string;
+  variant?: "relationship" | "blocked";
+  blockedRecordId?: string;
   /** true = 关注tab, false = 粉丝tab */
   isFollowingTab: boolean;
   /** 是否已关注该用户 */
@@ -31,7 +34,7 @@ interface UserCardProps {
   onUpdate: () => void;
 }
 
-export default function UserCard({ user, currentUserId, isFollowingTab, isFollowed, selectable = false, selected = false, onToggleSelect, onUpdate }: UserCardProps) {
+export default function UserCard({ user, currentUserId, variant = "relationship", blockedRecordId, isFollowingTab, isFollowed, selectable = false, selected = false, onToggleSelect, onUpdate }: UserCardProps) {
   const supabase = createClient();
   const dialog = useAppDialog();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -54,6 +57,29 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
 
   const handleRelationshipAction = async () => {
     if (relationshipActionLoading) return;
+    if (variant === "blocked") {
+      if (!blockedRecordId) return;
+      setRelationshipActionLoading(true);
+      try {
+        const { error } = await supabase
+          .from("blocked_users")
+          .delete()
+          .eq("id", blockedRecordId)
+          .eq("user_id", currentUserId);
+        if (error) throw error;
+        onUpdate();
+        dialog.toast("已取消屏蔽");
+      } catch (actionError) {
+        await dialog.alert({
+          title: "取消屏蔽失败",
+          message: actionError instanceof Error && actionError.message ? actionError.message : "请稍后重试。",
+          variant: "danger",
+        });
+      } finally {
+        setRelationshipActionLoading(false);
+      }
+      return;
+    }
     const shouldUnfollow = isFollowingTab || Boolean(isFollowed);
     setRelationshipActionLoading(true);
     try {
@@ -104,12 +130,12 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
   };
 
   // 按钮文字
-  const shouldUnfollow = isFollowingTab || Boolean(isFollowed);
-  const btnText = relationshipActionLoading ? "处理中…" : shouldUnfollow ? "取消关注" : "回关";
+  const shouldUnfollow = variant === "blocked" || isFollowingTab || Boolean(isFollowed);
+  const btnText = relationshipActionLoading ? "处理中…" : variant === "blocked" ? "取消屏蔽" : shouldUnfollow ? "取消关注" : "回关";
 
   return (
     <div
-      className={`user-card${moreOpen ? " show-popup" : ""}${selectable ? " user-card--selectable" : ""}${selected ? " selected" : ""}`}
+      className={`user-card${moreOpen ? " show-popup" : ""}${selectable ? " user-card--selectable" : ""}${selected ? " selected" : ""}${variant === "blocked" ? " user-card--blocked" : ""}`}
       role={selectable ? "button" : undefined}
       tabIndex={selectable ? 0 : undefined}
       aria-pressed={selectable ? selected : undefined}
@@ -141,7 +167,7 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
         </div>
         <div className="user-info">
           <div className="user-name">{user.nickname}</div>
-          {user.bio && <div className="user-bio">{user.bio}</div>}
+          {user.show_profile_info !== false && user.bio && <div className="user-bio">{user.bio}</div>}
         </div>
       </Link>
       <div className="user-actions" onClick={(event) => event.stopPropagation()}>
@@ -154,26 +180,30 @@ export default function UserCard({ user, currentUserId, isFollowingTab, isFollow
         >
           {btnText}
         </button>
-        <button className="btn-block" onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }} title="更多">
-          <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
-        </button>
-        <div className={`user-action-popup${moreOpen ? " show" : ""}`} ref={popupRef}>
-          <button
-            type="button"
-            className="user-action-popup-item relationship-action-popup-item"
-            disabled={relationshipActionLoading}
-            aria-busy={relationshipActionLoading}
-            onClick={() => { setMoreOpen(false); void handleRelationshipAction(); }}
-          >
-            <SiteIcon name={shouldUnfollow ? "fa-user-minus" : "fa-user-plus"} variant="outline" hoverVariant="solid" />{btnText}
-          </button>
-          <button className="user-action-popup-item" onClick={handleBlock}>
-            <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />屏蔽
-          </button>
-          <button className="user-action-popup-item" onClick={handleReport}>
-            <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />举报
-          </button>
-        </div>
+        {variant === "relationship" && (
+          <>
+            <button className="btn-block" onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }} title="更多" aria-label="更多">
+              <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
+            </button>
+            <div className={`user-action-popup${moreOpen ? " show" : ""}`} ref={popupRef}>
+              <button
+                type="button"
+                className="user-action-popup-item relationship-action-popup-item"
+                disabled={relationshipActionLoading}
+                aria-busy={relationshipActionLoading}
+                onClick={() => { setMoreOpen(false); void handleRelationshipAction(); }}
+              >
+                <SiteIcon name={shouldUnfollow ? "fa-user-minus" : "fa-user-plus"} variant="outline" hoverVariant="solid" />{btnText}
+              </button>
+              <button className="user-action-popup-item" onClick={handleBlock}>
+                <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />屏蔽
+              </button>
+              <button className="user-action-popup-item" onClick={handleReport}>
+                <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />举报
+              </button>
+            </div>
+          </>
+        )}
       </div>
       <ModerationReasonModal
         open={reportOpen}

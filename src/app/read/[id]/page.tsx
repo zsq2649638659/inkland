@@ -101,7 +101,7 @@ export default async function ReadPage({
   const postQuery = withTestDataVisibility(
     supabase
       .from("posts")
-      .select("id,title,content,author_note,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url,bio),post_tags(tags!inner(name))")
+      .select("id,title,content,author_note,cover_url,word_count,post_type,created_at,series_name,chapter_number,user_id,visibility,author:profiles!posts_user_id_fkey(nickname,avatar_url),post_tags(tags!inner(name))")
       .eq("id", id)
       .eq("status", "published"),
     includeTestData,
@@ -119,9 +119,16 @@ export default async function ReadPage({
   const p = posts[0] as Record<string, unknown>;
   const postType = p.post_type as string;
   const seriesName = p.series_name as string | null;
-  const { data: seriesRow } = seriesName
-    ? await supabase.from("series").select("id").eq("name", seriesName).maybeSingle()
-    : { data: null };
+  const [seriesResult, bioResult] = await Promise.all([
+    seriesName
+      ? supabase.from("series").select("id").eq("name", seriesName).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.rpc("get_public_profile_bios", { p_user_ids: [p.user_id as string] }),
+  ]);
+  const seriesRow = seriesResult.data;
+  const authorBio = Array.isArray(bioResult.data)
+    ? bioResult.data.find((entry: { profile_id: string; bio: unknown }) => entry.profile_id === p.user_id)
+    : null;
   const isImagePost = postType === "illustration" || postType === "comic" || postType === "cosplay" || postType === "art";
   const initialAdjacentPromise = loadAdjacentChapters(
     supabase,
@@ -141,7 +148,7 @@ export default async function ReadPage({
     initialAdjacentPromise,
   ]);
 
-  const author = p.author as { nickname: string; avatar_url: string | null; bio: string | null } | null;
+  const author = p.author as { nickname: string; avatar_url: string | null } | null;
   const tags = Array.isArray(p.post_tags)
     ? (p.post_tags as unknown as Array<{ tags: { name: string } }>).map((pt) => pt.tags?.name).filter(Boolean)
     : [];
@@ -180,7 +187,7 @@ export default async function ReadPage({
     author: {
       nickname: author?.nickname || "匿名用户",
       avatar_url: author?.avatar_url,
-      bio: author?.bio,
+      bio: typeof authorBio?.bio === "string" ? authorBio.bio : null,
     },
     comment_count: 0,
     like_count: 0,

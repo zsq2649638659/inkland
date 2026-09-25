@@ -18,6 +18,7 @@ import { assertCanComment } from "@/lib/userRestrictions";
 import type { Post, Comment } from "@/lib/types";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { includeTestDataForProfile } from "@/lib/test-data-visibility";
+import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 import DetailFloatingActions from "@/components/DetailFloatingActions";
 import ChapterNav from "@/components/ChapterNav";
 import { loadReadingHistory, saveReadingHistory } from "@/lib/readingHistory";
@@ -359,6 +360,8 @@ export default function ImageReaderClient({ post, images: initialImages, initial
         post_id: post.id,
         content: commentText.trim(),
       });
+    } else {
+      showToast(getSettingsPrivacyErrorMessage(error) || "评论发布失败，请稍后重试。");
     }
     setCommentLoading(false);
   };
@@ -563,7 +566,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
     if (!user) return;
     if (!await dialog.confirm({ title:"删除评论", message:"确定要删除这条评论吗？删除后无法恢复。", confirmLabel:"删除评论", variant:"danger" })) return;
     const { error } = await supabase.from("comments").delete().eq("id", commentId).eq("user_id", user.id);
-    if (!error) {
+                                if (!error) {
       await loadComments();
       fetchStats();
     }
@@ -1026,9 +1029,11 @@ export default function ImageReaderClient({ post, images: initialImages, initial
                                   type: "reply",
                                   actor_id: user.id,
                                   post_id: post.id,
-                                  content: replyText.trim(),
-                                });
-                              }
+                                    content: replyText.trim(),
+                                  });
+                                } else {
+                                  showToast(getSettingsPrivacyErrorMessage(error) || "回复发布失败，请稍后重试。");
+                                }
                               setCommentLoading(false);
                             }}
                           >

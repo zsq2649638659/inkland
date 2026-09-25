@@ -18,6 +18,7 @@ import { useAppDialog } from "@/components/AppDialogProvider";
 import type { Comment } from "@/lib/types";
 import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 import { formatHomeFeedTimestamp } from "@/lib/formatHomeFeedTimestamp";
+import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 
 export interface SerialPostCardData {
   chapterId: string;
@@ -181,7 +182,8 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       const { error } = await supabase
         .from("follows")
         .insert({ follower_id: user.id, following_id: data.authorId });
-      if (!error) setFollowing(true);
+      if (error) setToastMessage(getSettingsPrivacyErrorMessage(error) || "关注失败，请稍后重试。");
+      else setFollowing(true);
     }
     setFollowLoading(false);
   };
@@ -280,7 +282,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
       .select("id, content, created_at, user_id, parent_id")
       .single();
     if (error || !inserted) {
-      setToastMessage("回复发布失败，请稍后重试。");
+      setToastMessage(getSettingsPrivacyErrorMessage(error) || "回复发布失败，请稍后重试。");
       return;
     }
     setComments((prev) => [...prev, {

@@ -11,6 +11,7 @@ import { createNotification } from "@/lib/notifications";
 import { assertCanComment } from "@/lib/userRestrictions";
 import type { Comment } from "@/lib/types";
 import { includeTestDataForProfile } from "@/lib/test-data-visibility";
+import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
 
 interface ParagraphCommentPanelProps {
   postId: string;
@@ -184,6 +185,8 @@ onReport,
         post_id: postId,
         content: commentText.trim(),
       });
+    } else {
+      showToast(getSettingsPrivacyErrorMessage(error) || "评论发布失败，请稍后重试。");
     }
     setSubmitting(false);
   };
@@ -214,6 +217,8 @@ onReport,
         post_id: postId,
         content: replyText.trim(),
       });
+    } else {
+      showToast(getSettingsPrivacyErrorMessage(error) || "回复发布失败，请稍后重试。");
     }
     setSubmitting(false);
   };
