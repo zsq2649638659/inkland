@@ -54,6 +54,8 @@ export default function LoginPage() {
   const [nickname, setNickname] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [canResendConfirmation, setCanResendConfirmation] = useState(false);
   const [status, setStatus] = useState<StatusMsg>({ type: null, message: "" });
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [authTimeout, setAuthTimeout] = useState(false);
@@ -101,6 +103,9 @@ export default function LoginPage() {
 
   const clearStatus = () => setStatus({ type: null, message: "" });
 
+  const getConfirmationRedirectUrl = () =>
+    new URL("/auth/confirm?flow=signup", window.location.origin).toString();
+
   const handleLogin = async () => {
     if (!email.trim()) {
       setStatus({ type: "error", message: "请输入邮箱地址" });
@@ -114,6 +119,7 @@ export default function LoginPage() {
     setLoading(true);
     setAuthActionInProgress(true);
     setServerSessionReady(false);
+    setCanResendConfirmation(false);
     clearStatus();
 
     let error: { message: string } | null = null;
@@ -133,17 +139,19 @@ export default function LoginPage() {
     }
 
     if (error) {
+      const needsEmailConfirmation = error.message === "Email not confirmed";
       setStatus({
         type: "error",
         message:
           error.message === "Invalid login credentials"
             ? "邮箱或密码错误，请检查后重试"
-            : error.message === "Email not confirmed"
-              ? "邮箱尚未验证，请先检查邮箱并点击确认链接"
+            : needsEmailConfirmation
+              ? "邮箱尚未验证，可以重新发送验证邮件后再登录"
               : error.message.includes("email") || error.message.includes("Email")
                 ? "邮箱格式不正确，请检查后重试"
                 : "登录失败，请稍后重试",
       });
+      setCanResendConfirmation(needsEmailConfirmation);
       setLoading(false);
       setAuthActionInProgress(false);
       return;
@@ -192,6 +200,7 @@ export default function LoginPage() {
 
     setLoading(true);
     setAuthActionInProgress(true);
+    setCanResendConfirmation(false);
     clearStatus();
 
     let data: Awaited<ReturnType<typeof supabase.auth.signUp>>["data"];
@@ -202,7 +211,7 @@ export default function LoginPage() {
         password,
         options: {
           data: { username: nickname.trim() },
-          emailRedirectTo: new URL("/auth/confirm?flow=signup", window.location.origin).toString(),
+          emailRedirectTo: getConfirmationRedirectUrl(),
         },
       }));
       ({ data, error } = result);
@@ -214,17 +223,19 @@ export default function LoginPage() {
     }
 
     if (error) {
+      const existingSignup = error.message === "User already registered";
       setStatus({
-        type: "error",
+        type: existingSignup ? "info" : "error",
         message:
-          error.message === "User already registered"
-            ? "该邮箱已被注册，请直接登录或使用其他邮箱"
+          existingSignup
+            ? "这个邮箱已有注册记录。若你还没完成验证，可以重发验证邮件；如已验证，请直接登录。"
             : error.message === "Password should be at least 6 characters"
               ? "密码至少需要 6 位字符"
               : error.message.includes("email") || error.message.includes("Email")
                 ? "邮箱格式不正确，请检查后重试"
                 : "注册失败，请稍后重试",
       });
+      setCanResendConfirmation(existingSignup);
       setLoading(false);
       setAuthActionInProgress(false);
       return;
@@ -234,9 +245,10 @@ export default function LoginPage() {
       // 检查 identities：如果为空数组，说明该邮箱已注册
       if (data.user.identities && data.user.identities.length === 0) {
         setStatus({
-          type: "error",
-          message: "该邮箱已被注册，请直接登录或使用其他邮箱",
+          type: "info",
+          message: "这个邮箱已有注册记录。若你还没完成验证，可以重发验证邮件；如已验证，请直接登录。",
         });
+        setCanResendConfirmation(true);
         setLoading(false);
         setAuthActionInProgress(false);
         return;
@@ -269,6 +281,61 @@ export default function LoginPage() {
     setLoading(false);
   };
 
+  const handleResendConfirmation = async () => {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setStatus({ type: "error", message: "请先填写注册邮箱" });
+      setCanResendConfirmation(true);
+      return;
+    }
+
+    setResendLoading(true);
+    try {
+      const { error } = await withTimeout<Awaited<ReturnType<typeof supabase.auth.resend>>>(
+        supabase.auth.resend({
+          type: "signup",
+          email: normalizedEmail,
+          options: { emailRedirectTo: getConfirmationRedirectUrl() },
+        })
+      );
+
+      if (error) {
+        const normalizedMessage = error.message.toLowerCase();
+        const alreadyConfirmed = normalizedMessage.includes("already confirmed")
+          || normalizedMessage.includes("already been confirmed");
+        const rateLimited = normalizedMessage.includes("rate limit")
+          || normalizedMessage.includes("too many")
+          || normalizedMessage.includes("security purposes");
+        setStatus({
+          type: "error",
+          message: alreadyConfirmed
+            ? "这个邮箱已完成验证，请切换到登录。"
+            : rateLimited
+              ? "验证邮件发送得太频繁，请稍后再试。"
+              : "验证邮件暂时发送失败，请稍后重试。",
+        });
+        setCanResendConfirmation(!alreadyConfirmed);
+        return;
+      }
+
+      setStatus({
+        type: "success",
+        message: "如果这个邮箱尚未验证，新的验证邮件会发送至该邮箱。请检查收件箱和垃圾邮件；如已验证，请直接登录。",
+      });
+      setCanResendConfirmation(true);
+    } catch (requestError) {
+      setStatus({
+        type: "error",
+        message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT"
+          ? "连接服务器超时，请检查网络后重试。"
+          : "验证邮件发送失败，请稍后重试。",
+      });
+      setCanResendConfirmation(true);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === "login") handleLogin();
@@ -277,6 +344,7 @@ export default function LoginPage() {
 
   const switchMode = (newMode: Mode) => {
     setMode(newMode);
+    setCanResendConfirmation(false);
     clearStatus();
   };
 
@@ -320,11 +388,21 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Status message — fixed height container, always renders to prevent layout shift */}
-          <div className="auth-status-wrapper">
+          {/* Status message reserves space and expands when the resend action appears. */}
+          <div className={`auth-status-wrapper${canResendConfirmation ? " auth-status-wrapper--resend" : ""}`}>
             <div className={`auth-status ${status.type ? statusClass[status.type] : "auth-status-hidden"}`}>
               <SiteIcon name={status.type ? statusIcon[status.type] : "fa-circle-exclamation"} variant="solid" />
               <span>{status.message || "\u00A0"}</span>
+              {canResendConfirmation && (
+                <button
+                  type="button"
+                  className="auth-status-action"
+                  onClick={handleResendConfirmation}
+                  disabled={resendLoading}
+                >
+                  {resendLoading ? "发送中…" : "重发验证邮件"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -379,6 +457,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
+                    setCanResendConfirmation(false);
                     clearStatus();
                   }}
                 />
