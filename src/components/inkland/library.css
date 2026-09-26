@@ -817,6 +817,7 @@
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-images { display: flex; height: 154px; min-width: 0; overflow: hidden; }
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-image { position: relative; display: grid; width: 100%; height: 154px; min-height: 154px; place-items: center; overflow: hidden; border-radius: var(--ink-radius-sm); color: var(--ink-primary-hover); background: var(--ink-surface-subtle); text-decoration: none; }
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-image img { width: 100%; height: 100%; object-fit: cover; }
+#page-tag .tag-history-card-grid .site-card__feed-image img { position: absolute; inset: 0; display: block; max-width: 100%; object-fit: contain; }
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-image-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--ink-space-2); padding: var(--ink-space-4); color: var(--ink-on-primary); background: linear-gradient(to top, rgba(26,26,26,.82), rgba(26,26,26,.2) 68%, transparent); opacity: 0; pointer-events: none; }
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-image:hover .site-card__feed-image-overlay,
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-image:focus-visible .site-card__feed-image-overlay { opacity: 1; }
@@ -841,14 +842,22 @@
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar { display: grid; place-items: center; overflow: hidden; border-radius: var(--ink-radius-full); color: var(--ink-on-primary); background: var(--ink-primary); font: var(--ink-font-card-author); }
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-#page-tag .tag-history-card-grid { align-items: start; }
-#page-tag .tag-history-card-grid .site-card { min-height: 0; row-gap: 0; padding-bottom: 0; }
-#page-tag .tag-history-card-grid .site-card__title-link + .site-card__excerpt,
-#page-tag .tag-history-card-grid .site-card__serial-intro + .site-card__latest-chapter { margin-top: var(--ink-space-3); }
-#page-tag .tag-history-card-grid .site-card__serial-heading { margin-bottom: var(--ink-space-3); }
-#page-tag .tag-history-card-grid .site-card__search-meta { min-height: 0; margin-block: 0; }
+#page-tag .tag-history-card-grid .site-card { box-sizing: border-box; height: 250px; min-height: 250px; overflow: hidden; }
+#page-tag .tag-history-card-grid .site-card__search-meta { min-height: var(--ink-height-card-meta); margin-block: 0; }
 #page-tag .tag-history-card-grid .site-card__tag-interactions span { min-height: 0; padding-block: 0; }
-#page-tag .tag-mobile-card-layout { display: none; }
+#page-tag .tag-mobile-filter-bar,
+#page-tag .tag-filter-drawer-backdrop { display: none; }
+#page-tag .tag-filter-drawer-section { display: grid; gap: var(--ink-space-2); margin-top: var(--ink-space-4); }
+#page-tag .tag-filter-drawer-section > strong { font: var(--ink-font-control-label); }
+#page-tag .tag-filter-drawer-section > div { display: flex; flex-wrap: wrap; gap: var(--ink-gap-tight); }
+#page-tag .tag-filter-control,
+#page-tag .tag-filter-drawer-actions button { min-height: var(--ink-button-medium-height); padding: 0 var(--ink-button-medium-padding-horizontal); border: var(--ink-button-border-width) solid var(--ink-button-default-border); border-radius: var(--ink-button-border-radius); color: var(--ink-button-default-color); background: transparent; font: var(--ink-button-medium-font); cursor: pointer; }
+#page-tag .tag-filter-control.is-active,
+#page-tag .tag-filter-drawer-actions .is-primary { border-color: var(--ink-button-primary-border); color: var(--ink-button-primary-color); background: var(--ink-button-primary-bg); }
+#page-tag .tag-filter-drawer-actions { display: flex; justify-content: flex-end; gap: var(--ink-gap-compact); margin-top: var(--ink-space-5); }
+#page-tag .tag-filter-drawer-actions .is-primary:hover { background: var(--ink-button-primary-active-bg); }
+#page-tag .tag-filter-control:focus-visible,
+#page-tag .tag-filter-drawer-actions button:focus-visible { outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
 #page-tag .tag-square-device { display: none; }
 
 #page-tag .tag-history-card-grid .site-card__title-link:hover .site-card__title { color: var(--ink-primary); }
@@ -867,35 +876,30 @@
   #page-tag .profile-action-btn { width: 40px; height: 40px; padding: 0; }
   #page-tag .profile-action-icon { display: block; width: 18px; height: 18px; }
   #page-tag .profile-action-label { display: none; }
-  #page-tag .tag-filter-selectors { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  #page-tag .tag-filter-selectors__sort { display: contents; }
-  #page-tag .tag-filter-selectors__sort > .filter-system-field:first-child { order: 1; }
-  #page-tag .tag-filter-selectors__type { order: 2; }
-  #page-tag .tag-filter-selectors__sort--with-time { display: contents; }
-  #page-tag .tag-hot-time-select { display: none; }
-  #page-tag .tag-hot-time-buttons { display: grid; grid-column: 1 / -1; order: 3; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ink-space-2); }
-  #page-tag .tag-hot-time-buttons button { width: 100%; height: 40px; padding: 0 var(--ink-radius-sm); border: var(--ink-border-none); border-radius: 8px; color: var(--ink-text-secondary); background: var(--ink-surface-subtle); font: var(--ink-button-medium-font); line-height: 40px; cursor: pointer; }
-  #page-tag .tag-hot-time-buttons button:hover { color: var(--ink-text-secondary); background: var(--ink-border); }
-  #page-tag .tag-hot-time-buttons button.is-selected { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-bg, #f26b5b); }
-  #page-tag .tag-hot-time-buttons button.is-selected:hover { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-active-bg, #e85a4a); }
-  #page-tag .tag-hot-time-buttons button:focus-visible { outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
+  #page-tag .tag-filter-selectors { display: none; }
   :is(#page-tag, #page-search) .tag-history-card-grid { display: block; column-count: 2; column-gap: var(--ink-gap-inline); }
   #page-tag .tag-history-card-grid { column-count: 1; }
   #page-tag .tag-history-card-grid.is-mobile-square { display: none; }
-  #page-tag .tag-mobile-card-layout { display: flex; justify-content: flex-end; margin-bottom: var(--ink-space-3); }
+  #page-tag .tag-mobile-filter-bar { display: flex; gap: var(--ink-gap-compact); margin-bottom: var(--ink-space-3); }
   #page-tag .profile-mobile-filter-button { min-height: var(--ink-height-control-md); border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); cursor: pointer; }
-  #page-tag .profile-mobile-filter-button.profile-mobile-icon-button { display: inline-grid; width: var(--ink-height-control-md); height: var(--ink-height-control-md); place-items: center; padding: 0; }
-  #page-tag .profile-mobile-icon-button svg { width: 15px; height: 15px; }
+  #page-tag .tag-mobile-filter-trigger { display: inline-flex; min-width: 0; flex: 1; align-items: center; justify-content: center; gap: var(--ink-space-2); padding: 0 var(--ink-space-3); }
+  #page-tag .profile-mobile-filter-button.profile-mobile-icon-button { display: inline-grid; width: var(--ink-height-control-md); height: var(--ink-height-control-md); flex: 0 0 var(--ink-height-control-md); place-items: center; padding: 0; }
+  #page-tag .tag-mobile-filter-bar svg { width: 15px; height: 15px; }
   #page-tag .profile-mobile-filter-button:focus-visible { outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
+  #page-tag .tag-filter-drawer-backdrop { position: fixed; inset: 0; z-index: var(--ink-z-modal); display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
+  #page-tag .tag-filter-drawer { width: 100%; max-height: 90dvh; overflow-y: auto; padding: var(--ink-space-5) var(--ink-space-5) max(var(--ink-space-5), env(safe-area-inset-bottom)); border-radius: var(--ink-radius-lg) var(--ink-radius-lg) 0 0; color: var(--ink-text); background: var(--ink-surface); box-shadow: var(--ink-shadow-lg); }
+  #page-tag .tag-filter-drawer h2 { margin: 0; font: var(--ink-font-title-sm); }
   #page-tag .tag-square-device.is-active { display: block; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card { display: flex; width: auto; min-height: 0; margin: 0 0 var(--ink-gap-inline); break-inside: avoid; padding: var(--ink-space-3); border-radius: var(--ink-radius-sm); }
-  #page-tag .tag-history-card-grid .site-card { padding-bottom: 0; }
+  #page-tag .tag-history-card-grid .site-card { height: 250px; min-height: 250px; padding: var(--ink-space-3); }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__title { font: var(--ink-font-card-title-mobile-square); -webkit-line-clamp: 1; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__excerpt { font: var(--ink-font-card-body-mobile-square); -webkit-line-clamp: 2; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card--feed-serial .site-card__excerpt { -webkit-line-clamp: 3; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card--feed-single .site-card__excerpt { -webkit-line-clamp: 5; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-images,
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__feed-image { height: auto; min-height: 0; aspect-ratio: 4 / 5; }
+  #page-tag .tag-history-card-grid .site-card__feed-images,
+  #page-tag .tag-history-card-grid .site-card__feed-image { height: 166px; min-height: 166px; aspect-ratio: auto; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__search-meta { min-height: var(--ink-height-card-meta); gap: var(--ink-size-2); margin-bottom: 0; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__tag-interactions { gap: var(--ink-size-2); font-size: var(--ink-font-size-xs); }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__tag-interactions svg { width: 15px; height: 15px; }

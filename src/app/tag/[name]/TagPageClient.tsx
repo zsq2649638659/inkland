@@ -100,6 +100,8 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileDraftFilters, setMobileDraftFilters] = useState<TagFilters>({ sort: "published", time: "all", type: "all" });
   const [participantCount, setParticipantCount] = useState(0);
   const [interactionCount, setInteractionCount] = useState(0);
   const [isFollowingTag, setIsFollowingTag] = useState(false);
@@ -125,6 +127,15 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
     setTimeFilter(filters.time);
     setTypeFilter(filters.type);
   };
+
+  useEffect(() => {
+    if (!mobileFilterOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileFilterOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileFilterOpen]);
 
   useEffect(() => {
     let active = true;
@@ -647,10 +658,35 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
         </section>
 
         {/* ===== Card Grid ===== */}
-        {!loadError && displayedCount > 0 && <div className="tag-mobile-card-layout">
-          <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为一列卡片"} aria-pressed={mobileCardLayout === "square"}>
-            <SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" />
+        {!loadError && <div className="tag-mobile-filter-bar">
+          <button type="button" className="profile-mobile-filter-button tag-mobile-filter-trigger" onClick={() => {
+            setMobileDraftFilters({ sort: sortFilter, time: timeFilter, type: typeFilter });
+            setMobileFilterOpen(true);
+          }} aria-label="打开筛选">
+            <SiteIcon name="fa-filter" variant="default" aria-hidden="true" />
+            <span>筛选作品</span>
           </button>
+          {displayedCount > 0 && <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为一列卡片"} aria-pressed={mobileCardLayout === "square"}>
+            <SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" />
+          </button>}
+        </div>}
+        {mobileFilterOpen && <div className="tag-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
+          <section className="tag-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选作品" onClick={(event) => event.stopPropagation()}>
+            <h2>筛选作品</h2>
+            <div className="tag-filter-drawer-section"><strong>排序</strong><div>
+              {([{ value: "published", label: "最新发布" }, { value: "hot", label: "热度最高" }] as const).map(({ value, label }) => <button key={value} type="button" className={`tag-filter-control${mobileDraftFilters.sort === value ? " is-active" : ""}`} onClick={() => setMobileDraftFilters((current) => ({ ...current, sort: value, time: value === "hot" ? current.time : "all" }))}>{label}</button>)}
+            </div></div>
+            {mobileDraftFilters.sort === "hot" && <div className="tag-filter-drawer-section"><strong>热度时间范围</strong><div>
+              {([{ value: "all", label: "全部" }, { value: "day", label: "一日" }, { value: "week", label: "一周" }, { value: "month", label: "一月" }] as const).map(({ value, label }) => <button key={value} type="button" className={`tag-filter-control${mobileDraftFilters.time === value ? " is-active" : ""}`} onClick={() => setMobileDraftFilters((current) => ({ ...current, time: value }))}>{label}</button>)}
+            </div></div>}
+            <div className="tag-filter-drawer-section"><strong>作品类型</strong><div>
+              {([{ value: "all", label: "所有作品" }, { value: "single", label: "单篇" }, { value: "image", label: "图片" }, { value: "series", label: "长篇连载" }] as const).map(({ value, label }) => <button key={value} type="button" className={`tag-filter-control${mobileDraftFilters.type === value ? " is-active" : ""}`} onClick={() => setMobileDraftFilters((current) => ({ ...current, type: value }))}>{label}</button>)}
+            </div></div>
+            <div className="tag-filter-drawer-actions">
+              <button type="button" onClick={() => setMobileDraftFilters({ sort: "published", time: "all", type: "all" })}>重置</button>
+              <button type="button" className="is-primary" onClick={() => { updateFilters(mobileDraftFilters); setMobileFilterOpen(false); }}>应用筛选</button>
+            </div>
+          </section>
         </div>}
         {loadError ? (
           <div className="tag-load-error" role="alert">
