@@ -138,7 +138,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [privacyMessageKind, setPrivacyMessageKind] = useState<"success" | "error" | "">("");
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
-  const feedbackCharacterCount = Array.from(feedbackText).length;
+  const feedbackCharacterCount = feedbackText.length;
   const trimmedFeedbackCharacterCount = Array.from(feedbackText.trim()).length;
   const feedbackCanSubmit = trimmedFeedbackCharacterCount >= feedbackMinimumLength
     && feedbackCharacterCount <= feedbackMaximumLength;
@@ -322,13 +322,14 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const handleFeedbackSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const content = feedbackText.trim();
-    const contentLength = Array.from(content).length;
-    if (contentLength < feedbackMinimumLength) {
-      setFeedbackError("请至少填写 2 个字的反馈内容。");
+    const contentLength = content.length;
+    const contentCharacterCount = Array.from(content).length;
+    if (contentCharacterCount < feedbackMinimumLength) {
+      setFeedbackError("请至少填写 2 个字符的反馈内容。");
       return;
     }
     if (contentLength > feedbackMaximumLength) {
-      setFeedbackError("反馈内容不能超过 5000 个字。");
+      setFeedbackError("反馈内容不能超过 5000 个字符。");
       return;
     }
     setFeedbackError("");
@@ -355,7 +356,12 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   };
 
   const handleFeedbackTextChange = (value: string) => {
-    setFeedbackText(Array.from(value).slice(0, feedbackMaximumLength).join(""));
+    let limitedValue = value.slice(0, feedbackMaximumLength);
+    const lastCodeUnit = limitedValue.charCodeAt(limitedValue.length - 1);
+    if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) {
+      limitedValue = limitedValue.slice(0, -1);
+    }
+    setFeedbackText(limitedValue);
     setFeedbackError("");
     setFeedbackSuccess("");
   };
@@ -736,14 +742,14 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               </div>
               <div className="settings-form-group">
                 <label className="settings-form-label" htmlFor="contact-feedback-content">反馈内容</label>
-                {/* HTML maxLength counts UTF-16 units; onChange enforces the server's 5000-character limit. */}
+                {/* The API counts JavaScript string units too; keep the visible limit aligned and avoid splitting a surrogate pair. */}
                 <textarea
                   id="contact-feedback-content"
                   className="settings-form-input settings-form-textarea"
                   rows={4}
                   required
                   minLength={feedbackMinimumLength}
-                  maxLength={feedbackMaximumLength * 2}
+                  maxLength={feedbackMaximumLength}
                   aria-describedby="contact-feedback-hint contact-feedback-count"
                   aria-invalid={feedbackCharacterCount > 0 && !feedbackCanSubmit}
                   disabled={feedbackSubmitting}
@@ -752,7 +758,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
                   onChange={(e) => handleFeedbackTextChange(e.target.value)}
                 />
                 <div className="settings-feedback-meta">
-                  <span className="settings-form-hint" id="contact-feedback-hint">需填写 2–5000 个字。</span>
+                  <span className="settings-form-hint" id="contact-feedback-hint">需填写 2–5000 个字符；emoji 按 2 个上限单位计。</span>
                   <span className="settings-feedback-count" id="contact-feedback-count">{feedbackCharacterCount} / {feedbackMaximumLength}</span>
                 </div>
               </div>
