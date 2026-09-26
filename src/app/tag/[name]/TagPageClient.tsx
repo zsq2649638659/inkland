@@ -659,12 +659,11 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
 
         {/* ===== Card Grid ===== */}
         {!loadError && <div className="tag-mobile-filter-bar">
-          <button type="button" className="profile-mobile-filter-button tag-mobile-filter-trigger" onClick={() => {
+          <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => {
             setMobileDraftFilters({ sort: sortFilter, time: timeFilter, type: typeFilter });
             setMobileFilterOpen(true);
           }} aria-label="打开筛选">
             <SiteIcon name="fa-filter" variant="default" aria-hidden="true" />
-            <span>筛选作品</span>
           </button>
           {displayedCount > 0 && <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为一列卡片"} aria-pressed={mobileCardLayout === "square"}>
             <SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" />
