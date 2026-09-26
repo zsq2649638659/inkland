@@ -533,10 +533,13 @@ onReport,
                     {/* 展开回复 */}
                     {(c.reply_count || 0) > 0 && (
                       <div className="nested-replies">
-                        {/* 显示回复列表（默认显示前3条，展开后显示全部） */}
+                        {/* 超过3条时默认收起，展开后显示全部回复 */}
                         {c.replies && c.replies.length > 0 && (
                           <>
-                            {(expandedReplies.has(c.id) ? c.replies : c.replies.slice(0, 3)).map((reply, replyIdx, arr) => {
+                            {(expandedReplies.has(c.id)
+                              ? c.replies
+                              : c.replies.length > 3 ? [] : c.replies
+                            ).map((reply, replyIdx, arr) => {
                               const isLast = replyIdx === arr.length - 1;
                               return (
                                 <div
@@ -616,7 +619,7 @@ onReport,
                             })}
                             
                             {/* 超过3条回复时显示展开/收起按钮 */}
-                            {(c.reply_count || 0) > 3 && (
+                            {c.replies.length > 3 && (
                               <button
                                 className="nested-reply-toggle-btn"
                                 onClick={() => toggleExpandReplies(c.id)}
@@ -624,7 +627,7 @@ onReport,
                                 {expandedReplies.has(c.id) ? (
                                   <>收起回复 <SiteIcon name="fa-chevron-up" variant="solid" /></>
                                 ) : (
-                                  <>展开全部{c.reply_count}条回复 <SiteIcon name="fa-chevron-down" variant="solid" /></>
+                                  <>展开全部{c.replies.length}条回复 <SiteIcon name="fa-chevron-down" variant="solid" /></>
                                 )}
                               </button>
                             )}

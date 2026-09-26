@@ -6263,7 +6263,7 @@ p {
   justify-content: center;
   background: var(--color-bg-secondary, #E8E4E0);
   color: var(--color-text-light, #999999);
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .nested-reply-body {
@@ -7739,7 +7739,7 @@ p {
   }
 
   .author-row {
-    align-items: flex-start;
+    align-items: center;
   }
 
   .author-name,
@@ -7962,6 +7962,23 @@ p {
     box-shadow: 0 -4px 16px rgba(0, 0, 0, .28);
   }
 
+}
+
+@media (max-width: 767px) {
+  .detail-floating-sidebar {
+    display: none;
+  }
+
+  .detail-mobile-floating-actions {
+    position: fixed;
+    right: 12px;
+    bottom: 20px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
 }
 
 @keyframes detail-mobile-sheet-in {

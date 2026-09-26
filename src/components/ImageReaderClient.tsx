@@ -890,7 +890,10 @@ export default function ImageReaderClient({ post, images: initialImages, initial
                     {/* 回复列表 */}
                     {replies[c.id] && replies[c.id].length > 0 && (
                       <div className="nested-replies">
-                        {(expandedReplyIds.has(c.id) ? replies[c.id] : replies[c.id].slice(0, 3)).map((reply) => (
+                        {(expandedReplyIds.has(c.id)
+                          ? replies[c.id]
+                          : replies[c.id].length > 3 ? [] : replies[c.id]
+                        ).map((reply) => (
                           <div key={reply.id} className="nested-reply-item" data-comment-id={reply.id}>
                             <div className="nested-reply-avatar">
                               <Link href={`/user/${reply.user_id}`}>
