@@ -690,9 +690,13 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                   <DefaultAvatar name={authorName} className="author-avatar-placeholder" />
                 )}
               </div>
-              <Link href={`/user/${post.author?.nickname || ""}`} className="author-name">
-                {authorName}
-              </Link>
+              {post.user_id ? (
+                <Link href={`/user/${post.user_id}`} className="author-name">
+                  {authorName}
+                </Link>
+              ) : (
+                <span className="author-name">{authorName}</span>
+              )}
               <div className="work-meta">
                 <span className="meta-item">
                   <SiteIcon name="fa-word-count" variant="default" />
