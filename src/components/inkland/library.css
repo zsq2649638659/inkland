@@ -731,6 +731,9 @@
   background: var(--ink-surface);
   outline: var(--ink-outline-none);
 }
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"]:hover:not(:disabled) {
+  background: var(--ink-surface-subtle);
+}
 #page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"]:disabled {
   color: var(--ink-muted);
   background: var(--ink-surface-subtle);
@@ -838,6 +841,13 @@
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar { display: grid; place-items: center; overflow: hidden; border-radius: var(--ink-radius-full); color: var(--ink-on-primary); background: var(--ink-primary); font: var(--ink-font-card-author); }
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar img { width: 100%; height: 100%; object-fit: cover; }
 
+#page-tag .tag-history-card-grid .site-card__title-link:hover .site-card__title { color: var(--ink-primary); }
+#page-tag .tag-history-card-grid .site-card__title-link:focus-visible {
+  border-radius: var(--ink-radius-xs);
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+}
+
 @media (max-width: 768px) {
   #page-tag .main-container { width: calc(100% - 32px); max-width: none; padding-block: var(--ink-space-4) var(--ink-space-8); }
   #page-tag .profile-section { grid-template-columns: 32px minmax(0, 1fr) auto; gap: var(--ink-space-3); padding: var(--ink-space-3); }
@@ -858,6 +868,7 @@
   #page-tag .tag-hot-time-buttons button:hover { color: var(--ink-text-secondary); background: var(--ink-border); }
   #page-tag .tag-hot-time-buttons button.is-selected { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-bg, #f26b5b); }
   #page-tag .tag-hot-time-buttons button.is-selected:hover { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-active-bg, #e85a4a); }
+  #page-tag .tag-hot-time-buttons button:focus-visible { outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
   :is(#page-tag, #page-search) .tag-history-card-grid { display: block; column-count: 2; column-gap: var(--ink-gap-inline); }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card { display: flex; width: auto; min-height: 0; margin: 0 0 var(--ink-gap-inline); break-inside: avoid; padding: var(--ink-space-3); border-radius: var(--ink-radius-sm); }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__title { font: var(--ink-font-card-title-mobile-square); -webkit-line-clamp: 1; }
@@ -871,6 +882,10 @@
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__tag-interactions svg { width: 15px; height: 15px; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar-link,
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar { width: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); height: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); flex-basis: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); }
+}
+
+@media (max-width: 360px) {
+  #page-tag .tag-history-card-grid { column-count: 1; }
 }
 
 #page-search .tag-history-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -2658,4 +2673,25 @@
 .inline-comment-panel .comment-action-btn-delete:hover .site-icon-hover__active,
 .inline-comment-panel .comment-action-btn-delete:focus-visible .site-icon-hover__active {
   display: inline-flex;
+}
+
+/* Shared ProfileFilterSelect controls keep a visible keyboard focus ring. */
+:is(#page-search, #page-profile, #page-studio, #page-user) .filter-system-field .custom-select > button[aria-haspopup="listbox"]:focus-visible,
+#page-tag .tag-filter-selectors .custom-select > button[aria-haspopup="listbox"]:focus-visible,
+#page-settings .settings-choice-select .custom-select > button[aria-haspopup="listbox"]:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
+  z-index: 1;
+}
+
+:is(#page-search, #page-profile, #page-studio, #page-user) .filter-system-field .select-option:focus-visible,
+#page-tag .tag-filter-selectors .select-option:focus-visible,
+#page-settings .settings-choice-select .select-option:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: calc(-1 * var(--ink-outline-offset-focus));
+}
+
+#page-tag .profile-action-btn:focus-visible {
+  outline: var(--ink-outline-focus);
+  outline-offset: var(--ink-outline-offset-focus);
 }
