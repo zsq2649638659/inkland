@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/components/AuthProvider";
 import ProfileFilterSelect from "@/components/ProfileFilterSelect";
 import TagHistoryCard from "@/components/TagHistoryCard";
+import ProfileWorkCard from "@/components/ProfileWorkCard";
 import type { Post } from "@/lib/types";
 import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
@@ -98,6 +99,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
   const [sortFilter, setSortFilter] = useState<SortFilter>("published");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
   const [participantCount, setParticipantCount] = useState(0);
   const [interactionCount, setInteractionCount] = useState(0);
   const [isFollowingTag, setIsFollowingTag] = useState(false);
@@ -221,6 +223,25 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
               tags: tagNames,
             } as Post;
           });
+
+          // 图片正文和封面可能存的是私有存储标记，列表也需要像阅读页一样签名后才能预览。
+          const privateMarker = /private:\/\/private-post-images\/([A-Za-z0-9/_\-.]+)/g;
+          const privatePaths = new Set<string>();
+          for (const post of allPosts) {
+            for (const source of [post.content || "", post.cover_url || ""]) {
+              for (const match of source.matchAll(privateMarker)) privatePaths.add(match[1]);
+            }
+          }
+          const signedUrls = new Map<string, string>();
+          await Promise.all([...privatePaths].map(async (path) => {
+            const { data } = await supabase.storage.from("private-post-images").createSignedUrl(path, 3600);
+            if (data?.signedUrl) signedUrls.set(`private://private-post-images/${path}`, data.signedUrl);
+          }));
+          allPosts = allPosts.map((post) => ({
+            ...post,
+            content: (post.content || "").replace(privateMarker, (marker) => signedUrls.get(marker) || marker),
+            cover_url: post.cover_url?.replace(privateMarker, (marker) => signedUrls.get(marker) || marker) || null,
+          }));
 
           standalonePostsList = allPosts.filter((p) => {
             const raw = postsData.find((r: Record<string, unknown>) => r.id === p.id) as Record<string, unknown> | undefined;
@@ -626,6 +647,11 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
         </section>
 
         {/* ===== Card Grid ===== */}
+        {!loadError && displayedCount > 0 && <div className="tag-mobile-card-layout">
+          <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为一列卡片"} aria-pressed={mobileCardLayout === "square"}>
+            <SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" />
+          </button>
+        </div>}
         {loadError ? (
           <div className="tag-load-error" role="alert">
             <EmptyState icon="fa-tag" title="标签内容暂时无法加载" description="请检查网络连接后重试。" actionLabel="重试" actionOnClick={() => setReloadToken((token) => token + 1)} />
@@ -655,7 +681,8 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
             )}
           </div>
         ) : (
-          <div className="tag-history-card-grid">
+          <>
+          <div className={`tag-history-card-grid${mobileCardLayout === "square" ? " is-mobile-square" : ""}`}>
             {displaySeries.map((series) => {
               const postForCard: Post = {
                 id: series.id,
@@ -680,6 +707,13 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
               <TagHistoryCard key={post.id} post={post} />
             ))}
           </div>
+          <div className={`profile-card-device profile-card-device--mobile-square tag-square-device${mobileCardLayout === "square" ? " is-active" : ""}`}>
+            <div className="card-device__cards">
+              {displaySeries.map((series) => <ProfileWorkCard key={`square-series-${series.id}`} series={{ ...series, id: series.name }} mode="mobile-square" />)}
+              {displayStandalone.map((post) => <ProfileWorkCard key={`square-post-${post.id}`} post={post} mode="mobile-square" />)}
+            </div>
+          </div>
+          </>
         )}
       </main>
     </div>
