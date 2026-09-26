@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { SkeletonTagPage } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
@@ -99,15 +99,49 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
   const [sortFilter, setSortFilter] = useState<SortFilter>("published");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
+  const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("square");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileDraftFilters, setMobileDraftFilters] = useState<TagFilters>({ sort: "published", time: "all", type: "all" });
   const [participantCount, setParticipantCount] = useState(0);
   const [interactionCount, setInteractionCount] = useState(0);
+  const [statsRequireIcon, setStatsRequireIcon] = useState(false);
+  const profileSectionRef = useRef<HTMLElement | null>(null);
   const [isFollowingTag, setIsFollowingTag] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followStateLoading, setFollowStateLoading] = useState(true);
   const [followStateError, setFollowStateError] = useState(false);
+
+  useEffect(() => {
+    const section = profileSectionRef.current;
+    const stats = section?.querySelector<HTMLElement>(".profile-stats");
+    if (!section || !stats || typeof ResizeObserver === "undefined") return;
+
+    const measure = () => {
+      const items = Array.from(stats.children);
+      if (items.length < 2) return;
+
+      const isCompact = section.classList.contains("is-stats-wrapped");
+      const widthFreedByIcon = isCompact ? 60 : 0;
+      const availableTextButtonWidth = stats.getBoundingClientRect().width - widthFreedByIcon;
+      const gap = Number.parseFloat(window.getComputedStyle(stats).columnGap) || 0;
+      const requiredWidth = items.reduce((total, item) => total + item.getBoundingClientRect().width, 0) + gap * (items.length - 1);
+      const shouldUseIcon = requiredWidth > availableTextButtonWidth + 0.5;
+
+      setStatsRequireIcon((current) => current === shouldUseIcon ? current : shouldUseIcon);
+    };
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(section);
+    observer.observe(stats);
+    Array.from(stats.children).forEach((item) => observer.observe(item));
+    window.addEventListener("resize", measure);
+    measure();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [contentLoaded, interactionCount, loading, participantCount, tagInfo?.post_count]);
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -566,35 +600,37 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
     : followStateError
       ? "状态未加载"
       : isFollowingTag
-        ? "已关注"
-        : "关注";
+      ? "已关注"
+      : "关注";
 
   return (
     <div id="page-tag" className="min-h-screen bg-paper">
       <main className="main-container">
         {/* ===== Profile Section ===== */}
-        <section className="profile-section">
+        <section ref={profileSectionRef} className={`profile-section${statsRequireIcon ? " is-stats-wrapped" : ""}`}>
           <div className="profile-avatar">
             <SiteIcon name="fa-tag" variant="solid" />
           </div>
-          <div className="profile-info">
-            <h1 className="profile-name">{decodedName}</h1>
-          </div>
-          <div className="profile-stats">
-            <div className="profile-stat">
-              <SiteIcon name="fa-tag-works" aria-hidden="true" />
-              <span>作品</span>
-              <span className="stat-value">{tagInfo ? tagInfo.post_count : 0}</span>
+          <div className="profile-details">
+            <div className="profile-info">
+              <h1 className="profile-name">{decodedName}</h1>
             </div>
-            <div className="profile-stat">
-              <SiteIcon name="fa-tag-participants" aria-hidden="true" />
-              <span>创作者</span>
-              <span className="stat-value">{contentLoaded ? formatCount(participantCount) : "—"}</span>
-            </div>
-            <div className="profile-stat">
-              <SiteIcon name="fa-tag-heat" aria-hidden="true" />
-              <span>互动</span>
-              <span className="stat-value">{contentLoaded ? formatCount(interactionCount) : "—"}</span>
+            <div className="profile-stats">
+              <div className="profile-stat">
+                <SiteIcon name="fa-tag-works" aria-hidden="true" />
+                <span>作品</span>
+                <span className="stat-value">{tagInfo ? tagInfo.post_count : 0}</span>
+              </div>
+              <div className="profile-stat">
+                <SiteIcon name="fa-tag-participants" aria-hidden="true" />
+                <span>创作者</span>
+                <span className="stat-value">{contentLoaded ? formatCount(participantCount) : "—"}</span>
+              </div>
+              <div className="profile-stat">
+                <SiteIcon name="fa-tag-heat" aria-hidden="true" />
+                <span>互动</span>
+                <span className="stat-value">{contentLoaded ? formatCount(interactionCount) : "—"}</span>
+              </div>
             </div>
           </div>
           <div className="profile-actions">
