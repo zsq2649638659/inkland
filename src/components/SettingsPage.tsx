@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -115,7 +115,9 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackType, setFeedbackType] = useState("功能建议");
+  const [feedbackTypeOpen, setFeedbackTypeOpen] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const feedbackSelectRef = useRef<HTMLDivElement>(null);
   const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; blockedUserId: string; name: string; avatarUrl: string | null; bio: string | null; showProfileInfo: boolean }>>([]);
   const [blockedLoading, setBlockedLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -145,6 +147,16 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const requestedTab = parseSettingsTab(searchParams.get("tab"));
   const activeTab = isTabForSection(requestedTab, section) ? requestedTab : defaultTabForSection(section);
   const privacyReady = Boolean(user && privacyLoadedUserId === user.id);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (feedbackSelectRef.current && !feedbackSelectRef.current.contains(event.target as Node)) {
+        setFeedbackTypeOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -715,20 +727,34 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
             <h3 className="settings-subtitle">快速反馈</h3>
             <form className="settings-feedback-form" onSubmit={handleFeedbackSubmit} aria-busy={feedbackSubmitting}>
               <div className="settings-form-group">
-                <label className="settings-form-label" htmlFor="contact-feedback-type">反馈类型</label>
-                <select
-                  id="contact-feedback-type"
-                  className="settings-form-select"
-                  disabled={feedbackSubmitting}
-                  value={feedbackType}
-                  onChange={(e) => {
-                    setFeedbackType(e.target.value);
-                    setFeedbackError("");
-                    setFeedbackSuccess("");
-                  }}
-                >
-                  {feedbackTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-                </select>
+                <label className="settings-form-label">反馈类型</label>
+                <div className="settings-custom-select" ref={feedbackSelectRef} tabIndex={0} onClick={() => setFeedbackTypeOpen(!feedbackTypeOpen)}>
+                  <span className="settings-custom-select-text">{feedbackType}</span>
+                  <span className="settings-custom-select-arrow">
+                    <SiteIcon name="fa-chevron-down" variant="solid" size={12} style={{ transform: feedbackTypeOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }} />
+                  </span>
+                  {feedbackTypeOpen && (
+                    <div className="settings-custom-select-dropdown">
+                      {feedbackTypes.map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          className={`settings-custom-select-option${feedbackType === type ? " active" : ""}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFeedbackType(type);
+                            setFeedbackTypeOpen(false);
+                            setFeedbackError("");
+                            setFeedbackSuccess("");
+                          }}
+                        >
+                          <span>{type}</span>
+                          {feedbackType === type && <SiteIcon name="fa-check" variant="solid" size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="settings-form-group">
                 <label className="settings-form-label" htmlFor="contact-feedback-content">反馈内容</label>
