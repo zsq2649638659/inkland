@@ -11760,6 +11760,9 @@ p {
 .settings-feedback-actions .settings-btn-save { order:2; }
 .settings-feedback-actions .settings-status { order:1; }
 .settings-feedback-actions .settings-status { flex:0 1 auto; }
+.settings-feedback-meta { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;color:var(--color-text-light);font-size:12px;line-height:1.5 }
+.settings-feedback-meta .settings-form-hint { min-width:0;margin-top:0 }
+.settings-feedback-count { flex:0 0 auto;font-variant-numeric:tabular-nums;white-space:nowrap }
 /* Custom select dropdown */
 .settings-form-select-wrapper { position:relative;width:100% }
 .settings-form-select { width:100%;height:42px;padding:0 36px 0 14px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-page);color:var(--color-text);font-size:14px;outline:none;font-family:var(--font-family);appearance:none;cursor:pointer;transition:border-color .25s ease,box-shadow .25s ease;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%236B6B6B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center }
@@ -11993,6 +11996,10 @@ p {
   .sidebar-dialog { padding:24px }
   #page-settings .settings-form-actions { align-items:flex-start;gap:12px; }
   #page-settings .settings-form-actions .settings-btn-save { align-self:center;flex-shrink:0; }
+  #page-settings .settings-feedback-actions { flex-wrap:wrap; }
+  #page-settings .settings-feedback-actions .settings-status { flex-basis:100%; }
+  #page-settings .settings-feedback-meta { align-items:flex-start;flex-direction:column;gap:2px; }
+  #page-settings .settings-feedback-count { align-self:flex-end; }
   #page-settings .settings-notification-actions { align-items:center;justify-content:flex-end; }
   #page-settings .settings-notification-actions .settings-btn-save { align-self:flex-end; }
   .account-settings-heading { flex-direction:column;gap:16px; }
