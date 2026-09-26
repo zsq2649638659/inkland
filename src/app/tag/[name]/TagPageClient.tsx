@@ -579,22 +579,22 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
           </div>
           <div className="profile-info">
             <h1 className="profile-name">{decodedName}</h1>
-            <div className="profile-stats">
-              <div className="profile-stat">
-                <SiteIcon name="fa-tag-works" aria-hidden="true" />
-                <span>作品</span>
-                <span className="stat-value">{tagInfo ? tagInfo.post_count : 0}</span>
-              </div>
-              <div className="profile-stat">
-                <SiteIcon name="fa-tag-participants" aria-hidden="true" />
-                <span>创作者</span>
-                <span className="stat-value">{contentLoaded ? formatCount(participantCount) : "—"}</span>
-              </div>
-              <div className="profile-stat">
-                <SiteIcon name="fa-tag-heat" aria-hidden="true" />
-                <span>互动</span>
-                <span className="stat-value">{contentLoaded ? formatCount(interactionCount) : "—"}</span>
-              </div>
+          </div>
+          <div className="profile-stats">
+            <div className="profile-stat">
+              <SiteIcon name="fa-tag-works" aria-hidden="true" />
+              <span>作品</span>
+              <span className="stat-value">{tagInfo ? tagInfo.post_count : 0}</span>
+            </div>
+            <div className="profile-stat">
+              <SiteIcon name="fa-tag-participants" aria-hidden="true" />
+              <span>创作者</span>
+              <span className="stat-value">{contentLoaded ? formatCount(participantCount) : "—"}</span>
+            </div>
+            <div className="profile-stat">
+              <SiteIcon name="fa-tag-heat" aria-hidden="true" />
+              <span>互动</span>
+              <span className="stat-value">{contentLoaded ? formatCount(interactionCount) : "—"}</span>
             </div>
           </div>
           <div className="profile-actions">
@@ -664,9 +664,11 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
             setMobileFilterOpen(true);
           }} aria-label="打开筛选">
             <SiteIcon name="fa-filter" variant="default" aria-hidden="true" />
+            <span>筛选</span>
           </button>
           {displayedCount > 0 && <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为一列卡片"} aria-pressed={mobileCardLayout === "square"}>
             <SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" />
+            <span>布局</span>
           </button>}
         </div>}
         {mobileFilterOpen && <div className="tag-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>

@@ -18153,6 +18153,14 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 
 @media (max-width: 767px) {
   #page-tag .profile-actions:not(:has(> :is(button, a):nth-child(2):last-child)) > .profile-action-btn {
+    width: 100px !important;
+    min-width: 100px !important;
+    flex-basis: 100px !important;
+  }
+}
+
+@media (max-width: 260px) {
+  #page-tag .profile-actions:not(:has(> :is(button, a):nth-child(2):last-child)) > .profile-action-btn {
     width: 40px !important;
     min-width: 40px !important;
     flex-basis: 40px !important;
