@@ -808,17 +808,13 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
           ) : user ? (
             <div className="comment-input-area">
                 <div className="comment-input-main">
-                  <textarea
-                    placeholder="写下你的想法..."
-                    className="comment-textarea"
-                    rows={3}
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    style={{
-                      background: darkMode ? "var(--color-bg-secondary, #2a2a2a)" : "var(--color-card, #FFFFFF)",
-                      color: darkMode ? "#d4c8b8" : "var(--color-text, #1A1A1A)",
-                    }}
-                  />
+                <textarea
+                  placeholder="写下你的想法..."
+                  className="comment-textarea"
+                  rows={3}
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                />
                   <div className="comment-submit-row">
                     <EmojiPicker
                       darkMode={darkMode}

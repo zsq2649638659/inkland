@@ -95,9 +95,6 @@ export default function DetailFloatingActions({
               <button className="floating-btn" title="字体调整" onClick={() => openPanel("font")}>
                 <SiteIcon name="fa-detail-font-adjust" size={22} />
               </button>
-              <button className="floating-btn" title="页面宽度" aria-label="页面宽度" onClick={() => openPanel("width")}>
-                <SiteIcon name="fa-detail-page-width" size={22} />
-              </button>
               <button className="floating-btn" title="举报作品" onClick={report}>
                 <SiteIcon name="fa-detail-report" size={22} />
               </button>

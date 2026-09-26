@@ -759,10 +759,6 @@ export default function ImageReaderClient({ post, images: initialImages, initial
                   rows={3}
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  style={{
-                    background: darkMode ? "var(--color-bg-secondary, #2a2a2a)" : "var(--color-card, #FFFFFF)",
-                    color: darkMode ? "#d4c8b8" : "var(--color-text, #1A1A1A)",
-                  }}
                 />
                 <div className="comment-submit-row">
                   <EmojiPicker

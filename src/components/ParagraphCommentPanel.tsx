@@ -650,6 +650,7 @@ onReport,
           </div>
         ) : null}
         <textarea
+          className="comment-textarea para-comment-panel-textarea"
           placeholder={user ? "写下你的想法..." : "请先登录"}
           rows={1}
           value={commentText}
