@@ -64,7 +64,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
   const [fontSize, setFontSize] = useState<number | null>(null);
   const [lineHeightPosition, setLineHeightPosition] = useState<number | null>(null);
   const [paragraphSpacing, setParagraphSpacing] = useState<number | null>(null);
-  const [readerWidth, setReaderWidth] = useState("900");
+  const [readerWidth, setReaderWidth] = useState("auto");
   const [fontFamily, setFontFamily] = useState("sans");
   const [showSettings, setShowSettings] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -72,11 +72,10 @@ export default function ImageReaderClient({ post, images: initialImages, initial
   const [expandedReplyIds, setExpandedReplyIds] = useState<Set<string>>(new Set());
   const [commentText, setCommentText] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
-  const [totalComments, setTotalComments] = useState(post.comment_count || 0);
   const [stats, setStats] = useState({
     like_count: post.like_count || 0,
     bookmark_count: post.bookmark_count || 0,
-    comment_count: post.comment_count || 0,
+    comment_count: 0,
   });
   // 举报状态
   const [reportModal, setReportModal] = useState<{ open: boolean; targetType: "comment" | "post"; targetId: string } | null>(null);
@@ -226,18 +225,27 @@ export default function ImageReaderClient({ post, images: initialImages, initial
   }, [post.id, profile?.is_test_account]);
 
   const fetchStats = async () => {
-    const { data } = await supabase
-      .from("post_stats")
-      .select("like_count, comment_count, bookmark_count")
-      .eq("id", post.id)
-      .single();
-    if (data) {
-      setStats({
+    const [{ data }, workComments] = await Promise.all([
+      supabase
+        .from("post_stats")
+        .select("like_count, bookmark_count")
+        .eq("id", post.id)
+        .single(),
+      supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .eq("post_id", post.id)
+        .is("paragraph_index", null),
+    ]);
+    const workCommentCount = workComments.count ?? 0;
+    setStats((current) => ({
+      ...current,
+      ...(data ? {
         like_count: (data as Record<string, number>).like_count || 0,
         bookmark_count: (data as Record<string, number>).bookmark_count || 0,
-        comment_count: (data as Record<string, number>).comment_count || 0,
-      });
-    }
+      } : {}),
+      comment_count: workCommentCount,
+    }));
   };
 
   const [replies, setReplies] = useState<Record<string, Comment[]>>({});
@@ -247,6 +255,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
       .from("comments")
       .select("id, content, created_at, user_id, parent_id, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
       .eq("post_id", post.id)
+      .is("paragraph_index", null)
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -312,7 +321,6 @@ export default function ImageReaderClient({ post, images: initialImages, initial
 
       setComments(topLevel);
       setReplies(replyMap);
-      setTotalComments(all.length);
     }
   };
 
@@ -351,7 +359,6 @@ export default function ImageReaderClient({ post, images: initialImages, initial
 
     if (!error) {
       setCommentText("");
-      setTotalComments((c) => c + 1);
       await loadComments();
       fetchStats();
       createNotification({
@@ -557,7 +564,6 @@ export default function ImageReaderClient({ post, images: initialImages, initial
       return;
     }
     setComments((prev) => prev.filter((c) => c.user_id !== blockModal.userId));
-    setTotalComments((c) => Math.max(0, c - 1));
     setBlockModal(null);
     showToast("屏蔽成功");
   };
@@ -604,7 +610,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
         ref={contentRef}
         className={`content-wrapper image-reader-page detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
         style={{
-          maxWidth: readerWidth === "auto" ? "var(--content-width, 900px)" : `${readerWidth}px`,
+          maxWidth: readerWidth === "auto" ? "var(--detail-reader-default-width, 900px)" : `${readerWidth}px`,
           color: darkMode ? "#b8a090" : themeColors[currentTheme].text,
         }}
       >
@@ -624,20 +630,22 @@ export default function ImageReaderClient({ post, images: initialImages, initial
 
         {/* Author Row */}
         <div className="author-row">
-          <div className="author-avatar">
-            {post.author?.avatar_url ? (
-              <img src={post.author.avatar_url} alt={authorName} />
+          <div className="author-identity">
+            <div className="author-avatar">
+              {post.author?.avatar_url ? (
+                <img src={post.author.avatar_url} alt={authorName} />
+              ) : (
+                <DefaultAvatar name={authorName} className="author-avatar-placeholder" />
+              )}
+            </div>
+            {post.user_id ? (
+              <Link href={`/user/${post.user_id}`} className="author-name">
+                {authorName}
+              </Link>
             ) : (
-              <DefaultAvatar name={authorName} className="author-avatar-placeholder" />
+              <span className="author-name">{authorName}</span>
             )}
           </div>
-          {post.user_id ? (
-            <Link href={`/user/${post.user_id}`} className="author-name">
-              {authorName}
-            </Link>
-          ) : (
-            <span className="author-name">{authorName}</span>
-          )}
           <div className="work-meta">
             {post.image_count && post.image_count > 0 ? (
               <span className="meta-item">
@@ -1022,7 +1030,6 @@ export default function ImageReaderClient({ post, images: initialImages, initial
                               if (!error) {
                                 setReplyText("");
                                 setReplyOpenId(null);
-                                setTotalComments((n) => n + 1);
                                 await loadComments();
                                 fetchStats();
                                 createNotification({

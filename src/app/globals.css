@@ -5304,6 +5304,16 @@ p {
 }
 
 /* ===== Post Detail Page (Design V2.0) ===== */
+:root {
+  --detail-reader-default-width: 900px;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --detail-reader-default-width: 640px;
+  }
+}
+
 .content-wrapper {
   background: var(--color-card, #FFFFFF);
   max-width: var(--content-width, 900px);
@@ -5314,6 +5324,13 @@ p {
 
 .content-wrapper.detail-reader-page {
   margin-bottom: 64px;
+}
+
+@media (min-width: 769px) and (max-width: 900px) {
+  .detail-floating-sidebar {
+    right: 12px !important;
+    left: auto !important;
+  }
 }
 
 .tags-row {
@@ -5338,6 +5355,13 @@ p {
   gap: var(--spacing-sm, 8px);
   margin-bottom: var(--spacing-lg, 24px);
   flex-wrap: wrap;
+}
+
+.author-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
 }
 
 .author-avatar {
@@ -6207,8 +6231,8 @@ p {
 
 .nested-reply-avatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   overflow: hidden;
   background: var(--color-bg-secondary, #E8E4E0);
@@ -7661,7 +7685,8 @@ p {
   }
 
   .content-wrapper.detail-reader-page {
-    margin: 0 8px 64px;
+    width: min(640px, calc(100% - 16px));
+    margin: 0 auto 64px;
   }
 
   .content-wrapper.detail-reader-page.has-chapter-nav {
@@ -7690,15 +7715,49 @@ p {
     display: none;
   }
 
-  .detail-mobile-floating-actions {
-    position: fixed;
-    right: 12px;
-    bottom: 20px;
-    z-index: 100;
+  .detail-floating-sidebar {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
+    top: 50%;
+    right: 8px !important;
+    left: auto !important;
+    gap: 6px;
+    transform: translateY(-50%);
+  }
+
+  .detail-floating-sidebar .floating-btn {
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 4px 14px rgba(26, 26, 26, .14);
+  }
+
+  .detail-mobile-floating-actions {
+    display: none;
+  }
+
+  [data-theme="dark"] .detail-floating-sidebar .floating-btn {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
+  }
+
+  .author-row {
+    align-items: flex-start;
+  }
+
+  .author-name,
+  .meta-item,
+  .meta-item .meta-value {
+    font-size: 14px;
+  }
+
+  .author-identity {
+    flex: 0 0 auto;
+  }
+
+  .work-meta {
+    flex: 0 0 auto;
+    min-width: max-content;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-left: 0;
   }
 
   .detail-mobile-more {

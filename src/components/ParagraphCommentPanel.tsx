@@ -300,6 +300,8 @@ onReport,
     const { data } = await supabase
       .from("comments")
       .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
+      .eq("post_id", postId)
+      .eq("paragraph_index", paragraphIndex)
       .eq("parent_id", commentId)
       .order("created_at", { ascending: true })
       .limit(100);
