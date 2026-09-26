@@ -673,7 +673,7 @@
   background: var(--ink-primary-bg);
 }
 
-#page-tag .profile-avatar { grid-column: 1; grid-row: 1 / span 2; }
+#page-tag .profile-avatar { grid-column: 1; grid-row: 1; }
 #page-tag .profile-avatar svg { width: 32px; height: 32px; }
 #page-tag .profile-info { min-width: 0; grid-column: 2; grid-row: 1; }
 #page-tag .profile-name { margin: 0; color: var(--ink-text); font: var(--ink-font-title-xl); line-height: 1.2; }
@@ -871,7 +871,7 @@
   outline-offset: var(--ink-outline-offset-focus);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   #page-tag .main-container { width: calc(100% - 32px); max-width: none; padding-block: var(--ink-space-4) var(--ink-space-8); }
   #page-tag .profile-section { grid-template-columns: 32px minmax(0, 1fr) 100px; column-gap: var(--ink-space-3); row-gap: var(--ink-space-2); padding: var(--ink-space-3); }
   #page-tag .profile-avatar { width: 32px; height: 32px; }
