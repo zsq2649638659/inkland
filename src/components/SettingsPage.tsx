@@ -664,16 +664,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               <span className="settings-about-value">v0.0.1</span>
             </div>
             <div className="settings-about-row">
-              <span className="settings-about-label">技术栈</span>
-              <span className="settings-about-value">Next.js + React + Supabase</span>
-            </div>
-            <div className="settings-about-row">
-              <span className="settings-about-label">开源许可</span>
-              <span className="settings-about-value" style={{ fontWeight: 400, fontSize: "13px", color: "var(--color-text-muted)" }}>
-                前端框架基于 Next.js（MIT License），UI 组件参考 Radix UI（MIT License），图标使用 FontAwesome 6（CC BY 4.0 / SIL OFL 1.1）。
-              </span>
-            </div>
-            <div className="settings-about-row">
               <span className="settings-about-label">数据合规</span>
               <span className="settings-about-value" style={{ fontWeight: 400, fontSize: "13px", color: "var(--color-text-muted)" }}>
                 个人信息处理方式与用户权利说明见 <Link href="/privacy" style={{ color: "var(--color-primary)" }}>隐私政策</Link>。
