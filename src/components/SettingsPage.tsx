@@ -116,6 +116,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackType, setFeedbackType] = useState("功能建议");
   const [feedbackTypeOpen, setFeedbackTypeOpen] = useState(false);
+  const [feedbackTypeActiveIndex, setFeedbackTypeActiveIndex] = useState(0);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const feedbackSelectRef = useRef<HTMLDivElement>(null);
   const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; blockedUserId: string; name: string; avatarUrl: string | null; bio: string | null; showProfileInfo: boolean }>>([]);
@@ -727,22 +728,74 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
             <h3 className="settings-subtitle">快速反馈</h3>
             <form className="settings-feedback-form" onSubmit={handleFeedbackSubmit} aria-busy={feedbackSubmitting}>
               <div className="settings-form-group">
-                <label className="settings-form-label">反馈类型</label>
-                <div className="settings-custom-select" ref={feedbackSelectRef} tabIndex={0} onClick={() => setFeedbackTypeOpen(!feedbackTypeOpen)}>
+                <label className="settings-form-label" id="contact-feedback-type-label">反馈类型</label>
+                <div
+                  className="settings-custom-select"
+                  ref={feedbackSelectRef}
+                  role="combobox"
+                  aria-labelledby="contact-feedback-type-label"
+                  aria-haspopup="listbox"
+                  aria-controls="contact-feedback-type-listbox"
+                  aria-expanded={feedbackTypeOpen}
+                  aria-activedescendant={feedbackTypeOpen ? `contact-feedback-type-option-${feedbackTypeActiveIndex}` : undefined}
+                  tabIndex={0}
+                  onClick={() => {
+                    const nextOpen = !feedbackTypeOpen;
+                    setFeedbackTypeOpen(nextOpen);
+                    if (nextOpen) setFeedbackTypeActiveIndex(Math.max(feedbackTypes.indexOf(feedbackType), 0));
+                  }}
+                  onKeyDown={(event) => {
+                    const selectedIndex = Math.max(feedbackTypes.indexOf(feedbackType), 0);
+                    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                      event.preventDefault();
+                      if (!feedbackTypeOpen) {
+                        setFeedbackTypeActiveIndex(selectedIndex);
+                        setFeedbackTypeOpen(true);
+                      } else {
+                        setFeedbackTypeActiveIndex((currentIndex) => (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + feedbackTypes.length) % feedbackTypes.length);
+                      }
+                    } else if (event.key === "Home" || event.key === "End") {
+                      event.preventDefault();
+                      setFeedbackTypeActiveIndex(event.key === "Home" ? 0 : feedbackTypes.length - 1);
+                      setFeedbackTypeOpen(true);
+                    } else if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      if (!feedbackTypeOpen) {
+                        setFeedbackTypeActiveIndex(selectedIndex);
+                        setFeedbackTypeOpen(true);
+                      } else {
+                        setFeedbackType(feedbackTypes[feedbackTypeActiveIndex] ?? feedbackType);
+                        setFeedbackTypeOpen(false);
+                        setFeedbackError("");
+                        setFeedbackSuccess("");
+                      }
+                    } else if (event.key === "Escape" && feedbackTypeOpen) {
+                      event.preventDefault();
+                      setFeedbackTypeOpen(false);
+                    } else if (event.key === "Tab") {
+                      setFeedbackTypeOpen(false);
+                    }
+                  }}
+                >
                   <span className="settings-custom-select-text">{feedbackType}</span>
                   <span className="settings-custom-select-arrow">
                     <SiteIcon name="fa-chevron-down" variant="solid" size={12} style={{ transform: feedbackTypeOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }} />
                   </span>
                   {feedbackTypeOpen && (
-                    <div className="settings-custom-select-dropdown">
-                      {feedbackTypes.map((type) => (
+                    <div className="settings-custom-select-dropdown" id="contact-feedback-type-listbox" role="listbox" aria-labelledby="contact-feedback-type-label">
+                      {feedbackTypes.map((type, index) => (
                         <button
                           key={type}
+                          id={`contact-feedback-type-option-${index}`}
                           type="button"
-                          className={`settings-custom-select-option${feedbackType === type ? " active" : ""}`}
+                          role="option"
+                          aria-selected={feedbackType === type}
+                          tabIndex={-1}
+                          className={`settings-custom-select-option${feedbackType === type ? " active" : ""}${feedbackTypeOpen && feedbackTypeActiveIndex === index ? " keyboard-active" : ""}`}
                           onClick={(event) => {
                             event.stopPropagation();
                             setFeedbackType(type);
+                            setFeedbackTypeActiveIndex(index);
                             setFeedbackTypeOpen(false);
                             setFeedbackError("");
                             setFeedbackSuccess("");
