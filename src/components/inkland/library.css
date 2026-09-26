@@ -675,17 +675,18 @@
 
 #page-tag .profile-avatar { grid-column: 1; grid-row: 1; }
 #page-tag .profile-avatar svg { width: 32px; height: 32px; }
-#page-tag .profile-info { min-width: 0; grid-column: 2; grid-row: 1; }
+#page-tag .profile-details { display: flex; min-width: 0; grid-column: 2; grid-row: 1; flex-direction: column; align-items: flex-start; gap: var(--ink-space-2); }
+#page-tag .profile-info { min-width: 0; }
 #page-tag .profile-name { margin: 0; color: var(--ink-text); font: var(--ink-font-title-xl); line-height: 1.2; }
 #page-tag .profile-bio { display: none; }
-#page-tag .profile-stats { display: flex; min-width: 0; grid-column: 2; grid-row: 2; flex-wrap: wrap; align-items: center; gap: var(--ink-space-4); margin: 0; }
+#page-tag .profile-stats { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--ink-space-4); margin: 0; }
 #page-tag .profile-stat { display: inline-flex; align-items: center; gap: var(--ink-space-1); color: var(--ink-muted); font: var(--ink-font-control); white-space: nowrap; }
 #page-tag .profile-stat svg { width: 15px; height: 15px; color: currentColor; }
 #page-tag .profile-stat .stat-value { color: var(--ink-text); font-weight: 600; }
-#page-tag .profile-actions { display: flex; grid-column: 3; grid-row: 1 / span 2; align-items: center; justify-content: flex-end; }
+#page-tag .profile-actions { display: flex; grid-column: 3; grid-row: 1; align-items: center; justify-content: flex-end; }
 #page-tag .profile-action-btn {
   display: inline-flex;
-  width: var(--ink-button-width, 120px);
+  width: var(--ink-button-width, 100px);
   height: var(--ink-button-height, 40px);
   align-items: center;
   justify-content: center;
@@ -701,6 +702,10 @@
 #page-tag .profile-action-btn:hover,
 #page-tag .profile-action-btn:focus-visible { color: var(--ink-button-primary-color, #fff); background: var(--ink-button-primary-active-bg, #e85a4a); outline: var(--ink-outline-none); }
 #page-tag .profile-action-icon { display: none; width: var(--ink-size-16); height: var(--ink-size-16); }
+#page-tag .profile-section.is-stats-wrapped { grid-template-columns: var(--ink-avatar-size-lg) minmax(0, 1fr) 40px; }
+#page-tag .profile-section.is-stats-wrapped .profile-actions { width: 40px; }
+#page-tag .profile-section.is-stats-wrapped .profile-action-icon { display: inline-flex; }
+#page-tag .profile-section.is-stats-wrapped .profile-action-label { display: none; }
 
 #page-tag .tag-filter-selectors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ink-space-3); margin-bottom: var(--ink-space-4); }
 #page-tag .tag-filter-selectors__sort { display: contents; }
@@ -783,6 +788,7 @@
   gap: var(--ink-gap-inline);
   align-items: stretch;
 }
+#page-tag .tag-history-card-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 214px), 1fr)); }
 :is(#page-tag, #page-search) .tag-history-card-grid .site-card {
   display: flex;
   min-width: 0;
@@ -873,17 +879,21 @@
 
 @media (max-width: 600px) {
   #page-tag .main-container { width: calc(100% - 32px); max-width: none; padding-block: var(--ink-space-4) var(--ink-space-8); }
-  #page-tag .profile-section { grid-template-columns: 32px minmax(0, 1fr) 100px; column-gap: var(--ink-space-3); row-gap: var(--ink-space-2); padding: var(--ink-space-3); }
+  #page-tag .profile-section { grid-template-columns: 32px minmax(0, 1fr) 100px; grid-template-rows: auto auto; column-gap: var(--ink-space-3); row-gap: var(--ink-space-2); padding: var(--ink-space-3); }
   #page-tag .profile-avatar { width: 32px; height: 32px; }
   #page-tag .profile-avatar svg { width: 18px; height: 18px; }
-  #page-tag .profile-stats { grid-column: 1 / 3; }
-  #page-tag .profile-actions { grid-column: 3; grid-row: 1 / span 2; justify-content: flex-end; }
+  #page-tag .profile-details { display: contents; }
+  #page-tag .profile-info { grid-column: 2; grid-row: 1; }
+  #page-tag .profile-stats { grid-column: 1 / 3; grid-row: 2; }
+  #page-tag .profile-actions { width: 100px; grid-column: 3; grid-row: 1 / span 2; justify-content: flex-end; }
   #page-tag .profile-action-btn { width: 100px; height: 40px; padding: 0 var(--ink-space-3); }
   #page-tag .profile-action-icon { display: none; width: 18px; height: 18px; }
   #page-tag .profile-action-label { display: inline; }
+  #page-tag .profile-section.is-stats-wrapped { grid-template-columns: 32px minmax(0, 1fr) 40px; }
+  #page-tag .profile-section.is-stats-wrapped .profile-actions { width: 40px; }
   #page-tag .tag-filter-selectors { display: none; }
   :is(#page-tag, #page-search) .tag-history-card-grid { display: block; column-count: 2; column-gap: var(--ink-gap-inline); }
-  #page-tag .tag-history-card-grid { column-count: 1; }
+  #page-tag .tag-history-card-grid { display: grid; column-count: initial; grid-template-columns: minmax(0, 1fr); }
   #page-tag .tag-history-card-grid.is-mobile-square { display: none; }
   #page-tag .tag-mobile-filter-bar { display: flex; width: 100%; gap: var(--ink-gap-compact); margin-bottom: var(--ink-space-3); }
   #page-tag .profile-mobile-filter-button { min-height: var(--ink-height-control-md); border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); cursor: pointer; }
@@ -910,6 +920,10 @@
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__tag-interactions svg { width: 15px; height: 15px; }
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar-link,
   :is(#page-tag, #page-search) .tag-history-card-grid .site-card__avatar { width: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); height: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); flex-basis: calc(var(--ink-avatar-size-sm) - var(--ink-space-2)); }
+}
+
+@media (min-width: 481px) and (max-width: 600px) {
+  #page-tag .tag-history-card-grid:not(.is-mobile-square) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 #page-search .tag-history-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -945,12 +959,6 @@
   #page-tag .tag-filter-selectors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 260px) {
-  #page-tag .profile-section { grid-template-columns: 32px minmax(0, 1fr) 40px; }
-  #page-tag .profile-action-btn { width: 40px; padding: 0; }
-  #page-tag .profile-action-icon { display: block; }
-  #page-tag .profile-action-label { display: none; }
-}
 
 /* 创作中心作品卡片：复用 Card Device Cards 的 studio@0.1 契约。
    PC 默认按实际 600px 内容栏两列，移动端在同一断点内切换为 studio-mobile-image@0.1 的单列信息结构。 */
