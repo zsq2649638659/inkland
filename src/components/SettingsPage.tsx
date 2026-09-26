@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -72,6 +72,8 @@ function parseSettingsTab(value: string | null): SettingsTab | null {
 const profileSettingsTabKeys: SettingsTab[] = ["account", "profile", "password"];
 
 const siteContactEmail = "inkland@163.com";
+const feedbackMinimumLength = 2;
+const feedbackMaximumLength = 5000;
 
 type BlockedUserRow = { id: string; blocked_user_id: string; created_at: string };
 type BlockedProfileRow = { id: string; nickname: string | null; avatar_url: string | null; show_profile_info: boolean };
@@ -91,7 +93,13 @@ function defaultTabForSection(section: SettingsSection): SettingsTab {
 }
 
 function SettingsPageTitle({ section }: { section: SettingsSection }) {
-  const title = section === "privacy" ? "设置和隐私" : section === "profile" ? "个人资料" : null;
+  const title = section === "privacy"
+    ? "设置和隐私"
+    : section === "profile"
+      ? "个人资料"
+      : section === "about"
+        ? "关于我们"
+        : "联系我们";
   return title ? <div className="page-header"><h1 className="page-title">{title}</h1></div> : null;
 }
 
@@ -108,6 +116,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackType, setFeedbackType] = useState("功能建议");
   const [feedbackTypeOpen, setFeedbackTypeOpen] = useState(false);
+  const [feedbackTypeActiveIndex, setFeedbackTypeActiveIndex] = useState(0);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const feedbackSelectRef = useRef<HTMLDivElement>(null);
   const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; blockedUserId: string; name: string; avatarUrl: string | null; bio: string | null; showProfileInfo: boolean }>>([]);
@@ -132,13 +141,17 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
   const [privacyMessageKind, setPrivacyMessageKind] = useState<"success" | "error" | "">("");
 
   const feedbackTypes = ["功能建议", "Bug 报告", "内容举报", "其他问题"];
+  const feedbackCharacterCount = feedbackText.length;
+  const trimmedFeedbackCharacterCount = Array.from(feedbackText.trim()).length;
+  const feedbackCanSubmit = trimmedFeedbackCharacterCount >= feedbackMinimumLength
+    && feedbackCharacterCount <= feedbackMaximumLength;
   const requestedTab = parseSettingsTab(searchParams.get("tab"));
   const activeTab = isTabForSection(requestedTab, section) ? requestedTab : defaultTabForSection(section);
   const privacyReady = Boolean(user && privacyLoadedUserId === user.id);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (feedbackSelectRef.current && !feedbackSelectRef.current.contains(e.target as Node)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (feedbackSelectRef.current && !feedbackSelectRef.current.contains(event.target as Node)) {
         setFeedbackTypeOpen(false);
       }
     };
@@ -308,8 +321,8 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
                   </div>
                 </div>
               </div>
-              <h2 className="feed-empty-title">登录后查看设置</h2>
-              <p className="feed-empty-desc">登录后即可管理你的账户设置</p>
+              <h2 className="feed-empty-title">{moreSettings ? "登录后查看此页面" : "登录后查看设置"}</h2>
+              <p className="feed-empty-desc">{moreSettings ? "登录后即可查看页面内容。" : "登录后即可管理你的账户设置"}</p>
               <Link href="/login" className="feed-empty-action">登录</Link>
               <Link href="/register" className="feed-empty-register">还没有账号？立即注册 →</Link>
             </div>
@@ -319,29 +332,51 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
     );
   }
 
-  const handleFeedbackSubmit = async () => {
-    if (feedbackText.trim().length < 2) {
-      setFeedbackError("请至少填写 2 个字的反馈内容");
+  const handleFeedbackSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const content = feedbackText.trim();
+    const contentLength = content.length;
+    const contentCharacterCount = Array.from(content).length;
+    if (contentCharacterCount < feedbackMinimumLength) {
+      setFeedbackError("请至少填写 2 个字符的反馈内容。");
+      return;
+    }
+    if (contentLength > feedbackMaximumLength) {
+      setFeedbackError("反馈内容不能超过 5000 个字符。");
       return;
     }
     setFeedbackError("");
     setFeedbackSuccess("");
     setFeedbackSubmitting(true);
-    const response = await fetch("/api/feedback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: feedbackType, content: feedbackText }),
-    });
-    const result = await response.json().catch(() => null) as { error?: string } | null;
-    if (!response.ok) {
-      setFeedbackError(result?.error || "反馈暂时提交失败，请稍后再试");
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: feedbackType, content }),
+      });
+      const result = await response.json().catch(() => null) as { error?: string; success?: boolean } | null;
+      if (!response.ok || !result?.success) {
+        setFeedbackError(result?.error || "反馈暂时提交失败，请稍后再试。");
+        return;
+      }
+      setFeedbackSuccess("反馈已成功提交，感谢你的建议！");
+      setFeedbackText("");
+    } catch {
+      setFeedbackError("网络连接异常，反馈尚未提交。请检查网络后重试。");
+    } finally {
       setFeedbackSubmitting(false);
-      return;
     }
-    setFeedbackSuccess("反馈已收到并保存到平台后台，感谢你的建议！");
-    setFeedbackText("");
-    setFeedbackSubmitting(false);
-    setTimeout(() => setFeedbackSuccess(""), 3000);
+  };
+
+  const handleFeedbackTextChange = (value: string) => {
+    let limitedValue = value.slice(0, feedbackMaximumLength);
+    const lastCodeUnit = limitedValue.charCodeAt(limitedValue.length - 1);
+    if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) {
+      limitedValue = limitedValue.slice(0, -1);
+    }
+    setFeedbackText(limitedValue);
+    setFeedbackError("");
+    setFeedbackSuccess("");
   };
 
   const handlePasswordChange = async () => {
@@ -642,19 +677,9 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               <span className="settings-about-value">v0.0.1</span>
             </div>
             <div className="settings-about-row">
-              <span className="settings-about-label">技术栈</span>
-              <span className="settings-about-value">Next.js + React + Supabase</span>
-            </div>
-            <div className="settings-about-row">
-              <span className="settings-about-label">开源许可</span>
-              <span className="settings-about-value" style={{ fontWeight: 400, fontSize: "13px", color: "var(--color-text-muted)" }}>
-                前端框架基于 Next.js（MIT License），UI 组件参考 Radix UI（MIT License），图标使用 FontAwesome 6（CC BY 4.0 / SIL OFL 1.1）。
-              </span>
-            </div>
-            <div className="settings-about-row">
               <span className="settings-about-label">数据合规</span>
               <span className="settings-about-value" style={{ fontWeight: 400, fontSize: "13px", color: "var(--color-text-muted)" }}>
-                数据处理、存储地域和用户权利说明将在正式上线前根据实际部署情况补充并审核。
+                个人信息处理方式与用户权利说明见 <Link href="/privacy" style={{ color: "var(--color-primary)" }}>隐私政策</Link>。
               </span>
             </div>
             <div className="settings-about-row">
@@ -681,7 +706,6 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
 
           {/* ---- Panel: 联系我们 ---- */}
           <div className="settings-panel" style={{ display: moreSettings && activeTab === "contact" ? "block" : "none" }}>
-            <h2 className="settings-panel-title">联系我们</h2>
             <p className="settings-panel-desc">有任何问题或建议？欢迎通过反馈表联系我们，也可以直接发送邮件。</p>
 
             {/* Multiple emails */}
@@ -700,56 +724,122 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               </div>
             </div>
 
-            {/* Feedback form — custom styled select */}
+            {/* Feedback form */}
             <h3 className="settings-subtitle">快速反馈</h3>
-            <div className="settings-form-group">
-              <label className="settings-form-label">反馈类型</label>
-              <div className="settings-custom-select" ref={feedbackSelectRef} tabIndex={0} onClick={() => setFeedbackTypeOpen(!feedbackTypeOpen)}>
-                <span className="settings-custom-select-text">{feedbackType}</span>
-                <span className="settings-custom-select-arrow">
-                  <SiteIcon name="fa-chevron-down" variant="solid" size={12} style={{ transform: feedbackTypeOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
-                </span>
-                {feedbackTypeOpen && (
-                  <div className="settings-custom-select-dropdown">
-                    {feedbackTypes.map((type) => (
-                      <button
-                        key={type}
-                        className={`settings-custom-select-option${feedbackType === type ? " active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); setFeedbackType(type); setFeedbackTypeOpen(false); }}
-                      >
-                        <span>{type}</span>
-                        {feedbackType === type && (
-                          <SiteIcon name="fa-check" variant="solid" size={14} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            <form className="settings-feedback-form" onSubmit={handleFeedbackSubmit} aria-busy={feedbackSubmitting}>
+              <div className="settings-form-group">
+                <label className="settings-form-label" id="contact-feedback-type-label">反馈类型</label>
+                <div
+                  className="settings-custom-select"
+                  ref={feedbackSelectRef}
+                  role="combobox"
+                  aria-labelledby="contact-feedback-type-label"
+                  aria-haspopup="listbox"
+                  aria-controls="contact-feedback-type-listbox"
+                  aria-expanded={feedbackTypeOpen}
+                  aria-activedescendant={feedbackTypeOpen ? `contact-feedback-type-option-${feedbackTypeActiveIndex}` : undefined}
+                  tabIndex={0}
+                  onClick={() => {
+                    const nextOpen = !feedbackTypeOpen;
+                    setFeedbackTypeOpen(nextOpen);
+                    if (nextOpen) setFeedbackTypeActiveIndex(Math.max(feedbackTypes.indexOf(feedbackType), 0));
+                  }}
+                  onKeyDown={(event) => {
+                    const selectedIndex = Math.max(feedbackTypes.indexOf(feedbackType), 0);
+                    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                      event.preventDefault();
+                      if (!feedbackTypeOpen) {
+                        setFeedbackTypeActiveIndex(selectedIndex);
+                        setFeedbackTypeOpen(true);
+                      } else {
+                        setFeedbackTypeActiveIndex((currentIndex) => (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + feedbackTypes.length) % feedbackTypes.length);
+                      }
+                    } else if (event.key === "Home" || event.key === "End") {
+                      event.preventDefault();
+                      setFeedbackTypeActiveIndex(event.key === "Home" ? 0 : feedbackTypes.length - 1);
+                      setFeedbackTypeOpen(true);
+                    } else if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      if (!feedbackTypeOpen) {
+                        setFeedbackTypeActiveIndex(selectedIndex);
+                        setFeedbackTypeOpen(true);
+                      } else {
+                        setFeedbackType(feedbackTypes[feedbackTypeActiveIndex] ?? feedbackType);
+                        setFeedbackTypeOpen(false);
+                        setFeedbackError("");
+                        setFeedbackSuccess("");
+                      }
+                    } else if (event.key === "Escape" && feedbackTypeOpen) {
+                      event.preventDefault();
+                      setFeedbackTypeOpen(false);
+                    } else if (event.key === "Tab") {
+                      setFeedbackTypeOpen(false);
+                    }
+                  }}
+                >
+                  <span className="settings-custom-select-text">{feedbackType}</span>
+                  <span className="settings-custom-select-arrow">
+                    <SiteIcon name="fa-chevron-down" variant="solid" size={12} style={{ transform: feedbackTypeOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }} />
+                  </span>
+                  {feedbackTypeOpen && (
+                    <div className="settings-custom-select-dropdown" id="contact-feedback-type-listbox" role="listbox" aria-labelledby="contact-feedback-type-label">
+                      {feedbackTypes.map((type, index) => (
+                        <button
+                          key={type}
+                          id={`contact-feedback-type-option-${index}`}
+                          type="button"
+                          role="option"
+                          aria-selected={feedbackType === type}
+                          tabIndex={-1}
+                          className={`settings-custom-select-option${feedbackType === type ? " active" : ""}${feedbackTypeOpen && feedbackTypeActiveIndex === index ? " keyboard-active" : ""}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFeedbackType(type);
+                            setFeedbackTypeActiveIndex(index);
+                            setFeedbackTypeOpen(false);
+                            setFeedbackError("");
+                            setFeedbackSuccess("");
+                          }}
+                        >
+                          <span>{type}</span>
+                          {feedbackType === type && <SiteIcon name="fa-check" variant="solid" size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="settings-form-group">
-              <label className="settings-form-label">反馈内容</label>
-              <textarea
-                className="settings-form-input settings-form-textarea"
-                rows={4}
-                placeholder="请详细描述你的问题或建议..."
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-              ></textarea>
-            </div>
+              <div className="settings-form-group">
+                <label className="settings-form-label" htmlFor="contact-feedback-content">反馈内容</label>
+                {/* The API counts JavaScript string units too; keep the visible limit aligned and avoid splitting a surrogate pair. */}
+                <textarea
+                  id="contact-feedback-content"
+                  className="settings-form-input settings-form-textarea"
+                  rows={4}
+                  required
+                  minLength={feedbackMinimumLength}
+                  maxLength={feedbackMaximumLength}
+                  aria-describedby="contact-feedback-hint contact-feedback-count"
+                  aria-invalid={feedbackCharacterCount > 0 && !feedbackCanSubmit}
+                  disabled={feedbackSubmitting}
+                  placeholder="请详细描述你的问题或建议..."
+                  value={feedbackText}
+                  onChange={(e) => handleFeedbackTextChange(e.target.value)}
+                />
+                <div className="settings-feedback-meta">
+                  <span className="settings-form-hint" id="contact-feedback-hint">需填写 2–5000 个字符；emoji 按 2 个上限单位计。</span>
+                  <span className="settings-feedback-count" id="contact-feedback-count">{feedbackCharacterCount} / {feedbackMaximumLength}</span>
+                </div>
+              </div>
 
-            <div className="settings-form-actions settings-feedback-actions">
-              {feedbackSuccess && (
-                <SettingsStatus kind="success" message={feedbackSuccess} />
-              )}
-
-              {feedbackError && (
-                <SettingsStatus kind="error" message={feedbackError} />
-              )}
-              <button className="settings-btn-save" onClick={handleFeedbackSubmit} disabled={feedbackSubmitting}>
-                {feedbackSubmitting ? "提交中…" : "提交反馈"}
-              </button>
-            </div>
+              <div className="settings-form-actions settings-feedback-actions">
+                {feedbackSuccess && <SettingsStatus kind="success" message={feedbackSuccess} />}
+                {feedbackError && <SettingsStatus kind="error" message={feedbackError} />}
+                <button className="settings-btn-save" type="submit" disabled={feedbackSubmitting || !feedbackCanSubmit}>
+                  {feedbackSubmitting ? "提交中…" : "提交反馈"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>

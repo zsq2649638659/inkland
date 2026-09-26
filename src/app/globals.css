@@ -11760,6 +11760,9 @@ p {
 .settings-feedback-actions .settings-btn-save { order:2; }
 .settings-feedback-actions .settings-status { order:1; }
 .settings-feedback-actions .settings-status { flex:0 1 auto; }
+.settings-feedback-meta { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;color:var(--color-text-light);font-size:12px;line-height:1.5 }
+.settings-feedback-meta .settings-form-hint { min-width:0;margin-top:0 }
+.settings-feedback-count { flex:0 0 auto;font-variant-numeric:tabular-nums;white-space:nowrap }
 /* Custom select dropdown */
 .settings-form-select-wrapper { position:relative;width:100% }
 .settings-form-select { width:100%;height:42px;padding:0 36px 0 14px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-page);color:var(--color-text);font-size:14px;outline:none;font-family:var(--font-family);appearance:none;cursor:pointer;transition:border-color .25s ease,box-shadow .25s ease;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%236B6B6B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center }
@@ -11775,6 +11778,7 @@ p {
 .settings-custom-select-dropdown { position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--color-card);border:1px solid var(--color-border);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.1);z-index:10;padding:4px;overflow:hidden;animation:dropdownFadeIn 0.15s ease }
 .settings-custom-select-option { display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 12px;font-size:14px;color:var(--color-text);background:transparent;border:none;border-radius:6px;cursor:pointer;font-family:var(--font-family);transition:all .12s ease;text-align:left }
 .settings-custom-select-option:hover { background:var(--color-primary-bg);color:var(--color-primary) }
+.settings-custom-select-option.keyboard-active { background:var(--color-primary-bg);color:var(--color-primary) }
 .settings-custom-select-option.active { color:var(--color-primary);font-weight:500 }
 .settings-custom-select-option svg { flex-shrink:0;color:var(--color-primary) }
 [data-theme="dark"] .settings-custom-select { background:#1A1A1A;border-color:#333;color:#E8E8E8 }
@@ -11993,6 +11997,10 @@ p {
   .sidebar-dialog { padding:24px }
   #page-settings .settings-form-actions { align-items:flex-start;gap:12px; }
   #page-settings .settings-form-actions .settings-btn-save { align-self:center;flex-shrink:0; }
+  #page-settings .settings-feedback-actions { flex-wrap:wrap; }
+  #page-settings .settings-feedback-actions .settings-status { flex-basis:100%; }
+  #page-settings .settings-feedback-meta { align-items:flex-start;flex-direction:column;gap:2px; }
+  #page-settings .settings-feedback-count { align-self:flex-end; }
   #page-settings .settings-notification-actions { align-items:center;justify-content:flex-end; }
   #page-settings .settings-notification-actions .settings-btn-save { align-self:flex-end; }
   .account-settings-heading { flex-direction:column;gap:16px; }
