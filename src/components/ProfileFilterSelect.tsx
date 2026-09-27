@@ -10,6 +10,7 @@ export default function ProfileFilterSelect({
   onChange,
   id,
   disabled = false,
+  restoreFocusOnClose = false,
 }: {
   label: string;
   value: string;
@@ -17,6 +18,7 @@ export default function ProfileFilterSelect({
   onChange: (value: string) => void;
   id: string;
   disabled?: boolean;
+  restoreFocusOnClose?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -39,7 +41,7 @@ export default function ProfileFilterSelect({
             data-select
             ref={rootRef}
             onKeyDown={(event) => {
-              if (event.key === "Escape" && open) {
+              if (restoreFocusOnClose && event.key === "Escape" && open) {
                 event.preventDefault();
                 event.stopPropagation();
                 setOpen(false);
@@ -53,7 +55,7 @@ export default function ProfileFilterSelect({
           </button>
           <div className="select-menu" id={id} role="listbox" aria-label={label} hidden={!open || disabled}>
             {options.map((option) => (
-              <button key={option.value} className="select-option" type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); setOpen(false); triggerRef.current?.focus(); }}>
+              <button key={option.value} className="select-option" type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); setOpen(false); if (restoreFocusOnClose) triggerRef.current?.focus(); }}>
                 {option.label}
               </button>
             ))}

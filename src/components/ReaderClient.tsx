@@ -61,7 +61,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
   const [fontSize, setFontSize] = useState<number | null>(null);
   const [lineHeightPosition, setLineHeightPosition] = useState<number | null>(null);
   const [paragraphSpacing, setParagraphSpacing] = useState<number | null>(null);
-  const [readerWidth, setReaderWidth] = useState("900");
+  const [readerWidth, setReaderWidth] = useState("auto");
   const [fontFamily, setFontFamily] = useState("sans");
   const [showSettings, setShowSettings] = useState(false);
   const [selectedParaIndex, setSelectedParaIndex] = useState<number | null>(null);
@@ -72,11 +72,10 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
   const [expandedReplyIds, setExpandedReplyIds] = useState<Set<string>>(new Set());
   const [commentText, setCommentText] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
-  const [totalComments, setTotalComments] = useState(post.comment_count || 0);
   const [stats, setStats] = useState({
     like_count: post.like_count || 0,
     bookmark_count: post.bookmark_count || 0,
-    comment_count: post.comment_count || 0,
+    comment_count: 0,
   });
   // 举报状态
   const [reportModal, setReportModal] = useState<{ open: boolean; targetType: "comment" | "post"; targetId: string } | null>(null);
@@ -207,18 +206,27 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
   }, [post.id, profile?.is_test_account]);
 
   const fetchStats = async () => {
-    const { data } = await supabase
-      .from("post_stats")
-      .select("like_count, comment_count, bookmark_count")
-      .eq("id", post.id)
-      .single();
-    if (data) {
-      setStats({
+    const [{ data }, workComments] = await Promise.all([
+      supabase
+        .from("post_stats")
+        .select("like_count, bookmark_count")
+        .eq("id", post.id)
+        .single(),
+      supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .eq("post_id", post.id)
+        .is("paragraph_index", null),
+    ]);
+    const workCommentCount = workComments.count ?? 0;
+    setStats((current) => ({
+      ...current,
+      ...(data ? {
         like_count: (data as Record<string, number>).like_count || 0,
         bookmark_count: (data as Record<string, number>).bookmark_count || 0,
-        comment_count: (data as Record<string, number>).comment_count || 0,
-      });
-    }
+      } : {}),
+      comment_count: workCommentCount,
+    }));
   };
 
   const [replies, setReplies] = useState<Record<string, Comment[]>>({});
@@ -229,6 +237,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
       .from("comments")
       .select("id, content, created_at, user_id, parent_id, paragraph_index, author:profiles!comments_user_id_fkey(nickname, avatar_url, is_test_account)")
       .eq("post_id", post.id)
+      .is("paragraph_index", null)
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -295,7 +304,6 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
 
       setComments(topLevel);
       setReplies(replyMap);
-      setTotalComments(all.length);
     }
   };
 
@@ -351,7 +359,6 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
 
     if (!error) {
       setCommentText("");
-      setTotalComments((c) => c + 1);
       await loadComments();
       fetchStats();
       createNotification({
@@ -564,7 +571,6 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
       return;
     }
     setComments((prev) => prev.filter((c) => c.user_id !== blockModal.userId));
-    setTotalComments((c) => Math.max(0, c - 1));
     setBlockModal(null);
     showToast("屏蔽成功");
   };
@@ -658,15 +664,16 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
         onReport={handlePostReport}
       />
 
-      {/* Content Wrapper - 居中显示，与 floating-sidebar 同级，无多余外层 */}
-      <div
-        ref={contentRef}
-        className={`content-wrapper detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
-        style={{
-          maxWidth: readerWidth === "auto" ? "var(--content-width, 900px)" : `${readerWidth}px`,
-          color: darkMode ? "#b8b0a0" : themeColors[currentTheme].text,
-        }}
-      >
+      {/* BFC shell keeps the card's external bottom margin in the document scroll height. */}
+      <div className="detail-reader-page-shell">
+        <div
+          ref={contentRef}
+          className={`content-wrapper detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
+          style={{
+            maxWidth: readerWidth === "auto" ? "var(--detail-reader-default-width, 900px)" : `${readerWidth}px`,
+            color: darkMode ? "#b8b0a0" : themeColors[currentTheme].text,
+          }}
+        >
             {/* Title */}
             <h1 className="work-title">{post.title}</h1>
 
@@ -683,16 +690,22 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
 
             {/* Author Row */}
             <div className="author-row">
-              <div className="author-avatar">
-                {post.author?.avatar_url ? (
-                  <img src={post.author.avatar_url} alt={authorName} />
+              <div className="author-identity">
+                <div className="author-avatar">
+                  {post.author?.avatar_url ? (
+                    <img src={post.author.avatar_url} alt={authorName} />
+                  ) : (
+                    <DefaultAvatar name={authorName} className="author-avatar-placeholder" />
+                  )}
+                </div>
+                {post.user_id ? (
+                  <Link href={`/user/${post.user_id}`} className="author-name">
+                    {authorName}
+                  </Link>
                 ) : (
-                  <DefaultAvatar name={authorName} className="author-avatar-placeholder" />
+                  <span className="author-name">{authorName}</span>
                 )}
               </div>
-              <Link href={`/user/${post.author?.nickname || ""}`} className="author-name">
-                {authorName}
-              </Link>
               <div className="work-meta">
                 <span className="meta-item">
                   <SiteIcon name="fa-word-count" variant="default" />
@@ -804,17 +817,13 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
           ) : user ? (
             <div className="comment-input-area">
                 <div className="comment-input-main">
-                  <textarea
-                    placeholder="写下你的想法..."
-                    className="comment-textarea"
-                    rows={3}
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    style={{
-                      background: darkMode ? "var(--color-bg-secondary, #2a2a2a)" : "var(--color-card, #FFFFFF)",
-                      color: darkMode ? "#d4c8b8" : "var(--color-text, #1A1A1A)",
-                    }}
-                  />
+                <textarea
+                  placeholder="写下你的想法..."
+                  className="comment-textarea"
+                  rows={3}
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                />
                   <div className="comment-submit-row">
                     <EmojiPicker
                       darkMode={darkMode}
@@ -937,7 +946,10 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                       {/* 回复列表 */}
                       {replies[c.id] && replies[c.id].length > 0 && (
                         <div className="nested-replies">
-                          {(expandedReplyIds.has(c.id) ? replies[c.id] : replies[c.id].slice(0, 3)).map((reply) => (
+                          {(expandedReplyIds.has(c.id)
+                            ? replies[c.id]
+                            : replies[c.id].length > 3 ? [] : replies[c.id]
+                          ).map((reply) => (
                             <div key={reply.id} className="nested-reply-item" data-comment-id={reply.id}>
                               <div className="nested-reply-avatar">
                                 <Link href={`/user/${reply.user_id}`}>
@@ -1077,7 +1089,6 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
                                 if (!error) {
                                   setReplyText("");
                                   setReplyOpenId(null);
-                                  setTotalComments((n) => n + 1);
                                   await loadComments();
                                   fetchStats();
                                   createNotification({
@@ -1104,6 +1115,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
             )}
           </div>
         </div>
+      </div>
 
 
 
@@ -1224,7 +1236,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
           setSelectedParaIndex(null);
         }}
       >
-        <div className="para-comment-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: readerWidth === "auto" ? "var(--content-width, 900px)" : `${readerWidth}px` }}>
+        <div className="para-comment-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: readerWidth === "auto" ? "var(--detail-reader-default-width, 900px)" : `${readerWidth}px` }}>
           {isTextPost && selectedParaIndex !== null && (
             <ParagraphCommentPanel
               postId={post.id}

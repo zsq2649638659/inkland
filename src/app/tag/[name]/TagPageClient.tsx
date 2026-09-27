@@ -652,6 +652,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
             <ProfileFilterSelect
               label="排序"
               id="tag-sort-menu"
+              restoreFocusOnClose
               value={sortFilter}
               options={[{ value: "published", label: "最新发布" }, { value: "hot", label: "热度最高" }]}
               onChange={(value) => updateFilters({ sort: value as SortFilter, time: value === "hot" ? timeFilter : "all", type: typeFilter })}
@@ -660,6 +661,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
               <ProfileFilterSelect
                 label="热度时间范围"
                 id="tag-hot-time-menu"
+                restoreFocusOnClose
                 value={timeFilter}
                 disabled={sortFilter !== "hot"}
                 options={[{ value: "all", label: "全部" }, { value: "day", label: "一日" }, { value: "week", label: "一周" }, { value: "month", label: "一月" }]}
@@ -686,6 +688,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
             <ProfileFilterSelect
               label="作品类型"
               id="tag-type-menu"
+              restoreFocusOnClose
               value={typeFilter}
               options={[{ value: "all", label: "所有作品" }, { value: "single", label: "单篇" }, { value: "image", label: "图片" }, { value: "series", label: "长篇连载" }]}
               onChange={(value) => updateFilters({ sort: sortFilter, time: timeFilter, type: value as TypeFilter })}
