@@ -52,6 +52,49 @@ interface SeriesInfo {
 type ProfileFilterType = "all" | "single" | "image" | "series";
 type ProfileSortMode = "latest" | "hot";
 type PublicActivityTab = "likes" | "bookmarks";
+type ProfileCardLayout = "full" | "square";
+
+interface ProfilePageControls {
+  filterType: ProfileFilterType;
+  sortMode: ProfileSortMode;
+  query: string;
+  layout: ProfileCardLayout;
+}
+
+function readProfilePageControls(params: Pick<URLSearchParams, "get">): ProfilePageControls {
+  const requestedFilter = params.get("type");
+  const requestedSort = params.get("sort");
+  return {
+    filterType: requestedFilter === "single" || requestedFilter === "image" || requestedFilter === "series" ? requestedFilter : "all",
+    sortMode: requestedSort === "hot" ? "hot" : "latest",
+    query: params.get("q") || "",
+    layout: params.get("layout") === "square" ? "square" : "full",
+  };
+}
+
+function writeProfilePageControls(controls: ProfilePageControls, mode: "push" | "replace") {
+  const params = new URLSearchParams(window.location.search);
+  params.delete("type");
+  params.delete("sort");
+  params.delete("q");
+  params.delete("layout");
+  if (controls.filterType !== "all") params.set("type", controls.filterType);
+  if (controls.sortMode !== "latest") params.set("sort", controls.sortMode);
+  if (controls.query) params.set("q", controls.query);
+  if (controls.layout === "square") params.set("layout", controls.layout);
+  const query = params.toString();
+  const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl !== currentUrl) window.history[mode === "push" ? "pushState" : "replaceState"](null, "", nextUrl);
+}
+
+function profileTabHref(id: string, currentParams: string, tab: string) {
+  const params = new URLSearchParams(currentParams);
+  if (tab === "works") params.delete("tab");
+  else params.set("tab", tab);
+  const query = params.toString();
+  return `/user/${id}${query ? `?${query}` : ""}`;
+}
 
 const profileWorkFilters: Array<{ key: ProfileFilterType; label: string }> = [
   { key: "all", label: "全部" },
@@ -85,13 +128,15 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [filterType, setFilterType] = useState<ProfileFilterType>("all");
-  const [sortMode, setSortMode] = useState<ProfileSortMode>("latest");
-  const [profileSearch, setProfileSearch] = useState("");
+  const initialControls = readProfilePageControls(searchParams);
+  const [filterType, setFilterType] = useState<ProfileFilterType>(initialControls.filterType);
+  const [sortMode, setSortMode] = useState<ProfileSortMode>(initialControls.sortMode);
+  const [profileSearch, setProfileSearch] = useState(initialControls.query);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileDraftFilter, setMobileDraftFilter] = useState<ProfileFilterType>("all");
   const [mobileDraftSort, setMobileDraftSort] = useState<ProfileSortMode>("latest");
-  const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
+  const [mobileDraftSearch, setMobileDraftSearch] = useState("");
+  const [mobileCardLayout, setMobileCardLayout] = useState<ProfileCardLayout>(initialControls.layout);
   const [activityPosts, setActivityPosts] = useState<Post[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState(false);
@@ -111,6 +156,35 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
   const isOwnProfile = currentUser?.id === id;
   const relationshipListsVisible = isOwnProfile || profile?.show_follow_lists === true;
+
+  const applyProfileControls = (controls: ProfilePageControls, mode: "push" | "replace" = "push") => {
+    writeProfilePageControls(controls, mode);
+    setFilterType(controls.filterType);
+    setSortMode(controls.sortMode);
+    setProfileSearch(controls.query);
+    setMobileCardLayout(controls.layout);
+  };
+
+  const openMobileFilters = () => {
+    setMobileDraftFilter(filterType);
+    setMobileDraftSort(sortMode);
+    setMobileDraftSearch(profileSearch);
+    setMobileFilterOpen(true);
+  };
+
+  useEffect(() => {
+    const syncControlsFromUrl = () => {
+      const controls = readProfilePageControls(new URLSearchParams(window.location.search));
+      setFilterType(controls.filterType);
+      setSortMode(controls.sortMode);
+      setProfileSearch(controls.query);
+      setMobileCardLayout(controls.layout);
+    };
+    window.addEventListener("popstate", syncControlsFromUrl);
+    return () => window.removeEventListener("popstate", syncControlsFromUrl);
+  }, []);
+
+  const searchParamsKey = searchParams.toString();
 
   const loadFollowers = useCallback(async () => {
     if (!relationshipListsVisible) {
@@ -577,9 +651,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
         <div className="tabs-wrapper user-public-tabs" aria-label="个人主页内容">
           <div className="tabs-inner">
-            <Link href={`/user/${id}`} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
-            {profile?.show_likes && <Link href={`/user/${id}?tab=likes`} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>喜欢</Link>}
-            {profile?.show_bookmarks && <Link href={`/user/${id}?tab=bookmarks`} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>收藏</Link>}
+            <Link href={profileTabHref(id, searchParamsKey, "works")} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
+            {profile?.show_likes && <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>喜欢</Link>}
+            {profile?.show_bookmarks && <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>收藏</Link>}
           </div>
         </div>
 
@@ -654,27 +728,37 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               <div className="filter-system-field filter-system-field--query">
                 <div className="profile-filter-search-shell">
                   <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                  <input className="form-control" type="search" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
-                  <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setProfileSearch("")}>
+                  <input className="form-control" type="search" value={profileSearch} onChange={(event) => applyProfileControls({ filterType, sortMode, query: event.target.value, layout: mobileCardLayout }, "replace")} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                  <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => applyProfileControls({ filterType, sortMode, query: "", layout: mobileCardLayout }, "replace")}>
                     <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                   </button>
                 </div>
               </div>
-              <ProfileFilterSelect label="作品类型" id="user-filter-type-menu" value={filterType} options={profileWorkFilters.map((item) => ({ value: item.key, label: item.key === "all" ? "所有作品" : item.label }))} onChange={(value) => setFilterType(value as ProfileFilterType)} />
-              <ProfileFilterSelect label="排序" id="user-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最新发布" }, { value: "hot", label: "热度最高" }]} onChange={(value) => setSortMode(value as ProfileSortMode)} />
+              <ProfileFilterSelect label="作品类型" id="user-filter-type-menu" value={filterType} options={profileWorkFilters.map((item) => ({ value: item.key, label: item.key === "all" ? "所有作品" : item.label }))} onChange={(value) => applyProfileControls({ filterType: value as ProfileFilterType, sortMode, query: profileSearch, layout: mobileCardLayout })} />
+              <ProfileFilterSelect label="排序" id="user-filter-sort-menu" value={sortMode} options={[{ value: "latest", label: "最新发布" }, { value: "hot", label: "热度最高" }]} onChange={(value) => applyProfileControls({ filterType, sortMode: value as ProfileSortMode, query: profileSearch, layout: mobileCardLayout })} />
             </div>}
 
             {activeTab === "works" && <div className="profile-mobile-filter-bar">
-              <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => { setMobileDraftFilter(filterType); setMobileDraftSort(sortMode); setMobileFilterOpen(true); }} aria-label="打开筛选"><SiteIcon name="fa-filter" variant="default" aria-hidden="true" /></button>
-              <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为单列列表"} aria-pressed={mobileCardLayout === "square"}><SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" /></button>
+              <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={openMobileFilters} aria-label="打开筛选"><SiteIcon name="fa-filter" variant="default" aria-hidden="true" /><span>筛选</span></button>
+              <button type="button" className="profile-mobile-filter-button profile-mobile-icon-button" onClick={() => applyProfileControls({ filterType, sortMode, query: profileSearch, layout: mobileCardLayout === "full" ? "square" : "full" })} aria-label="切换卡片布局" aria-pressed={mobileCardLayout === "square"}><SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" /><span>布局</span></button>
             </div>}
             {activeTab === "works" && mobileFilterOpen && (
               <div className="profile-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
                 <section className="profile-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选作品" onClick={(event) => event.stopPropagation()}>
                   <h2>筛选作品</h2>
+                  <div className="profile-filter-drawer-search filter-system-field">
+                    <label htmlFor="user-mobile-filter-search">搜索作品标题</label>
+                    <div className="profile-filter-search-shell">
+                      <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
+                      <input id="user-mobile-filter-search" className="form-control" type="search" value={mobileDraftSearch} onChange={(event) => setMobileDraftSearch(event.target.value)} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                      <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => setMobileDraftSearch("")}>
+                        <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="profile-filter-drawer-section"><strong>作品类型</strong><div>{profileWorkFilters.map((item) => <button key={item.key} type="button" className={`profile-filter-control${mobileDraftFilter === item.key ? " is-active" : ""}`} onClick={() => setMobileDraftFilter(item.key)}>{item.label}</button>)}</div></div>
                   <div className="profile-filter-drawer-section"><strong>排序</strong><div>{[{ value: "latest" as const, label: "最新发布" }, { value: "hot" as const, label: "热度最高" }].map((item) => <button key={item.value} type="button" className={`profile-filter-control${mobileDraftSort === item.value ? " is-active" : ""}`} onClick={() => setMobileDraftSort(item.value)}>{item.label}</button>)}</div></div>
-                  <div className="profile-filter-drawer-actions"><button type="button" onClick={() => { setMobileDraftFilter("all"); setMobileDraftSort("latest"); }}>重置</button><button type="button" className="is-primary" onClick={() => { setFilterType(mobileDraftFilter); setSortMode(mobileDraftSort); setMobileFilterOpen(false); }}>应用筛选</button></div>
+                  <div className="profile-filter-drawer-actions"><button type="button" onClick={() => { setMobileDraftFilter("all"); setMobileDraftSort("latest"); setMobileDraftSearch(""); }}>重置</button><button type="button" className="is-primary" onClick={() => { applyProfileControls({ filterType: mobileDraftFilter, sortMode: mobileDraftSort, query: mobileDraftSearch, layout: mobileCardLayout }); setMobileFilterOpen(false); }}>应用筛选</button></div>
                 </section>
               </div>
             )}
