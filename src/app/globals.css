@@ -10038,6 +10038,11 @@ p {
     font-size: 24px;
   }
   #page-user .profile-name { overflow-wrap: anywhere; }
+  #page-user .profile-identity--name-below { flex-wrap: wrap; }
+  #page-user .profile-identity--name-below .profile-info {
+    width: 100%;
+    flex: 0 0 100%;
+  }
 }
 
 @media (max-width: 360px) {
@@ -10051,12 +10056,7 @@ p {
   #page-user .profile-identity {
     width: 100%;
     align-items: flex-start;
-    flex-wrap: wrap;
     gap: var(--ink-space-3);
-  }
-  #page-user .profile-info {
-    width: 100%;
-    flex: 0 0 100%;
   }
   #page-user .profile-actions {
     width: 100%;

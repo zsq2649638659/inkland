@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useCallback, useEffect, useState, use } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -150,6 +150,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [blockDialogMessage, setBlockDialogMessage] = useState("");
   const [blockBusy, setBlockBusy] = useState(false);
   const [blockTargetId, setBlockTargetId] = useState<string | null>(null);
+  const [profileNameBelowAvatar, setProfileNameBelowAvatar] = useState(false);
+  const profileIdentityRef = useRef<HTMLDivElement>(null);
+  const profileNameRef = useRef<HTMLHeadingElement>(null);
   const profileLoaded = Boolean(profile);
   const profileActivityVisible = activeTab === "likes" ? Boolean(profile?.show_likes) : activeTab === "bookmarks" ? Boolean(profile?.show_bookmarks) : false;
   const includeTestDataForViewer = includeTestDataForProfile(currentProfile);
@@ -567,6 +570,51 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
   const displayName = profile?.nickname || "匿名用户";
 
+  useLayoutEffect(() => {
+    const identity = profileIdentityRef.current;
+    const avatar = identity?.querySelector<HTMLElement>(".profile-avatar");
+    const name = profileNameRef.current;
+    if (!identity || !avatar || !name) return;
+
+    const mobileViewport = window.matchMedia("(max-width: 600px)");
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return;
+
+    let disposed = false;
+    const measureName = () => {
+      if (disposed) return;
+      if (!mobileViewport.matches) {
+        setProfileNameBelowAvatar(false);
+        return;
+      }
+
+      const nameStyle = window.getComputedStyle(name);
+      context.font = `${nameStyle.fontStyle} ${nameStyle.fontWeight} ${nameStyle.fontSize} ${nameStyle.fontFamily}`;
+      const text = name.textContent || "";
+      const letterSpacing = Number.parseFloat(nameStyle.letterSpacing) || 0;
+      const textWidth = context.measureText(text).width + Math.max(0, [...text].length - 1) * letterSpacing;
+      const identityStyle = window.getComputedStyle(identity);
+      const gap = Number.parseFloat(identityStyle.columnGap) || Number.parseFloat(identityStyle.gap) || 0;
+      const inlineWidth = identity.getBoundingClientRect().width - avatar.getBoundingClientRect().width - gap;
+      setProfileNameBelowAvatar(textWidth > inlineWidth);
+    };
+
+    const resizeObserver = new ResizeObserver(measureName);
+    resizeObserver.observe(identity);
+    window.addEventListener("resize", measureName);
+    void document.fonts?.ready.then(() => {
+      if (!disposed) measureName();
+    });
+    measureName();
+
+    return () => {
+      disposed = true;
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measureName);
+    };
+  }, [displayName]);
+
   // Close dropdown on outside click
   useEffect(() => {
     if (!moreOpen) return;
@@ -586,7 +634,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     <div id="page-user" className="min-h-screen bg-paper">
       <main className="main-container">
         <section className="profile-section">
-          <div className="profile-identity">
+          <div ref={profileIdentityRef} className={`profile-identity${profileNameBelowAvatar ? " profile-identity--name-below" : ""}`}>
             <div className="profile-avatar">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt={displayName} />
@@ -595,7 +643,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               )}
             </div>
             <div className="profile-info">
-              <h1 className="profile-name">{displayName}</h1>
+              <h1 ref={profileNameRef} className="profile-name">{displayName}</h1>
               {profile?.show_profile_info && <p className="profile-bio">{profile.bio || "这个人很懒，什么都没写"}</p>}
               {profile?.gender && <p className="profile-gender">{profile.gender === "male" ? "男" : "女"}</p>}
             </div>
