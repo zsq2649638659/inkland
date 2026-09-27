@@ -5322,8 +5322,13 @@ p {
   border-radius: var(--radius-lg, 20px);
 }
 
+.detail-reader-page-shell {
+  display: flow-root;
+  width: 100%;
+}
+
 .content-wrapper.detail-reader-page {
-  margin-bottom: 64px;
+  margin: var(--spacing-2xl, 48px) auto 64px;
 }
 
 @media (min-width: 769px) and (max-width: 900px) {

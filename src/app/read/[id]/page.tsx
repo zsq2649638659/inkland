@@ -110,6 +110,7 @@ export default async function ReadPage({
 
   if (postError) {
     console.error(`Supabase fetch failed: ${postError.message} for posts`);
+    throw new Error("Failed to load post details", { cause: postError });
   }
 
   if (!posts || posts.length === 0) {

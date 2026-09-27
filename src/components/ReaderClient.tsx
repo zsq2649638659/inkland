@@ -664,15 +664,16 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
         onReport={handlePostReport}
       />
 
-      {/* Content Wrapper - 居中显示，与 floating-sidebar 同级，无多余外层 */}
-      <div
-        ref={contentRef}
-        className={`content-wrapper detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
-        style={{
-          maxWidth: readerWidth === "auto" ? "var(--detail-reader-default-width, 900px)" : `${readerWidth}px`,
-          color: darkMode ? "#b8b0a0" : themeColors[currentTheme].text,
-        }}
-      >
+      {/* BFC shell keeps the card's external bottom margin in the document scroll height. */}
+      <div className="detail-reader-page-shell">
+        <div
+          ref={contentRef}
+          className={`content-wrapper detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
+          style={{
+            maxWidth: readerWidth === "auto" ? "var(--detail-reader-default-width, 900px)" : `${readerWidth}px`,
+            color: darkMode ? "#b8b0a0" : themeColors[currentTheme].text,
+          }}
+        >
             {/* Title */}
             <h1 className="work-title">{post.title}</h1>
 
@@ -1114,6 +1115,7 @@ export default function ReaderClient({ post, initialAdjacent }: ReaderClientProp
             )}
           </div>
         </div>
+      </div>
 
 
 

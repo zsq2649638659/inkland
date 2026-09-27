@@ -605,15 +605,16 @@ export default function ImageReaderClient({ post, images: initialImages, initial
         onReport={handlePostReport}
       />
 
-      {/* Content Wrapper - 居中显示 */}
-      <div
-        ref={contentRef}
-        className={`content-wrapper image-reader-page detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
-        style={{
-          maxWidth: readerWidth === "auto" ? "var(--detail-reader-default-width, 900px)" : `${readerWidth}px`,
-          color: darkMode ? "#b8a090" : themeColors[currentTheme].text,
-        }}
-      >
+      {/* BFC shell keeps the card's external bottom margin in the document scroll height. */}
+      <div className="detail-reader-page-shell">
+        <div
+          ref={contentRef}
+          className={`content-wrapper image-reader-page detail-reader-page${post.series_name ? " has-chapter-nav" : ""}`}
+          style={{
+            maxWidth: readerWidth === "auto" ? "var(--detail-reader-default-width, 900px)" : `${readerWidth}px`,
+            color: darkMode ? "#b8a090" : themeColors[currentTheme].text,
+          }}
+        >
         {/* Title */}
         <h1 className="work-title">{post.title}</h1>
 
@@ -1057,6 +1058,7 @@ export default function ImageReaderClient({ post, images: initialImages, initial
               </div>
             ))
           )}
+        </div>
         </div>
       </div>
 
