@@ -10032,9 +10032,18 @@ p {
 }
 
 @media (max-width: 600px) {
+  #page-user .profile-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+  #page-user .profile-name { overflow-wrap: anywhere; }
+}
+
+@media (max-width: 360px) {
   #page-user .profile-section {
     display: flex;
-    align-items: stretch;
+    align-items: flex-start;
     flex-direction: column;
     gap: var(--ink-space-4);
     padding: var(--ink-space-4);
@@ -10042,16 +10051,13 @@ p {
   #page-user .profile-identity {
     width: 100%;
     align-items: flex-start;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--ink-space-3);
   }
-  #page-user .profile-avatar {
-    width: 48px;
-    height: 48px;
-    font-size: 24px;
+  #page-user .profile-info {
+    width: 100%;
+    flex: 0 0 100%;
   }
-  #page-user .profile-info { width: 100%; }
-  #page-user .profile-name { overflow-wrap: anywhere; }
   #page-user .profile-actions {
     width: 100%;
     grid-column: auto;
