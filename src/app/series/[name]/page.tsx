@@ -3,6 +3,7 @@ import SiteIcon from "@/components/SiteIcon";
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { SkeletonSeriesDetail } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
@@ -49,6 +50,7 @@ function formatDateYmd(value: string) {
 }
 
 export default function SeriesPage({ params }: { params: Promise<{ name: string }> }) {
+  const router = useRouter();
   const dialog = useAppDialog();
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
@@ -105,6 +107,25 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
       const firstChapter = chapters[0] || null;
       const authorId = (seriesRow?.user_id as string | undefined) || (firstChapter?.user_id as string | undefined);
 
+      if (chapters.length === 0 && authorId && seriesRow?.id) {
+        const { data: collectionWorks, error: collectionWorksError } = await withTestDataVisibility(
+          supabase
+            .from("posts")
+            .select("id")
+            .eq("series_name", resolvedSeriesName)
+            .eq("user_id", authorId)
+            .neq("post_type", "serial")
+            .eq("status", "published")
+            .limit(1),
+          includeTestData,
+        );
+        if (!active) return;
+        if (!collectionWorksError && collectionWorks?.length) {
+          router.replace(`/collection/${encodeURIComponent(seriesRow.id as string)}`);
+          return;
+        }
+      }
+
       if (authorId) {
         const authorPromise = supabase
           .from("profiles")
@@ -153,7 +174,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
     };
     void load();
     return () => { active = false; };
-  }, [decodedName, profile, supabase, user?.id]);
+  }, [decodedName, profile, router, supabase, user?.id]);
 
   // 连载进度只读取当前用户自己的阅读记录；章节本身仍由上面的可见性查询控制。
   useEffect(() => {

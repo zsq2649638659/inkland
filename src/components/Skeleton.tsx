@@ -383,28 +383,28 @@ export function SkeletonCollectionDetail() {
               <SB style={{ width: 200, height: 30 }} />
             </div>
             <div className="collection-hero-actions">
-              <span className="sk-pill" style={{ width: 104, height: 32, flexShrink: 0 }} />
-              <span className="sk-pill" style={{ width: 80, height: 32, flexShrink: 0 }} />
+              <span className="sk-pill" style={{ width: 120, height: 40, flexShrink: 0 }} />
             </div>
           </div>
-          <div className="collection-description" style={{ marginTop: 12 }}>
-            <SB style={{ width: "60%", height: 15 }} />
-          </div>
-          <div className="collection-meta-row" style={{ marginTop: 16 }}>
-            <span className="sk-circle" style={{ width: 22, height: 22, flexShrink: 0 }} />
+          <div className="collection-meta-row">
+            <span className="sk-circle" style={{ width: 32, height: 32, flexShrink: 0 }} />
             <SB style={{ width: 84, height: 14 }} />
-            <span className="collection-meta-sep">|</span>
-            <SB style={{ width: 60, height: 14 }} />
-            <span className="collection-meta-sep">|</span>
-            <SB style={{ width: 60, height: 14 }} />
+            <div className="collection-stats-row">
+              <SB style={{ width: 60, height: 14 }} />
+              <span className="collection-meta-sep">|</span>
+              <SB style={{ width: 60, height: 14 }} />
+            </div>
+          </div>
+          <div className="collection-synopsis">
+            <SB style={{ width: 64, height: 16 }} />
+            <SB style={{ width: "60%", height: 15 }} />
           </div>
         </section>
         <div className="collection-works-head">
           <SB style={{ width: 80, height: 18 }} />
           <div className="collection-filters" style={{ display: "flex", gap: 8 }}>
-            <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
-            <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
-            <span className="sk-pill" style={{ width: 56, height: 30, flexShrink: 0 }} />
+            <span className="sk-pill" style={{ width: 176, height: 40, flexShrink: 0 }} />
+            <span className="sk-pill" style={{ width: 120, height: 40, flexShrink: 0 }} />
           </div>
         </div>
         <SkeletonWorksGrid count={6} containerClass="collection-card-grid" />
