@@ -28,6 +28,14 @@ type CollectionInfo = {
 
 type CollectionFilter = "all" | "text" | "image";
 
+const parseCollectionFilter = (value: string | null): CollectionFilter => (
+  value === "text" || value === "image" ? value : "all"
+);
+
+const parseCollectionSort = (value: string | null): "asc" | "desc" => (
+  value === "asc" ? "asc" : "desc"
+);
+
 const hasImages = (post: Post) => {
   const content = post.content || "";
   return Boolean(post.cover_url && !post.cover_url.startsWith("private://")) || /!\[.*?\]\((?!private:\/\/).*?\)/.test(content);
@@ -53,8 +61,30 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const [bookmarkStatusReady, setBookmarkStatusReady] = useState(false);
   const [bookmarkStatusError, setBookmarkStatusError] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [draftFilter, setDraftFilter] = useState<CollectionFilter>("all");
   const collectionId = collection?.id;
   const userId = user?.id;
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      setFilter(parseCollectionFilter(params.get("type")));
+      setSortOrder(parseCollectionSort(params.get("order")));
+    };
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileFilterOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileFilterOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileFilterOpen]);
 
   useEffect(() => {
     let active = true;
@@ -187,6 +217,21 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
     return sortOrder === "desc" ? db - da : da - db;
   });
 
+  const updateCollectionView = (nextFilter: CollectionFilter, nextSortOrder: "asc" | "desc") => {
+    const url = new URL(window.location.href);
+    if (nextFilter === "all") url.searchParams.delete("type");
+    else url.searchParams.set("type", nextFilter);
+    if (nextSortOrder === "desc") url.searchParams.delete("order");
+    else url.searchParams.set("order", nextSortOrder);
+    window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    setFilter(nextFilter);
+    setSortOrder(nextSortOrder);
+  };
+
+  const toggleCollectionSort = () => {
+    updateCollectionView(filter, sortOrder === "desc" ? "asc" : "desc");
+  };
+
   const handleShare = async () => {
     const url = window.location.href;
     try {
@@ -311,13 +356,58 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
             <div><span className="collection-works-title">合集作品</span><span className="collection-works-count"> · 共 {posts.length} 篇</span></div>
             <div className="collection-filters" role="tablist" aria-label="作品类型筛选">
               {([{ key: "all", label: "全部" }, { key: "text", label: "单篇" }, { key: "image", label: "图片" }] as Array<{ key: CollectionFilter; label: string }>).map((item) => (
-                <button key={item.key} type="button" role="tab" aria-selected={filter === item.key} className={`type-filter-pill${filter === item.key ? " active" : ""}`} onClick={() => setFilter(item.key)}>{item.label}</button>
+                <button key={item.key} type="button" role="tab" aria-selected={filter === item.key} className={`type-filter-pill${filter === item.key ? " active" : ""}`} onClick={() => updateCollectionView(item.key, sortOrder)}>{item.label}</button>
               ))}
-              <button type="button" className={`collection-sort-toggle${sortOrder === "asc" ? " reversed" : ""}`} onClick={() => setSortOrder((order) => order === "desc" ? "asc" : "desc")}><SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" /> {sortOrder === "desc" ? "倒序" : "正序"}</button>
+              <button type="button" className={`collection-sort-toggle${sortOrder === "asc" ? " reversed" : ""}`} onClick={toggleCollectionSort} aria-label={`当前${sortOrder === "desc" ? "倒序" : "正序"}，点击切换排序`}><SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" /> {sortOrder === "desc" ? "倒序" : "正序"}</button>
             </div>
+            <div className="collection-mobile-filter-bar">
+              <button type="button" className="collection-mobile-filter-button" onClick={() => { setDraftFilter(filter); setMobileFilterOpen(true); }} aria-expanded={mobileFilterOpen} aria-haspopup="dialog">
+                <SiteIcon name="fa-filter" variant="default" aria-hidden="true" />
+                <span>筛选{filter !== "all" ? `：${filter === "text" ? "单篇" : "图片"}` : ""}</span>
+              </button>
+              <button type="button" className="collection-mobile-filter-button" onClick={toggleCollectionSort} aria-label={`当前${sortOrder === "desc" ? "倒序" : "正序"}，点击切换排序`}>
+                <SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" aria-hidden="true" />
+                <span>{sortOrder === "desc" ? "倒序" : "正序"}</span>
+              </button>
+            </div>
+            {mobileFilterOpen && (
+              <div className="collection-filter-drawer-backdrop" role="presentation" onClick={() => setMobileFilterOpen(false)}>
+                <section className="collection-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选合集作品" onClick={(event) => event.stopPropagation()}>
+                  <div className="collection-filter-drawer-heading">
+                    <h2>筛选作品</h2>
+                    <button type="button" className="collection-filter-drawer-close" aria-label="关闭筛选" onClick={() => setMobileFilterOpen(false)}><SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" /></button>
+                  </div>
+                  <div className="collection-filter-drawer-section">
+                    <strong>作品类型</strong>
+                    <div className="collection-filter-drawer-options">
+                      {([{ key: "all", label: "全部" }, { key: "text", label: "单篇" }, { key: "image", label: "图片" }] as Array<{ key: CollectionFilter; label: string }>).map((item) => (
+                        <button key={item.key} type="button" className={`collection-filter-control${draftFilter === item.key ? " is-active" : ""}`} aria-pressed={draftFilter === item.key} onClick={() => setDraftFilter(item.key)}>{item.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="collection-filter-drawer-actions">
+                    <button type="button" onClick={() => setDraftFilter("all")}>重置</button>
+                    <button type="button" className="is-primary" onClick={() => { updateCollectionView(draftFilter, sortOrder); setMobileFilterOpen(false); }}>应用筛选</button>
+                  </div>
+                </section>
+              </div>
+            )}
           </div>
 
-          {filteredPosts.length === 0 ? (
+          {posts.length === 0 ? (
+            <div className="collection-empty collection-empty-state">
+              <div className="empty-illustration">
+                <div className="empty-tag-ring">
+                  <div className="tag-ring-outer"></div>
+                  <div className="tag-ring-inner">
+                    <SiteIcon name="fa-layer-group" variant="solid" />
+                  </div>
+                </div>
+              </div>
+              <h2 className="empty-title">这个合集还没有作品</h2>
+              <p className="empty-desc">合集创建后，作品会显示在这里。</p>
+            </div>
+          ) : filteredPosts.length === 0 ? (
             <div className="collection-empty collection-empty-state">
               <div className="empty-illustration">
                 <div className="empty-tag-ring">
@@ -329,6 +419,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
               </div>
               <h2 className="empty-title">这个分类下还没有作品</h2>
               <p className="empty-desc">换一个分类，或者稍后再来看看。</p>
+              <button type="button" className="collection-reset-filter" onClick={() => updateCollectionView("all", sortOrder)}>查看全部作品</button>
             </div>
           ) : (
             <div className="collection-card-grid">
