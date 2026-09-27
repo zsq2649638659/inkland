@@ -2,6 +2,7 @@
 import SiteIcon from "@/components/SiteIcon";
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import PostTagCard from "@/components/PostTagCard";
 import { SkeletonCollectionDetail } from "@/components/Skeleton";
@@ -9,6 +10,8 @@ import type { Post } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
 import { slimContent } from "@/lib/feed";
 import { useAuth } from "@/components/AuthProvider";
+import { useAppDialog } from "@/components/AppDialogProvider";
+import { assertCanInteract } from "@/lib/userRestrictions";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type CollectionInfo = {
@@ -34,7 +37,9 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   const supabase = createClient();
-  const { profile } = useAuth();
+  const router = useRouter();
+  const dialog = useAppDialog();
+  const { profile, user, loading: authLoading } = useAuth();
   const includeTestData = includeTestDataForProfile(profile);
   const [collection, setCollection] = useState<CollectionInfo | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -45,6 +50,43 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const [retryKey, setRetryKey] = useState(0);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isSaved, setIsSaved] = useState(false);
+  const [bookmarkStatusReady, setBookmarkStatusReady] = useState(false);
+  const [bookmarkStatusError, setBookmarkStatusError] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const collectionId = collection?.id;
+  const userId = user?.id;
+
+  useEffect(() => {
+    let active = true;
+    const loadBookmarkStatus = async () => {
+      if (authLoading) return;
+      if (!userId || !collectionId) {
+        setIsSaved(false);
+        setBookmarkStatusError(false);
+        setBookmarkStatusReady(true);
+        return;
+      }
+
+      setBookmarkStatusReady(false);
+      const { data, error } = await supabase
+        .from("collection_bookmarks")
+        .select("series_id")
+        .eq("series_id", collectionId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!active) return;
+      if (error) {
+        setBookmarkStatusError(true);
+        setBookmarkStatusReady(false);
+        return;
+      }
+      setIsSaved(Boolean(data));
+      setBookmarkStatusError(false);
+      setBookmarkStatusReady(true);
+    };
+    void loadBookmarkStatus();
+    return () => { active = false; };
+  }, [authLoading, collectionId, supabase, userId]);
 
   useEffect(() => {
     let active = true;
@@ -154,6 +196,52 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
     }
   };
 
+  const toggleCollectionBookmark = async () => {
+    if (authLoading || bookmarkLoading) return;
+    if (bookmarkStatusError || !bookmarkStatusReady) {
+      dialog.toast("暂时无法读取合集的收藏状态，请稍后重试。", "danger");
+      return;
+    }
+    if (!user) {
+      const next = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?next=${encodeURIComponent(next)}`);
+      return;
+    }
+    if (!collection) return;
+
+    setBookmarkLoading(true);
+    try {
+      if (!isSaved) {
+        const blocked = await assertCanInteract();
+        if (blocked) {
+          dialog.toast(blocked, "danger");
+          return;
+        }
+      }
+
+      const result = isSaved
+        ? await supabase
+          .from("collection_bookmarks")
+          .delete()
+          .eq("series_id", collection.id)
+          .eq("user_id", user.id)
+        : await supabase
+          .from("collection_bookmarks")
+          .upsert({ series_id: collection.id, user_id: user.id }, { onConflict: "series_id,user_id", ignoreDuplicates: true });
+
+      if (result.error) {
+        dialog.toast("收藏合集失败，请稍后重试。", "danger");
+      } else {
+        setIsSaved(!isSaved);
+        dialog.toast(isSaved ? "已取消收藏合集" : "已收藏合集", "success");
+      }
+    } catch {
+      dialog.toast("收藏合集失败，请稍后重试。", "danger");
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
+
   if (loading) {
     return <div id="page-collection" className="min-h-screen bg-paper"><SkeletonCollectionDetail /></div>;
   }
@@ -203,7 +291,9 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
                 <h1 className="collection-title">{collection.name}</h1>
               </div>
               <div className="collection-hero-actions">
-                <button type="button" className={`collection-action-btn${isSaved ? " saved" : ""}`} onClick={() => setIsSaved((saved) => !saved)}>{isSaved ? "已收藏" : "收藏合集"}</button>
+                <button type="button" className={`collection-action-btn${isSaved ? " saved" : ""}`} onClick={toggleCollectionBookmark} disabled={authLoading || bookmarkLoading} aria-pressed={isSaved} aria-busy={bookmarkLoading}>
+                  {bookmarkLoading ? "收藏中…" : isSaved ? "已收藏" : "收藏合集"}
+                </button>
                 <button type="button" className="collection-action-btn" onClick={handleShare}>分享</button>
               </div>
             </div>
