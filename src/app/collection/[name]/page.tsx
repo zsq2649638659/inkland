@@ -63,6 +63,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [draftFilter, setDraftFilter] = useState<CollectionFilter>("all");
+  const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
   const collectionId = collection?.id;
   const userId = user?.id;
 
@@ -235,9 +236,13 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const handleShare = async () => {
     const url = window.location.href;
     try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
       await navigator.clipboard.writeText(url);
+      setShareFallbackUrl(null);
+      dialog.toast("合集链接已复制", "success");
     } catch {
-      // 复制失败时仍保留页面，不阻断浏览。
+      setShareFallbackUrl(url);
+      dialog.toast("自动复制失败，请手动复制显示的链接。", "danger");
     }
   };
 
@@ -342,6 +347,21 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
                 <button type="button" className="collection-action-btn" onClick={handleShare}>分享</button>
               </div>
             </div>
+            {shareFallbackUrl && (
+              <div className="collection-share-fallback" role="alert">
+                <p>自动复制失败，可点按链接后手动复制：</p>
+                <input
+                  type="text"
+                  readOnly
+                  aria-label="合集分享链接，可手动复制"
+                  value={shareFallbackUrl}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onClick={(event) => event.currentTarget.select()}
+                />
+                <button type="button" onClick={handleShare}>再试一次</button>
+                <button type="button" aria-label="关闭复制提示" onClick={() => setShareFallbackUrl(null)}><SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" /></button>
+              </div>
+            )}
             {collection.description && <p className="collection-description">{collection.description}</p>}
             <div className="collection-meta-row">
               <span className="collection-author"><span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : <DefaultAvatar name={collection.nickname} />}</span><span>作者：{collection.nickname}</span></span>
