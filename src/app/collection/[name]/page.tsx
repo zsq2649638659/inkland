@@ -12,6 +12,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 
 type CollectionInfo = {
+  id: string;
   name: string;
   description: string;
   created_at: string | null;
@@ -34,76 +35,106 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const decodedName = decodeURIComponent(name);
   const supabase = createClient();
   const { profile } = useAuth();
+  const includeTestData = includeTestDataForProfile(profile);
   const [collection, setCollection] = useState<CollectionInfo | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<CollectionFilter>("all");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const load = async () => {
-      const includeTestData = includeTestDataForProfile(profile);
-      const [{ data: series }, { data: postData }] = await Promise.all([
-        withTestDataVisibility(
+      setLoading(true);
+      setLoadError(false);
+      setNotFound(false);
+      setCollection(null);
+      setPosts([]);
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decodedName);
+        const { data: series, error: seriesError } = await withTestDataVisibility(
           supabase
             .from("series")
-            .select("name, description, created_at, updated_at, user_id")
-            .eq("name", decodedName),
+            .select("id, name, description, created_at, updated_at, user_id")
+            .eq(isUuid ? "id" : "name", decodedName),
           includeTestData,
-        ).maybeSingle(),
-        withTestDataVisibility(
+        ).maybeSingle();
+
+        if (seriesError) throw seriesError;
+        if (!series) {
+          if (active) setNotFound(true);
+          return;
+        }
+
+        const seriesRow = series as unknown as Record<string, unknown>;
+        const seriesId = seriesRow.id as string;
+        const seriesName = (seriesRow.name as string) || decodedName;
+        let postsQuery = withTestDataVisibility(
           supabase
             .from("posts")
             .select("id, title, content, cover_url, post_type, created_at, published_at, series_name, chapter_number, user_id, post_tags(tags(name))")
-            .eq("series_name", decodedName)
+            .eq("series_name", seriesName)
             .neq("post_type", "serial")
             .eq("status", "published"),
           includeTestData,
-        ).order("created_at", { ascending: false }),
-      ]);
+        );
+        if (seriesRow.user_id) postsQuery = postsQuery.eq("user_id", seriesRow.user_id as string);
+        const { data: postData, error: postsError } = await postsQuery.order("created_at", { ascending: false });
+        if (postsError) throw postsError;
 
-      const rawPosts = (postData || []) as unknown as Array<Record<string, unknown>>;
-      const authorId = (series?.user_id as string | null) || (rawPosts[0]?.user_id as string | null) || null;
-      const postIds = rawPosts.map((post) => post.id as string).filter(Boolean);
-      const authorPromise = authorId
-        ? supabase.from("profiles").select("nickname, avatar_url").eq("id", authorId).maybeSingle()
-        : Promise.resolve({ data: null });
-      const bookmarkPromise = postIds.length > 0
-        ? supabase.from("post_stats").select("bookmark_count").in("id", postIds)
-        : Promise.resolve({ data: [] as unknown[] });
-      const [{ data: author }, { data: bookmarkStats }] = await Promise.all([authorPromise, bookmarkPromise]);
-      const nickname = (author?.nickname as string) || "匿名用户";
-      const avatarUrl = (author?.avatar_url as string | null) || null;
-      const bookmarkCount = ((bookmarkStats || []) as Array<{ bookmark_count?: number | null }>)
-        .reduce((total, stat) => total + (stat.bookmark_count || 0), 0);
+        const rawPosts = (postData || []) as unknown as Array<Record<string, unknown>>;
+        const authorId = (seriesRow.user_id as string | null) || (rawPosts[0]?.user_id as string | null) || null;
+        const postIds = rawPosts.map((post) => post.id as string).filter(Boolean);
+        const authorPromise = authorId
+          ? supabase.from("profiles").select("nickname, avatar_url").eq("id", authorId).maybeSingle()
+          : Promise.resolve({ data: null });
+        const bookmarkPromise = postIds.length > 0
+          ? supabase.from("post_stats").select("bookmark_count").in("id", postIds)
+          : Promise.resolve({ data: [] as unknown[] });
+        const [{ data: author }, { data: bookmarkStats, error: bookmarkError }] = await Promise.all([authorPromise, bookmarkPromise]);
+        if (bookmarkError) throw bookmarkError;
+        const nickname = (author?.nickname as string) || "匿名用户";
+        const avatarUrl = (author?.avatar_url as string | null) || null;
+        const bookmarkCount = ((bookmarkStats || []) as Array<{ bookmark_count?: number | null }>)
+          .reduce((total, stat) => total + (stat.bookmark_count || 0), 0);
 
-      const formatted = rawPosts
-        .map((post) => {
-          const joinedTags = post.post_tags as Array<{ tags: { name: string } | null }> | undefined;
-          return {
-            ...post,
-            content: slimContent((post.content as string) || ""),
-            tags: joinedTags?.map((item) => item.tags?.name).filter(Boolean) || [],
-          } as unknown as Post;
-        })
-        .sort((a, b) => new Date(b.published_at || b.created_at || "").getTime() - new Date(a.published_at || a.created_at || "").getTime());
+        const formatted = rawPosts
+          .map((post) => {
+            const joinedTags = post.post_tags as Array<{ tags: { name: string } | null }> | undefined;
+            return {
+              ...post,
+              content: slimContent((post.content as string) || ""),
+              tags: joinedTags?.map((item) => item.tags?.name).filter(Boolean) || [],
+            } as unknown as Post;
+          })
+          .sort((a, b) => new Date(b.published_at || b.created_at || "").getTime() - new Date(a.published_at || a.created_at || "").getTime());
 
-      setCollection({
-        name: decodedName,
-        description: (series?.description as string) || "",
-        created_at: (series?.created_at as string) || null,
-        updated_at: (series?.updated_at as string) || null,
-        user_id: authorId,
-        nickname,
-        avatar_url: avatarUrl,
-        bookmark_count: bookmarkCount,
-      });
-      setPosts(formatted);
-      setLoading(false);
+        if (!active) return;
+        setCollection({
+          id: seriesId,
+          name: seriesName,
+          description: (seriesRow.description as string) || "",
+          created_at: (seriesRow.created_at as string) || null,
+          updated_at: (seriesRow.updated_at as string) || null,
+          user_id: authorId,
+          nickname,
+          avatar_url: avatarUrl,
+          bookmark_count: bookmarkCount,
+        });
+        setPosts(formatted);
+      } catch {
+        if (active) setLoadError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
     };
-    load();
-  }, [decodedName, supabase, profile?.is_test_account]);
+    void load();
+    return () => { active = false; };
+  }, [decodedName, includeTestData, retryKey, supabase]);
 
   const filteredPosts = posts.filter((post) => {
     if (filter === "all") return true;
@@ -127,7 +158,21 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
     return <div id="page-collection" className="min-h-screen bg-paper"><SkeletonCollectionDetail /></div>;
   }
 
-  if (!collection) {
+  if (loadError) {
+    return (
+      <div id="page-collection" className="min-h-screen bg-paper">
+        <div className="collection-page-wrapper">
+          <div className="collection-empty collection-empty-state" role="alert">
+            <h2 className="empty-title">合集加载失败</h2>
+            <p className="empty-desc">页面暂时没能读取合集信息和作品，请检查网络后重试。</p>
+            <button type="button" className="collection-retry-button" onClick={() => setRetryKey((key) => key + 1)}>重试</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !collection) {
     return (
       <div id="page-collection" className="min-h-screen bg-paper">
         <div className="collection-page-wrapper">
