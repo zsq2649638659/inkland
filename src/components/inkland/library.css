@@ -1354,6 +1354,18 @@
   color: var(--ink-muted);
 }
 
+@media (max-width: 575px) {
+  #page-collection .profile-card-device--mobile-full .site-card__title-link:hover .site-card__title,
+  #page-collection .profile-card-device--mobile-square .site-card__title-link:hover .site-card__title {
+    color: var(--ink-text);
+  }
+
+  #page-collection .profile-card-device--mobile-full .site-card__content-link:hover .site-card__excerpt,
+  #page-collection .profile-card-device--mobile-square .site-card__content-link:hover .site-card__excerpt {
+    color: var(--ink-muted);
+  }
+}
+
 :is(#page-profile, #page-user, #page-collection) .profile-card-device .site-card__title {
   display: -webkit-box;
   margin: var(--ink-space-0);
