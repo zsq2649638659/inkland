@@ -10,6 +10,7 @@ export default function ProfileFilterSelect({
   onChange,
   id,
   disabled = false,
+  restoreFocusOnClose = false,
 }: {
   label: string;
   value: string;
@@ -17,9 +18,11 @@ export default function ProfileFilterSelect({
   onChange: (value: string) => void;
   id: string;
   disabled?: boolean;
+  restoreFocusOnClose?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const active = options.find((option) => option.value === value) || options[0];
 
   useEffect(() => {
@@ -33,14 +36,26 @@ export default function ProfileFilterSelect({
   return (
     <div className="filter-system-field">
       <span className="filter-system-select-wrap">
-        <div className="custom-select" data-select ref={rootRef}>
-            <button type="button" disabled={disabled} aria-haspopup="listbox" aria-expanded={!disabled && open} aria-controls={id} aria-label={label} onClick={() => { if (!disabled) setOpen((current) => !current); }}>
+          <div
+            className="custom-select"
+            data-select
+            ref={rootRef}
+            onKeyDown={(event) => {
+              if (restoreFocusOnClose && event.key === "Escape" && open) {
+                event.preventDefault();
+                event.stopPropagation();
+                setOpen(false);
+                triggerRef.current?.focus();
+              }
+            }}
+          >
+            <button ref={triggerRef} type="button" disabled={disabled} aria-haspopup="listbox" aria-expanded={!disabled && open} aria-controls={id} aria-label={label} onClick={() => { if (!disabled) setOpen((current) => !current); }}>
             <span data-select-label>{active.label}</span>
             <SiteIcon name="fa-chevron-right" variant="solid" aria-hidden="true" style={{ transform: `rotate(${!disabled && open ? "-90deg" : "90deg"})` }} />
           </button>
           <div className="select-menu" id={id} role="listbox" aria-label={label} hidden={!open || disabled}>
             {options.map((option) => (
-              <button key={option.value} className="select-option" type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); setOpen(false); }}>
+              <button key={option.value} className="select-option" type="button" role="option" aria-selected={option.value === value} onClick={() => { onChange(option.value); setOpen(false); if (restoreFocusOnClose) triggerRef.current?.focus(); }}>
                 {option.label}
               </button>
             ))}
