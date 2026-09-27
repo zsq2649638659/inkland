@@ -1,11 +1,12 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
-import PostTagCard from "@/components/PostTagCard";
+import ProfileFilterSelect from "@/components/ProfileFilterSelect";
+import ProfileWorkCard, { type ProfileCardMode } from "@/components/ProfileWorkCard";
 import { SkeletonCollectionDetail } from "@/components/Skeleton";
 import type { Post } from "@/lib/types";
 import DefaultAvatar from "@/components/DefaultAvatar";
@@ -64,9 +65,14 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [draftFilter, setDraftFilter] = useState<CollectionFilter>("all");
-  const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
+  const [mobileCardLayout, setMobileCardLayout] = useState<"full" | "square">("full");
+  const [expandedDescriptionKey, setExpandedDescriptionKey] = useState<string | null>(null);
+  const [isDescriptionOverflowing, setIsDescriptionOverflowing] = useState(false);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
   const collectionId = collection?.id;
   const userId = user?.id;
+  const descriptionKey = collection ? JSON.stringify([collection.id, collection.description]) : null;
+  const isDescriptionExpanded = descriptionKey !== null && expandedDescriptionKey === descriptionKey;
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -87,6 +93,24 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [mobileFilterOpen]);
+
+  useEffect(() => {
+    const element = descriptionRef.current;
+    if (!element) {
+      setIsDescriptionOverflowing(false);
+      return;
+    }
+
+    const measureOverflow = () => {
+      if (isDescriptionExpanded) return;
+      setIsDescriptionOverflowing(element.scrollHeight > element.clientHeight + 1);
+    };
+
+    measureOverflow();
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [collection?.description, isDescriptionExpanded]);
 
   useEffect(() => {
     let active = true;
@@ -234,19 +258,6 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
     updateCollectionView(filter, sortOrder === "desc" ? "asc" : "desc");
   };
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
-      await navigator.clipboard.writeText(url);
-      setShareFallbackUrl(null);
-      dialog.toast("合集链接已复制", "success");
-    } catch {
-      setShareFallbackUrl(url);
-      dialog.toast("自动复制失败，请手动复制显示的链接。", "danger");
-    }
-  };
-
   const toggleCollectionBookmark = async () => {
     if (authLoading || bookmarkLoading) return;
     if (bookmarkStatusError || !bookmarkStatusReady) {
@@ -332,11 +343,11 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
     );
   }
 
-  const authorContent = (
-    <>
-      <span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : <DefaultAvatar name={collection.nickname} />}</span>
-      <span>作者：{collection.nickname}</span>
-    </>
+  const isOwner = Boolean(user?.id && user.id === collection.user_id);
+  const renderProfileCards = (mode: ProfileCardMode) => (
+    <div className="card-device__cards">
+      {filteredPosts.map((post) => <ProfileWorkCard key={post.id} post={post} mode={mode} />)}
+    </div>
   );
 
   return (
@@ -349,57 +360,84 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
                 <h1 className="collection-title">{collection.name}</h1>
               </div>
               <div className="collection-hero-actions">
-                <button type="button" className={`collection-action-btn${isSaved ? " saved" : ""}`} onClick={toggleCollectionBookmark} disabled={authLoading || bookmarkLoading} aria-pressed={isSaved} aria-busy={bookmarkLoading}>
-                  {bookmarkLoading ? "收藏中…" : isSaved ? "已收藏" : "收藏合集"}
-                </button>
-                <button type="button" className="collection-action-btn" onClick={handleShare}>分享</button>
+                {isOwner ? (
+                  <Link className="collection-action-btn collection-action-btn-primary" href={`/studio/series/${encodeURIComponent(collection.name)}?edit=1`}>管理</Link>
+                ) : (
+                  <button type="button" className="collection-action-btn collection-action-btn-primary" onClick={toggleCollectionBookmark} disabled={authLoading || bookmarkLoading} aria-pressed={isSaved} aria-busy={bookmarkLoading}>
+                    {bookmarkLoading ? "收藏中…" : isSaved ? "已收藏" : "收藏"}
+                  </button>
+                )}
               </div>
             </div>
-            {shareFallbackUrl && (
-              <div className="collection-share-fallback" role="alert">
-                <p>自动复制失败，可点按链接后手动复制：</p>
-                <input
-                  type="text"
-                  readOnly
-                  aria-label="合集分享链接，可手动复制"
-                  value={shareFallbackUrl}
-                  onFocus={(event) => event.currentTarget.select()}
-                  onClick={(event) => event.currentTarget.select()}
-                />
-                <button type="button" onClick={handleShare}>再试一次</button>
-                <button type="button" aria-label="关闭复制提示" onClick={() => setShareFallbackUrl(null)}><SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" /></button>
-              </div>
-            )}
-            {collection.description && <p className="collection-description">{collection.description}</p>}
             <div className="collection-meta-row">
               {collection.user_id ? (
-                <Link href={`/user/${encodeURIComponent(collection.user_id)}`} className="collection-author collection-author-link">{authorContent}</Link>
+                <Link href={`/user/${encodeURIComponent(collection.user_id)}`} className="collection-author collection-author-link">
+                  <span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : <DefaultAvatar name={collection.nickname} />}</span>
+                  <span className="collection-author-name">{collection.nickname}</span>
+                </Link>
               ) : (
-                <span className="collection-author">{authorContent}</span>
+                <span className="collection-author">
+                  <span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : <DefaultAvatar name={collection.nickname} />}</span>
+                  <span className="collection-author-name">{collection.nickname}</span>
+                </span>
               )}
-              <span className="collection-meta-sep">|</span>
-              <span className="collection-stat-item"><span className="collection-stat-label">作品数</span><span className="collection-stat-value">{posts.length}</span></span>
-              <span className="collection-meta-sep">|</span>
-              <span className="collection-stat-item"><span className="collection-stat-label">收藏数</span><span className="collection-stat-value">{collection.bookmark_count}</span></span>
+              <div className="collection-stats-row">
+                <span className="collection-stat-item"><span className="collection-stat-label">作品数</span><span className="collection-stat-value">{posts.length}</span></span>
+                <span className="collection-meta-sep">|</span>
+                <span className="collection-stat-item"><span className="collection-stat-label">收藏数</span><span className="collection-stat-value">{collection.bookmark_count}</span></span>
+              </div>
             </div>
+            {collection.description && (
+              <div className="collection-synopsis">
+                <div className="synopsis-header"><span className="synopsis-title">合集简介</span></div>
+                <p
+                  ref={descriptionRef}
+                  id="collection-description-text"
+                  className={`synopsis-text${isDescriptionExpanded ? " is-expanded" : " is-collapsed"}`}
+                >
+                  {collection.description}
+                </p>
+                {isDescriptionOverflowing && (
+                  <button
+                    type="button"
+                    className="collection-synopsis-toggle"
+                    aria-expanded={isDescriptionExpanded}
+                    aria-controls="collection-description-text"
+                    onClick={() => setExpandedDescriptionKey(isDescriptionExpanded ? null : descriptionKey)}
+                  >
+                    {isDescriptionExpanded ? "收起" : "展开更多"}
+                  </button>
+                )}
+              </div>
+            )}
           </section>
 
           <div className="collection-works-head">
             <div><span className="collection-works-title">合集作品</span><span className="collection-works-count"> · 共 {posts.length} 篇</span></div>
-            <div className="collection-filters" role="tablist" aria-label="作品类型筛选">
-              {([{ key: "all", label: "全部" }, { key: "text", label: "单篇" }, { key: "image", label: "图片" }] as Array<{ key: CollectionFilter; label: string }>).map((item) => (
-                <button key={item.key} type="button" role="tab" aria-selected={filter === item.key} className={`type-filter-pill${filter === item.key ? " active" : ""}`} onClick={() => updateCollectionView(item.key, sortOrder)}>{item.label}</button>
-              ))}
-              <button type="button" className={`collection-sort-toggle${sortOrder === "asc" ? " reversed" : ""}`} onClick={toggleCollectionSort} aria-label={`当前${sortOrder === "desc" ? "倒序" : "正序"}，点击切换排序`}><SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" /> {sortOrder === "desc" ? "倒序" : "正序"}</button>
+            <div className="collection-filters">
+              <ProfileFilterSelect
+                label="作品类型"
+                id="collection-filter-type-menu"
+                value={filter}
+                options={[{ value: "all", label: "所有作品" }, { value: "text", label: "单篇" }, { value: "image", label: "图片" }]}
+                onChange={(value) => updateCollectionView(value as CollectionFilter, sortOrder)}
+              />
+              <button type="button" className={`collection-sort-toggle sort-toggle${sortOrder === "desc" ? " reversed" : ""}`} onClick={toggleCollectionSort} aria-label={`当前${sortOrder === "desc" ? "倒序" : "正序"}，点击切换排序`}>
+                <SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" aria-hidden="true" />
+                <span>{sortOrder === "desc" ? "倒序" : "正序"}</span>
+              </button>
             </div>
             <div className="collection-mobile-filter-bar">
               <button type="button" className="collection-mobile-filter-button" onClick={() => { setDraftFilter(filter); setMobileFilterOpen(true); }} aria-expanded={mobileFilterOpen} aria-haspopup="dialog">
                 <SiteIcon name="fa-filter" variant="default" aria-hidden="true" />
                 <span>筛选{filter !== "all" ? `：${filter === "text" ? "单篇" : "图片"}` : ""}</span>
               </button>
-              <button type="button" className="collection-mobile-filter-button" onClick={toggleCollectionSort} aria-label={`当前${sortOrder === "desc" ? "倒序" : "正序"}，点击切换排序`}>
+              <button type="button" className="collection-mobile-filter-button collection-mobile-sort-button" onClick={toggleCollectionSort} aria-label={`当前${sortOrder === "desc" ? "倒序" : "正序"}，点击切换排序`}>
                 <SiteIcon name={sortOrder === "asc" ? "fa-arrow-up-wide-short" : "fa-arrow-down-wide-short"} variant="solid" aria-hidden="true" />
                 <span>{sortOrder === "desc" ? "倒序" : "正序"}</span>
+              </button>
+              <button type="button" className="collection-mobile-filter-button profile-mobile-icon-button collection-mobile-icon-button" onClick={() => setMobileCardLayout((current) => current === "full" ? "square" : "full")} aria-label={mobileCardLayout === "full" ? "切换为三列卡片" : "切换为单列列表"} aria-pressed={mobileCardLayout === "square"}>
+                <SiteIcon name={mobileCardLayout === "full" ? "fa-card-compact" : "fa-list-compact"} variant="default" aria-hidden="true" />
               </button>
             </div>
             {mobileFilterOpen && (
@@ -412,7 +450,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
                   <div className="collection-filter-drawer-section">
                     <strong>作品类型</strong>
                     <div className="collection-filter-drawer-options">
-                      {([{ key: "all", label: "全部" }, { key: "text", label: "单篇" }, { key: "image", label: "图片" }] as Array<{ key: CollectionFilter; label: string }>).map((item) => (
+                      {([{ key: "all", label: "所有作品" }, { key: "text", label: "单篇" }, { key: "image", label: "图片" }] as Array<{ key: CollectionFilter; label: string }>).map((item) => (
                         <button key={item.key} type="button" className={`collection-filter-control${draftFilter === item.key ? " is-active" : ""}`} aria-pressed={draftFilter === item.key} onClick={() => setDraftFilter(item.key)}>{item.label}</button>
                       ))}
                     </div>
@@ -454,8 +492,16 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
               <button type="button" className="collection-reset-filter" onClick={() => updateCollectionView("all", sortOrder)}>查看全部作品</button>
             </div>
           ) : (
-            <div className="collection-card-grid">
-              {filteredPosts.map((post) => <PostTagCard key={post.id} post={post} />)}
+            <div className="collection-profile-cards">
+              <div className="profile-card-device profile-card-device--pc card-device-grid" data-card-variant="collection-pc">
+                <div className="card-device-frame card-device card-device--pc">{renderProfileCards("pc")}</div>
+              </div>
+              <div className={`profile-card-device profile-card-device--mobile-full card-device-grid${mobileCardLayout === "full" ? " is-active" : ""}`} data-card-variant="collection-mobile-full">
+                <div className="card-device-frame card-device card-device--mobile">{renderProfileCards("mobile-full")}</div>
+              </div>
+              <div className={`profile-card-device profile-card-device--mobile-square card-device-grid${mobileCardLayout === "square" ? " is-active" : ""}`} data-card-variant="collection-mobile-square">
+                <div className="card-device-frame card-device card-device--profile-square">{renderProfileCards("mobile-square")}</div>
+              </div>
             </div>
           )}
         </div>
