@@ -14774,6 +14774,9 @@ p {
 #page-collection .collection-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 0; color: var(--color-text-light); font-size: var(--font-size-sm); }
 #page-collection .collection-meta-sep { color: var(--color-border); }
 #page-collection .collection-author { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text); font-weight: 500; }
+#page-collection .collection-author-link { text-decoration: none; transition: color var(--ink-motion-base) var(--ink-ease-standard); }
+#page-collection .collection-author-link:hover { color: var(--ink-primary); }
+#page-collection .collection-author-link:focus-visible { border-radius: var(--ink-radius-sm); outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
 #page-collection .collection-author-avatar { width: var(--ink-avatar-size-sm, 32px); height: var(--ink-avatar-size-sm, 32px); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 50%; background: var(--color-primary); color: var(--color-on-primary, #fff); font-size: 13px; }
 #page-collection .collection-author-avatar img { width: 100%; height: 100%; object-fit: cover; }
 #page-collection .collection-stat-item { display: flex; align-items: baseline; gap: 3px; }

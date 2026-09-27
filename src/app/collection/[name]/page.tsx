@@ -2,6 +2,7 @@
 import SiteIcon from "@/components/SiteIcon";
 
 import { use, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import PostTagCard from "@/components/PostTagCard";
@@ -331,6 +332,13 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
     );
   }
 
+  const authorContent = (
+    <>
+      <span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : <DefaultAvatar name={collection.nickname} />}</span>
+      <span>作者：{collection.nickname}</span>
+    </>
+  );
+
   return (
     <div id="page-collection" className="min-h-screen bg-paper">
       <div className="collection-page-wrapper">
@@ -364,7 +372,11 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
             )}
             {collection.description && <p className="collection-description">{collection.description}</p>}
             <div className="collection-meta-row">
-              <span className="collection-author"><span className="collection-author-avatar">{collection.avatar_url ? <img src={collection.avatar_url} alt="" /> : <DefaultAvatar name={collection.nickname} />}</span><span>作者：{collection.nickname}</span></span>
+              {collection.user_id ? (
+                <Link href={`/user/${encodeURIComponent(collection.user_id)}`} className="collection-author collection-author-link">{authorContent}</Link>
+              ) : (
+                <span className="collection-author">{authorContent}</span>
+              )}
               <span className="collection-meta-sep">|</span>
               <span className="collection-stat-item"><span className="collection-stat-label">作品数</span><span className="collection-stat-value">{posts.length}</span></span>
               <span className="collection-meta-sep">|</span>
