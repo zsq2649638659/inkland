@@ -10019,13 +10019,9 @@ p {
   #page-user .profile-mobile-icon-button span { font-size: 14px; line-height: 1.2; }
   #page-user .profile-mobile-filter-button:focus-visible { outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
   #page-user .profile-mobile-filter-button[aria-pressed="true"] { border-color: transparent; color: var(--ink-text-secondary); background: var(--ink-surface); }
-  #page-user .profile-filter-drawer-backdrop { position: fixed; inset: 0; z-index: var(--ink-z-modal); display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
+  #page-user .profile-filter-drawer-backdrop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .28); }
   #page-user .profile-filter-drawer { width: 100%; max-height: 90dvh; overflow-y: auto; padding: var(--ink-space-5) var(--ink-space-5) max(var(--ink-space-5), env(safe-area-inset-bottom)); border-radius: var(--ink-radius-lg) var(--ink-radius-lg) 0 0; color: var(--ink-text); background: var(--ink-surface); box-shadow: var(--ink-shadow-lg); }
   #page-user .profile-filter-drawer h2 { margin: var(--ink-space-0); font: var(--ink-font-title-sm); }
-  #page-user .profile-filter-drawer-search { display: grid; gap: var(--ink-space-2); margin-top: var(--ink-space-4); }
-  #page-user .profile-filter-drawer-search > label { color: var(--ink-text-secondary); font: var(--ink-font-control-label); }
-  #page-user .profile-filter-drawer-search .form-control { width: 100%; min-height: var(--ink-input-height-md); padding: 0 var(--ink-input-padding-action) 0 var(--ink-input-padding-leading); border: var(--ink-button-border-width) solid var(--ink-button-default-border); border-radius: var(--ink-input-border-radius); color: var(--ink-text); background: var(--ink-surface); font: var(--ink-font-control); }
-  #page-user .profile-filter-drawer-search .form-control:focus { border-color: var(--ink-button-primary-border); outline: var(--ink-outline-focus); outline-offset: var(--ink-outline-offset-focus); }
   #page-user .profile-filter-control { padding-inline: var(--ink-button-medium-padding-horizontal); }
   #page-user .profile-filter-drawer-actions { width: 100%; gap: var(--ink-space-2); }
   #page-user .profile-filter-drawer-actions button { width: 50%; flex: 1 1 50%; }
