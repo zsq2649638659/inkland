@@ -19592,12 +19592,13 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   #page-settings .profile-password-module .settings-form-group { margin-bottom:16px; }
 }
 
-/* Keep the collection and public user pages aligned with the Navbar on tablet. */
+/* Keep personal/public profile and collection content aligned with the Navbar on tablet. */
 @media (min-width: 601px) and (max-width: 900px) {
   #page-collection .collection-page-wrapper {
     padding-inline: 16px;
   }
 
+  #page-profile .main-container,
   #page-user .main-container {
     width: calc(100% - 32px);
     padding-inline: 0;
