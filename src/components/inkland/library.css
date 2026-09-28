@@ -1862,45 +1862,6 @@
   -webkit-line-clamp: 5;
 }
 
-#page-history .history-card-device--pc .site-card__tags {
-  display: flex;
-  min-width: 0;
-  flex-wrap: nowrap;
-  gap: var(--ink-gap-inline);
-  margin: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-#page-history .history-card-device--pc .site-card__tags::-webkit-scrollbar { display: none; }
-
-#page-history .history-card-device--pc .site-card__tag {
-  display: inline-flex;
-  max-width: none;
-  height: auto;
-  min-height: var(--ink-height-tag);
-  flex: 0 0 auto;
-  align-items: center;
-  padding: var(--ink-space-1) var(--ink-space-3);
-  border-radius: var(--ink-radius-xl);
-  color: var(--ink-muted);
-  background: var(--ink-surface-subtle);
-  font: var(--ink-font-site-tag);
-  text-decoration: none;
-  line-height: 1.35;
-  white-space: nowrap;
-}
-
-#page-history .history-card-device--pc .site-card__tag:hover,
-#page-history .history-card-device--pc .site-card__tag:focus-visible {
-  color: var(--ink-primary);
-  background: var(--ink-primary-bg);
-  outline: var(--ink-outline-none);
-}
-
 #page-history .history-card-device--pc .site-card__feed-images-shell {
   position: relative;
   min-width: 0;
@@ -2340,9 +2301,6 @@
     font: var(--ink-font-tag-meta);
     text-decoration: none;
   }
-  #page-history .history-card-device--mobile .site-card__tags { display: flex; min-width: 0; flex-wrap: nowrap; gap: var(--ink-size-2); margin: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-  #page-history .history-card-device--mobile .site-card__tags::-webkit-scrollbar { display: none; }
-  #page-history .history-card-device--mobile .site-card__tag { min-width: 0; max-width: none; height: auto; min-height: var(--ink-height-tag); flex: 0 0 auto; padding: var(--ink-space-1) var(--ink-space-3); border-radius: var(--ink-radius-xl); color: var(--ink-muted); background: var(--ink-surface-subtle); font: var(--ink-font-site-tag); line-height: 1.35; white-space: nowrap; }
   #page-history .history-card-device--mobile .site-card__search-meta { gap: var(--ink-size-2); margin-top: 0; }
   #page-history .history-card-device--mobile .site-card__history-info { align-items: center; flex-direction: row; justify-content: space-between; gap: var(--ink-size-2); }
   #page-history .history-card-device--mobile .site-card__avatar-link,
