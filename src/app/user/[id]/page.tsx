@@ -574,7 +574,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     const identity = profileIdentityRef.current;
     const avatar = identity?.querySelector<HTMLElement>(".profile-avatar");
     const name = profileNameRef.current;
-    if (!identity || !avatar || !name) return;
+    const info = identity?.querySelector<HTMLElement>(".profile-info");
+    if (!identity || !avatar || !name || !info) return;
 
     const mobileViewport = window.matchMedia("(max-width: 600px)");
     let disposed = false;
@@ -588,33 +589,29 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       const identityStyle = window.getComputedStyle(identity);
       const gap = Number.parseFloat(identityStyle.columnGap) || Number.parseFloat(identityStyle.gap) || 0;
       const inlineWidth = identity.getBoundingClientRect().width - avatar.getBoundingClientRect().width - gap;
+      const infoProbe = info.cloneNode(true) as HTMLElement;
+      Object.assign(infoProbe.style, {
+        position: "fixed",
+        insetInlineStart: "-10000px",
+        insetBlockStart: "0",
+        visibility: "hidden",
+        width: `${inlineWidth}px`,
+        minWidth: `${inlineWidth}px`,
+        maxWidth: `${inlineWidth}px`,
+        flex: "none",
+        height: "auto",
+        overflow: "visible",
+      });
+      identity.appendChild(infoProbe);
+      const probeName = infoProbe.querySelector<HTMLElement>(".profile-name");
+      const probeBio = infoProbe.querySelector<HTMLElement>(".profile-bio");
+      const nameLineHeight = probeName ? Number.parseFloat(window.getComputedStyle(probeName).lineHeight) || probeName.getBoundingClientRect().height : 0;
+      const nameWraps = probeName ? probeName.getBoundingClientRect().height > nameLineHeight * 1.5 : false;
+      const bioLineHeight = probeBio ? Number.parseFloat(window.getComputedStyle(probeBio).lineHeight) || probeBio.getBoundingClientRect().height : 0;
+      const bioNeedsMoreRoom = probeBio ? probeBio.getBoundingClientRect().height > bioLineHeight * 2.5 : false;
+      infoProbe.remove();
 
-      // Measure text on one line in its real font. Measuring wrapped Range
-      // fragments can miss overflow when `overflow-wrap: anywhere` is active.
-      const measureUnwrappedWidth = (element: HTMLElement) => {
-        const probe = element.cloneNode(true) as HTMLElement;
-        Object.assign(probe.style, {
-          position: "fixed",
-          insetInlineStart: "-10000px",
-          insetBlockStart: "0",
-          visibility: "hidden",
-          width: "max-content",
-          minWidth: "max-content",
-          maxWidth: "none",
-          whiteSpace: "nowrap",
-          overflow: "visible",
-          overflowWrap: "normal",
-        });
-        identity.appendChild(probe);
-        const width = probe.getBoundingClientRect().width;
-        probe.remove();
-        return width;
-      };
-      const bio = identity.querySelector<HTMLElement>(".profile-bio");
-      const nameDoesNotFit = measureUnwrappedWidth(name) > inlineWidth;
-      const bioDoesNotFit = bio ? measureUnwrappedWidth(bio) > inlineWidth : false;
-
-      const doesNotFitInline = nameDoesNotFit || bioDoesNotFit;
+      const doesNotFitInline = nameWraps || bioNeedsMoreRoom;
       setProfileInfoBelowAvatar(doesNotFitInline);
     };
 
