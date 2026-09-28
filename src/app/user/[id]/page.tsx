@@ -578,10 +578,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     if (!identity || !avatar || !name || !info) return;
 
     const mobileViewport = window.matchMedia("(max-width: 600px)");
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    if (!context) return;
-
     let disposed = false;
     const measureProfileInfo = () => {
       if (disposed) return;
@@ -596,13 +592,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       const infoLines = [name, ...Array.from(info.querySelectorAll<HTMLElement>(".profile-bio, .profile-gender"))];
       const doesNotFitInline = infoLines.some((line) => {
         if (line.getClientRects().length === 0) return false;
-        const lineStyle = window.getComputedStyle(line);
-        const text = (line.innerText || line.textContent || "").replace(/\s+/g, " ").trim();
-        if (!text) return false;
-
-        context.font = `${lineStyle.fontStyle} ${lineStyle.fontWeight} ${lineStyle.fontSize} ${lineStyle.fontFamily}`;
-        const letterSpacing = Number.parseFloat(lineStyle.letterSpacing) || 0;
-        const textWidth = context.measureText(text).width + Math.max(0, [...text].length - 1) * letterSpacing;
+        const range = document.createRange();
+        range.selectNodeContents(line);
+        const textWidth = Array.from(range.getClientRects()).reduce((width, rect) => width + rect.width, 0);
         return textWidth > inlineWidth;
       });
       setProfileInfoBelowAvatar(doesNotFitInline);
