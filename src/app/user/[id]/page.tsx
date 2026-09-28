@@ -574,8 +574,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     const identity = profileIdentityRef.current;
     const avatar = identity?.querySelector<HTMLElement>(".profile-avatar");
     const name = profileNameRef.current;
-    const info = identity?.querySelector<HTMLElement>(".profile-info");
-    if (!identity || !avatar || !name || !info) return;
+    if (!identity || !avatar || !name) return;
 
     const mobileViewport = window.matchMedia("(max-width: 600px)");
     let disposed = false;
@@ -589,14 +588,27 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       const identityStyle = window.getComputedStyle(identity);
       const gap = Number.parseFloat(identityStyle.columnGap) || Number.parseFloat(identityStyle.gap) || 0;
       const inlineWidth = identity.getBoundingClientRect().width - avatar.getBoundingClientRect().width - gap;
-      const infoLines = [name, ...Array.from(info.querySelectorAll<HTMLElement>(".profile-bio, .profile-gender"))];
-      const doesNotFitInline = infoLines.some((line) => {
-        if (line.getClientRects().length === 0) return false;
-        const range = document.createRange();
-        range.selectNodeContents(line);
-        const textWidth = Array.from(range.getClientRects()).reduce((width, rect) => width + rect.width, 0);
-        return textWidth > inlineWidth;
+
+      // Measure the name on one line in its real font. Measuring wrapped Range
+      // fragments can miss overflow when `overflow-wrap: anywhere` is active.
+      const nameProbe = name.cloneNode(true) as HTMLElement;
+      Object.assign(nameProbe.style, {
+        position: "fixed",
+        insetInlineStart: "-10000px",
+        insetBlockStart: "0",
+        visibility: "hidden",
+        width: "max-content",
+        minWidth: "max-content",
+        maxWidth: "none",
+        whiteSpace: "nowrap",
+        overflow: "visible",
+        overflowWrap: "normal",
       });
+      identity.appendChild(nameProbe);
+      const nameWidth = nameProbe.getBoundingClientRect().width;
+      nameProbe.remove();
+
+      const doesNotFitInline = nameWidth > inlineWidth;
       setProfileInfoBelowAvatar(doesNotFitInline);
     };
 
