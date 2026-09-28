@@ -1768,6 +1768,12 @@
   :is(#page-profile, #page-collection) .profile-card-device--mobile-square.is-active { display: block; }
 }
 
+@media (max-width: 360px) {
+  #page-user .profile-card-device--mobile-square .card-device__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* 阅读历史：严格复用搜索框作品卡片的 Card Device PC / Mobile 契约。 */
 #page-history .history-card-device {
   width: 100%;
