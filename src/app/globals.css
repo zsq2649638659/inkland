@@ -19594,8 +19594,12 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 
 /* Keep the collection and public user pages aligned with the Navbar on tablet. */
 @media (min-width: 601px) and (max-width: 900px) {
-  #page-collection .collection-page-wrapper,
-  #page-user .main-container {
+  #page-collection .collection-page-wrapper {
     padding-inline: 16px;
+  }
+
+  #page-user .main-container {
+    width: calc(100% - 32px);
+    padding-inline: 0;
   }
 }
