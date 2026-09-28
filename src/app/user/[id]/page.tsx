@@ -737,11 +737,11 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         {/* ─── Works Section ─── */}
         {activeTab !== "followers" && activeTab !== "following" && (
           <>
-            {activeTab === "works" && <div className="filter-system-composition-row user-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
+            {showPublicWorkControls && <div className="filter-system-composition-row user-filter-composition" data-composition-contract="filter.toolbar@0.1" data-composition-dependencies="Input Select">
               <div className="filter-system-field filter-system-field--query">
                 <div className="profile-filter-search-shell">
                   <SiteIcon name="fa-magnifying-glass" variant="solid" aria-hidden="true" />
-                  <input className="form-control" type="search" value={profileSearch} onChange={(event) => applyProfileControls({ filterType, sortMode, query: event.target.value, layout: mobileCardLayout }, "replace")} placeholder="搜索作品标题…" aria-label="搜索作品标题" />
+                  <input className="form-control" type="search" value={profileSearch} onChange={(event) => applyProfileControls({ filterType, sortMode, query: event.target.value, layout: mobileCardLayout }, "replace")} placeholder={activeTab === "likes" ? "搜索喜欢的作品标题…" : activeTab === "bookmarks" ? "搜索收藏的作品标题…" : "搜索作品标题…"} aria-label={activeTab === "likes" ? "搜索喜欢的作品标题" : activeTab === "bookmarks" ? "搜索收藏的作品标题" : "搜索作品标题"} />
                   <button type="button" className="profile-filter-search-clear" aria-label="清除搜索作品" onClick={() => applyProfileControls({ filterType, sortMode, query: "", layout: mobileCardLayout }, "replace")}>
                     <SiteIcon name="fa-xmark" variant="solid" aria-hidden="true" />
                   </button>

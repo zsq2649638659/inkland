@@ -17980,7 +17980,7 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 }
 
 #page-user .profile-gender { margin:4px 0 0;font-size:13px;color:var(--color-text-muted); }
-#page-user .user-public-tabs { margin-bottom:var(--spacing-lg); }
+#page-user .user-public-tabs { padding-bottom:var(--ink-space-2);margin-bottom:var(--ink-space-2); }
 #page-user .user-activity-state { display:grid;justify-items:center;gap:12px;text-align:center; }
 #page-user .user-activity-state > button { padding:8px 16px;border:1px solid var(--color-border);border-radius:var(--radius-full);background:var(--color-card);color:var(--color-text);font:inherit;cursor:pointer; }
 
