@@ -19601,6 +19601,13 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
   #page-profile .main-container,
   #page-user .main-container {
     width: calc(100% - 32px);
+  }
+
+  #page-profile .main-container {
+    padding-inline: 0 !important;
+  }
+
+  #page-user .main-container {
     padding-inline: 0;
   }
 }
