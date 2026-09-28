@@ -589,26 +589,32 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
       const gap = Number.parseFloat(identityStyle.columnGap) || Number.parseFloat(identityStyle.gap) || 0;
       const inlineWidth = identity.getBoundingClientRect().width - avatar.getBoundingClientRect().width - gap;
 
-      // Measure the name on one line in its real font. Measuring wrapped Range
+      // Measure text on one line in its real font. Measuring wrapped Range
       // fragments can miss overflow when `overflow-wrap: anywhere` is active.
-      const nameProbe = name.cloneNode(true) as HTMLElement;
-      Object.assign(nameProbe.style, {
-        position: "fixed",
-        insetInlineStart: "-10000px",
-        insetBlockStart: "0",
-        visibility: "hidden",
-        width: "max-content",
-        minWidth: "max-content",
-        maxWidth: "none",
-        whiteSpace: "nowrap",
-        overflow: "visible",
-        overflowWrap: "normal",
-      });
-      identity.appendChild(nameProbe);
-      const nameWidth = nameProbe.getBoundingClientRect().width;
-      nameProbe.remove();
+      const measureUnwrappedWidth = (element: HTMLElement) => {
+        const probe = element.cloneNode(true) as HTMLElement;
+        Object.assign(probe.style, {
+          position: "fixed",
+          insetInlineStart: "-10000px",
+          insetBlockStart: "0",
+          visibility: "hidden",
+          width: "max-content",
+          minWidth: "max-content",
+          maxWidth: "none",
+          whiteSpace: "nowrap",
+          overflow: "visible",
+          overflowWrap: "normal",
+        });
+        identity.appendChild(probe);
+        const width = probe.getBoundingClientRect().width;
+        probe.remove();
+        return width;
+      };
+      const bio = identity.querySelector<HTMLElement>(".profile-bio");
+      const nameDoesNotFit = measureUnwrappedWidth(name) > inlineWidth;
+      const bioDoesNotFit = bio ? measureUnwrappedWidth(bio) > inlineWidth : false;
 
-      const doesNotFitInline = nameWidth > inlineWidth;
+      const doesNotFitInline = nameDoesNotFit || bioDoesNotFit;
       setProfileInfoBelowAvatar(doesNotFitInline);
     };
 
