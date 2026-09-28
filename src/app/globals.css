@@ -10038,8 +10038,8 @@ p {
     font-size: 24px;
   }
   #page-user .profile-name { overflow-wrap: anywhere; }
-  #page-user .profile-identity--name-below { flex-wrap: wrap; }
-  #page-user .profile-identity--name-below .profile-info {
+  #page-user .profile-identity--info-below { flex-wrap: wrap; }
+  #page-user .profile-identity--info-below .profile-info {
     width: 100%;
     flex: 0 0 100%;
   }

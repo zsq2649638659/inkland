@@ -150,7 +150,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [blockDialogMessage, setBlockDialogMessage] = useState("");
   const [blockBusy, setBlockBusy] = useState(false);
   const [blockTargetId, setBlockTargetId] = useState<string | null>(null);
-  const [profileNameBelowAvatar, setProfileNameBelowAvatar] = useState(false);
+  const [profileInfoBelowAvatar, setProfileInfoBelowAvatar] = useState(false);
   const profileIdentityRef = useRef<HTMLDivElement>(null);
   const profileNameRef = useRef<HTMLHeadingElement>(null);
   const profileLoaded = Boolean(profile);
@@ -574,7 +574,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     const identity = profileIdentityRef.current;
     const avatar = identity?.querySelector<HTMLElement>(".profile-avatar");
     const name = profileNameRef.current;
-    if (!identity || !avatar || !name) return;
+    const info = identity?.querySelector<HTMLElement>(".profile-info");
+    if (!identity || !avatar || !name || !info) return;
 
     const mobileViewport = window.matchMedia("(max-width: 600px)");
     const canvas = document.createElement("canvas");
@@ -582,38 +583,45 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     if (!context) return;
 
     let disposed = false;
-    const measureName = () => {
+    const measureProfileInfo = () => {
       if (disposed) return;
       if (!mobileViewport.matches) {
-        setProfileNameBelowAvatar(false);
+        setProfileInfoBelowAvatar(false);
         return;
       }
 
-      const nameStyle = window.getComputedStyle(name);
-      context.font = `${nameStyle.fontStyle} ${nameStyle.fontWeight} ${nameStyle.fontSize} ${nameStyle.fontFamily}`;
-      const text = name.textContent || "";
-      const letterSpacing = Number.parseFloat(nameStyle.letterSpacing) || 0;
-      const textWidth = context.measureText(text).width + Math.max(0, [...text].length - 1) * letterSpacing;
       const identityStyle = window.getComputedStyle(identity);
       const gap = Number.parseFloat(identityStyle.columnGap) || Number.parseFloat(identityStyle.gap) || 0;
       const inlineWidth = identity.getBoundingClientRect().width - avatar.getBoundingClientRect().width - gap;
-      setProfileNameBelowAvatar(textWidth > inlineWidth);
+      const infoLines = [name, ...Array.from(info.querySelectorAll<HTMLElement>(".profile-bio, .profile-gender"))];
+      const doesNotFitInline = infoLines.some((line) => {
+        if (line.getClientRects().length === 0) return false;
+        const lineStyle = window.getComputedStyle(line);
+        const text = (line.innerText || line.textContent || "").replace(/\s+/g, " ").trim();
+        if (!text) return false;
+
+        context.font = `${lineStyle.fontStyle} ${lineStyle.fontWeight} ${lineStyle.fontSize} ${lineStyle.fontFamily}`;
+        const letterSpacing = Number.parseFloat(lineStyle.letterSpacing) || 0;
+        const textWidth = context.measureText(text).width + Math.max(0, [...text].length - 1) * letterSpacing;
+        return textWidth > inlineWidth;
+      });
+      setProfileInfoBelowAvatar(doesNotFitInline);
     };
 
-    const resizeObserver = new ResizeObserver(measureName);
+    const resizeObserver = new ResizeObserver(measureProfileInfo);
     resizeObserver.observe(identity);
-    window.addEventListener("resize", measureName);
+    window.addEventListener("resize", measureProfileInfo);
     void document.fonts?.ready.then(() => {
-      if (!disposed) measureName();
+      if (!disposed) measureProfileInfo();
     });
-    measureName();
+    measureProfileInfo();
 
     return () => {
       disposed = true;
       resizeObserver.disconnect();
-      window.removeEventListener("resize", measureName);
+      window.removeEventListener("resize", measureProfileInfo);
     };
-  }, [displayName]);
+  }, [displayName, profile?.bio, profile?.gender, profile?.show_gender, profile?.show_profile_info]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -634,7 +642,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     <div id="page-user" className="min-h-screen bg-paper">
       <main className="main-container">
         <section className="profile-section">
-          <div ref={profileIdentityRef} className={`profile-identity${profileNameBelowAvatar ? " profile-identity--name-below" : ""}`}>
+          <div ref={profileIdentityRef} className={`profile-identity${profileInfoBelowAvatar ? " profile-identity--info-below" : ""}`}>
             <div className="profile-avatar">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt={displayName} />
