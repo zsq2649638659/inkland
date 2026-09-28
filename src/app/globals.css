@@ -10065,7 +10065,7 @@ p {
     justify-content: flex-start;
     margin-bottom: 0;
   }
-  #page-user .profile-section:has(.profile-actions > .btn-follow) {
+  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "avatar actions" "info info";
@@ -10073,24 +10073,27 @@ p {
     column-gap: var(--ink-space-3);
     row-gap: var(--ink-space-4);
   }
-  #page-user .profile-section:has(.profile-actions > .btn-follow) .profile-identity {
+  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-identity {
     display: contents;
   }
-  #page-user .profile-section:has(.profile-actions > .btn-follow) .profile-avatar {
+  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-avatar {
     grid-area: avatar;
   }
-  #page-user .profile-section:has(.profile-actions > .btn-follow) .profile-info {
+  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-info {
     grid-area: info;
     width: 100%;
     min-width: 0;
   }
-  #page-user .profile-section:has(.profile-actions > .btn-follow) .profile-actions {
+  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-actions {
     grid-area: actions;
     width: auto;
     min-width: 0;
     justify-self: end;
     align-self: center;
     justify-content: flex-end;
+  }
+  #page-user .profile-section:has(.profile-actions > .btn-edit-profile) .btn-edit-profile {
+    width: auto;
   }
 }
 
