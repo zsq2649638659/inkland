@@ -10032,17 +10032,17 @@ p {
 }
 
 @media (max-width: 600px) {
+  #page-user .profile-identity { flex-wrap: wrap; }
+  #page-user .profile-info {
+    width: 100%;
+    flex: 0 0 100%;
+  }
   #page-user .profile-avatar {
     width: 48px;
     height: 48px;
     font-size: 24px;
   }
   #page-user .profile-name { overflow-wrap: anywhere; }
-  #page-user .profile-identity--info-below { flex-wrap: wrap; }
-  #page-user .profile-identity--info-below .profile-info {
-    width: 100%;
-    flex: 0 0 100%;
-  }
 }
 
 @media (max-width: 360px) {

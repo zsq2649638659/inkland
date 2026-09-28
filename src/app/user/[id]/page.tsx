@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -150,9 +150,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [blockDialogMessage, setBlockDialogMessage] = useState("");
   const [blockBusy, setBlockBusy] = useState(false);
   const [blockTargetId, setBlockTargetId] = useState<string | null>(null);
-  const [profileInfoBelowAvatar, setProfileInfoBelowAvatar] = useState(false);
-  const profileIdentityRef = useRef<HTMLDivElement>(null);
-  const profileNameRef = useRef<HTMLHeadingElement>(null);
   const profileLoaded = Boolean(profile);
   const profileActivityVisible = activeTab === "likes" ? Boolean(profile?.show_likes) : activeTab === "bookmarks" ? Boolean(profile?.show_bookmarks) : false;
   const includeTestDataForViewer = includeTestDataForProfile(currentProfile);
@@ -570,66 +567,6 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
   const displayName = profile?.nickname || "匿名用户";
 
-  useLayoutEffect(() => {
-    const identity = profileIdentityRef.current;
-    const avatar = identity?.querySelector<HTMLElement>(".profile-avatar");
-    const name = profileNameRef.current;
-    const info = identity?.querySelector<HTMLElement>(".profile-info");
-    if (!identity || !avatar || !name || !info) return;
-
-    const mobileViewport = window.matchMedia("(max-width: 600px)");
-    let disposed = false;
-    const measureProfileInfo = () => {
-      if (disposed) return;
-      if (!mobileViewport.matches) {
-        setProfileInfoBelowAvatar(false);
-        return;
-      }
-
-      const identityStyle = window.getComputedStyle(identity);
-      const gap = Number.parseFloat(identityStyle.columnGap) || Number.parseFloat(identityStyle.gap) || 0;
-      const inlineWidth = identity.getBoundingClientRect().width - avatar.getBoundingClientRect().width - gap;
-      const infoProbe = info.cloneNode(true) as HTMLElement;
-      Object.assign(infoProbe.style, {
-        position: "fixed",
-        insetInlineStart: "-10000px",
-        insetBlockStart: "0",
-        visibility: "hidden",
-        width: `${inlineWidth}px`,
-        minWidth: `${inlineWidth}px`,
-        maxWidth: `${inlineWidth}px`,
-        flex: "none",
-        height: "auto",
-        overflow: "visible",
-      });
-      identity.appendChild(infoProbe);
-      const probeName = infoProbe.querySelector<HTMLElement>(".profile-name");
-      const probeBio = infoProbe.querySelector<HTMLElement>(".profile-bio");
-      const nameLineHeight = probeName ? Number.parseFloat(window.getComputedStyle(probeName).lineHeight) || probeName.getBoundingClientRect().height : 0;
-      const nameWraps = probeName ? probeName.getBoundingClientRect().height > nameLineHeight * 1.5 : false;
-      const bioLineHeight = probeBio ? Number.parseFloat(window.getComputedStyle(probeBio).lineHeight) || probeBio.getBoundingClientRect().height : 0;
-      const bioNeedsMoreRoom = probeBio ? probeBio.getBoundingClientRect().height > bioLineHeight * 2.5 : false;
-      infoProbe.remove();
-
-      const doesNotFitInline = nameWraps || bioNeedsMoreRoom;
-      setProfileInfoBelowAvatar(doesNotFitInline);
-    };
-
-    const resizeObserver = new ResizeObserver(measureProfileInfo);
-    resizeObserver.observe(identity);
-    window.addEventListener("resize", measureProfileInfo);
-    void document.fonts?.ready.then(() => {
-      if (!disposed) measureProfileInfo();
-    });
-    measureProfileInfo();
-
-    return () => {
-      disposed = true;
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", measureProfileInfo);
-    };
-  }, [displayName, profile?.bio, profile?.gender, profile?.show_gender, profile?.show_profile_info]);
-
   // Close dropdown on outside click
   useEffect(() => {
     if (!moreOpen) return;
@@ -649,7 +586,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     <div id="page-user" className="min-h-screen bg-paper">
       <main className="main-container">
         <section className="profile-section">
-          <div ref={profileIdentityRef} className={`profile-identity${profileInfoBelowAvatar ? " profile-identity--info-below" : ""}`}>
+          <div className="profile-identity">
             <div className="profile-avatar">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt={displayName} />
@@ -658,7 +595,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               )}
             </div>
             <div className="profile-info">
-              <h1 ref={profileNameRef} className="profile-name">{displayName}</h1>
+              <h1 className="profile-name">{displayName}</h1>
               {profile?.show_profile_info && <p className="profile-bio">{profile.bio || "这个人很懒，什么都没写"}</p>}
               {profile?.gender && <p className="profile-gender">{profile.gender === "male" ? "男" : "女"}</p>}
             </div>
