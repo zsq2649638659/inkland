@@ -9829,6 +9829,10 @@ p {
   position: relative;
 }
 
+#page-user .profile-actions-wrapper > .comment-popup {
+  z-index: 110;
+}
+
 #page-user .more-dropdown {
   position: absolute;
   top: calc(100% + 6px);
