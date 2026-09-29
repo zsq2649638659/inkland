@@ -701,8 +701,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         <div className="tabs-wrapper user-public-tabs" aria-label="个人主页内容">
           <div className="tabs-inner">
             <Link href={profileTabHref(id, searchParamsKey, "works")} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
-            {profile && <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>喜欢</Link>}
-            {profile && <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>收藏</Link>}
+            <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>喜欢</Link>
+            <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>收藏</Link>
           </div>
         </div>
         </div>
