@@ -45,24 +45,6 @@ function positionLabel(record: ReadingHistoryRecord) {
   return `已读 ${Math.round(record.progress_ratio * 100)}%`;
 }
 
-function tagsFor(post: ReadingHistoryPostSnapshot, kind: "single" | "image" | "serial") {
-  const tags = (kind === "serial" && post.series_tags?.length ? post.series_tags : post.tags)?.filter(Boolean) || [];
-  if (tags.length) return tags;
-  return [kind === "image" ? "图片作品" : kind === "serial" ? "长篇连载" : "单篇作品"];
-}
-
-function tagLinks(tags: string[], mobile = false) {
-  return (
-    <div className={`site-card__tags${mobile ? " site-card__search-mobile-tags" : ""}`} aria-label="作品标签">
-      {tags.map((tag) => (
-        <Link key={tag} href={`/tag/${encodeURIComponent(tag)}`} className="tag tag--site site-card__tag">
-          {tag}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 function searchMeta(record: ReadingHistoryRecord, mode: CardMode) {
   const author = record.post?.author;
   const nickname = author?.nickname?.trim() || "Inkland 作者";
@@ -140,7 +122,7 @@ export default function HistoryWorkCard({ record, mode }: { record: ReadingHisto
       ? title
       : `第${chapterNumber}章 ${title}`
     : "章节待发布，敬请期待";
-  const seriesHref = post?.series_name ? `/series/${encodeURIComponent(post.series_name)}` : `/read/${record.post_id}`;
+  const seriesHref = post?.series_id ? `/series/${encodeURIComponent(post.series_id)}` : `/read/${record.post_id}`;
   const seriesCompleted = post?.series_status === "completed";
 
   const body = isImage
@@ -193,7 +175,6 @@ export default function HistoryWorkCard({ record, mode }: { record: ReadingHisto
       aria-label={`阅读历史${kind === "serial" ? "长篇连载" : kind === "image" ? "图片" : "单篇"}作品卡片`}
     >
       {body}
-      {tagLinks(tagsFor(post || { id: record.post_id }, kind), mode === "mobile")}
       <div className="site-card__history-info" role="group" aria-label="阅读进度和最近阅读时间">
         <span>{positionLabel(record)}</span>
         <time dateTime={record.last_read_at}>{formatLastRead(record.last_read_at)}</time>

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { slimContent } from "@/lib/feed";
+import { attachSeriesIds } from "@/lib/seriesLinks";
+import { includeTestDataForProfile } from "@/lib/test-data-visibility";
 
 // 个人中心列表数据的服务端入口（works / likes / bookmarks 三个 tab）。
 // 服务端在机房内拉取数据并瘦身 content，客户端不再跨区下载数 MB 全文。
@@ -61,7 +63,9 @@ export async function GET(request: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const slimmed = (rows || []).map((p) => ({
+    const { data: profile } = await supabase.from("profiles").select("is_test_account").eq("id", user.id).maybeSingle();
+    const linkedRows = await attachSeriesIds(supabase, rows || [], includeTestDataForProfile(profile));
+    const slimmed = linkedRows.map((p) => ({
       ...p,
       content: slimContent((p.content as string) || ""),
     }));

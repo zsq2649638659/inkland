@@ -14,6 +14,7 @@ import { assertCanInteract } from "@/lib/userRestrictions";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 import { loadReadingHistory, type ReadingHistoryRecord } from "@/lib/readingHistory";
 import { getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
+import { isUuid } from "@/lib/seriesLinks";
 
 interface ChapterInfo {
   id: string;
@@ -79,28 +80,26 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
     const load = async () => {
       const includeTestData = includeTestDataForProfile(profile);
       const seriesSelect = "id, user_id, name, description, cover_url, tags, status, series_type, created_at, updated_at";
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decodedName);
+      const routeIsUuid = isUuid(decodedName);
       const initialSeriesResult = await withTestDataVisibility(
         supabase
           .from("series")
           .select(seriesSelect)
-          .eq(isUuid ? "id" : "name", decodedName),
+          .eq(routeIsUuid ? "id" : "name", decodedName),
         includeTestData,
       ).maybeSingle();
       const seriesData = initialSeriesResult.data;
       const seriesRow = seriesData as unknown as Record<string, unknown> | null;
       const resolvedSeriesName = (seriesRow?.name as string | undefined) || decodedName;
-      const { data: chData } = await withTestDataVisibility(
-        supabase
+      let chaptersQuery = supabase
           .from("posts")
           .select("id, title, chapter_number, chapter_title, word_count, created_at, updated_at, user_id, status")
           .eq("series_name", resolvedSeriesName)
           .eq("post_type", "serial")
           .eq("status", "published")
-          .gt("chapter_number", 0)
-          .order("chapter_number", { ascending: true }),
-        includeTestData,
-      );
+          .gt("chapter_number", 0);
+      if (seriesRow?.user_id) chaptersQuery = chaptersQuery.eq("user_id", seriesRow.user_id as string);
+      const { data: chData } = await withTestDataVisibility(chaptersQuery.order("chapter_number", { ascending: true }), includeTestData);
 
       if (!active) return;
       const chapters = (chData || []) as unknown as Array<Record<string, unknown>>;
@@ -300,7 +299,7 @@ export default function SeriesPage({ params }: { params: Promise<{ name: string 
                   </Link>
                 )}
                 {isOwner && (
-                  <Link href={`/studio/series/${encodeURIComponent(seriesInfo.title)}`} className="hero-action-btn">
+                  <Link href={`/studio/series/${encodeURIComponent(seriesInfo.id)}`} className="hero-action-btn">
                     管理
                   </Link>
                 )}

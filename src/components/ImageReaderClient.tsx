@@ -715,8 +715,8 @@ export default function ImageReaderClient({ post, images: initialImages, initial
         {post.series_name && (
           <ChapterNav
             postType={post.post_type}
-            seriesName={post.series_name}
             seriesId={post.series_id}
+            postId={post.id}
             previous={prevChapter}
             next={nextChapter}
           />

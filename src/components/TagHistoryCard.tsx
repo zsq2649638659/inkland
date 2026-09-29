@@ -51,7 +51,7 @@ export default function TagHistoryCard({ post, context = "tag" }: { post: Post; 
   const isImage = !isSerial && Boolean(images.length || post.post_type === "illustration" || post.post_type === "comic" || post.post_type === "cosplay");
   const kind = isSerial ? "serial" : isImage ? "image" : "single";
   const readHref = `/read/${post.id}`;
-  const seriesHref = post.series_name ? `/series/${encodeURIComponent(post.series_name)}` : readHref;
+  const seriesHref = post.series_id ? `/series/${encodeURIComponent(post.series_id)}` : readHref;
   const seriesTitle = post.series_name || title;
   const latestTitle = post.chapter_number ? `第${post.chapter_number}章 ${title}` : "章节待发布，敬请期待";
 

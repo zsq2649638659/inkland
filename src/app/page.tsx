@@ -16,7 +16,6 @@ import { loadFeed, type FeedResult } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 import { readClientCache, writeClientCache } from "@/lib/client-cache";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
-import { loadReadingHistory, type ReadingHistoryRecord } from "@/lib/readingHistory";
 
 type TabType = "following" | "myTags" | "hot24";
 
@@ -77,7 +76,6 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(false);
   const [hasNewPosts, setHasNewPosts] = useState(false);
   const [requestTimedOut, setRequestTimedOut] = useState(false);
-  const [latestReading, setLatestReading] = useState<ReadingHistoryRecord | null>(null);
   const latestPostTimeRef = useRef<string>("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const feedRequestRef = useRef(0);
@@ -303,20 +301,6 @@ export default function HomePage() {
   }, [tab, user, profile?.is_test_account]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      return;
-    }
-    let active = true;
-    void loadReadingHistory(supabase, user.id).then(({ records }) => {
-      if (active) setLatestReading(records[0] || null);
-    });
-    return () => {
-      active = false;
-    };
-  }, [authLoading, supabase, user]);
-
   const tabs: { key: TabType; label: string }[] = [
     { key: "following", label: "关注" },
     { key: "myTags", label: "标签" },
@@ -341,14 +325,6 @@ export default function HomePage() {
     ...serialCards.map((card) => ({ type: "serial" as const, createdAt: card.createdAt, card })),
     ...posts.map((post) => ({ type: "post" as const, createdAt: post.created_at || "", post })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const latestReadingPost = latestReading?.post;
-  const latestReadingPosition = latestReading
-    ? latestReading.position_label
-      || (latestReadingPost?.post_type === "serial" && (latestReading.chapter_number || latestReadingPost.chapter_number)
-        ? `第${latestReading.chapter_number || latestReadingPost.chapter_number}章`
-        : `已读${Math.round(latestReading.progress_ratio * 100)}%`)
-    : "";
-
   return (
     <div id="page-home" className="min-h-screen bg-paper pb-20 lg:pb-0">
       {/* V2: main container with sidebar + content */}
@@ -374,22 +350,6 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-
-          {user && tab === "following" && latestReadingPost && (
-            <section className="home-continue-reading" aria-label="继续阅读">
-              <div className="home-continue-reading-copy">
-                <p className="home-continue-reading-label"><SiteIcon name="fa-clock" variant="outline" />继续阅读</p>
-                <h2>{latestReadingPost.title || "未命名作品"}</h2>
-                <p>
-                  {latestReadingPost.series_name ? `${latestReadingPost.series_name} · ` : ""}
-                  {latestReadingPosition}
-                </p>
-              </div>
-              <Link className="home-continue-reading-action" href={`/read/${latestReading.post_id}`}>
-                继续阅读 <span aria-hidden="true">→</span>
-              </Link>
-            </section>
-          )}
 
           {/* 关注作品 Feed */}
           <div className="feed home-feed-card-device card-device card-device--pc" id="feed-works" style={{ display: tab === "following" ? undefined : "none" }}>

@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { assertCanPublish } from "@/lib/userRestrictions";
 import { cleanImportHeading, extractImportPreamble, parseImportChapterHeading, splitImportChapters, type ImportChapter } from "@/lib/importChapterDetection";
 import { clearImportBatch, loadImportBatch, saveImportBatch, type ImportBatchSnapshot } from "@/lib/importBatchStore";
-import { findImportDuplicate, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
+import { createDuplicateSerialName, findImportDuplicate, getKeptDuplicateSerialPlanIds, type ExistingImportPost, type ImportDuplicateAction, type ImportDuplicateMatch } from "@/lib/importDuplicates";
 import { extractTextImportMetadata, normalizeImportedDescription, normalizeImportedTitle } from "@/lib/importMetadata";
 import { MAX_TAGS_PER_WORK } from "@/lib/tagRules";
 import styles from "./import.module.css";
@@ -49,6 +49,7 @@ interface ParsedWork {
   detectedEncoding?: string;
   duplicateMatch?: ImportDuplicateMatch;
   duplicateAction?: ImportDuplicateAction;
+  duplicateSeriesCopy?: boolean;
 }
 
 interface PublishResult {
@@ -80,6 +81,7 @@ interface TextImportPlan {
   groupName: string;
   groupDescription: string;
   groupTags: string[];
+  duplicateSeriesCopy?: boolean;
   descriptionCandidate: string;
   descriptionCandidateSource?: string;
   descriptionCandidateAccepted?: boolean;
@@ -566,6 +568,7 @@ async function buildTextWorks(plan: TextImportPlan): Promise<ParsedWork[]> {
     detectedEncoding: plan.canChangeEncoding ? plan.encoding : undefined,
     groupDescription: plan.groupDescription,
     groupTags: plan.groupTags,
+    duplicateSeriesCopy: plan.duplicateSeriesCopy,
     descriptionCandidate: plan.descriptionCandidate,
     descriptionCandidateSource: plan.descriptionCandidateSource,
     warning: plan.warning,
@@ -963,11 +966,68 @@ export default function ImportWorkspace() {
     return annotatedWorks;
   };
 
+  const separateKeptDuplicateSerials = async (works: ParsedWork[]) => {
+    const duplicatePlanIds = getKeptDuplicateSerialPlanIds(works);
+    if (duplicatePlanIds.length === 0) return works;
+
+    const { data: existingSeries, error } = await supabase
+      .from("series")
+      .select("name")
+      .eq("user_id", user!.id);
+    if (error) throw error;
+
+    const occupiedNames = new Set<string>([
+      ...((existingSeries || []) as Array<{ name?: string | null }>).map((series) => series.name?.trim() || "").filter(Boolean),
+      ...works.map((work) => work.groupName?.trim() || "").filter(Boolean),
+    ]);
+    const renamedPlans = new Map<string, string>();
+    for (const planId of duplicatePlanIds) {
+      const planWorks = works.filter((work) => work.sourcePlanId === planId);
+      const originalName = planWorks[0]?.groupName?.trim();
+      if (!originalName) continue;
+      const duplicateName = createDuplicateSerialName(originalName, occupiedNames, 20);
+      occupiedNames.add(duplicateName);
+      renamedPlans.set(planId, duplicateName);
+    }
+    if (renamedPlans.size === 0) return works;
+
+    const nextWorks = works.map((work) => {
+      const duplicateName = work.sourcePlanId ? renamedPlans.get(work.sourcePlanId) : undefined;
+      return duplicateName ? { ...work, groupName: duplicateName, duplicateSeriesCopy: true } : work;
+    });
+    setParsedWorks(nextWorks);
+    setTextPlans((plans) => plans.map((plan) => {
+      const duplicateName = renamedPlans.get(plan.id);
+      return duplicateName ? { ...plan, groupName: duplicateName, duplicateSeriesCopy: true } : plan;
+    }));
+    const titles = [...renamedPlans.values()].map((name) => `《${name}》`).join("、");
+    setNotice(`你选择保留了整本重复内容；本次会另建连载 ${titles}，章节标题和正文不变。`);
+    return nextWorks;
+  };
+
   const setDuplicateAction = (workId: string, action: ImportDuplicateAction) => {
     setParsedWorks((works) => works.map((work) => work.id === workId
       ? { ...work, duplicateAction: action, selected: action !== "skip" && action !== "review" }
       : work));
     setError("");
+  };
+
+  const continueAfterDuplicateChoices = async (works: ParsedWork[]) => {
+    if (!works.some((work) => work.selected)) {
+      setError("请至少选择一篇作品");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const separatedWorks = await separateKeptDuplicateSerials(works);
+      setParsedWorks(separatedWorks);
+      setCurrentStep(3);
+    } catch (error) {
+      setError(`无法为重复连载建立独立目录：${getErrorMessage(error, "请稍后重试")}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const openImportNotices = (workIds: string[]) => {
@@ -981,10 +1041,16 @@ export default function ImportWorkspace() {
     setNoticeModalWorkIds([]);
   };
 
-  const finishImportNotice = (action?: ImportDuplicateAction) => {
+  const finishImportNotice = async (action?: ImportDuplicateAction) => {
     if (!noticeModalWorkId) return;
     const currentWorkId = noticeModalWorkId;
-    if (action) setDuplicateAction(currentWorkId, action);
+    const nextWorks = action
+      ? parsedWorks.map((work) => work.id === currentWorkId
+        ? { ...work, duplicateAction: action, selected: action !== "skip" && action !== "review" }
+        : work)
+      : parsedWorks;
+    if (action) setParsedWorks(nextWorks);
+    setError("");
     const remainingWorkIds = noticeModalWorkIds.filter((workId) => workId !== currentWorkId);
     setNoticeModalWorkIds(remainingWorkIds);
     if (remainingWorkIds.length > 0) {
@@ -992,11 +1058,10 @@ export default function ImportWorkspace() {
       return;
     }
     setNoticeModalWorkId(null);
-    const selectedAfter = parsedWorks.filter((work) => work.id === currentWorkId ? action !== "skip" : work.selected).length;
-    if (selectedAfter > 0) setCurrentStep(3);
+    await continueAfterDuplicateChoices(nextWorks);
   };
 
-  const finishAllDuplicateNotices = (action: Extract<ImportDuplicateAction, "skip" | "keep" | "update">) => {
+  const finishAllDuplicateNotices = async (action: Extract<ImportDuplicateAction, "skip" | "keep" | "update">) => {
     const targetWorkIds = noticeModalWorkIds.filter((workId) => {
       const work = parsedWorks.find((item) => item.id === workId);
       if (!work?.duplicateMatch) return false;
@@ -1005,9 +1070,10 @@ export default function ImportWorkspace() {
     if (targetWorkIds.length === 0) return;
 
     const targetWorkIdSet = new Set(targetWorkIds);
-    setParsedWorks((works) => works.map((work) => targetWorkIdSet.has(work.id)
+    const nextWorks = parsedWorks.map((work) => targetWorkIdSet.has(work.id)
       ? { ...work, duplicateAction: action, selected: action !== "skip" }
-      : work));
+      : work);
+    setParsedWorks(nextWorks);
     setError("");
 
     const remainingWorkIds = noticeModalWorkIds.filter((workId) => !targetWorkIdSet.has(workId));
@@ -1015,8 +1081,7 @@ export default function ImportWorkspace() {
     setNoticeModalWorkId(remainingWorkIds[0] || null);
 
     if (remainingWorkIds.length === 0) {
-      const selectedAfter = parsedWorks.filter((work) => targetWorkIdSet.has(work.id) ? action !== "skip" : work.selected).length;
-      if (selectedAfter > 0) setCurrentStep(3);
+      await continueAfterDuplicateChoices(nextWorks);
     }
   };
 
@@ -1105,6 +1170,7 @@ export default function ImportWorkspace() {
           content,
           chapters,
           mode,
+          duplicateSeriesCopy: mode === "serial" ? plan.duplicateSeriesCopy : false,
           ...(metadata ? { descriptionCandidate: metadata.descriptionCandidate, descriptionCandidateSource: metadata.descriptionSource, descriptionCandidateAccepted: false } : {}),
         };
         nextPlans.push(nextPlan);
@@ -1258,6 +1324,9 @@ export default function ImportWorkspace() {
       .maybeSingle();
     if (findError) throw findError;
     if (existing?.id) {
+      if (work.duplicateSeriesCopy) {
+        throw new Error(`新连载标题“${work.groupName}”已被占用，请返回修改标题后再导入。`);
+      }
       const { error: updateError } = await supabase.from("series").update({
         description: work.groupDescription?.trim() || "",
         ...(work.groupMode === "serial" ? { tags: work.groupTags || [] } : {}),
@@ -1417,6 +1486,7 @@ export default function ImportWorkspace() {
         openImportNotices(noticeWorks.map((work) => work.id));
         return;
       }
+      await separateKeptDuplicateSerials(annotatedWorks);
       setCurrentStep(3);
     } catch (databaseError) {
       setError(`暂时无法再次检查已有作品：${getErrorMessage(databaseError, "请稍后重试")}`);
@@ -1707,6 +1777,9 @@ export default function ImportWorkspace() {
 
               {currentStep === 3 && <div className={styles.stepPage}>
                 <div className={styles.sectionHeader}><div><h2>编辑信息</h2><p>确认简介后，才会写入连载或合集。</p></div></div>
+                {activeGroupedPlans.filter((plan) => plan.duplicateSeriesCopy).map((plan) => <p key={plan.id} className={styles.duplicateSummary} role="status">
+                  你选择保留了与旧内容完全重复的章节。本次会单独新建连载“{plan.groupName}”；章节标题和正文不变，不会并进旧连载。
+                </p>)}
                 <div className={styles.stepScrollArea}>
                   {activeGroupedPlans.map((plan) => <section className={styles.groupInfoCard} key={plan.id}>
                     <label><span>{plan.mode === "serial" ? "连载标题" : "合集标题"}</span><input value={plan.groupName || ""} maxLength={plan.mode === "serial" ? 20 : 100} onChange={(event) => updateGroupInformation(plan.id, { groupName: event.target.value })} /></label>

@@ -21,6 +21,16 @@ export interface ImportDuplicateMatch {
   message: string;
 }
 
+export interface DuplicateSerialImportCandidate {
+  sourcePlanId?: string;
+  groupMode?: "single" | "collection" | "serial";
+  groupName?: string;
+  selected: boolean;
+  duplicateMatch?: Pick<ImportDuplicateMatch, "kind">;
+  duplicateAction?: ImportDuplicateAction;
+  duplicateSeriesCopy?: boolean;
+}
+
 const SIMILARITY_THRESHOLD = 0.84;
 const MIN_SIMILARITY_LENGTH = 80;
 
@@ -123,4 +133,42 @@ export function findImportDuplicate(
       ? `与当前导入批次中的《${bestMatch.post.title || "未命名作品"}》正文相似度约 ${formatSimilarity(bestMatch.similarity)}，请确认是否仍要导入。`
       : `与已有作品《${bestMatch.post.title || "未命名作品"}》正文相似度约 ${formatSimilarity(bestMatch.similarity)}，请确认是否仍要导入。`,
   };
+}
+
+export function getKeptDuplicateSerialPlanIds(works: readonly DuplicateSerialImportCandidate[]) {
+  const byPlan = new Map<string, DuplicateSerialImportCandidate[]>();
+  for (const work of works) {
+    if (work.groupMode !== "serial" || !work.sourcePlanId) continue;
+    const planWorks = byPlan.get(work.sourcePlanId) || [];
+    planWorks.push(work);
+    byPlan.set(work.sourcePlanId, planWorks);
+  }
+
+  return [...byPlan.entries()]
+    .filter(([, planWorks]) => {
+      const groupName = planWorks[0]?.groupName?.trim();
+      return Boolean(groupName)
+        && planWorks.every((work) => work.selected
+          && work.groupName?.trim() === groupName
+          && work.duplicateMatch?.kind === "exact"
+          && work.duplicateAction === "keep"
+          && !work.duplicateSeriesCopy);
+    })
+    .map(([planId]) => planId);
+}
+
+export function createDuplicateSerialName(baseName: string, occupiedNames: ReadonlySet<string>, maxLength = 20) {
+  const base = Array.from(baseName.trim() || "未命名连载");
+  for (let copyNumber = 2; copyNumber <= 9999; copyNumber += 1) {
+    const suffix = `（副本${copyNumber}）`;
+    const prefixLimit = Math.max(1, maxLength - suffix.length);
+    let prefix = "";
+    for (const character of base) {
+      if (prefix.length + character.length > prefixLimit) break;
+      prefix += character;
+    }
+    const candidate = `${prefix}${suffix}`;
+    if (!occupiedNames.has(candidate)) return candidate;
+  }
+  throw new Error("无法为重复导入的连载生成新标题");
 }

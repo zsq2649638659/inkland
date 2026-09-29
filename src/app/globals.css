@@ -12853,64 +12853,6 @@ p {
 .home-refresh-notice:hover { box-shadow:var(--shadow-hover);transform:translateY(-1px) }
 .home-refresh-notice:focus-visible { outline:3px solid color-mix(in srgb, var(--color-primary) 22%, transparent);outline-offset:2px }
 
-/* Reading history: a lightweight resume card for the default home feed. */
-.home-continue-reading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 20px;
-  padding: 16px 20px;
-  border-radius: var(--radius-lg, 16px);
-  background: var(--color-card, #fff);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-.home-continue-reading-copy { min-width: 0; }
-.home-continue-reading-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 4px;
-  color: var(--color-primary, #F26B5B);
-  font-size: 12px;
-  font-weight: 600;
-}
-.home-continue-reading-copy h2 {
-  overflow: hidden;
-  margin: 0;
-  color: var(--color-text, #1A1A1A);
-  font-size: 15px;
-  font-weight: 650;
-  line-height: 1.5;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.home-continue-reading-copy > p:last-child {
-  overflow: hidden;
-  margin: 4px 0 0;
-  color: var(--color-text-muted, #6B6B6B);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.home-continue-reading-action {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 0 16px;
-  border-radius: var(--radius-full, 999px);
-  background: var(--color-primary, #F26B5B);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
-.home-continue-reading-action:hover { color: #fff; opacity: .9; }
-@media (max-width: 640px) {
-  .home-continue-reading { align-items: flex-start; flex-direction: column; gap: 12px; }
-  .home-continue-reading-action { justify-content: center; width: 100%; }
-}
 [data-theme="dark"] .home-refresh-notice { background:var(--color-card);color:var(--color-primary) }
 
 #page-create .type-cards {
@@ -15144,9 +15086,15 @@ p {
    frame reserved for hover, focus, or selection.
    -------------------------------------------------------------------------- */
 #page-create .ink-input,
-#page-create .ink-textarea,
-#page-create .ink-tag-input__list {
+#page-create .ink-textarea {
   border: var(--ink-border-width-thin) solid transparent;
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+/* Keep selected tags and the text cursor inside one visibly bounded field. */
+#page-create .ink-tag-input__list {
+  border: var(--ink-input-border-width) solid var(--ink-border);
   background: var(--ink-color-bg-surface);
   box-shadow: none;
 }
@@ -19590,4 +19538,24 @@ a[class*="btn--variant-outline"]:hover:not(#inkland-button-contract-excluded) {
 @media (max-width: 600px) {
   #page-settings .profile-password-module { padding:16px;border-radius:16px; }
   #page-settings .profile-password-module .settings-form-group { margin-bottom:16px; }
+}
+
+/* Keep personal/public profile and collection content aligned with the Navbar on tablet. */
+@media (min-width: 601px) and (max-width: 900px) {
+  #page-collection .collection-page-wrapper {
+    padding-inline: 16px;
+  }
+
+  #page-profile .main-container,
+  #page-user .main-container {
+    width: calc(100% - 32px);
+  }
+
+  #page-profile .main-container {
+    padding-inline: 0 !important;
+  }
+
+  #page-user .main-container {
+    padding-inline: 0;
+  }
 }

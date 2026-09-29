@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { SettingsSectionPage } from "@/components/SettingsPage";
 
 export default function EditProfilePage() {
-  redirect("/profile-settings?tab=profile");
+  return <SettingsSectionPage section="profile" />;
 }

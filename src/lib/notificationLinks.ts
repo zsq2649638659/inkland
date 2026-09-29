@@ -41,8 +41,9 @@ export function getNotificationLink(notification: NotificationLinkInput): string
     if (template === "activity_reminder") return direct;
 
     if (template === "series_review_rejected") {
-      const seriesName = notification.series_name || notification.metadata?.series_name;
-      if (seriesName) return `/studio/series/${encodeURIComponent(seriesName)}?edit=1`;
+      if (relatedType === "series" && notification.related_entity_id) {
+        return `/studio/series/${encodeURIComponent(notification.related_entity_id)}?edit=1`;
+      }
       // 旧通知没有保存连载名称时，至少回到创作中心，避免打开无效的 /create?series=...
       return "/studio";
     }

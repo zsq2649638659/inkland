@@ -201,7 +201,7 @@ function StudioWorkCard({
   const mobileExcerpt = isImage ? (displayTitle ? excerpt : "") : excerpt || (isSeries ? "暂无系列简介" : "暂无正文摘要");
   const latestChapterTitle = work.series_chapter_count ? `第${work.series_chapter_count}章` : "章节待发布";
   const workHref = isSeries && work.series_name
-    ? `/studio/series/${encodeURIComponent(work.series_name)}`
+    ? `/studio/series/${encodeURIComponent(work.id)}`
     : `/read/${work.id}`;
   const editHref = isSeries
     ? workHref

@@ -122,7 +122,7 @@ export default async function ReadPage({
   const seriesName = p.series_name as string | null;
   const [seriesResult, bioResult] = await Promise.all([
     seriesName
-      ? supabase.from("series").select("id").eq("name", seriesName).maybeSingle()
+      ? supabase.from("series").select("id").eq("name", seriesName).eq("user_id", p.user_id as string).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.rpc("get_public_profile_bios", { p_user_ids: [p.user_id as string] }),
   ]);

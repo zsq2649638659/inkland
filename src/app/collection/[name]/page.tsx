@@ -361,7 +361,7 @@ export default function CollectionPage({ params }: { params: Promise<{ name: str
               </div>
               <div className="collection-hero-actions">
                 {isOwner ? (
-                  <Link className="collection-action-btn collection-action-btn-primary" href={`/studio/series/${encodeURIComponent(collection.name)}?edit=1`}>管理</Link>
+                  <Link className="collection-action-btn collection-action-btn-primary" href={`/studio/series/${encodeURIComponent(collection.id)}?edit=1`}>管理</Link>
                 ) : (
                   <button type="button" className="collection-action-btn collection-action-btn-primary" onClick={toggleCollectionBookmark} disabled={authLoading || bookmarkLoading} aria-pressed={isSaved} aria-busy={bookmarkLoading}>
                     {bookmarkLoading ? "收藏中…" : isSaved ? "已收藏" : "收藏"}

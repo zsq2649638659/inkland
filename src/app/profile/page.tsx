@@ -20,6 +20,8 @@ import { slimContent } from "@/lib/feed";
 import type { Post } from "@/lib/types";
 import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
 import { getPublicProfileBios } from "@/lib/profile-privacy";
+import { attachSeriesIds } from "@/lib/seriesLinks";
+import { canViewTestData } from "@/lib/test-data-visibility";
 
 type FilterType = "all" | "single" | "image" | "series";
 type TabType = "works" | "likes" | "bookmarks" | "following" | "followers";
@@ -186,6 +188,11 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
   const router = useRouter();
   const dialog = useAppDialog();
   const { user, profile, loading: authLoading } = useAuth();
+  const withSeriesIds = async (posts: Post[]) => attachSeriesIds(
+    supabase,
+    posts,
+    await canViewTestData(supabase, user?.id),
+  );
   const displayName = profile?.nickname || user?.email?.split("@")[0] || "用户";
   const [displayPosts, setDisplayPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -347,7 +354,8 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       const { data: signed } = await supabase.storage.from("private-post-images").createSignedUrl(url.slice(privatePrefix.length), 3600);
       return signed?.signedUrl || url;
     };
-    const resolvedPosts = await Promise.all((data as unknown as Post[]).map(async (post) => {
+    const linkedPosts = await withSeriesIds(data as Post[]);
+    const resolvedPosts = await Promise.all(linkedPosts.map(async (post) => {
       let content = post.content || "";
       const privateUrls = [...new Set([...content.matchAll(/private:\/\/private-post-images\/([^\s)]+)/g)].map((match) => match[0]))];
       const replacements = await Promise.all(privateUrls.map(async (url) => ({ url, signedUrl: await resolvePrivateUrl(url) })));
@@ -441,7 +449,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       }
     }
     if (posts.length > 0) {
-      const formatted = posts.map((p) => {
+      const formatted = (await withSeriesIds(posts)).map((p) => {
         const cp = p as unknown as Record<string, unknown>;
         const ptags = (cp.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
         return { ...p, tags: ptags };
@@ -486,7 +494,7 @@ export default function ProfilePage({ defaultTab = "works" }: { defaultTab?: Tab
       }
     }
     if (posts.length > 0) {
-      const formatted = posts.map((p) => {
+      const formatted = (await withSeriesIds(posts)).map((p) => {
         const cp = p as unknown as Record<string, unknown>;
         const ptags = (cp.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
         return { ...p, tags: ptags };

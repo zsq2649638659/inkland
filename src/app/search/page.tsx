@@ -282,8 +282,11 @@ function SearchContent() {
       .filter((post) => !blockedIds.has(post.user_id || ""));
 
     const serialNames = [...new Set(rawTitlePosts.filter((post) => post.post_type === "serial" && post.series_name).map((post) => post.series_name as string))];
-    const seriesQuery = serialNames.length > 0
-      ? withTestDataVisibility(supabase.from("series").select("name, status").in("name", serialNames), includeTestData)
+    const serialOwnerIds = [...new Set(rawTitlePosts
+      .filter((post) => post.post_type === "serial" && post.series_name && post.user_id)
+      .map((post) => post.user_id as string))];
+    const seriesQuery = serialNames.length > 0 && serialOwnerIds.length > 0
+      ? withTestDataVisibility(supabase.from("series").select("id, user_id, name, status").in("name", serialNames).in("user_id", serialOwnerIds), includeTestData)
       : null;
     const statsQuery = applyWorkRefine && sortBy !== "latest" && rawTitlePosts.length > 0
       ? supabase.from("post_stats").select("id, like_count, comment_count, bookmark_count").in("id", rawTitlePosts.map((post) => post.id))
@@ -293,13 +296,18 @@ function SearchContent() {
       statsQuery || Promise.resolve({ data: [] as unknown[] }),
     ]);
 
-    const seriesStatusMap = new Map(((seriesRows || []) as Array<{ name?: string | null; status?: SeriesStatusFilter }>).map((row) => [row.name || "", row.status || "ongoing"]));
+    const seriesByOwnerAndName = new Map(((seriesRows || []) as Array<{ id?: string | null; user_id?: string | null; name?: string | null; status?: SeriesStatusFilter }>).map((row) => [`${row.user_id}\u0000${row.name}`, row]));
     const statsMap = new Map(((statsRows || []) as Array<{ id?: string; like_count?: number; comment_count?: number; bookmark_count?: number }>).map((row) => [row.id || "", row]));
     const visibleTitlePosts = rawTitlePosts
       .map((post) => ({
         ...post,
         content: slimContent(post.content || ""),
-        series_status: post.post_type === "serial" ? (seriesStatusMap.get(post.series_name || "") || "ongoing") : undefined,
+        series_id: post.post_type === "serial" && post.user_id && post.series_name
+          ? seriesByOwnerAndName.get(`${post.user_id}\u0000${post.series_name}`)?.id || null
+          : null,
+        series_status: post.post_type === "serial" && post.user_id && post.series_name
+          ? (seriesByOwnerAndName.get(`${post.user_id}\u0000${post.series_name}`)?.status || "ongoing")
+          : undefined,
         like_count: statsMap.get(post.id)?.like_count || 0,
         comment_count: statsMap.get(post.id)?.comment_count || 0,
         bookmark_count: statsMap.get(post.id)?.bookmark_count || 0,

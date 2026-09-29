@@ -23,11 +23,14 @@ export default function ChapterPreviewPage() {
   useEffect(() => {
     const stored = window.localStorage.getItem("inkland:chapter-preview");
     if (!stored) return;
+    let frame = 0;
     try {
-      setPreview(JSON.parse(stored) as ChapterPreviewData);
+      const nextPreview = JSON.parse(stored) as ChapterPreviewData;
+      frame = window.requestAnimationFrame(() => setPreview(nextPreview));
     } catch {
       window.localStorage.removeItem("inkland:chapter-preview");
     }
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   if (!preview) {
@@ -56,7 +59,7 @@ export default function ChapterPreviewPage() {
     <main className="chapter-static-preview-page">
       <div className="chapter-static-preview-toolbar">
         <div><span>章节发布效果预览</span><strong>{preview.seriesName}</strong></div>
-        <button type="button" onClick={() => router.push(preview.returnUrl || `/create?seriesName=${encodeURIComponent(preview.seriesName)}`)}><SiteIcon name="fa-arrow-left" variant="solid" />返回编辑</button>
+        <button type="button" onClick={() => router.push(preview.returnUrl || "/studio")}><SiteIcon name="fa-arrow-left" variant="solid" />返回编辑</button>
       </div>
       <article className="content-wrapper chapter-static-preview-content">
         <h1 className="work-title">{displayTitle}</h1>
