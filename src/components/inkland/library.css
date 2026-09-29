@@ -593,7 +593,7 @@
   }
 }
 
-/* 首页移动端布局：内容留 8px 侧边空间，继续阅读保持紧凑的左右排布。 */
+/* 首页移动端布局：内容留 8px 侧边空间。 */
 @media (max-width: 768px) {
   #navbar .navbar-inner {
     padding-inline: 16px;
@@ -626,19 +626,6 @@
     width: 100%;
   }
 
-  #page-home .home-continue-reading {
-    align-items: center;
-    flex-direction: row;
-    gap: var(--ink-space-2);
-    margin-bottom: var(--ink-space-2);
-    padding: var(--ink-space-3);
-  }
-
-  #page-home .home-continue-reading-action {
-    width: auto;
-    justify-content: center;
-    padding-inline: var(--ink-space-3);
-  }
 }
 
 /* 标签详情页：与阅读历史共用 site-card 结构，筛选器在所有断点都保持选择器形态。 */
