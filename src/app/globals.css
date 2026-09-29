@@ -9743,13 +9743,6 @@ p {
   column-gap: var(--main-layout-gap);
 }
 
-#page-user .profile-section {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
-  margin-bottom: 24px;
-}
-
 #page-user .user-profile-sidebar {
   grid-column: 2;
   grid-row: 1 / span 2;
@@ -9758,12 +9751,136 @@ p {
 
 #page-user .user-profile-sidebar .sidebar-card {
   margin-bottom: 0;
+  overflow: visible;
 }
 
 #page-user .user-main-content {
   grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+#page-user .user-work-content {
+  grid-column: 1;
   grid-row: 2;
   min-width: 0;
+}
+
+#page-user .user-profile-sidebar .sidebar-user-name {
+  margin: 0 0 10px;
+}
+
+#page-user .user-profile-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+#page-user .user-profile-actions--own {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#page-user .user-profile-actions .btn-follow,
+#page-user .user-profile-actions .btn-edit-profile,
+#page-user .user-profile-actions .user-profile-more-button {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font: var(--ink-font-control);
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+  text-decoration: none;
+}
+
+#page-user .user-profile-actions-wrapper {
+  min-width: 0;
+}
+
+#page-user .user-profile-actions .user-profile-more-button {
+  width: 100% !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 44px !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--color-border);
+  border-radius: 10px !important;
+  color: var(--color-text);
+  background: transparent;
+  font-family: var(--font-family);
+  font-size: 13px;
+}
+
+#page-user .user-profile-actions .user-profile-more-button:hover,
+#page-user .user-profile-actions .user-profile-more-button.active {
+  background: var(--color-bg-secondary);
+}
+
+#page-user .user-profile-sidebar .sidebar-user-bio {
+  display: block;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  -webkit-line-clamp: unset;
+}
+
+#page-user .user-profile-sidebar .sidebar-user-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat,
+#page-user .user-profile-sidebar .sidebar-stat-link {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 64px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 12px;
+  color: inherit;
+  background: var(--ink-surface-subtle, #faf9f7);
+  text-align: center;
+  text-decoration: none;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat-value {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat-link:hover .sidebar-stat-value {
+  color: var(--color-primary-hover);
 }
 
 #page-user .user-profile-sidebar-details,
@@ -9810,17 +9927,11 @@ p {
 #page-user .user-profile-sidebar-tags > div {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--ink-gap-compact-xs);
 }
 
-#page-user .user-profile-tag {
+#page-user .user-profile-sidebar-tags .site-card__tag {
   max-width: 100%;
-  padding: 4px 8px;
-  border-radius: 999px;
-  color: var(--color-primary, #F26B5B);
-  background: var(--color-bg-secondary, #F1EFED);
-  font-size: 11px;
-  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
@@ -10070,15 +10181,14 @@ p {
 @media (max-width: 1024px) {
   #page-user .user-profile-layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
+    grid-template-rows: auto auto auto;
     row-gap: 16px;
   }
-  #page-user .profile-section,
   #page-user .user-profile-sidebar,
-  #page-user .user-main-content {
+  #page-user .user-main-content,
+  #page-user .user-work-content {
     grid-column: 1;
   }
-  #page-user .profile-section { grid-row: 1; margin-bottom: 0; }
   #page-user .user-profile-sidebar {
     display: block;
     position: static;
@@ -10101,7 +10211,8 @@ p {
   }
   #page-user .user-profile-sidebar-details { grid-column: 2; grid-row: 1; }
   #page-user .user-profile-sidebar-tags { grid-column: 2; grid-row: 2; }
-  #page-user .user-main-content { grid-row: 3; }
+  #page-user .user-main-content { grid-row: 1; }
+  #page-user .user-work-content { grid-row: 3; }
 }
 
 @media (max-width: 768px) {
@@ -10134,41 +10245,6 @@ p {
     display: block;
     margin: 2px 0 0;
   }
-  #page-user .profile-section {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 16px;
-    padding: 24px;
-  }
-  #page-user .profile-identity {
-    min-width: 0;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  #page-user .profile-avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
-  }
-  #page-user .profile-info {
-    min-width: 0;
-    gap: 6px;
-  }
-  #page-user .profile-name {
-    font-size: 18px;
-  }
-  #page-user .profile-bio {
-    display: block;
-    overflow: visible;
-    -webkit-line-clamp: unset;
-  }
-  #page-user .profile-actions {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: start;
-    justify-content: flex-end;
-  }
   #page-user .type-filters-row {
     flex-direction: column;
     align-items: flex-start;
@@ -10187,72 +10263,6 @@ p {
   #page-user .profile-filter-control { padding-inline: var(--ink-button-medium-padding-horizontal); }
   #page-user .profile-filter-drawer-actions { width: 100%; gap: var(--ink-space-2); }
   #page-user .profile-filter-drawer-actions button { width: 50%; flex: 1 1 50%; }
-}
-
-@media (max-width: 600px) {
-  #page-user .profile-identity { flex-wrap: wrap; }
-  #page-user .profile-info {
-    width: 100%;
-    flex: 0 0 100%;
-  }
-  #page-user .profile-avatar {
-    width: 48px;
-    height: 48px;
-    font-size: 24px;
-  }
-  #page-user .profile-name { overflow-wrap: anywhere; }
-}
-
-@media (max-width: 360px) {
-  #page-user .profile-section {
-    display: flex;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: var(--ink-space-4);
-    padding: var(--ink-space-4);
-  }
-  #page-user .profile-identity {
-    width: 100%;
-    align-items: flex-start;
-    gap: var(--ink-space-3);
-  }
-  #page-user .profile-actions {
-    width: 100%;
-    grid-column: auto;
-    grid-row: auto;
-    justify-content: flex-start;
-    margin-bottom: 0;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "avatar actions" "info info";
-    align-items: center;
-    column-gap: var(--ink-space-3);
-    row-gap: var(--ink-space-4);
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-identity {
-    display: contents;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-avatar {
-    grid-area: avatar;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-info {
-    grid-area: info;
-    width: 100%;
-    min-width: 0;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-actions {
-    grid-area: actions;
-    width: auto;
-    min-width: 0;
-    justify-self: end;
-    align-self: center;
-    justify-content: flex-end;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-edit-profile) .btn-edit-profile {
-    width: auto;
-  }
 }
 
 /* ===== User Profile - Card Grid (shared by #page-user and #page-profile) ===== */

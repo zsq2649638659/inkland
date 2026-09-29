@@ -21,6 +21,7 @@ import { assembleSeriesInfo } from "@/lib/seriesInfo";
 import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 import { getPublicProfileBios, getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
+import { readAccountPreferences } from "@/lib/accountPreferences";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface FollowUser {
@@ -149,6 +150,12 @@ function profileTabHref(id: string, currentParams: string, tab: string) {
   return `/user/${id}${query ? `?${query}` : ""}`;
 }
 
+function formatBirthDate(value: string | null) {
+  if (!value) return "未设置";
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? "未设置" : date.toLocaleDateString("zh-CN");
+}
+
 const profileWorkFilters: Array<{ key: ProfileFilterType; label: string }> = [
   { key: "all", label: "全部" },
   { key: "single", label: "单篇" },
@@ -222,6 +229,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
 
   const isOwnProfile = currentUser?.id === id;
   const relationshipListsVisible = isOwnProfile || profile?.show_follow_lists === true;
+  const birthDateLabel = isOwnProfile
+    ? formatBirthDate(readAccountPreferences(currentUser).birth_date)
+    : "不公开";
 
   const applyProfileControls = (controls: ProfilePageControls, mode: "push" | "replace" = "push") => {
     writeProfilePageControls(controls, mode);
@@ -686,68 +696,28 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
     <div id="page-user" className="min-h-screen bg-paper">
       <main className="main-container">
         <div className="user-profile-layout">
-        <section className="profile-section">
-          <div className="profile-identity">
-            <div className="profile-avatar">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt={displayName} />
-              ) : (
-                <DefaultAvatar name={displayName} />
-              )}
-            </div>
-            <div className="profile-info">
-              <h1 className="profile-name">{displayName}</h1>
-              <p className="profile-bio">{profile?.show_profile_info ? profile.bio || "这个人很懒，什么都没写" : "这个人很懒，什么都没写"}</p>
-            </div>
-          </div>
-          {!isOwnProfile && currentUser && (
-            <div className="profile-actions">
-              <button
-                className={`btn-follow ${isFollowing ? "btn-follow-outline" : "btn-follow-primary"}`}
-                onClick={handleFollow}
-                disabled={followLoading || (!isFollowing && profile?.allow_follows === false)}
-              >
-                {followLoading ? (
-                  <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />
-                ) : isFollowing ? (
-                  <><SiteIcon name="fa-check" variant="solid" /> 已关注</>
-                ) : profile?.allow_follows === false ? (
-                  <>暂不接受关注</>
-                ) : (
-                  <><SiteIcon name="fa-plus" variant="solid" /> 关注</>
-                )}
-              </button>
-              <div className="profile-actions-wrapper">
-                <button
-                  className={`btn-more ${moreOpen ? "active" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }}
-                  title="更多"
-                >
-                  <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
-                </button>
-                {moreOpen && (
-                  <div className="comment-popup show" onClick={(e) => e.stopPropagation()}>
-                    <button className="comment-popup-item" onClick={() => void handleBlock(id)}>
-                      <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />
-                      {blockedRecordId ? "取消屏蔽" : "屏蔽"}
-                    </button>
-                    <button className="comment-popup-item" onClick={handleReport}>
-                      <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
-                      举报
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {isOwnProfile && (
-            <div className="profile-actions">
-              <Link href="/profile/edit" className="btn-edit-profile">
-                编辑资料
+        <div className="user-main-content">
+
+        <div className="tabs-wrapper user-public-tabs" aria-label="个人主页内容">
+          <div className="tabs-inner">
+            <Link href={profileTabHref(id, searchParamsKey, "works")} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
+            {profile && (profile.show_likes || isOwnProfile ? (
+              <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>
+                喜欢{!profile.show_likes && <span className="user-tab-privacy">不公开</span>}
               </Link>
-            </div>
-          )}
-        </section>
+            ) : (
+              <span className="tab-btn user-private-tab" aria-disabled="true">喜欢<span className="user-tab-privacy">不公开</span></span>
+            ))}
+            {profile && (profile.show_bookmarks || isOwnProfile ? (
+              <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>
+                收藏{!profile.show_bookmarks && <span className="user-tab-privacy">不公开</span>}
+              </Link>
+            ) : (
+              <span className="tab-btn user-private-tab" aria-disabled="true">收藏<span className="user-tab-privacy">不公开</span></span>
+            ))}
+          </div>
+        </div>
+        </div>
 
         <aside className="sidebar user-profile-sidebar" aria-label={`${displayName}的资料`}>
           <div className="sidebar-card">
@@ -756,9 +726,55 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                 {profile?.avatar_url ? <Image src={profile.avatar_url} alt="" width={64} height={64} unoptimized /> : <DefaultAvatar name={displayName} style={{ width: "100%", height: "100%", borderRadius: "inherit" }} />}
               </div>
               <div className="sidebar-user-info">
-                <div className="sidebar-user-name">{displayName}</div>
+                <h1 className="sidebar-user-name">{displayName}</h1>
+                {isOwnProfile ? (
+                  <div className="profile-actions user-profile-actions user-profile-actions--own">
+                    <Link href="/profile/edit" className="btn-edit-profile">编辑资料</Link>
+                  </div>
+                ) : currentUser ? (
+                  <div className="profile-actions user-profile-actions">
+                    <button
+                      className={`btn-follow ${isFollowing ? "btn-follow-outline" : "btn-follow-primary"}`}
+                      onClick={handleFollow}
+                      disabled={followLoading || (!isFollowing && profile?.allow_follows === false)}
+                    >
+                      {followLoading ? (
+                        <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />
+                      ) : isFollowing ? (
+                        <><SiteIcon name="fa-check" variant="solid" /> 已关注</>
+                      ) : profile?.allow_follows === false ? (
+                        <>暂不接受关注</>
+                      ) : (
+                        <><SiteIcon name="fa-plus" variant="solid" /> 关注</>
+                      )}
+                    </button>
+                    <div className="profile-actions-wrapper user-profile-actions-wrapper">
+                      <button
+                        className={`btn-more user-profile-more-button ${moreOpen ? "active" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }}
+                        aria-label="更多"
+                        title="更多"
+                      >
+                        <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
+                        <span>更多</span>
+                      </button>
+                      {moreOpen && (
+                        <div className="comment-popup show" onClick={(e) => e.stopPropagation()}>
+                          <button className="comment-popup-item" onClick={() => void handleBlock(id)}>
+                            <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />
+                            {blockedRecordId ? "取消屏蔽" : "屏蔽"}
+                          </button>
+                          <button className="comment-popup-item" onClick={handleReport}>
+                            <SiteIcon name="fa-flag" variant="outline" hoverVariant="solid" />
+                            举报
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="sidebar-user-bio">{profile?.show_profile_info ? profile.bio || "这个人很懒，什么都没写" : "这个人很懒，什么都没写"}</div>
-                <div className="sidebar-user-stats">
+                <div className="sidebar-user-stats" aria-label="关注、粉丝和作品数量">
                   {relationshipListsVisible ? (
                     <Link href={profileTabHref(id, searchParamsKey, "following")} className="sidebar-stat sidebar-stat-link" aria-label={`查看${displayName}的关注列表，共${profileCounts.following ?? "未知"}人`}>
                       <div className="sidebar-stat-value">{profileCounts.following ?? "—"}</div>
@@ -793,39 +809,19 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               <dl>
                 <div><dt>ID</dt><dd>{id}</dd></div>
                 <div><dt>性别</dt><dd>{profile?.show_gender && profile.gender ? profile.gender === "male" ? "男" : "女" : "不公开"}</dd></div>
-                <div><dt>出生日期</dt><dd>待确认</dd></div>
+                <div><dt>出生日期</dt><dd>{birthDateLabel}</dd></div>
               </dl>
             </div>
             {topTags.length > 0 && (
               <div className="user-profile-sidebar-tags">
                 <h2>创作标签</h2>
-                <div>{topTags.map((tag) => <span className="user-profile-tag" key={tag.name}>{tag.name}</span>)}</div>
+                <div>{topTags.map((tag) => <Link href={`/tag/${encodeURIComponent(tag.name)}`} className="tag tag--site site-card__tag" key={tag.name}>{tag.name}</Link>)}</div>
               </div>
             )}
           </div>
         </aside>
 
-        <div className="user-main-content">
-
-        <div className="tabs-wrapper user-public-tabs" aria-label="个人主页内容">
-          <div className="tabs-inner">
-            <Link href={profileTabHref(id, searchParamsKey, "works")} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
-            {profile && (profile.show_likes || isOwnProfile ? (
-              <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>
-                喜欢{!profile.show_likes && <span className="user-tab-privacy">不公开</span>}
-              </Link>
-            ) : (
-              <span className="tab-btn user-private-tab" aria-disabled="true">喜欢<span className="user-tab-privacy">不公开</span></span>
-            ))}
-            {profile && (profile.show_bookmarks || isOwnProfile ? (
-              <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>
-                收藏{!profile.show_bookmarks && <span className="user-tab-privacy">不公开</span>}
-              </Link>
-            ) : (
-              <span className="tab-btn user-private-tab" aria-disabled="true">收藏<span className="user-tab-privacy">不公开</span></span>
-            ))}
-          </div>
-        </div>
+        <div className="user-work-content">
 
         {/* ─── Followers / Following Tab ─── */}
         {(activeTab === "followers" || activeTab === "following") && (
