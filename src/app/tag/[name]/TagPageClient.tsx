@@ -321,10 +321,11 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
 
           const userIds = [...new Set(rawSeries.map((s) => s.user_id))];
           const chapterRowsPromise = withTestDataVisibility(
-            supabase
-              .from("posts")
-              .select("id, series_name, chapter_number, created_at")
+              supabase
+                .from("posts")
+              .select("id, user_id, series_name, chapter_number, created_at")
               .in("series_name", [...allSeriesNames])
+              .in("user_id", userIds)
               .eq("post_type", "serial")
               .eq("status", "published"),
             includeTestData,
@@ -345,6 +346,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
 
           const chapters = (chapterRows || []) as Array<{
             id: string;
+            user_id: string;
             series_name: string | null;
             chapter_number: number | null;
             created_at: string | null;
@@ -352,12 +354,13 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
           const chaptersBySeries = new Map<string, typeof chapters>();
           for (const chapter of chapters) {
             if (!chapter.series_name) continue;
-            const current = chaptersBySeries.get(chapter.series_name) || [];
+            const seriesKey = `${chapter.user_id}\u0000${chapter.series_name}`;
+            const current = chaptersBySeries.get(seriesKey) || [];
             current.push(chapter);
-            chaptersBySeries.set(chapter.series_name, current);
+            chaptersBySeries.set(seriesKey, current);
           }
           const latestBySeries = new Map<string, (typeof chapters)[number]>();
-          for (const [seriesName, rows] of chaptersBySeries) {
+          for (const [seriesKey, rows] of chaptersBySeries) {
             const latest = rows.reduce((best, row) => {
               if (!best) return row;
               const bestNumber = best.chapter_number ?? -1;
@@ -365,7 +368,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
               if (rowNumber !== bestNumber) return rowNumber > bestNumber ? row : best;
               return new Date(row.created_at || "").getTime() > new Date(best.created_at || "").getTime() ? row : best;
             }, null as (typeof chapters)[number] | null);
-            if (latest) latestBySeries.set(seriesName, latest);
+            if (latest) latestBySeries.set(seriesKey, latest);
           }
 
           const chapterIds = chapters.map((chapter) => chapter.id);
@@ -400,8 +403,9 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
           }
 
           matchedSeries = rawSeries.map((s) => {
-            const rows = chaptersBySeries.get(s.name) || [];
-            const latest = latestBySeries.get(s.name);
+            const seriesKey = `${s.user_id}\u0000${s.name}`;
+            const rows = chaptersBySeries.get(seriesKey) || [];
+            const latest = latestBySeries.get(seriesKey);
             const detail = latest ? latestDetails.get(latest.id) : undefined;
             const totals = rows.reduce((sum, row) => {
               const stats = statsMap.get(row.id);
@@ -774,6 +778,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
                 created_at: series.created_at,
                 post_type: "serial",
                 series_name: series.name,
+                series_id: series.id,
                 chapter_number: series.latestChapterNumber,
                 status: "published",
               };
@@ -785,7 +790,7 @@ export default function TagPageClient({ decodedName, initialTagInfo }: { decoded
           </div>
           <div className={`profile-card-device profile-card-device--mobile-square tag-square-device${mobileCardLayout === "square" ? " is-active" : ""}`}>
             <div className="card-device__cards">
-              {displaySeries.map((series) => <ProfileWorkCard key={`square-series-${series.id}`} series={{ ...series, id: series.name }} mode="mobile-square" />)}
+              {displaySeries.map((series) => <ProfileWorkCard key={`square-series-${series.id}`} series={series} mode="mobile-square" />)}
               {displayStandalone.map((post) => <ProfileWorkCard key={`square-post-${post.id}`} post={post} mode="mobile-square" />)}
             </div>
           </div>

@@ -562,25 +562,49 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
     const params = new URLSearchParams(window.location.search);
     const editSeries = params.get("editSeries");
     const editPost = params.get("editPost");
+    const seriesId = params.get("seriesId");
     const seriesName = params.get("seriesName");
 
     if (editSeries) {
       // 直接跳转到连载管理页面
       router.push("/studio");
       setInitDone(true);
-    } else if (seriesName) {
-      // 从 URL 参数 ?seriesName=xxx 创建章节
-      setSeriesNameFromUrl(seriesName);
+    } else if (seriesId || seriesName) {
+      // 新链接使用稳定的连载 ID；同时兼容已有的 ?seriesName=xxx 书签。
       const initChapter = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (cancelled) return;
         if (!user) { setInitDone(true); return; }
+        let targetName = seriesName || "";
+        let targetId = seriesId;
+        if (seriesId) {
+          const { data: series } = await supabase.from("series").select("id,name").eq("id", seriesId).eq("user_id", user.id).maybeSingle();
+          if (cancelled) return;
+          if (!series?.name) {
+            setErrorMsg("找不到这个连载，无法新建章节");
+            setInitDone(true);
+            return;
+          }
+          targetName = series.name as string;
+        } else if (targetName) {
+          const { data: series } = await supabase.from("series").select("id,name").eq("name", targetName).eq("user_id", user.id).limit(1).maybeSingle();
+          if (cancelled) return;
+          if (!series?.id) {
+            setErrorMsg("找不到这个连载，无法新建章节");
+            setInitDone(true);
+            return;
+          }
+          targetId = series.id as string;
+          targetName = series.name as string;
+        }
+        setSeriesNameFromUrl(targetName);
+        setSeriesIdFromUrl(targetId);
         // 计算下一个章节号
         const { data: chapters } = await supabase
           .from("posts")
           .select("chapter_number")
           .eq("user_id", user.id)
-          .eq("series_name", seriesName)
+          .eq("series_name", targetName)
           .eq("post_type", "serial")
           .order("chapter_number", { ascending: false })
           .limit(1);
@@ -589,6 +613,30 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
           ? ((chapters[0] as Record<string, unknown>).chapter_number as number) + 1
           : 1;
         setChapterNumberFromUrl(nextNum);
+        const currentUrl = `${window.location.pathname}${window.location.search}`;
+        const savedChapterPreview = window.localStorage.getItem("inkland:chapter-preview");
+        if (savedChapterPreview) {
+          try {
+            const preview = JSON.parse(savedChapterPreview) as {
+              returnUrl?: string;
+              chapterNumber?: number;
+              title?: string;
+              titleMode?: "numbered" | "free";
+              content?: string;
+              authorNote?: string;
+            };
+            if (preview.returnUrl === currentUrl) {
+              setTitle(preview.title || "");
+              editor.setContent(preview.content || "");
+              setAuthorNote(preview.authorNote || "");
+              setChapterTitleMode(preview.titleMode === "free" ? "free" : "numbered");
+              setChapterNumberOverride(Number.isInteger(preview.chapterNumber) && preview.chapterNumber! > 0 ? preview.chapterNumber! : null);
+              window.localStorage.removeItem("inkland:chapter-preview");
+            }
+          } catch {
+            window.localStorage.removeItem("inkland:chapter-preview");
+          }
+        }
         setView("chapter-create");
         setInitDone(true);
       };
@@ -599,14 +647,14 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
       const loadPost = async () => {
         let { data, error: loadError } = await supabase
           .from("posts")
-          .select("id, title, content, author_note, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility, pending_review_status, pending_review_reason, pending_version_id, published_version_number")
+          .select("id, user_id, title, content, author_note, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility, pending_review_status, pending_review_reason, pending_version_id, published_version_number")
           .eq("id", editPost)
           .single();
         if (cancelled) return;
         if (loadError?.message.includes("author_note")) {
           const fallback = await supabase
             .from("posts")
-            .select("id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility, pending_review_status, pending_review_reason, pending_version_id, published_version_number")
+            .select("id, user_id, title, content, post_type, cover_url, series_name, chapter_number, review_status, review_reason, status, published_at, visibility, pending_review_status, pending_review_reason, pending_version_id, published_version_number")
             .eq("id", editPost)
             .single();
           data = fallback.data ? { ...fallback.data, author_note: null } : null;
@@ -656,6 +704,7 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
                 .from("posts")
                 .select("chapter_number")
                 .eq("series_name", editingSeriesName)
+                .eq("user_id", p.user_id as string)
                 .eq("post_type", "serial")
                 .not("chapter_number", "is", null)
                 .gt("chapter_number", 0)
@@ -666,6 +715,17 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
               editingChapterNumber = (latestNumber || 0) + 1;
             }
             setSeriesNameFromUrl(editingSeriesName);
+            if (editingSeriesName) {
+              const { data: editingSeries } = await supabase
+                .from("series")
+                .select("id")
+                .eq("name", editingSeriesName)
+                .eq("user_id", p.user_id as string)
+                .limit(1)
+                .maybeSingle();
+              if (cancelled) return;
+              setSeriesIdFromUrl((editingSeries?.id as string | undefined) || null);
+            }
             setChapterNumberFromUrl(editingChapterNumber || 1);
           }
           const pendingReviewStatus = (p.pending_review_status as string) || null;
@@ -809,6 +869,7 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
   const [reviewRejectionCollapsed, setReviewRejectionCollapsed] = useState(false);
   const [editingPostSeriesName, setEditingPostSeriesName] = useState<string | null>(null);
   const [seriesNameFromUrl, setSeriesNameFromUrl] = useState<string | null>(null);
+  const [seriesIdFromUrl, setSeriesIdFromUrl] = useState<string | null>(null);
   const [chapterNumberFromUrl, setChapterNumberFromUrl] = useState<number>(1);
   const [authorNote, setAuthorNote] = useState("");
   const [chapterTitleMode, setChapterTitleMode] = useState<"numbered" | "free">("numbered");
@@ -1351,18 +1412,66 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
       await recordRecentTags(user.id, newSeriesTags);
       notifyStatsChanged();
       setSubmitting(false);
-      router.push(`/studio/series/${encodeURIComponent(newSeriesName.trim())}`);
+      router.push(`/studio/series/${encodeURIComponent(editingSeriesId)}`);
     } else {
-      const { error } = await supabase.from("series").insert({ ...seriesData, user_id: user.id });
+      const { data: sameNameSeries } = await supabase
+        .from("series")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("name", newSeriesName.trim())
+        .limit(1);
+      if (sameNameSeries?.length) {
+        setErrorMsg("你已经有一个同名连载了。请换个名称，避免章节放进同一个目录。");
+        setSubmitting(false);
+        return;
+      }
+      const { data: createdSeries, error } = await supabase
+        .from("series")
+        .insert({ ...seriesData, user_id: user.id })
+        .select("id")
+        .single();
       if (error) { setErrorMsg(`创建失败: ${error.message}`); setSubmitting(false); return; }
+      if (!createdSeries?.id) { setErrorMsg("创建失败：没有拿到连载编号，请重试"); setSubmitting(false); return; }
       await recordRecentTags(user.id, newSeriesTags);
       notifyStatsChanged();
       setSubmitting(false);
-      router.push(`/studio/series/${encodeURIComponent(newSeriesName.trim())}`);
+      router.push(`/studio/series/${encodeURIComponent(createdSeries.id as string)}`);
     }
   };
 
   // ============ 新增章节 ============
+
+  const previewChapter = () => {
+    if (!title.trim()) { setErrorMsg("请填写章节标题"); return; }
+    if (title.trim().length > 20) { setErrorMsg("章节标题不能超过20个字"); return; }
+    if (!editor.content.trim()) { setErrorMsg("请填写章节内容"); return; }
+    if (authorNote.length > 500) { setErrorMsg("作者的话不能超过500个字"); return; }
+
+    const targetSeriesName = seriesNameFromUrl || currentSeries?.name;
+    if (!targetSeriesName) { setErrorMsg("找不到这个连载，无法预览章节"); return; }
+    if (seriesNameFromUrl && !seriesIdFromUrl) {
+      setErrorMsg("找不到这个连载，无法预览章节");
+      return;
+    }
+
+    const chapterNumber = chapterNumberOverride ?? (seriesNameFromUrl
+      ? chapterNumberFromUrl
+      : chapterList.length > 0
+        ? Math.max(...chapterList.map((chapter) => chapter.chapter_number)) + 1
+        : 1);
+    window.localStorage.setItem("inkland:chapter-preview", JSON.stringify({
+      seriesName: targetSeriesName,
+      seriesId: seriesIdFromUrl || currentSeries?.id || null,
+      chapterNumber,
+      title: title.trim(),
+      titleMode: chapterTitleMode,
+      content: editor.content,
+      authorNote: authorNote.trim(),
+      wordCount: editor.content.replace(/\s/g, "").length,
+      returnUrl: `${window.location.pathname}${window.location.search}`,
+    }));
+    router.push("/create/chapter-preview");
+  };
 
   const submitChapter = async (options?: { scheduledAt?: string; draft?: boolean }) => {
     if (!title.trim()) { setErrorMsg("请填写章节标题"); return; }
@@ -1372,6 +1481,10 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
 
     const targetSeriesName = seriesNameFromUrl || currentSeries?.name;
     if (!targetSeriesName) return;
+    if (seriesNameFromUrl && !seriesIdFromUrl) {
+      setErrorMsg("找不到这个连载，无法新建章节");
+      return;
+    }
 
     setSubmitting(true);
     setErrorMsg("");
@@ -1452,7 +1565,7 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
     notifyStatsChanged();
     setSubmitting(false);
     if (seriesNameFromUrl) {
-      router.push(`/studio/series/${encodeURIComponent(targetSeriesName)}`);
+      router.push(`/studio/series/${encodeURIComponent(seriesIdFromUrl!)}`);
     } else {
       loadChapters(targetSeriesName);
       setView("series-detail");
@@ -1974,7 +2087,7 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
       <div className="min-h-screen bg-paper chapter-create-page">
         <header className="sticky top-0 z-50 bg-card border-b border-rule">
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-            <button className="btn-ghost" onClick={() => router.push(`/studio/series/${encodeURIComponent(currentSeries.name)}`)}>
+            <button className="btn-ghost" onClick={() => router.push(`/studio/series/${encodeURIComponent(currentSeries.id)}`)}>
               <SiteIcon name="fa-arrow-left" variant="solid" className="mr-1" />返回
             </button>
             <span className="text-sm font-medium text-warm">章节管理</span>
@@ -2110,6 +2223,10 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
             {renderError()}
             <div className="publish-action-bar">
               <div className="publish-actions-right">
+                <button type="button" className="article-draft-button" onClick={previewChapter} disabled={submitting}>
+                  <SiteIcon name="fa-eye" variant="solid" />
+                  预览
+                </button>
                 <button type="button" className="article-draft-button" onClick={() => void submitChapter({ draft: true })} disabled={submitting}>
                   {submitting && <SiteIcon name="fa-spinner" variant="solid" className="animate-spin" />}
                   保存草稿

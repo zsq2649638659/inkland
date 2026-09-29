@@ -98,7 +98,7 @@ export default function SerialPostCard({ data }: { data: SerialPostCardData }) {
   const plainExcerpt = useMemo(() => stripMarkdown(data.content), [data.content]);
   const seriesHref = data.seriesId
     ? `/series/${encodeURIComponent(data.seriesId)}`
-    : `/series/${encodeURIComponent(data.seriesName)}`;
+    : `/read/${data.chapterId}`;
 
   const goToLogin = () => {
     if (authLoading) return;

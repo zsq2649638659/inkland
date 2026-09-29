@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canViewTestData, withTestDataVisibility } from "@/lib/test-data-visibility";
+import { attachSeriesIds } from "@/lib/seriesLinks";
 
 export interface ReadingHistoryPostSnapshot {
   id: string;
@@ -7,6 +8,7 @@ export interface ReadingHistoryPostSnapshot {
   content?: string | null;
   post_type?: string | null;
   series_name?: string | null;
+  series_id?: string | null;
   chapter_number?: number | null;
   word_count?: number | null;
   cover_url?: string | null;
@@ -90,6 +92,7 @@ function mergePostSnapshots(
     content: primary.content ?? fallback.content ?? null,
     post_type: primary.post_type ?? fallback.post_type ?? null,
     series_name: primary.series_name ?? fallback.series_name ?? null,
+    series_id: primary.series_id ?? fallback.series_id ?? null,
     chapter_number: primary.chapter_number ?? fallback.chapter_number ?? null,
     word_count: primary.word_count ?? fallback.word_count ?? null,
     cover_url: primary.cover_url ?? fallback.cover_url ?? null,
@@ -242,7 +245,11 @@ export async function loadReadingHistory(
       id: string;
     };
     type PostTagQueryRow = { post_id?: string | null; tags?: { name?: string | null } | null };
-    const posts = (postsResult.data || []) as unknown as PostQueryRow[];
+    const posts = await attachSeriesIds(
+      supabase,
+      (postsResult.data || []) as unknown as PostQueryRow[],
+      includeTestData,
+    );
     const postTags = (postTagsResult.data || []) as unknown as PostTagQueryRow[];
     const tagsByPost = new Map<string, string[]>();
     for (const row of postTags) {
@@ -268,7 +275,7 @@ export async function loadReadingHistory(
       seriesNames.length
         ? withTimeout(
           withTestDataVisibility(
-            supabase.from("series").select("name,description,tags,status").in("name", seriesNames),
+            supabase.from("series").select("id,user_id,name,description,tags,status").in("name", seriesNames).in("user_id", authorIds),
             includeTestData,
           ),
           HISTORY_METADATA_TIMEOUT_MS,
@@ -306,7 +313,7 @@ export async function loadReadingHistory(
       console.error("[reading-history] likes query returned error", likesResult.error);
     }
     const likeCounts = new Map((statsResult.data || []).map((row) => [String(row.id), Number(row.like_count) || 0]));
-    const seriesMetadata = new Map((seriesResult.data || []).map((row) => [String(row.name), row]));
+    const seriesMetadata = new Map((seriesResult.data || []).map((row) => [`${String(row.user_id)}\u0000${String(row.name)}`, row]));
     const authors = new Map((authorsResult.data || []).map((row) => [String(row.id), row]));
     const likedPostIds = new Set((likesResult.data || []).map((row) => String(row.post_id)));
     const likesLookupSucceeded = !("error" in likesResult && likesResult.error);
@@ -314,7 +321,9 @@ export async function loadReadingHistory(
       const existing = records.find((record) => record.post_id === post.id)?.post;
       const tags = post.tags?.length ? post.tags : (tagsByPost.get(post.id) || existing?.tags || []);
       const snapshot = { ...post };
-      const series = post.series_name ? seriesMetadata.get(post.series_name) : undefined;
+      const series = post.series_name && post.user_id
+        ? seriesMetadata.get(`${post.user_id}\u0000${post.series_name}`)
+        : undefined;
       return [post.id, {
         ...snapshot,
         tags,

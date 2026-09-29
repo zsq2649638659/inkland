@@ -69,8 +69,12 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
 
   // 系列上下文
   const seriesName = cp.series_name as string | null;
+  const seriesId = cp.series_id as string | null;
   const chapterNumber = cp.chapter_number as number | null | undefined;
   const seriesContext = seriesName ? (chapterNumber ? `${seriesName} · 第${chapterNumber}章` : seriesName) : null;
+  const seriesHref = seriesContext && seriesId
+    ? `/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesId)}`
+    : `/read/${post.id}`;
   const rawImageTitle = post.title?.trim() || "";
   const imageTitle = ["图片分享", "Image Title"].includes(rawImageTitle) ? "" : rawImageTitle;
   const hasImageCopy = Boolean(imageTitle || plainText || (imageTagsInOverlay && tags.length > 0));
@@ -100,7 +104,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
     return (
       <div className={`tag-card image${isRejected ? " review-rejected" : ""}`} data-type="image" style={style} onClick={navigateCard} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") router.push(targetHref); }}>
         {seriesContext && (
-          <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
+          <Link href={seriesHref} className="card-series-badge">
             <SiteIcon name="fa-layer-group" variant="solid" /> {seriesContext}
           </Link>
         )}
@@ -198,7 +202,7 @@ export default function PostTagCard({ post, style, showAuthorAvatar, imageTagsIn
   return (
     <div className={`tag-card single${isRejected ? " review-rejected" : ""}`} data-type="single" style={style} onClick={navigateCard} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") router.push(targetHref); }}>
       {seriesContext && (
-        <Link href={`/${post.post_type === "serial" ? "series" : "collection"}/${encodeURIComponent(seriesName || "")}`} className="card-series-badge">
+        <Link href={seriesHref} className="card-series-badge">
           <SiteIcon name="fa-layer-group" variant="solid" /> {seriesContext}
         </Link>
       )}

@@ -1012,6 +1012,24 @@ export default function ImportWorkspace() {
     setError("");
   };
 
+  const continueAfterDuplicateChoices = async (works: ParsedWork[]) => {
+    if (!works.some((work) => work.selected)) {
+      setError("请至少选择一篇作品");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const separatedWorks = await separateKeptDuplicateSerials(works);
+      setParsedWorks(separatedWorks);
+      setCurrentStep(3);
+    } catch (error) {
+      setError(`无法为重复连载建立独立目录：${getErrorMessage(error, "请稍后重试")}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openImportNotices = (workIds: string[]) => {
     setError("");
     setNoticeModalWorkIds(workIds);
@@ -1023,10 +1041,16 @@ export default function ImportWorkspace() {
     setNoticeModalWorkIds([]);
   };
 
-  const finishImportNotice = (action?: ImportDuplicateAction) => {
+  const finishImportNotice = async (action?: ImportDuplicateAction) => {
     if (!noticeModalWorkId) return;
     const currentWorkId = noticeModalWorkId;
-    if (action) setDuplicateAction(currentWorkId, action);
+    const nextWorks = action
+      ? parsedWorks.map((work) => work.id === currentWorkId
+        ? { ...work, duplicateAction: action, selected: action !== "skip" && action !== "review" }
+        : work)
+      : parsedWorks;
+    if (action) setParsedWorks(nextWorks);
+    setError("");
     const remainingWorkIds = noticeModalWorkIds.filter((workId) => workId !== currentWorkId);
     setNoticeModalWorkIds(remainingWorkIds);
     if (remainingWorkIds.length > 0) {
@@ -1034,11 +1058,10 @@ export default function ImportWorkspace() {
       return;
     }
     setNoticeModalWorkId(null);
-    const selectedAfter = parsedWorks.filter((work) => work.id === currentWorkId ? action !== "skip" : work.selected).length;
-    if (selectedAfter > 0) setCurrentStep(3);
+    await continueAfterDuplicateChoices(nextWorks);
   };
 
-  const finishAllDuplicateNotices = (action: Extract<ImportDuplicateAction, "skip" | "keep" | "update">) => {
+  const finishAllDuplicateNotices = async (action: Extract<ImportDuplicateAction, "skip" | "keep" | "update">) => {
     const targetWorkIds = noticeModalWorkIds.filter((workId) => {
       const work = parsedWorks.find((item) => item.id === workId);
       if (!work?.duplicateMatch) return false;
@@ -1047,9 +1070,10 @@ export default function ImportWorkspace() {
     if (targetWorkIds.length === 0) return;
 
     const targetWorkIdSet = new Set(targetWorkIds);
-    setParsedWorks((works) => works.map((work) => targetWorkIdSet.has(work.id)
+    const nextWorks = parsedWorks.map((work) => targetWorkIdSet.has(work.id)
       ? { ...work, duplicateAction: action, selected: action !== "skip" }
-      : work));
+      : work);
+    setParsedWorks(nextWorks);
     setError("");
 
     const remainingWorkIds = noticeModalWorkIds.filter((workId) => !targetWorkIdSet.has(workId));
@@ -1057,8 +1081,7 @@ export default function ImportWorkspace() {
     setNoticeModalWorkId(remainingWorkIds[0] || null);
 
     if (remainingWorkIds.length === 0) {
-      const selectedAfter = parsedWorks.filter((work) => targetWorkIdSet.has(work.id) ? action !== "skip" : work.selected).length;
-      if (selectedAfter > 0) setCurrentStep(3);
+      await continueAfterDuplicateChoices(nextWorks);
     }
   };
 

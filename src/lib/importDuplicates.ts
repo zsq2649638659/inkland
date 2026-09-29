@@ -146,7 +146,6 @@ export function getKeptDuplicateSerialPlanIds(works: readonly DuplicateSerialImp
 
   return [...byPlan.entries()]
     .filter(([, planWorks]) => {
-      if (planWorks.length < 2) return false;
       const groupName = planWorks[0]?.groupName?.trim();
       return Boolean(groupName)
         && planWorks.every((work) => work.selected

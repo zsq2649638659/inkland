@@ -122,7 +122,7 @@ export default function HistoryWorkCard({ record, mode }: { record: ReadingHisto
       ? title
       : `第${chapterNumber}章 ${title}`
     : "章节待发布，敬请期待";
-  const seriesHref = post?.series_name ? `/series/${encodeURIComponent(post.series_name)}` : `/read/${record.post_id}`;
+  const seriesHref = post?.series_id ? `/series/${encodeURIComponent(post.series_id)}` : `/read/${record.post_id}`;
   const seriesCompleted = post?.series_status === "completed";
 
   const body = isImage

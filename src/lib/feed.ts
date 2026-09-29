@@ -113,7 +113,7 @@ export async function loadFeed(
   // ---- wave 2：主 feed 与收藏作品解析并行（二者只依赖 wave1） ----
   const bookmarkedPostsPromise = bookmarkedPostIds.length > 0
     ? withTestDataVisibility(
-      supabase.from("posts").select("id, series_name, post_type, chapter_number").in("id", bookmarkedPostIds).eq("status", "published"),
+      supabase.from("posts").select("id, user_id, series_name, post_type, chapter_number").in("id", bookmarkedPostIds).eq("status", "published"),
       includeTestData,
     )
     : Promise.resolve({ data: [] as unknown[] });
@@ -125,9 +125,13 @@ export async function loadFeed(
   if (err) return { posts: [], serialCards: [], followedTags: [], error: err.message };
 
   let rawArr = (rawPosts || []) as unknown as Record<string, unknown>[];
-  const bookmarkedSeriesNames = [...new Set((bookmarkedPosts || [])
+  const bookmarkedSeriesPairs = [...new Map((bookmarkedPosts || [])
     .filter((p) => (p as Record<string, unknown>).post_type === "serial" && (p as Record<string, unknown>).chapter_number && (p as Record<string, unknown>).series_name)
-    .map((p) => (p as Record<string, unknown>).series_name as string))];
+    .map((p) => {
+      const row = p as Record<string, unknown>;
+      return [`${row.user_id}\u0000${row.series_name}`, { userId: row.user_id as string, name: row.series_name as string }];
+    }))].map(([, pair]) => pair as { userId: string; name: string });
+  const bookmarkedSeriesNames = [...new Set(bookmarkedSeriesPairs.map((pair) => pair.name))];
 
   rawArr = rawArr.filter((post) => !blockedIds.has(post.user_id as string));
   rawArr.sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
@@ -137,7 +141,7 @@ export async function loadFeed(
 
   const feedIds = rawArr.map((p) => p.id as string);
   const seriesNames = [...new Set(rawArr
-    .filter((p) => p.post_type === "serial" && p.chapter_number && (p.chapter_number as number) > 0)
+    .filter((p) => p.series_name)
     .map((p) => p.series_name as string)
     .filter(Boolean))];
 
@@ -146,16 +150,25 @@ export async function loadFeed(
     .from("post_stats")
     .select("id, like_count, comment_count, bookmark_count")
     .in("id", feedIds);
-  const seriesFullPostsPromise = bookmarkedSeriesNames.length > 0
+  const seriesFullPostsPromise = bookmarkedSeriesPairs.length > 0
     ? withTestDataVisibility(
-      supabase.from("posts").select(postSelect).in("series_name", bookmarkedSeriesNames).eq("status", "published"),
+      supabase.from("posts").select(postSelect)
+        .in("series_name", bookmarkedSeriesNames)
+        .in("user_id", [...new Set(bookmarkedSeriesPairs.map((pair) => pair.userId))])
+        .eq("status", "published"),
       includeTestData,
     )
     : Promise.resolve({ data: [] as unknown[] });
   const seriesMetaNames = [...new Set([...bookmarkedSeriesNames, ...seriesNames])];
+  const seriesOwnerIds = [...new Set([
+    ...bookmarkedSeriesPairs.map((pair) => pair.userId),
+    ...rawArr.filter((p) => p.series_name).map((p) => p.user_id as string),
+  ])];
   const seriesMetaPromise = seriesMetaNames.length > 0
     ? withTestDataVisibility(
-      supabase.from("series").select("id, name, description, cover_url, tags, status, series_type").in("name", seriesMetaNames),
+      supabase.from("series").select("id, user_id, name, description, cover_url, tags, status, series_type")
+        .in("name", seriesMetaNames)
+        .in("user_id", seriesOwnerIds),
       includeTestData,
     )
     : Promise.resolve({ data: [] as unknown[] });
@@ -250,6 +263,9 @@ export async function loadFeed(
       user_id: p.user_id as string,
       series_name: p.series_name as string | null,
       chapter_number: p.chapter_number as number | null,
+      series_id: p.series_name
+        ? (seriesMeta.get(`${p.user_id}\u0000${p.series_name}`)?.id as string | undefined) || null
+        : null,
       tags: ptags,
       author: { nickname: author?.nickname || "匿名用户", avatar_url: author?.avatar_url },
       excerpt: plainText,
@@ -266,7 +282,7 @@ export async function loadFeed(
   const seriesMeta = new Map<string, Record<string, unknown>>();
   if (seriesData) {
     for (const s of seriesData as Record<string, unknown>[]) {
-      seriesMeta.set(s.name as string, s);
+      if (s.user_id && s.name) seriesMeta.set(`${s.user_id}\u0000${s.name}`, s);
     }
   }
 
@@ -276,7 +292,7 @@ export async function loadFeed(
   for (const chapter of serialChapters) {
     const sn = chapter.series_name as string;
     if (!sn) continue;
-    const meta = seriesMeta.get(sn) || {};
+    const meta = seriesMeta.get(`${chapter.user_id}\u0000${sn}`) || {};
     const author = chapter.author as { nickname: string; avatar_url: string | null } | null;
     const st = statsMap.get(chapter.id as string) || { like_count: 0, comment_count: 0, bookmark_count: 0 };
 
@@ -446,32 +462,49 @@ async function normalizeRpcResult(
     }
   }
 
-  const seriesNames = [...new Set(serials.map((s) => s.series_name as string).filter(Boolean))];
-  // 优先消费 RPC 已折叠的 seriesMeta，避免二次往返；仅当某系列名缺失时才回退查询（兼容旧版本 SQL）。
+  const seriesNames = [...new Set((raw as RpcRow[])
+    .map((post) => post.series_name as string | undefined)
+    .filter((name): name is string => Boolean(name)))];
+  const seriesOwnerIds = [...new Set((raw as RpcRow[])
+    .filter((post) => post.series_name && post.user_id)
+    .map((post) => post.user_id as string))];
+  // 优先消费 RPC 已折叠的 seriesMeta；系列名可能由不同作者重复使用，必须用作者+名称定位。
   const seriesMeta = new Map<string, RpcRow>();
   if (Array.isArray(data.seriesMeta)) {
     for (const s of data.seriesMeta as RpcRow[]) {
       if (s && s.is_test_data !== false) return null;
-      if (s && typeof s.name === "string") seriesMeta.set(s.name as string, s);
+      if (s && typeof s.name === "string" && typeof s.user_id === "string") {
+        seriesMeta.set(`${s.user_id}\u0000${s.name}`, s);
+      }
     }
   }
-  // 旧版 RPC 可能只返回名称；即使名称已存在，也必须补查 id，
-  // 否则首页仍会生成 /series/连载名称，无法满足稳定的 ID 路径约定。
-  const seriesNamesMissingId = seriesNames.filter((name) => !seriesMeta.get(name)?.id);
-  if (seriesNamesMissingId.length > 0) {
+  // 旧版 RPC 可能只返回章节和名称；按作者+名称补齐系列 ID，避免同名系列串到一起。
+  const missingSeriesPairs = (raw as RpcRow[]).filter((chapter) => {
+    const name = chapter.series_name as string;
+    return name && !seriesMeta.get(`${chapter.user_id}\u0000${name}`)?.id;
+  });
+  if (missingSeriesPairs.length > 0) {
     const { data: fetched } = await supabase
       .from("series")
-      .select("id, name, description, cover_url, tags, status, series_type")
-      .in("name", seriesNamesMissingId)
+      .select("id, user_id, name, description, cover_url, tags, status, series_type")
+      .in("name", seriesNames)
+      .in("user_id", seriesOwnerIds)
       .eq("is_test_data", false);
-    if (fetched) for (const s of fetched as RpcRow[]) seriesMeta.set(s.name as string, s);
+    if (fetched) for (const s of fetched as RpcRow[]) {
+      seriesMeta.set(`${s.user_id}\u0000${s.name}`, s);
+    }
+  }
+
+  for (const post of normals) {
+    const name = post.series_name;
+    if (name && post.user_id) post.series_id = seriesMeta.get(`${post.user_id}\u0000${name}`)?.id || null;
   }
 
   const serialCards: SerialPostCardData[] = [];
   for (const chapter of serials) {
     const sn = chapter.series_name as string;
     if (!sn) continue;
-    const meta = seriesMeta.get(sn) || {};
+    const meta = seriesMeta.get(`${chapter.user_id}\u0000${sn}`) || {};
     serialCards.push({
       chapterId: chapter.id as string,
       chapterTitle: chapter.title || "无标题",

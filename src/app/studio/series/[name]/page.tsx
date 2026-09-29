@@ -1,7 +1,7 @@
 "use client";
 import SiteIcon from "@/components/SiteIcon";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -14,6 +14,7 @@ import Textarea from "@/components/inkland/Textarea";
 import Tag from "@/components/inkland/Tag";
 import TagInput from "@/components/inkland/TagInput";
 import { normalizeModerationReason } from "@shared/moderationReasons";
+import { isUuid } from "@/lib/seriesLinks";
 
 interface ChapterInfo {
   id: string;
@@ -75,25 +76,24 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [decodedName, user]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
-    // 系列、章节和创作者资料彼此独立，合并成一波请求。
-    const seriesPromise = supabase
+    // 先通过 ID（新链接）或名称（旧书签）解析系列，再按系列所有者加载章节。
+    const seriesResult = await supabase
       .from("series")
       .select("*")
-      .eq("name", decodedName)
+      .eq(isUuid(decodedName) ? "id" : "name", decodedName)
       .eq("user_id", user.id)
-      .single();
+      .limit(1)
+      .maybeSingle();
+    const seriesRow = seriesResult.data as Record<string, unknown> | null;
+    const resolvedName = (seriesRow?.name as string | undefined) || decodedName;
     const chaptersPromise = supabase
       .from("posts")
       .select("id, title, chapter_number, chapter_title, word_count, status, review_status, review_reason, created_at, updated_at")
-      .eq("series_name", decodedName)
+      .eq("series_name", resolvedName)
       .eq("post_type", "serial")
       .eq("user_id", user.id)
       .gt("chapter_number", 0)
@@ -109,8 +109,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
       .eq("user_id", user.id)
       .order("last_used_at", { ascending: false })
       .limit(10);
-    const [{ data: seriesData }, { data: chData }, { data: profileData }, { data: recentTagData }] = await Promise.all([
-      seriesPromise,
+    const [{ data: chData }, { data: profileData }, { data: recentTagData }] = await Promise.all([
       chaptersPromise,
       profilePromise,
       recentTagsPromise,
@@ -124,8 +123,8 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
       .filter((tag): tag is string => Boolean(tag));
     setRecentTags([...new Set(recentTagNames)].slice(0, 10));
 
-    if (seriesData) {
-      const s = seriesData as unknown as Record<string, unknown>;
+    if (seriesRow) {
+      const s = seriesRow;
       setSeries({
         id: s.id as string,
         name: s.name as string,
@@ -162,12 +161,28 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     }
 
     setLoading(false);
-  };
+  }, [decodedName, supabase, user]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => { void loadData(); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loadData]);
 
   const handleSaveSeries = async () => {
     if (!series || !user) return;
     const nextName = editName.trim();
     if (!nextName) { await dialog.alert({ title:"保存失败", message:"连载标题不能为空", variant:"danger" }); return; }
+    const { data: duplicateSeries } = await supabase
+      .from("series")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("name", nextName)
+      .neq("id", series.id)
+      .limit(1);
+    if (duplicateSeries?.length) {
+      await dialog.alert({ title:"保存失败", message:"你已经有一个同名连载了，请换个名称，避免章节目录混在一起。", variant:"danger" });
+      return;
+    }
     const { error } = await supabase
       .from("series")
       .update({
@@ -193,7 +208,7 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
     }
     setSeries({ ...series, name: nextName, description: editDesc, tags: editTags });
     setEditSeries(false);
-    if (nextName !== series.name) router.replace(`/studio/series/${encodeURIComponent(nextName)}`);
+    if (nextName !== series.name) router.replace(`/studio/series/${encodeURIComponent(series.id)}`);
   };
 
   const handleDeleteChapter = async (chId: string) => {
@@ -246,9 +261,11 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
       <Link href={`/create?editPost=${chapterId}`} className="chapter-control" title="编辑" aria-label="编辑章节">
         <SiteIcon name="fa-action-edit" size={16} />
       </Link>
-      <Link href={`/read/${chapterId}`} className="chapter-control" title="预览" aria-label="预览章节" target="_blank">
-        <SiteIcon name="fa-action-preview-open" size={16} />
-      </Link>
+      {chapters.some((chapter) => chapter.id === chapterId && chapter.status === "published") && (
+        <Link href={`/read/${chapterId}`} className="chapter-control" title="预览" aria-label="预览章节" target="_blank">
+          <SiteIcon name="fa-action-preview-open" size={16} />
+        </Link>
+      )}
       <button className="chapter-control" title="删除" aria-label="删除章节" onClick={() => handleDeleteChapter(chapterId)} type="button">
         <SiteIcon name="fa-action-delete" variant="outline" size={14} />
       </button>
@@ -450,15 +467,17 @@ export default function SeriesManagePage({ params }: { params: Promise<{ name: s
                     <span className="series-chapter-sort-label">{sortOrder === "asc" ? "正序" : "倒序"}</span>
                   </button>
                 )}
-                <Link
-                  href={`/create?seriesName=${encodeURIComponent(decodedName)}`}
-                  className="series-chapter-create"
-                  title="新建章节"
-                  aria-label="新建章节"
-                >
-                  <SiteIcon name="fa-plus" variant="solid" className="series-chapter-create-icon" aria-hidden="true" />
-                  <span className="series-chapter-create-label">新建章节</span>
-                </Link>
+                {series && (
+                  <Link
+                    href={`/create?seriesId=${encodeURIComponent(series.id)}`}
+                    className="series-chapter-create"
+                    title="新建章节"
+                    aria-label="新建章节"
+                  >
+                    <SiteIcon name="fa-plus" variant="solid" className="series-chapter-create-icon" aria-hidden="true" />
+                    <span className="series-chapter-create-label">新建章节</span>
+                  </Link>
+                )}
               </div>
             </div>
             <div className="chapter-table-wrapper">
