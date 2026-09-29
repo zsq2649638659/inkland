@@ -3,6 +3,7 @@ import SiteIcon from "@/components/SiteIcon";
 
 import { useCallback, useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { submitReportV1 } from "@/lib/reportContent";
@@ -20,6 +21,7 @@ import { assembleSeriesInfo } from "@/lib/seriesInfo";
 import { slimContent } from "@/lib/feed";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
 import { getPublicProfileBios, getSettingsPrivacyErrorMessage } from "@/lib/profile-privacy";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface FollowUser {
   id: string;
@@ -59,6 +61,57 @@ interface ProfilePageControls {
   sortMode: ProfileSortMode;
   query: string;
   layout: ProfileCardLayout;
+}
+
+interface ProfileTagCount {
+  name: string;
+  count: number;
+}
+
+async function loadTopPublishedTags(
+  supabase: SupabaseClient,
+  userId: string,
+  includeTestData: boolean,
+): Promise<ProfileTagCount[]> {
+  const tagCounts = new Map<string, number>();
+  const pageSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await withTestDataVisibility(
+      supabase
+        .from("posts")
+        .select("id, chapter_number, post_tags(tags(name))")
+        .eq("user_id", userId)
+        .eq("status", "published"),
+      includeTestData,
+    )
+      .order("id", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+
+    if (error || !data) return [];
+
+    const works = data as unknown as Array<{
+      chapter_number: number | null;
+      post_tags: Array<{ tags: { name: string } | Array<{ name: string }> | null }> | null;
+    }>;
+    for (const work of works) {
+      if (typeof work.chapter_number === "number" && work.chapter_number > 0) continue;
+      const workTags = new Set((work.post_tags || []).flatMap((item) => {
+        const tags = Array.isArray(item.tags) ? item.tags : item.tags ? [item.tags] : [];
+        return tags.map((tag) => tag.name).filter(Boolean);
+      }));
+      for (const tag of workTags) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+
+    if (works.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return [...tagCounts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "zh-CN"))
+    .slice(0, 6);
 }
 
 function readProfilePageControls(params: Pick<URLSearchParams, "get">): ProfilePageControls {
@@ -153,6 +206,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [activityRetryKey, setActivityRetryKey] = useState(0);
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [following, setFollowing] = useState<FollowUser[]>([]);
+  const [profileCounts, setProfileCounts] = useState<{ following: number | null; followers: number | null; works: number | null }>({ following: null, followers: null, works: null });
+  const [topTags, setTopTags] = useState<ProfileTagCount[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [blockedRecordId, setBlockedRecordId] = useState<string | null>(null);
@@ -270,11 +325,41 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           .eq("user_id", id),
         includeTestData,
       ).order("created_at", { ascending: false });
-      const [{ data: prof }, { data: rawData }, { data: allSeriesData }] = await Promise.all([
+      const worksCountPromise = withTestDataVisibility(
+        supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", id).eq("status", "published")
+          .or("post_type.neq.serial,chapter_number.is.null,chapter_number.eq.0"),
+        includeTestData,
+      );
+      const followCountsPromise = isOwnProfile
+        ? Promise.all([
+          supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", id),
+          supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", id),
+        ])
+        : supabase.rpc("get_public_profile_follow_counts", { p_user_id: id });
+      const [{ data: prof }, { data: rawData }, { data: allSeriesData }, worksCountResult, followCountsResult, nextTopTags] = await Promise.all([
         profilePromise,
         postsPromise,
         seriesPromise,
+        worksCountPromise,
+        followCountsPromise,
+        loadTopPublishedTags(supabase, id, includeTestData),
       ]);
+      setTopTags(nextTopTags);
+      if (isOwnProfile && Array.isArray(followCountsResult)) {
+        setProfileCounts({
+          following: followCountsResult[0].count ?? null,
+          followers: followCountsResult[1].count ?? null,
+          works: worksCountResult.count ?? null,
+        });
+      } else {
+        const countRow = Array.isArray(followCountsResult.data) ? followCountsResult.data[0] : null;
+        const counts = countRow as { following_count?: number | null; followers_count?: number | null } | null;
+        setProfileCounts({
+          following: counts?.following_count ?? null,
+          followers: counts?.followers_count ?? null,
+          works: worksCountResult.count ?? null,
+        });
+      }
       if (prof) {
         const profileData = prof as {
           nickname: string;
@@ -600,6 +685,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   return (
     <div id="page-user" className="min-h-screen bg-paper">
       <main className="main-container">
+        <div className="user-profile-layout">
         <section className="profile-section">
           <div className="profile-identity">
             <div className="profile-avatar">
@@ -611,8 +697,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             </div>
             <div className="profile-info">
               <h1 className="profile-name">{displayName}</h1>
-              {profile?.show_profile_info && <p className="profile-bio">{profile.bio || "这个人很懒，什么都没写"}</p>}
-              {profile?.gender && <p className="profile-gender">{profile.gender === "male" ? "男" : "女"}</p>}
+              <p className="profile-bio">{profile?.show_profile_info ? profile.bio || "这个人很懒，什么都没写" : "这个人很懒，什么都没写"}</p>
             </div>
           </div>
           {!isOwnProfile && currentUser && (
@@ -664,11 +749,81 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           )}
         </section>
 
+        <aside className="sidebar user-profile-sidebar" aria-label={`${displayName}的资料`}>
+          <div className="sidebar-card">
+            <div className="sidebar-user">
+              <div className="sidebar-user-avatar">
+                {profile?.avatar_url ? <Image src={profile.avatar_url} alt="" width={64} height={64} unoptimized /> : <DefaultAvatar name={displayName} style={{ width: "100%", height: "100%", borderRadius: "inherit" }} />}
+              </div>
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">{displayName}</div>
+                <div className="sidebar-user-bio">{profile?.show_profile_info ? profile.bio || "这个人很懒，什么都没写" : "这个人很懒，什么都没写"}</div>
+                <div className="sidebar-user-stats">
+                  {relationshipListsVisible ? (
+                    <Link href={profileTabHref(id, searchParamsKey, "following")} className="sidebar-stat sidebar-stat-link" aria-label={`查看${displayName}的关注列表，共${profileCounts.following ?? "未知"}人`}>
+                      <div className="sidebar-stat-value">{profileCounts.following ?? "—"}</div>
+                      <div className="sidebar-stat-label">关注</div>
+                    </Link>
+                  ) : (
+                    <div className="sidebar-stat" aria-label={`关注 ${profileCounts.following ?? "—"}，列表不公开`}>
+                      <div className="sidebar-stat-value">{profileCounts.following ?? "—"}</div>
+                      <div className="sidebar-stat-label">关注</div>
+                    </div>
+                  )}
+                  {relationshipListsVisible ? (
+                    <Link href={profileTabHref(id, searchParamsKey, "followers")} className="sidebar-stat sidebar-stat-link" aria-label={`查看${displayName}的粉丝列表，共${profileCounts.followers ?? "未知"}人`}>
+                      <div className="sidebar-stat-value">{profileCounts.followers ?? "—"}</div>
+                      <div className="sidebar-stat-label">粉丝</div>
+                    </Link>
+                  ) : (
+                    <div className="sidebar-stat" aria-label={`粉丝 ${profileCounts.followers ?? "—"}，列表不公开`}>
+                      <div className="sidebar-stat-value">{profileCounts.followers ?? "—"}</div>
+                      <div className="sidebar-stat-label">粉丝</div>
+                    </div>
+                  )}
+                  <div className="sidebar-stat" aria-label={`已发布作品 ${profileCounts.works ?? "—"}`}>
+                    <div className="sidebar-stat-value">{profileCounts.works ?? "—"}</div>
+                    <div className="sidebar-stat-label">作品</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="user-profile-sidebar-details">
+              <h2>个人信息</h2>
+              <dl>
+                <div><dt>ID</dt><dd>{id}</dd></div>
+                <div><dt>性别</dt><dd>{profile?.show_gender && profile.gender ? profile.gender === "male" ? "男" : "女" : "不公开"}</dd></div>
+                <div><dt>出生日期</dt><dd>待确认</dd></div>
+              </dl>
+            </div>
+            {topTags.length > 0 && (
+              <div className="user-profile-sidebar-tags">
+                <h2>创作标签</h2>
+                <div>{topTags.map((tag) => <span className="user-profile-tag" key={tag.name}>{tag.name}</span>)}</div>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <div className="user-main-content">
+
         <div className="tabs-wrapper user-public-tabs" aria-label="个人主页内容">
           <div className="tabs-inner">
             <Link href={profileTabHref(id, searchParamsKey, "works")} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
-            {profile?.show_likes && <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>喜欢</Link>}
-            {profile?.show_bookmarks && <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>收藏</Link>}
+            {profile && (profile.show_likes || isOwnProfile ? (
+              <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>
+                喜欢{!profile.show_likes && <span className="user-tab-privacy">不公开</span>}
+              </Link>
+            ) : (
+              <span className="tab-btn user-private-tab" aria-disabled="true">喜欢<span className="user-tab-privacy">不公开</span></span>
+            ))}
+            {profile && (profile.show_bookmarks || isOwnProfile ? (
+              <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>
+                收藏{!profile.show_bookmarks && <span className="user-tab-privacy">不公开</span>}
+              </Link>
+            ) : (
+              <span className="tab-btn user-private-tab" aria-disabled="true">收藏<span className="user-tab-privacy">不公开</span></span>
+            ))}
           </div>
         </div>
 
@@ -809,6 +964,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           setBlockDialogMessage(result.message);
           setBlockDialog("success");
         }} />
+        </div>
+        </div>
       </main>
     </div>
   );
