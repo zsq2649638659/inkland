@@ -9854,6 +9854,35 @@ p {
   color: var(--color-text-muted, #6B6B6B) !important;
 }
 
+#page-user .user-profile-sidebar .user-profile-actions .btn-follow,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  box-sizing: border-box !important;
+  padding: 0 10px !important;
+  border: 1px solid #d4cec8 !important;
+  border-radius: 10px !important;
+  color: #6b6b6b !important;
+  background: transparent !important;
+  font-family: var(--font-family) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+}
+
+#page-user .user-profile-sidebar .user-profile-actions .btn-follow:hover,
+#page-user .user-profile-sidebar .user-profile-actions .btn-follow:focus-visible,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button:hover,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button:focus-visible,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button.active {
+  border: 1px solid #d4cec8 !important;
+  color: #6b6b6b !important;
+  background: #ede9e5 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
 #page-user .user-profile-sidebar .sidebar-user-bio {
   display: block;
   overflow: visible;
@@ -10285,7 +10314,13 @@ p {
     flex-direction: column;
     align-items: flex-start;
   }
-  #page-user .filter-system-composition-row { display: none; }
+  #page-user .filter-system-composition-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-bottom: var(--ink-space-2);
+  }
+  #page-user .filter-system-composition-row > :not(.filter-system-field--query) { display: none; }
   #page-user .profile-mobile-filter-bar { display: flex; width: 100%; gap: var(--ink-gap-compact); margin-bottom: var(--ink-space-3); }
   #page-user .profile-mobile-filter-button { min-height: var(--ink-height-control-md); border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); cursor: pointer; }
   #page-user .profile-mobile-filter-button.profile-mobile-icon-button { display: inline-flex; width: 0; height: var(--ink-height-control-md); min-width: 0; flex: 1 1 0; align-items: center; justify-content: center; gap: var(--ink-space-2); padding: 0 var(--ink-space-3); }
