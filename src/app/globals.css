@@ -8849,7 +8849,8 @@ p {
 [data-theme="dark"] #page-search .tags-grid .tag-card,
 [data-theme="dark"] #page-search .user-cards-grid .user-card,
 [data-theme="dark"] #page-search .work-list .work-item,
-[data-theme="dark"] #page-profile .user-card {
+[data-theme="dark"] #page-profile .user-card,
+[data-theme="dark"] #page-user .user-card {
   background: #242424;
 }
 [data-theme="dark"] #page-search .work-item-icon {
@@ -11494,34 +11495,35 @@ p {
 #page-profile .user-card.selected { box-shadow:0 0 0 var(--ink-button-border-width) var(--ink-button-primary-border),var(--shadow-hover); }
 #page-profile .user-card-check { flex:0 0 20px; }
 #page-profile .relationship-filter-empty { min-height:220px; }
-#page-profile .user-cards-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--spacing-md);padding-bottom:var(--spacing-xl) }
-:is(#page-profile, #page-settings) .user-card { display:flex;align-items:center;gap:8px;padding:16px 8px;background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
-:is(#page-profile, #page-settings) .user-card .user-avatar { width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:600;position:relative;overflow:hidden }
-:is(#page-profile, #page-settings) .user-card .user-avatar img { width:100%;height:100%;object-fit:cover;border-radius:50% }
-:is(#page-profile, #page-settings) .user-card .user-info { flex:1;min-width:0 }
-:is(#page-profile, #page-settings) .user-card .user-name { font-size:15px;font-weight:600;letter-spacing:-0.02em;margin-bottom:2px;line-height:1.3;color:var(--color-text) }
-:is(#page-profile, #page-settings) .user-card .user-bio { font-size:13px;color:var(--color-text-muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.01em }
-:is(#page-profile, #page-settings) .user-card .user-actions { display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0 }
-:is(#page-profile, #page-settings) .user-card .btn-follow { width:80px;max-width:80px;min-width:0;box-sizing:border-box;min-height:var(--ink-button-small-height);padding:0 var(--ink-button-small-padding-horizontal);border:var(--ink-button-border-width) solid var(--ink-button-default-border);border-radius:var(--ink-button-border-radius);font:var(--ink-button-small-font);cursor:pointer;transition:color var(--ink-motion-base) var(--ink-ease-standard),background var(--ink-motion-base) var(--ink-ease-standard),border-color var(--ink-motion-base) var(--ink-ease-standard),transform var(--ink-motion-base) var(--ink-ease-standard);letter-spacing:normal;white-space:nowrap;color:var(--ink-button-default-color);background:var(--ink-surface);text-align:center }
-:is(#page-profile, #page-settings) .user-card .btn-follow:hover,
-:is(#page-profile, #page-settings) .user-card .btn-follow:focus-visible { color:var(--ink-button-default-color);background:var(--ink-button-default-bg);border-color:var(--ink-color-border-strong);transform:translateY(-1px);box-shadow:var(--ink-shadow-none);outline:var(--ink-outline-focus);outline-offset:var(--ink-outline-offset-focus) }
-:is(#page-profile, #page-settings) .user-card .btn-follow.followed { color:var(--ink-button-default-color);background:var(--ink-surface);border-color:var(--ink-button-default-border) }
-:is(#page-profile, #page-settings) .user-card:hover { box-shadow:var(--shadow-hover);transform:translateY(-2px) }
-:is(#page-profile, #page-settings) .user-card.show-popup { z-index:10 }
-:is(#page-profile, #page-settings) .user-card .btn-block { padding:6px;border:none;background:transparent;color:var(--color-text-light);font-size:15px;cursor:pointer;border-radius:var(--radius-md);transition:all .2s ease;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative }
-:is(#page-profile, #page-settings) .user-card .btn-block:hover { color:var(--color-text-muted);background:rgba(0,0,0,0.04) }
-:is(#page-profile, #page-settings) .user-card .user-action-popup { position:absolute;right:0;top:100%;margin-top:4px;z-index:50;background:var(--color-card);border-radius:var(--radius-md);box-shadow:0 4px 20px rgba(0,0,0,0.12);min-width:140px;overflow:visible;display:none }
-:is(#page-profile, #page-settings) .user-card .user-action-popup.show { display:block }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item { display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--color-text-muted);cursor:pointer;transition:all .15s ease;border:none;background:none;font-family:var(--font-family);width:100%;text-align:left }
-:is(#page-profile, #page-settings) .user-card .relationship-action-popup-item { display:none; }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item svg { width:16px;height:16px;flex-shrink:0 }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item:hover { background:var(--color-bg-secondary);color:var(--color-text) }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item.danger { color:var(--color-primary) }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item.danger:hover { background:var(--color-primary-light);color:var(--color-primary-hover) }
-:is(#page-profile, #page-settings) .user-card .btn-follow:disabled { cursor:not-allowed;opacity:var(--ink-opacity-disabled);transform:none; }
-:is(#page-settings, #page-profile) .user-card--blocked .btn-follow { width:auto;max-width:none;min-width:80px; }
+#page-profile .user-cards-grid,
+#page-user .user-cards-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--spacing-md);padding-bottom:var(--spacing-xl) }
+:is(#page-profile, #page-settings, #page-user) .user-card { display:flex;align-items:center;gap:8px;padding:16px 8px;background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-avatar { width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:600;position:relative;overflow:hidden }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-avatar img { width:100%;height:100%;object-fit:cover;border-radius:50% }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-info { flex:1;min-width:0 }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-name { font-size:15px;font-weight:600;letter-spacing:-0.02em;margin-bottom:2px;line-height:1.3;color:var(--color-text) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-bio { font-size:13px;color:var(--color-text-muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.01em }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-actions { display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0 }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow { width:80px;max-width:80px;min-width:0;box-sizing:border-box;min-height:var(--ink-button-small-height);padding:0 var(--ink-button-small-padding-horizontal);border:var(--ink-button-border-width) solid var(--ink-button-default-border);border-radius:var(--ink-button-border-radius);font:var(--ink-button-small-font);cursor:pointer;transition:color var(--ink-motion-base) var(--ink-ease-standard),background var(--ink-motion-base) var(--ink-ease-standard),border-color var(--ink-motion-base) var(--ink-ease-standard),transform var(--ink-motion-base) var(--ink-ease-standard);letter-spacing:normal;white-space:nowrap;color:var(--ink-button-default-color);background:var(--ink-surface);text-align:center }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow:hover,
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow:focus-visible { color:var(--ink-button-default-color);background:var(--ink-button-default-bg);border-color:var(--ink-color-border-strong);transform:translateY(-1px);box-shadow:var(--ink-shadow-none);outline:var(--ink-outline-focus);outline-offset:var(--ink-outline-offset-focus) }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow.followed { color:var(--ink-button-default-color);background:var(--ink-surface);border-color:var(--ink-button-default-border) }
+:is(#page-profile, #page-settings, #page-user) .user-card:hover { box-shadow:var(--shadow-hover);transform:translateY(-2px) }
+:is(#page-profile, #page-settings, #page-user) .user-card.show-popup { z-index:10 }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-block { padding:6px;border:none;background:transparent;color:var(--color-text-light);font-size:15px;cursor:pointer;border-radius:var(--radius-md);transition:all .2s ease;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-block:hover { color:var(--color-text-muted);background:rgba(0,0,0,0.04) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup { position:absolute;right:0;top:100%;margin-top:4px;z-index:50;background:var(--color-card);border-radius:var(--radius-md);box-shadow:0 4px 20px rgba(0,0,0,0.12);min-width:140px;overflow:visible;display:none }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup.show { display:block }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item { display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--color-text-muted);cursor:pointer;transition:all .15s ease;border:none;background:none;font-family:var(--font-family);width:100%;text-align:left }
+:is(#page-profile, #page-settings, #page-user) .user-card .relationship-action-popup-item { display:none; }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item svg { width:16px;height:16px;flex-shrink:0 }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item:hover { background:var(--color-bg-secondary);color:var(--color-text) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item.danger { color:var(--color-primary) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item.danger:hover { background:var(--color-primary-light);color:var(--color-primary-hover) }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow:disabled { cursor:not-allowed;opacity:var(--ink-opacity-disabled);transform:none; }
+:is(#page-settings, #page-profile, #page-user) .user-card--blocked .btn-follow { width:auto;max-width:none;min-width:80px; }
 @media (min-width: 768px) {
-  #page-profile .user-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  :is(#page-profile, #page-user) .user-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 768px) {
   #page-profile .section-header { flex-direction:column;align-items:flex-start }
@@ -11533,7 +11535,7 @@ p {
 }
 
 @media (max-width: 767px) {
-  #page-profile .user-cards-grid { grid-template-columns:1fr; }
+  :is(#page-profile, #page-user) .user-cards-grid { grid-template-columns:1fr; }
 }
 
 /* Keep the search and single batch entry on one row at every supported width.
@@ -11555,9 +11557,9 @@ p {
 /* At the narrowest width, keep the identity block and the overflow action on
    one row; the relationship action itself remains available in the menu. */
 @media (max-width: 360px) {
-  #page-profile .user-card { flex-wrap:nowrap; }
-  #page-profile .user-card > .no-underline { min-width:0; }
-  #page-profile .user-card .user-actions { flex:0 0 auto;width:auto;justify-content:flex-end; }
+  :is(#page-profile, #page-user) .user-card { flex-wrap:nowrap; }
+  :is(#page-profile, #page-user) .user-card > .no-underline { min-width:0; }
+  :is(#page-profile, #page-user) .user-card .user-actions { flex:0 0 auto;width:auto;justify-content:flex-end; }
   #page-profile .user-card:not(.user-card--blocked) .btn-follow { display:none !important; }
   #page-profile .user-card .relationship-action-popup-item { display:flex; }
   #page-settings .user-card--blocked .btn-follow { display:flex !important; }
