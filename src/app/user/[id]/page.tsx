@@ -727,11 +727,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
               </div>
               <div className="sidebar-user-info">
                 <h1 className="sidebar-user-name">{displayName}</h1>
-                {isOwnProfile ? (
-                  <div className="profile-actions user-profile-actions user-profile-actions--own">
-                    <Link href="/profile/edit" className="btn-edit-profile">编辑资料</Link>
-                  </div>
-                ) : currentUser ? (
+                {!isOwnProfile && currentUser ? (
                   <div className="profile-actions user-profile-actions">
                     <button
                       className={`btn-follow ${isFollowing ? "btn-follow-outline" : "btn-follow-primary"}`}
@@ -750,7 +746,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                     </button>
                     <div className="profile-actions-wrapper user-profile-actions-wrapper">
                       <button
-                        className={`btn-more user-profile-more-button ${moreOpen ? "active" : ""}`}
+                        className={`btn-more user-profile-more-button${isFollowing ? " user-profile-more-button--following" : ""} ${moreOpen ? "active" : ""}`}
                         onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }}
                         aria-label="更多"
                         title="更多"
