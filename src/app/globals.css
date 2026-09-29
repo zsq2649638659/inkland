@@ -15144,9 +15144,15 @@ p {
    frame reserved for hover, focus, or selection.
    -------------------------------------------------------------------------- */
 #page-create .ink-input,
-#page-create .ink-textarea,
-#page-create .ink-tag-input__list {
+#page-create .ink-textarea {
   border: var(--ink-border-width-thin) solid transparent;
+  background: var(--ink-color-bg-surface);
+  box-shadow: none;
+}
+
+/* Keep selected tags and the text cursor inside one visibly bounded field. */
+#page-create .ink-tag-input__list {
+  border: var(--ink-input-border-width) solid var(--ink-border);
   background: var(--ink-color-bg-surface);
   box-shadow: none;
 }

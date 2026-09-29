@@ -1572,17 +1572,6 @@
   color: inherit;
 }
 
-/* Bulk tag entry uses the same removable tag component as the single/image
-   publishing flows, but the surrounding field remains borderless. */
-:global(#page-create) .tagEditorInput :global(.ink-tag-input__list),
-:global(#page-create) .tagEditorInput :global(.ink-tag-input__list:focus-within) {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-}
-
 :global(#page-create) .tagEditorInput :global(.ink-tag__remove),
 :global(#page-create) .tagEditorInput :global(.ink-tag__remove:hover),
 :global(#page-create) .tagEditorInput :global(.ink-tag__remove:focus-visible) {
