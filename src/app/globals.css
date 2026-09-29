@@ -10257,7 +10257,7 @@ p {
   #page-user .user-profile-sidebar {
     display: block;
     position: static;
-    grid-row: 2;
+    grid-row: 1;
     width: 100%;
     max-width: none;
     max-height: none;
@@ -10276,7 +10276,7 @@ p {
   }
   #page-user .user-profile-sidebar-details { grid-column: 2; grid-row: 1; }
   #page-user .user-profile-sidebar-tags { grid-column: 2; grid-row: 2; }
-  #page-user .user-main-content { grid-row: 1; }
+  #page-user .user-main-content { grid-row: 2; }
   #page-user .user-work-content { grid-row: 3; }
 }
 
