@@ -701,20 +701,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         <div className="tabs-wrapper user-public-tabs" aria-label="个人主页内容">
           <div className="tabs-inner">
             <Link href={profileTabHref(id, searchParamsKey, "works")} scroll={false} className={`tab-btn${activeTab === "works" ? " active" : ""}`}>作品</Link>
-            {profile && (profile.show_likes || isOwnProfile ? (
-              <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>
-                喜欢{!profile.show_likes && <span className="user-tab-privacy">不公开</span>}
-              </Link>
-            ) : (
-              <span className="tab-btn user-private-tab" aria-disabled="true">喜欢<span className="user-tab-privacy">不公开</span></span>
-            ))}
-            {profile && (profile.show_bookmarks || isOwnProfile ? (
-              <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>
-                收藏{!profile.show_bookmarks && <span className="user-tab-privacy">不公开</span>}
-              </Link>
-            ) : (
-              <span className="tab-btn user-private-tab" aria-disabled="true">收藏<span className="user-tab-privacy">不公开</span></span>
-            ))}
+            {profile && <Link href={profileTabHref(id, searchParamsKey, "likes")} scroll={false} className={`tab-btn${activeTab === "likes" ? " active" : ""}`}>喜欢</Link>}
+            {profile && <Link href={profileTabHref(id, searchParamsKey, "bookmarks")} scroll={false} className={`tab-btn${activeTab === "bookmarks" ? " active" : ""}`}>收藏</Link>}
           </div>
         </div>
         </div>
@@ -917,7 +905,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             ) : activeTab !== "likes" && activeTab !== "bookmarks" ? (
               <ProfileCardCollection posts={posts} series={seriesList} filter={filterType} query={profileSearch} status="all" sort={sortMode} limit={50} mobileLayout={mobileCardLayout} />
             ) : !(activeTab === "likes" ? profile?.show_likes : profile?.show_bookmarks) ? (
-              <div className="user-activity-state" role="status"><EmptyState icon="fa-eye-slash" title="此用户未公开该列表" /></div>
+              <div className="user-activity-state" role="status"><EmptyState icon="fa-eye-slash" title={activeTab === "likes" ? "该用户隐藏了Ta的喜欢" : "该用户隐藏了Ta的收藏"} /></div>
             ) : activityLoading ? (
               <p className="text-sm text-muted text-center py-8" role="status">正在加载…</p>
             ) : activityError ? (

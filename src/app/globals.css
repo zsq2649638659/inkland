@@ -9994,22 +9994,6 @@ p {
   overflow-wrap: anywhere;
 }
 
-#page-user .user-private-tab {
-  color: var(--color-text-muted, #6B6B6B);
-  cursor: not-allowed;
-}
-
-#page-user .user-private-tab:hover {
-  color: var(--color-text-muted, #6B6B6B);
-}
-
-#page-user .user-tab-privacy {
-  margin-left: 5px;
-  color: var(--color-text-muted, #6B6B6B);
-  font-size: 10px;
-  font-weight: 400;
-}
-
 #page-user .profile-identity {
   display: flex;
   min-width: 0;
@@ -10305,10 +10289,6 @@ p {
     min-width: 0;
     padding: 8px 0;
     text-align: center;
-  }
-  #page-user .user-public-tabs .user-tab-privacy {
-    display: block;
-    margin: 2px 0 0;
   }
   #page-user .type-filters-row {
     flex-direction: column;
