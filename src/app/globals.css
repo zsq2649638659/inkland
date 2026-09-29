@@ -9819,6 +9819,13 @@ p {
   text-decoration: none;
 }
 
+#page-user .user-profile-actions .btn-follow > svg,
+#page-user .user-profile-actions .user-profile-more-button > svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 14px !important;
+}
+
 #page-user .user-profile-actions-wrapper {
   width: 100%;
   min-width: 0;
@@ -9832,7 +9839,7 @@ p {
   padding: 8px 10px !important;
   border: 1px solid var(--color-border);
   border-radius: 10px !important;
-  color: var(--color-text-light);
+  color: var(--color-text-muted, #6B6B6B);
   background: transparent;
   font-family: var(--font-family);
   font-size: 13px;
@@ -9844,8 +9851,7 @@ p {
 }
 
 #page-user .user-profile-sidebar .user-profile-actions .btn-follow.btn-follow-outline:not(:hover) {
-  color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+  color: var(--color-text-muted, #6B6B6B) !important;
 }
 
 #page-user .user-profile-sidebar .sidebar-user-bio {
@@ -9911,16 +9917,6 @@ p {
   position: relative;
   padding: 16px 20px 20px;
   border-top: 0;
-}
-
-#page-user .user-profile-sidebar-details::before,
-#page-user .user-profile-sidebar-tags::before {
-  position: absolute;
-  top: 0;
-  right: 20px;
-  left: 20px;
-  border-top: 1px solid var(--color-rule, #E5E1DE);
-  content: "";
 }
 
 #page-user .user-profile-sidebar-details h2,
@@ -10078,8 +10074,7 @@ p {
 #page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button--following,
 #page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button--following:hover,
 #page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button--following.active {
-  color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+  color: var(--color-text-muted, #6B6B6B) !important;
 }
 
 #page-user .profile-actions-wrapper {
