@@ -69,7 +69,7 @@ function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
               sizes="(max-width: 700px) 0px, 380px"
               className={`auth-decor-image${activeSlide === index ? " is-active" : ""}`}
             />
-          ))}
+          ))
         )}
       </div>
       {!isRegister && (
