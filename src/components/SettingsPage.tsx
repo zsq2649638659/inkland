@@ -8,6 +8,7 @@ import type { User } from "@supabase/supabase-js";
 import HomeSidebar from "@/components/HomeSidebar";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/browser";
+import { getPasswordPairErrors } from "@/lib/passwordValidation";
 import { getPublicProfileBios } from "@/lib/profile-privacy";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import AccountSettingsPanel from "@/components/AccountSettingsPanel";
@@ -384,8 +385,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
     setPasswordMessageKind("");
     const nextFieldErrors = {
       currentPassword: currentPassword ? "" : "请输入当前密码。",
-      newPassword: !newPassword ? "请输入新密码。" : newPassword.length < 8 ? "新密码至少需要 8 位。" : "",
-      confirmPassword: !confirmPassword ? "请再次输入新密码。" : newPassword !== confirmPassword ? "两次输入的新密码不一致。" : "",
+      ...getPasswordPairErrors(newPassword, confirmPassword),
     };
     setPasswordFieldErrors(nextFieldErrors);
     if (Object.values(nextFieldErrors).some(Boolean)) {

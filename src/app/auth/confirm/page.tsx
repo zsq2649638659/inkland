@@ -5,7 +5,7 @@ import type { EmailOtpType, User } from "@supabase/supabase-js";
 import SiteIcon from "@/components/SiteIcon";
 import { createClient } from "@/lib/supabase/browser";
 
-type ConfirmationFlow = "signup" | "email-change";
+type ConfirmationFlow = "signup" | "email-change" | "recovery";
 type ConfirmationState = "checking" | "awaiting" | "success" | "pending" | "error";
 type ConfirmationIssue = "link-used-or-expired" | "exchange-failed" | "verification-failed" | "unknown";
 type PendingEmailConfirmation = {
@@ -26,7 +26,15 @@ const supportedOtpTypes = new Set<EmailOtpType>([
 ]);
 
 function isConfirmationFlow(value: string | null): value is ConfirmationFlow {
-  return value === "signup" || value === "email-change";
+  return value === "signup" || value === "email-change" || value === "recovery";
+}
+
+function markPasswordRecoveryConfirmed() {
+  try {
+    window.sessionStorage.setItem("inkland:password-recovery-confirmed", "1");
+  } catch {
+    // The reset form still checks the Supabase session before allowing a password change.
+  }
 }
 
 function isExpiredAuthError(error: { code?: string; message?: string } | null) {
@@ -107,9 +115,11 @@ export default function AuthConfirmPage() {
       const flowFromUrl = query.get("flow");
       const currentFlow: ConfirmationFlow = isConfirmationFlow(flowFromUrl)
         ? flowFromUrl
-        : type === "email_change"
-          ? "email-change"
-          : "signup";
+        : type === "recovery"
+          ? "recovery"
+          : type === "email_change"
+            ? "email-change"
+            : "signup";
       setFlow(currentFlow);
 
       const storedConfirmation = window.history.state?.inklandEmailConfirmation as {
@@ -143,6 +153,10 @@ export default function AuthConfirmPage() {
         if (previousResult !== "error") {
           const { data } = await supabase.auth.getUser();
           if (active) setConfirmedUser(data.user);
+          if (active && currentFlow === "recovery" && data.user) {
+            markPasswordRecoveryConfirmed();
+            window.location.replace("/login?mode=reset-password");
+          }
         }
         return;
       }
@@ -237,6 +251,11 @@ export default function AuthConfirmPage() {
         && Boolean(confirmedUserResult?.new_email)
         ? "pending"
         : "success";
+      if (currentFlow === "recovery") markPasswordRecoveryConfirmed();
+      if (currentFlow === "recovery") {
+        window.location.replace("/login?mode=reset-password");
+        return;
+      }
       cleanConfirmationUrl(currentFlow, confirmationResult);
       if (active) {
         setConfirmedUser(confirmedUserResult);
@@ -304,6 +323,11 @@ export default function AuthConfirmPage() {
         return;
       }
 
+      if (pendingConfirmation.flow === "recovery") {
+        markPasswordRecoveryConfirmed();
+        window.location.replace("/login?mode=reset-password");
+        return;
+      }
       const confirmationResult: ConfirmationState = pendingConfirmation.flow === "email-change"
         && Boolean(data.user.new_email)
         ? "pending"
@@ -321,11 +345,17 @@ export default function AuthConfirmPage() {
     }
   };
 
-  const continueHref = flow === "email-change"
-    ? "/profile-settings?tab=profile"
-    : confirmedUser ? "/" : "/login";
+  const continueHref = flow === "recovery"
+    ? result === "error" ? "/login?mode=forgot-password" : "/login?mode=reset-password"
+    : flow === "email-change"
+      ? "/profile-settings?tab=profile"
+      : confirmedUser ? "/" : "/login";
   const continueAfterConfirmation = () => {
     if (result === "checking" || result === "awaiting") return;
+    if (flow === "recovery") {
+      window.location.assign(continueHref);
+      return;
+    }
     if (flow === "signup" && confirmedUser) {
       try {
         const pending = JSON.parse(window.localStorage.getItem("inkland:pending-interest-onboarding") || "null") as {
@@ -364,7 +394,11 @@ export default function AuthConfirmPage() {
         ? `刚才的验证请求未能完成（${confirmationErrorCode}）。请检查网络后重试。`
         : "为防止邮件安全扫描提前使用验证链接，请点击下方按钮完成邮箱验证。"
     : isError
-      ? confirmationIssue === "exchange-failed" && flow === "signup"
+      ? flow === "recovery"
+        ? confirmationIssue === "link-used-or-expired"
+          ? "重置链接已被使用或过期，请返回登录页重新申请密码重置邮件。"
+          : "暂时无法验证这条重置链接，请重新申请邮件后使用最新链接。"
+        : confirmationIssue === "exchange-failed" && flow === "signup"
           ? "邮箱链接已通过验证，但当前浏览器未能完成登录。请返回登录页，用注册时设置的密码继续。"
         : confirmationIssue === "link-used-or-expired" && flow === "signup"
           ? "验证链接可能已被邮件安全扫描提前访问，或已经过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
@@ -375,20 +409,24 @@ export default function AuthConfirmPage() {
                 ? `验证服务未完成这次邮箱更换${confirmationErrorCode ? `（错误代码：${confirmationErrorCode}）` : ""}。请把错误代码告诉我们，再重新发送最新验证邮件。`
               : "邮箱验证暂未完成。请回到编辑资料重新提交邮箱，再使用最新的验证邮件。"
             : "验证链接无效或已过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
-      : flow === "email-change"
-        ? isPending
-          ? "这封邮件的验证已通过。请在另一邮箱（通常是原绑定邮箱）中完成另一封确认邮件；两边确认后，新邮箱才会生效。"
-          : "新邮箱已验证，并已成为当前账号的绑定邮箱。"
-        : "账号已激活，可以进入 Inkland 继续使用。";
+      : flow === "recovery"
+        ? "邮箱验证成功。继续后可在登录页面设置新密码。"
+        : flow === "email-change"
+          ? isPending
+            ? "这封邮件的验证已通过。请在另一邮箱（通常是原绑定邮箱）中完成另一封确认邮件；两边确认后，新邮箱才会生效。"
+            : "新邮箱已验证，并已成为当前账号的绑定邮箱。"
+          : "账号已激活，可以进入 Inkland 继续使用。";
   const actionLabel = result === "checking"
     ? "正在验证…"
     : result === "awaiting"
       ? "确认邮箱"
-    : flow === "email-change"
-      ? "返回编辑资料"
-      : confirmedUser
-        ? "进入 Inkland"
-        : "返回登录";
+    : flow === "recovery"
+      ? result === "error" ? "重新申请重置邮件" : "设置新密码"
+      : flow === "email-change"
+        ? "返回编辑资料"
+        : confirmedUser
+          ? "进入 Inkland"
+          : "返回登录";
 
   return (
     <main className="auth-confirm-page">

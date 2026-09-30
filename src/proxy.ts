@@ -1,21 +1,32 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPaths = ["/create", "/studio", "/profile", "/settings"];
+const publicPagePaths = [
+  "/login",
+  "/register",
+  "/auth/confirm",
+  "/about",
+  "/contact",
+  "/copyright",
+  "/guidelines",
+  "/privacy",
+  "/terms",
+];
 
-function isProtectedPath(pathname: string) {
-  return protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+function isPublicPage(pathname: string) {
+  return publicPagePaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
   if (
     process.env.NODE_ENV === "development"
-    && request.nextUrl.pathname === "/settings"
+    && pathname === "/settings"
     && request.nextUrl.searchParams.get("preview") === "1"
   ) {
     return NextResponse.next({ request });
   }
-  if (!isProtectedPath(request.nextUrl.pathname)) return NextResponse.next({ request });
+  if (isPublicPage(pathname)) return NextResponse.next({ request });
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
@@ -27,7 +38,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
@@ -47,6 +58,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:avif|bmp|css|csv|eot|gif|ico|jpe?g|js|json|map|pdf|png|svg|ttf|txt|webp|woff2?|xml)$).*)",
   ],
 };
