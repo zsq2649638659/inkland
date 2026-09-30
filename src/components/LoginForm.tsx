@@ -15,6 +15,83 @@ type Mode = "login" | "register";
 type AuthView = Mode | "forgot-password" | "reset-password";
 type StatusType = "error" | "success" | "info" | null;
 
+const loginIllustrations = [
+  { src: "/images/auth-login-01.png", alt: "Inkland 社区定位：让创作回到作品本身" },
+  { src: "/images/auth-login-02.png", alt: "Inkland 批量作品搬家：支持多种文档批量导入" },
+  { src: "/images/auth-login-03.png", alt: "Inkland 长篇阅读体验：阅读设置与章节续读" },
+];
+
+function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setReducedMotion(mediaQuery.matches);
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (isRegister || reducedMotion) return;
+    const timer = window.setInterval(() => {
+      setActiveSlide((current) => (current + 1) % loginIllustrations.length);
+    }, 4500);
+    return () => window.clearInterval(timer);
+  }, [isRegister, reducedMotion]);
+
+  useEffect(() => {
+    if (isRegister) setActiveSlide(0);
+  }, [isRegister]);
+
+  return (
+    <div className="auth-decor-panel" role="group" aria-label={isRegister ? "注册主题插画" : "Inkland 产品介绍"}>
+      <div className="auth-decor-artwork">
+        {isRegister ? (
+          <Image
+            src="/images/auth-register.png"
+            alt="Inkland 注册页面主题插画"
+            fill
+            priority
+            sizes="(max-width: 700px) 0px, 380px"
+            className="auth-decor-image is-active"
+          />
+        ) : (
+          loginIllustrations.map((illustration, index) => (
+            <Image
+              key={illustration.src}
+              src={illustration.src}
+              alt={activeSlide === index ? illustration.alt : ""}
+              aria-hidden={activeSlide !== index}
+              fill
+              priority={index === 0}
+              sizes="(max-width: 700px) 0px, 380px"
+              className={`auth-decor-image${activeSlide === index ? " is-active" : ""}`}
+            />
+          ))
+        )}
+      </div>
+      {!isRegister && (
+        <div className="auth-carousel-controls" role="group" aria-label="选择登录页主题插画">
+          <div className="auth-carousel-dots">
+            {loginIllustrations.map((illustration, index) => (
+              <button
+                key={illustration.src}
+                type="button"
+                className={`auth-carousel-dot${activeSlide === index ? " is-active" : ""}`}
+                aria-label={`显示第 ${index + 1} 张插画：${illustration.alt}`}
+                aria-current={activeSlide === index ? "true" : undefined}
+                onClick={() => setActiveSlide(index)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const passwordRecoveryStorageKey = "inkland:password-recovery-confirmed";
 const passwordRecoveryGrantPrefix = "inkland:password-recovery-grant:";
 const passwordRecoveryGrantMaxAge = 60 * 60 * 1000;
@@ -828,16 +905,7 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
         </div>
 
         {/* ===== Right Panel — Decorative ===== */}
-        <div className="auth-decor-panel">
-          <Image
-            src={isRegister ? "/images/auth-register.png" : "/images/auth-login.png"}
-            alt={isRegister ? "Inkland 注册页面主题插画" : "Inkland 登录页面主题插画"}
-            fill
-            priority
-            sizes="(max-width: 768px) 100vw, 380px"
-            className="auth-decor-image"
-          />
-        </div>
+        <AuthDecorPanel isRegister={isRegister} />
       </div>
     </div>
       )}
