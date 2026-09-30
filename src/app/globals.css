@@ -4980,60 +4980,60 @@ p {
   .auth-card-v2 {
     width: 100%;
     max-width: 880px;
-    height: min(760px, calc(100vh - 40px));
-    min-height: 560px;
+    height: 760px;
   }
   .auth-form-panel {
-    padding: 36px clamp(24px, 4vw, 36px);
+    padding: 36px clamp(16px, 3vw, 28px);
   }
   .auth-decor-panel {
-    width: clamp(230px, 36vw, 320px);
+    width: 380px;
+  }
+  .auth-form-header {
+    gap: 12px;
+  }
+  .auth-form-header .auth-logo-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+  }
+  .auth-form-header .auth-logo-icon::after {
+    width: 36px;
+    height: 36px;
+  }
+  .auth-form-title {
+    font-size: 22px;
+  }
+  .auth-form-subtitle {
+    font-size: 13px;
   }
 }
 
-@media (min-width: 561px) and (max-width: 700px) {
-  .auth-page {
-    padding: 16px;
-    overflow-y: auto;
-  }
-  .auth-card-v2 {
-    width: 100%;
-    max-width: 660px;
-    height: min(760px, calc(100vh - 32px));
-    min-height: 520px;
-  }
+@media (min-width: 701px) and (max-width: 760px) {
   .auth-form-panel {
-    padding: 28px 18px;
+    padding: 24px 14px;
   }
   .auth-form-header {
-    gap: 10px;
-    margin-bottom: 22px;
+    gap: 8px;
+    margin-bottom: 20px;
   }
   .auth-form-header .auth-logo-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 13px;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
   }
   .auth-form-header .auth-logo-icon::after {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
   }
   .auth-form-title {
     font-size: 20px;
   }
   .auth-form-subtitle {
-    font-size: 13px;
-  }
-  .auth-decor-panel {
-    width: clamp(176px, 32vw, 220px);
-  }
-  .auth-carousel-controls {
-    right: 12px;
-    bottom: 12px;
+    font-size: 12px;
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 700px) {
   .auth-page {
     align-items: flex-start;
     overflow-y: auto;

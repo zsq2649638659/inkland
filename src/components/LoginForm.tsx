@@ -54,7 +54,7 @@ function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
           alt="Inkland 注册页面主题插画"
           fill
           priority
-          sizes="(max-width: 560px) 0px, (max-width: 700px) 32vw, (max-width: 900px) 36vw, 380px"
+          sizes="(max-width: 700px) 0px, 380px"
           className="auth-decor-image"
         />
       ) : (
@@ -67,7 +67,7 @@ function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
               aria-hidden={activeSlide !== index}
               fill
               priority={index === 0}
-              sizes="(max-width: 560px) 0px, (max-width: 700px) 32vw, (max-width: 900px) 36vw, 380px"
+              sizes="(max-width: 700px) 0px, 380px"
               className={`auth-decor-image${activeSlide === index ? " is-active" : ""}`}
             />
           ))}
