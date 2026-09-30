@@ -8,7 +8,7 @@ const publicPagePaths = [
 ];
 
 function isPublicPage(pathname: string) {
-  return publicPagePaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  return publicPagePaths.includes(pathname);
 }
 
 export async function proxy(request: NextRequest) {
