@@ -5,9 +5,9 @@ import type { EmailOtpType, User } from "@supabase/supabase-js";
 import SiteIcon from "@/components/SiteIcon";
 import { createClient } from "@/lib/supabase/browser";
 
-type ConfirmationFlow = "signup" | "email-change";
+type ConfirmationFlow = "signup" | "email-change" | "recovery";
 type ConfirmationState = "checking" | "awaiting" | "success" | "pending" | "error";
-type ConfirmationIssue = "link-used-or-expired" | "exchange-failed" | "verification-failed" | "unknown";
+type ConfirmationIssue = "link-used-or-expired" | "exchange-failed" | "verification-failed" | "account-session-mismatch" | "unknown";
 type PendingEmailConfirmation = {
   flow: ConfirmationFlow;
   tokenHash: string;
@@ -15,6 +15,11 @@ type PendingEmailConfirmation = {
 };
 
 const pendingConfirmationStorageKey = "inkland:pending-email-confirmation";
+const passwordRecoveryStorageKey = "inkland:password-recovery-confirmed";
+const passwordRecoveryGrantPrefix = "inkland:password-recovery-grant:";
+const passwordRecoveryGrantMaxAge = 60 * 60 * 1000;
+
+type PasswordRecoveryGrant = { userId: string; confirmedAt: number };
 
 const supportedOtpTypes = new Set<EmailOtpType>([
   "signup",
@@ -26,7 +31,53 @@ const supportedOtpTypes = new Set<EmailOtpType>([
 ]);
 
 function isConfirmationFlow(value: string | null): value is ConfirmationFlow {
-  return value === "signup" || value === "email-change";
+  return value === "signup" || value === "email-change" || value === "recovery";
+}
+
+function readPasswordRecoveryGrant(flowId: string | null): PasswordRecoveryGrant | null {
+  if (!flowId) return null;
+  try {
+    const key = `${passwordRecoveryGrantPrefix}${flowId}`;
+    const stored = JSON.parse(window.localStorage.getItem(key) || "null") as Partial<PasswordRecoveryGrant> | null;
+    if (!stored || typeof stored.userId !== "string" || typeof stored.confirmedAt !== "number") return null;
+    const age = Date.now() - stored.confirmedAt;
+    if (age < 0 || age > passwordRecoveryGrantMaxAge) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    return stored as PasswordRecoveryGrant;
+  } catch {
+    return null;
+  }
+}
+
+function markPasswordRecoveryConfirmed(userId?: string, flowId?: string | null) {
+  try {
+    if (userId && flowId) {
+      window.localStorage.setItem(`${passwordRecoveryGrantPrefix}${flowId}`, JSON.stringify({ userId, confirmedAt: Date.now() }));
+    } else {
+      // Legacy links without a flow ID remain usable in the tab that opened them.
+      window.sessionStorage.setItem(passwordRecoveryStorageKey, "1");
+    }
+  } catch {
+    // The reset form still checks the Supabase session before allowing a password change.
+  }
+}
+
+function hasPasswordRecoveryConfirmation(flowId?: string | null, userId?: string) {
+  if (flowId) {
+    const grant = readPasswordRecoveryGrant(flowId);
+    return Boolean(grant && (!userId || grant.userId === userId));
+  }
+  try {
+    return window.sessionStorage.getItem(passwordRecoveryStorageKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function getPasswordResetPath(flowId?: string | null) {
+  return `/login?mode=reset-password${flowId ? `&flow_id=${encodeURIComponent(flowId)}` : ""}`;
 }
 
 function isExpiredAuthError(error: { code?: string; message?: string } | null) {
@@ -45,12 +96,18 @@ function cleanConfirmationUrl(
 ) {
   const cleanUrl = new URL("/auth/confirm", window.location.origin);
   cleanUrl.searchParams.set("flow", flow);
+  const stateFlowId = window.history.state?.inklandEmailConfirmation?.recoveryFlowId;
+  const recoveryFlowId = flow === "recovery"
+    ? new URL(window.location.href).searchParams.get("flow_id") || (typeof stateFlowId === "string" ? stateFlowId : null)
+    : null;
+  if (recoveryFlowId) cleanUrl.searchParams.set("flow_id", recoveryFlowId);
   window.history.replaceState(
     {
       ...(window.history.state || {}),
       inklandEmailConfirmation: {
         flow,
         result,
+        ...(recoveryFlowId ? { recoveryFlowId } : {}),
         ...(issue ? { issue } : {}),
         ...(errorCode ? { errorCode } : {}),
       },
@@ -94,10 +151,33 @@ export default function AuthConfirmPage() {
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingEmailConfirmation | null>(null);
   const [confirmationIssue, setConfirmationIssue] = useState<ConfirmationIssue>("unknown");
   const [confirmationErrorCode, setConfirmationErrorCode] = useState("");
+  const [recoveryFlowId, setRecoveryFlowId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     const supabase = createClient();
+
+    const continueWithExistingRecoverySession = async (currentFlow: ConfirmationFlow, flowId: string | null) => {
+      // A callback may already have completed in another tab, then return here
+      // via browser history. Resume only for this exact recovery request and user.
+      if (currentFlow !== "recovery" || !hasPasswordRecoveryConfirmation(flowId)) return false;
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (!active) return true;
+        if (error || !data.user) return false;
+        if (!hasPasswordRecoveryConfirmation(flowId, data.user.id)) {
+          setConfirmationIssue("account-session-mismatch");
+          setConfirmationErrorCode("RECOVERY_ACCOUNT_MISMATCH");
+          cleanConfirmationUrl(currentFlow, "error", "account-session-mismatch", "RECOVERY_ACCOUNT_MISMATCH");
+          setResult("error");
+          return true;
+        }
+      } catch {
+        return false;
+      }
+      window.location.replace(getPasswordResetPath(flowId));
+      return true;
+    };
 
     const confirmEmail = async () => {
       const url = new URL(window.location.href);
@@ -107,9 +187,11 @@ export default function AuthConfirmPage() {
       const flowFromUrl = query.get("flow");
       const currentFlow: ConfirmationFlow = isConfirmationFlow(flowFromUrl)
         ? flowFromUrl
-        : type === "email_change"
-          ? "email-change"
-          : "signup";
+        : type === "recovery"
+          ? "recovery"
+          : type === "email_change"
+            ? "email-change"
+            : "signup";
       setFlow(currentFlow);
 
       const storedConfirmation = window.history.state?.inklandEmailConfirmation as {
@@ -117,7 +199,10 @@ export default function AuthConfirmPage() {
         result?: string;
         issue?: ConfirmationIssue;
         errorCode?: string;
+        recoveryFlowId?: string;
       } | undefined;
+      const currentRecoveryFlowId = query.get("flow_id") || storedConfirmation?.recoveryFlowId || null;
+      setRecoveryFlowId(currentRecoveryFlowId);
       const previousResult = storedConfirmation?.flow === currentFlow
         ? storedConfirmation.result
         : null;
@@ -135,6 +220,7 @@ export default function AuthConfirmPage() {
         return;
       }
       if (previousResult === "success" || previousResult === "pending" || previousResult === "error") {
+        if (previousResult === "error" && await continueWithExistingRecoverySession(currentFlow, currentRecoveryFlowId)) return;
         setResult(previousResult);
         if (previousResult === "error") {
           setConfirmationIssue(storedConfirmation?.issue ?? "unknown");
@@ -143,6 +229,10 @@ export default function AuthConfirmPage() {
         if (previousResult !== "error") {
           const { data } = await supabase.auth.getUser();
           if (active) setConfirmedUser(data.user);
+          if (active && currentFlow === "recovery" && data.user) {
+            markPasswordRecoveryConfirmed(data.user.id, currentRecoveryFlowId);
+            window.location.replace(getPasswordResetPath(currentRecoveryFlowId));
+          }
         }
         return;
       }
@@ -201,12 +291,14 @@ export default function AuthConfirmPage() {
         authError = error;
         confirmedUserResult = data.user;
       } else {
+        if (await continueWithExistingRecoverySession(currentFlow, currentRecoveryFlowId)) return;
         cleanConfirmationUrl(currentFlow, "error");
         if (active) setResult("error");
         return;
       }
 
       if (authError) {
+        if (await continueWithExistingRecoverySession(currentFlow, currentRecoveryFlowId)) return;
         const issue = code
           ? "exchange-failed"
           : isExpiredAuthError(authError)
@@ -237,6 +329,11 @@ export default function AuthConfirmPage() {
         && Boolean(confirmedUserResult?.new_email)
         ? "pending"
         : "success";
+      if (currentFlow === "recovery") markPasswordRecoveryConfirmed(confirmedUserResult.id, currentRecoveryFlowId);
+      if (currentFlow === "recovery") {
+        window.location.replace(getPasswordResetPath(currentRecoveryFlowId));
+        return;
+      }
       cleanConfirmationUrl(currentFlow, confirmationResult);
       if (active) {
         setConfirmedUser(confirmedUserResult);
@@ -244,14 +341,19 @@ export default function AuthConfirmPage() {
       }
     };
 
-    void confirmEmail().catch(() => {
+    void confirmEmail().catch(async () => {
       if (!active) return;
-      clearPendingConfirmation();
-      setConfirmationIssue("unknown");
       const url = new URL(window.location.href);
       const currentFlow = isConfirmationFlow(url.searchParams.get("flow"))
         ? url.searchParams.get("flow") as ConfirmationFlow
         : "signup";
+      const flowId = url.searchParams.get("flow_id")
+        || window.history.state?.inklandEmailConfirmation?.recoveryFlowId
+        || null;
+      if (flowId) setRecoveryFlowId(flowId);
+      if (await continueWithExistingRecoverySession(currentFlow, flowId)) return;
+      clearPendingConfirmation();
+      setConfirmationIssue("unknown");
       cleanConfirmationUrl(currentFlow, "error", "unknown");
       setFlow(currentFlow);
       setResult("error");
@@ -304,6 +406,11 @@ export default function AuthConfirmPage() {
         return;
       }
 
+      if (pendingConfirmation.flow === "recovery") {
+        markPasswordRecoveryConfirmed();
+        window.location.replace("/login?mode=reset-password");
+        return;
+      }
       const confirmationResult: ConfirmationState = pendingConfirmation.flow === "email-change"
         && Boolean(data.user.new_email)
         ? "pending"
@@ -321,11 +428,28 @@ export default function AuthConfirmPage() {
     }
   };
 
-  const continueHref = flow === "email-change"
-    ? "/profile-settings?tab=profile"
-    : confirmedUser ? "/" : "/login";
-  const continueAfterConfirmation = () => {
+  const continueHref = flow === "recovery"
+    ? result === "error" ? "/login?mode=forgot-password" : "/login?mode=reset-password"
+    : flow === "email-change"
+      ? "/profile-settings?tab=profile"
+      : confirmedUser ? "/" : "/login";
+  const continueAfterConfirmation = async () => {
     if (result === "checking" || result === "awaiting") return;
+    if (flow === "recovery") {
+      if (result === "error" && hasPasswordRecoveryConfirmation(recoveryFlowId)) {
+        try {
+          const { data, error } = await createClient().auth.getUser();
+          if (!error && data.user && hasPasswordRecoveryConfirmation(recoveryFlowId, data.user.id)) {
+            window.location.assign(getPasswordResetPath(recoveryFlowId));
+            return;
+          }
+        } catch {
+          // If session validation is temporarily unavailable, let the user request a fresh link.
+        }
+      }
+      window.location.assign(continueHref);
+      return;
+    }
     if (flow === "signup" && confirmedUser) {
       try {
         const pending = JSON.parse(window.localStorage.getItem("inkland:pending-interest-onboarding") || "null") as {
@@ -364,7 +488,13 @@ export default function AuthConfirmPage() {
         ? `刚才的验证请求未能完成（${confirmationErrorCode}）。请检查网络后重试。`
         : "为防止邮件安全扫描提前使用验证链接，请点击下方按钮完成邮箱验证。"
     : isError
-      ? confirmationIssue === "exchange-failed" && flow === "signup"
+        ? flow === "recovery"
+        ? confirmationIssue === "account-session-mismatch"
+          ? "此链接对应的账号与当前重置会话不一致。一次只处理一个邮箱：请在对应链接的标签页先完成密码重置，再处理另一个邮箱。"
+          : confirmationIssue === "link-used-or-expired"
+          ? "重置链接已被使用或过期，请返回登录页重新申请密码重置邮件。"
+          : "暂时无法验证这条重置链接，请重新申请邮件后使用最新链接。"
+        : confirmationIssue === "exchange-failed" && flow === "signup"
           ? "邮箱链接已通过验证，但当前浏览器未能完成登录。请返回登录页，用注册时设置的密码继续。"
         : confirmationIssue === "link-used-or-expired" && flow === "signup"
           ? "验证链接可能已被邮件安全扫描提前访问，或已经过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
@@ -375,20 +505,24 @@ export default function AuthConfirmPage() {
                 ? `验证服务未完成这次邮箱更换${confirmationErrorCode ? `（错误代码：${confirmationErrorCode}）` : ""}。请把错误代码告诉我们，再重新发送最新验证邮件。`
               : "邮箱验证暂未完成。请回到编辑资料重新提交邮箱，再使用最新的验证邮件。"
             : "验证链接无效或已过期。请先返回登录尝试；如果提示邮箱尚未验证，再重新发起验证并使用最新邮件。"
-      : flow === "email-change"
-        ? isPending
-          ? "这封邮件的验证已通过。请在另一邮箱（通常是原绑定邮箱）中完成另一封确认邮件；两边确认后，新邮箱才会生效。"
-          : "新邮箱已验证，并已成为当前账号的绑定邮箱。"
-        : "账号已激活，可以进入 Inkland 继续使用。";
+      : flow === "recovery"
+        ? "邮箱验证成功。继续后可在登录页面设置新密码。"
+        : flow === "email-change"
+          ? isPending
+            ? "这封邮件的验证已通过。请在另一邮箱（通常是原绑定邮箱）中完成另一封确认邮件；两边确认后，新邮箱才会生效。"
+            : "新邮箱已验证，并已成为当前账号的绑定邮箱。"
+          : "账号已激活，可以进入 Inkland 继续使用。";
   const actionLabel = result === "checking"
     ? "正在验证…"
     : result === "awaiting"
       ? "确认邮箱"
-    : flow === "email-change"
-      ? "返回编辑资料"
-      : confirmedUser
-        ? "进入 Inkland"
-        : "返回登录";
+    : flow === "recovery"
+      ? result === "error" ? "重新申请重置邮件" : "设置新密码"
+      : flow === "email-change"
+        ? "返回编辑资料"
+        : confirmedUser
+          ? "进入 Inkland"
+          : "返回登录";
 
   return (
     <main className="auth-confirm-page">

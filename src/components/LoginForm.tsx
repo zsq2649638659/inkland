@@ -3,14 +3,53 @@ import SiteIcon from "@/components/SiteIcon";
 import type { InklandIconName } from "@/components/inkland/iconRegistry";
 import Checkbox from "@/components/inkland/Checkbox";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { useAuth } from "@/components/AuthProvider";
+import { getPasswordPairErrors } from "@/lib/passwordValidation";
 
 type Mode = "login" | "register";
+type AuthView = Mode | "forgot-password" | "reset-password";
 type StatusType = "error" | "success" | "info" | null;
+
+const passwordRecoveryStorageKey = "inkland:password-recovery-confirmed";
+const passwordRecoveryGrantPrefix = "inkland:password-recovery-grant:";
+const passwordRecoveryGrantMaxAge = 60 * 60 * 1000;
+
+function getRecoveryFlowId() {
+  return new URLSearchParams(window.location.search).get("flow_id");
+}
+
+function readRecoveryGrant(flowId: string) {
+  try {
+    const key = `${passwordRecoveryGrantPrefix}${flowId}`;
+    const grant = JSON.parse(window.localStorage.getItem(key) || "null") as {
+      userId?: unknown;
+      confirmedAt?: unknown;
+    } | null;
+    if (!grant || typeof grant.userId !== "string" || typeof grant.confirmedAt !== "number") return null;
+    const age = Date.now() - grant.confirmedAt;
+    if (age < 0 || age > passwordRecoveryGrantMaxAge) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    return { userId: grant.userId, confirmedAt: grant.confirmedAt };
+  } catch {
+    return null;
+  }
+}
+
+function clearRecoveryGrant(flowId = getRecoveryFlowId()) {
+  try {
+    if (flowId) window.localStorage.removeItem(`${passwordRecoveryGrantPrefix}${flowId}`);
+    window.sessionStorage.removeItem(passwordRecoveryStorageKey);
+  } catch {
+    // Ignore unavailable browser storage.
+  }
+}
 
 interface StatusMsg {
   type: StatusType;
@@ -44,13 +83,14 @@ async function waitForServerSession(attempts = 20): Promise<boolean> {
   return false;
 }
 
-export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
+export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView }) {
   const supabase = createClient();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [mode, setMode] = useState<AuthView>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [nickname, setNickname] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -62,17 +102,18 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
   const [authActionInProgress, setAuthActionInProgress] = useState(false);
   const [serverSessionReady, setServerSessionReady] = useState(false);
   const [postAuthPath, setPostAuthPath] = useState<string | null>(null);
+  const [recoveryReady, setRecoveryReady] = useState(false);
 
-  const getNextPath = () => {
+  const getNextPath = useCallback(() => {
     if (postAuthPath) return postAuthPath;
     const next = new URLSearchParams(window.location.search).get("next");
     return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-  };
+  }, [postAuthPath]);
 
-  const getInterestOnboardingPath = () => {
+  const getInterestOnboardingPath = useCallback(() => {
     const next = getNextPath();
     return `/onboarding/interests?next=${encodeURIComponent(next)}`;
-  };
+  }, [getNextPath]);
 
   // 本地超时保护：如果 authLoading 超过 3 秒，强制显示表单
   useEffect(() => {
@@ -82,10 +123,10 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
 
   // 已登录用户自动跳转（保留 next 参数）
   useEffect(() => {
-    if (!authLoading && user && !authActionInProgress && serverSessionReady) {
+    if (!authLoading && user && !authActionInProgress && serverSessionReady && mode !== "forgot-password" && mode !== "reset-password") {
       router.replace(getNextPath());
     }
-  }, [user, authLoading, authActionInProgress, serverSessionReady, postAuthPath, router]);
+  }, [user, authLoading, authActionInProgress, serverSessionReady, getNextPath, mode, router]);
 
   // 处理从其他页面进入登录页时已有客户端 session、但服务器 Cookie 尚未确认的窗口。
   useEffect(() => {
@@ -100,15 +141,80 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
   useEffect(() => {
     const queryMode = new URLSearchParams(window.location.search).get("mode");
     const frame = window.requestAnimationFrame(() => {
-      setMode(queryMode === "register" ? "register" : initialMode);
+      setMode(
+        queryMode === "forgot-password" || queryMode === "reset-password"
+          ? queryMode
+          : queryMode === "register"
+            ? "register"
+            : initialMode
+      );
     });
     return () => window.cancelAnimationFrame(frame);
   }, [initialMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get("reason");
+    const frame = window.requestAnimationFrame(() => {
+      if (reason === "password-changed") {
+        setStatus({ type: "success", message: "密码已修改，请使用新密码登录。" });
+      } else if (reason === "password-reset") {
+        setStatus({ type: "success", message: "密码重设成功，请使用新密码登录。" });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "reset-password") return;
+    let active = true;
+    const verifyRecoverySession = async () => {
+      const flowId = getRecoveryFlowId();
+      let confirmedForThisTab = false;
+      try {
+        confirmedForThisTab = window.sessionStorage.getItem(passwordRecoveryStorageKey) === "1";
+      } catch {
+        // Recovery still requires an active Supabase session below.
+      }
+      const { data, error } = await supabase.auth.getUser();
+      const grant = flowId ? readRecoveryGrant(flowId) : null;
+      const ready = !error && Boolean(data.user) && (flowId
+        ? grant?.userId === data.user!.id
+        : confirmedForThisTab);
+      if (!ready && !flowId) {
+        try { window.sessionStorage.removeItem(passwordRecoveryStorageKey); } catch { /* ignore unavailable storage */ }
+      }
+      if (active) {
+        setRecoveryReady(ready);
+        if (!ready) {
+          const mismatch = flowId && data.user && grant && grant.userId !== data.user.id;
+          setStatus({
+            type: "error",
+            message: mismatch
+              ? "当前浏览器已切换到另一个邮箱账号。请先完成一个账号的密码重置，再处理另一个邮箱。"
+              : "重置链接无效或已过期，请重新申请密码重置邮件。",
+          });
+        }
+      }
+    };
+    void verifyRecoverySession().catch(() => {
+      if (!active) return;
+      setRecoveryReady(false);
+      setStatus({ type: "error", message: "暂时无法确认重置链接，请重新打开邮件，或重新申请重置邮件。" });
+    });
+    return () => { active = false; };
+  }, [mode, supabase]);
 
   const clearStatus = () => setStatus({ type: null, message: "" });
 
   const getConfirmationRedirectUrl = () =>
     new URL("/auth/confirm?flow=signup", window.location.origin).toString();
+
+  const getPasswordRecoveryRedirectUrl = (flowId: string) => {
+    const redirectUrl = new URL("/auth/confirm?flow=recovery", window.location.origin);
+    redirectUrl.searchParams.set("flow_id", flowId);
+    return redirectUrl.toString();
+  };
 
   const handleLogin = async () => {
     if (!email.trim()) {
@@ -285,6 +391,85 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
     setLoading(false);
   };
 
+  const handleForgotPassword = async () => {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setStatus({ type: "error", message: "请输入注册时使用的邮箱地址。" });
+      return;
+    }
+
+    setLoading(true);
+    clearStatus();
+    const flowId = window.crypto.randomUUID();
+    try {
+      const { error } = await withTimeout<Awaited<ReturnType<typeof supabase.auth.resetPasswordForEmail>>>(
+        supabase.auth.resetPasswordForEmail(normalizedEmail, {
+          redirectTo: getPasswordRecoveryRedirectUrl(flowId),
+        })
+      );
+      setStatus(error
+        ? { type: "error", message: "重置邮件暂时发送失败，请稍后重试。" }
+        : { type: "success", message: "如果该邮箱已注册，我们会发送密码重置邮件。请检查收件箱和垃圾邮件。" });
+    } catch (requestError) {
+      setStatus({
+        type: "error",
+        message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT"
+          ? "连接服务器超时，请检查网络后重试。"
+          : "重置邮件暂时发送失败，请稍后重试。",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!recoveryReady) {
+      setStatus({ type: "error", message: "重置链接无效或已过期，请重新申请密码重置邮件。" });
+      return;
+    }
+    const errors = getPasswordPairErrors(password, confirmPassword);
+    if (errors.newPassword || errors.confirmPassword) {
+      setStatus({ type: "error", message: errors.newPassword || errors.confirmPassword });
+      return;
+    }
+
+    setLoading(true);
+    clearStatus();
+    try {
+      const { data, error: sessionError } = await supabase.auth.getUser();
+      if (sessionError || !data.user) {
+        setRecoveryReady(false);
+        setStatus({ type: "error", message: "重置链接已失效，请重新申请密码重置邮件。" });
+        return;
+      }
+
+      const { error } = await withTimeout<Awaited<ReturnType<typeof supabase.auth.updateUser>>>(
+        supabase.auth.updateUser({ password })
+      );
+      if (error) {
+        setStatus({ type: "error", message: "密码重设失败，请稍后重试。" });
+        return;
+      }
+
+      clearRecoveryGrant();
+      await supabase.auth.signOut();
+      setPassword("");
+      setConfirmPassword("");
+      setRecoveryReady(false);
+      setMode("login");
+      router.replace("/login?reason=password-reset");
+    } catch (requestError) {
+      setStatus({
+        type: "error",
+        message: requestError instanceof Error && requestError.message === "REQUEST_TIMEOUT"
+          ? "连接服务器超时，请稍后重试。"
+          : "密码重设失败，请稍后重试。",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResendConfirmation = async () => {
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
@@ -342,14 +527,36 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === "login") handleLogin();
-    else handleRegister();
+    if (mode === "login") void handleLogin();
+    else if (mode === "register") void handleRegister();
+    else if (mode === "forgot-password") void handleForgotPassword();
+    else void handleResetPassword();
   };
 
   const switchMode = (newMode: Mode) => {
+    if (mode === "reset-password") clearRecoveryGrant();
     setMode(newMode);
     setCanResendConfirmation(false);
+    setConfirmPassword("");
+    setRecoveryReady(false);
     clearStatus();
+  };
+
+  const openForgotPassword = () => {
+    setMode("forgot-password");
+    setCanResendConfirmation(false);
+    setConfirmPassword("");
+    clearStatus();
+  };
+
+  const openLoginFromRecovery = () => {
+    if (mode === "reset-password") clearRecoveryGrant();
+    setMode("login");
+    setPassword("");
+    setConfirmPassword("");
+    setRecoveryReady(false);
+    clearStatus();
+    router.replace("/login");
   };
 
   const statusIcon: Record<Exclude<StatusType, null>, InklandIconName> = {
@@ -363,6 +570,12 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
     success: "auth-status-success",
     info: "auth-status-info",
   };
+
+  const isAccountForm = mode === "login" || mode === "register";
+  const isLogin = mode === "login";
+  const isRegister = mode === "register";
+  const isForgotPassword = mode === "forgot-password";
+  const isResetPassword = mode === "reset-password";
 
   return (
     <>
@@ -382,12 +595,22 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
             </div>
             <div className="auth-form-heading">
               <div className="auth-form-title">
-                {mode === "login" ? "欢迎回来" : "加入 inkland"}
+                {isLogin
+                  ? "欢迎回来"
+                  : isRegister
+                    ? "加入 inkland"
+                    : isForgotPassword
+                      ? "找回密码"
+                      : "设置新密码"}
               </div>
               <div className="auth-form-subtitle">
-                {mode === "login"
+                {isLogin
                   ? "登录你的账号，继续创作之旅"
-                  : "创建一个账号，开始你的同人创作之旅"}
+                  : isRegister
+                    ? "创建一个账号，开始你的同人创作之旅"
+                    : isForgotPassword
+                      ? "输入注册邮箱，我们会发送密码重置链接"
+                      : "请设置至少 8 位的新密码并再次确认"}
               </div>
             </div>
           </div>
@@ -411,25 +634,30 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
           </div>
 
           {/* Tabs */}
-          <div className="auth-tabs">
-            <button
-              className={`auth-tab-v2 ${mode === "login" ? "active" : ""}`}
-              onClick={() => switchMode("login")}
-            >
-              登录
-            </button>
-            <button
-              className={`auth-tab-v2 ${mode === "register" ? "active" : ""}`}
-              onClick={() => switchMode("register")}
-            >
-              注册
-            </button>
-          </div>
+          {isAccountForm && (
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={`auth-tab-v2 ${isLogin ? "active" : ""}`}
+                onClick={() => switchMode("login")}
+              >
+                登录
+              </button>
+              <button
+                type="button"
+                className={`auth-tab-v2 ${isRegister ? "active" : ""}`}
+                onClick={() => switchMode("register")}
+              >
+                注册
+              </button>
+            </div>
+          )}
 
           {/* Form */}
+          {(!isResetPassword || recoveryReady) ? (
           <form onSubmit={handleSubmit}>
             {/* Nickname (register only) */}
-            {mode === "register" && (
+            {isRegister && (
               <div className="auth-field">
                 <label className="auth-field-label">昵称</label>
                 <div className="auth-input-wrapper">
@@ -450,14 +678,17 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
             )}
 
             {/* Email */}
+            {!isResetPassword && (
             <div className="auth-field">
-              <label className="auth-field-label">邮箱</label>
+              <label className="auth-field-label" htmlFor="auth-email">邮箱</label>
               <div className="auth-input-wrapper">
                 <SiteIcon name="fa-envelope" variant="solid" className="auth-input-icon" />
                 <input
+                  id="auth-email"
                   type="email"
                   className="auth-input"
                   placeholder="请输入邮箱地址"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -467,16 +698,20 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
                 />
               </div>
             </div>
+            )}
 
             {/* Password */}
+            {!isForgotPassword && (
             <div className="auth-field">
-              <label className="auth-field-label">密码</label>
+              <label className="auth-field-label" htmlFor="auth-password">{isResetPassword ? "新密码" : "密码"}</label>
               <div className="auth-input-wrapper">
                 <SiteIcon name="fa-lock" variant="solid" className="auth-input-icon" />
                 <input
+                  id="auth-password"
                   type={showPassword ? "text" : "password"}
                   className="auth-input"
-                  placeholder={mode === "register" ? "至少 6 位密码" : "请输入密码"}
+                  placeholder={isRegister ? "至少 6 位密码" : isResetPassword ? "至少 8 位新密码" : "请输入密码"}
+                  autoComplete={isResetPassword || isRegister ? "new-password" : "current-password"}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -493,9 +728,34 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
                 </button>
               </div>
             </div>
+            )}
+
+            {isResetPassword && (
+              <div className="auth-field">
+                <label className="auth-field-label" htmlFor="auth-confirm-password">确认新密码</label>
+                <div className="auth-input-wrapper">
+                  <SiteIcon name="fa-lock" variant="solid" className="auth-input-icon" />
+                  <input
+                    id="auth-confirm-password"
+                    type={showPassword ? "text" : "password"}
+                    className="auth-input"
+                    placeholder="请再次输入新密码"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => { setConfirmPassword(e.target.value); clearStatus(); }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {isLogin && (
+              <div className="auth-forgot-row">
+                <button type="button" onClick={openForgotPassword}>忘记密码？</button>
+              </div>
+            )}
 
             {/* Terms checkbox (register only) */}
-            {mode === "register" && (
+            {isRegister && (
               <div className="auth-checkbox-row">
                 <Checkbox
                   id="agreeTerms"
@@ -514,63 +774,69 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
             <button
               type="submit"
               className="auth-submit-btn"
-              disabled={loading}
+              disabled={loading || (isResetPassword && !recoveryReady)}
             >
               {loading ? (
                 <>
                   <span className="auth-spinner" />
-                  {mode === "login" ? "登录中..." : "注册中..."}
+                  {isLogin ? "登录中..." : isRegister ? "注册中..." : isForgotPassword ? "发送中..." : "保存中..."}
                 </>
-              ) : mode === "login" ? (
+              ) : isLogin ? (
                 "登录"
-              ) : (
+              ) : isRegister ? (
                 "注册"
+              ) : isForgotPassword ? (
+                "发送重置邮件"
+              ) : (
+                "保存新密码"
               )}
             </button>
           </form>
+          ) : (
+            <div className="auth-recovery-pending" role="status" aria-live="polite">
+              {status.type === "error" ? (
+                <>
+                  <p>{status.message}</p>
+                  <button type="button" className="auth-recovery-link" onClick={openForgotPassword}>重新申请重置邮件</button>
+                </>
+              ) : (
+                <><span className="auth-spinner" /> 正在确认重置链接…</>
+              )}
+            </div>
+          )}
 
           {/* Footer link */}
           <div className="auth-footer-link">
-            {mode === "login" ? (
+            {isLogin ? (
               <>
                 还没有账号？{" "}
                 <button type="button" onClick={() => switchMode("register")}>
                   立即注册
                 </button>
               </>
-            ) : (
+            ) : isRegister ? (
               <>
                 已有账号？{" "}
                 <button type="button" onClick={() => switchMode("login")}>
                   去登录
                 </button>
               </>
+            ) : (
+              <button type="button" onClick={openLoginFromRecovery}>返回登录</button>
             )}
           </div>
         </div>
 
         {/* ===== Right Panel — Decorative ===== */}
         <div className="auth-decor-panel">
-          {/* Decorative illustration */}
-          <div className="auth-decor-illustration">
-            <div className="auth-decor-ring auth-decor-ring-1" />
-            <div className="auth-decor-ring auth-decor-ring-2" />
-            <div className="auth-decor-ring auth-decor-ring-3" />
-            <div className="auth-decor-center">
-              <SiteIcon name={mode === "login" ? "fa-feather-pointed" : "fa-sparkles"} variant="solid" />
-            </div>
-          </div>
-
-          <div className="auth-decor-quote">
-            {mode === "login"
-              ? "每一个故事都值得被看见"
-              : "用文字创造属于你的世界"}
-          </div>
-          <div className="auth-decor-sub">
-            {mode === "login"
-              ? "inkland — 干净、无广告的同人创作社区"
-              : "加入 inkland，与创作者们一起分享热爱"}
-          </div>
+          <Image
+            src={isRegister ? "/images/auth-register.png" : "/images/auth-login.png"}
+            alt={isRegister ? "Inkland 注册页面主题插画" : "Inkland 登录页面主题插画"}
+            fill
+            priority
+            sizes="(max-width: 768px) 100vw, 380px"
+            className="auth-decor-image"
+          />
         </div>
       </div>
     </div>
