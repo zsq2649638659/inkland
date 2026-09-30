@@ -16,6 +16,40 @@ type AuthView = Mode | "forgot-password" | "reset-password";
 type StatusType = "error" | "success" | "info" | null;
 
 const passwordRecoveryStorageKey = "inkland:password-recovery-confirmed";
+const passwordRecoveryGrantPrefix = "inkland:password-recovery-grant:";
+const passwordRecoveryGrantMaxAge = 60 * 60 * 1000;
+
+function getRecoveryFlowId() {
+  return new URLSearchParams(window.location.search).get("flow_id");
+}
+
+function readRecoveryGrant(flowId: string) {
+  try {
+    const key = `${passwordRecoveryGrantPrefix}${flowId}`;
+    const grant = JSON.parse(window.localStorage.getItem(key) || "null") as {
+      userId?: unknown;
+      confirmedAt?: unknown;
+    } | null;
+    if (!grant || typeof grant.userId !== "string" || typeof grant.confirmedAt !== "number") return null;
+    const age = Date.now() - grant.confirmedAt;
+    if (age < 0 || age > passwordRecoveryGrantMaxAge) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    return { userId: grant.userId, confirmedAt: grant.confirmedAt };
+  } catch {
+    return null;
+  }
+}
+
+function clearRecoveryGrant(flowId = getRecoveryFlowId()) {
+  try {
+    if (flowId) window.localStorage.removeItem(`${passwordRecoveryGrantPrefix}${flowId}`);
+    window.sessionStorage.removeItem(passwordRecoveryStorageKey);
+  } catch {
+    // Ignore unavailable browser storage.
+  }
+}
 
 interface StatusMsg {
   type: StatusType;
@@ -135,6 +169,7 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
     if (mode !== "reset-password") return;
     let active = true;
     const verifyRecoverySession = async () => {
+      const flowId = getRecoveryFlowId();
       let confirmedForThisTab = false;
       try {
         confirmedForThisTab = window.sessionStorage.getItem(passwordRecoveryStorageKey) === "1";
@@ -142,13 +177,24 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
         // Recovery still requires an active Supabase session below.
       }
       const { data, error } = await supabase.auth.getUser();
-      const ready = confirmedForThisTab && !error && Boolean(data.user);
-      if (!ready) {
+      const grant = flowId ? readRecoveryGrant(flowId) : null;
+      const ready = !error && Boolean(data.user) && (flowId
+        ? grant?.userId === data.user!.id
+        : confirmedForThisTab);
+      if (!ready && !flowId) {
         try { window.sessionStorage.removeItem(passwordRecoveryStorageKey); } catch { /* ignore unavailable storage */ }
       }
       if (active) {
         setRecoveryReady(ready);
-        if (!ready) setStatus({ type: "error", message: "重置链接无效或已过期，请重新申请密码重置邮件。" });
+        if (!ready) {
+          const mismatch = flowId && data.user && grant && grant.userId !== data.user.id;
+          setStatus({
+            type: "error",
+            message: mismatch
+              ? "当前浏览器已切换到另一个邮箱账号。请先完成一个账号的密码重置，再处理另一个邮箱。"
+              : "重置链接无效或已过期，请重新申请密码重置邮件。",
+          });
+        }
       }
     };
     void verifyRecoverySession().catch(() => {
@@ -164,8 +210,11 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
   const getConfirmationRedirectUrl = () =>
     new URL("/auth/confirm?flow=signup", window.location.origin).toString();
 
-  const getPasswordRecoveryRedirectUrl = () =>
-    new URL("/auth/confirm?flow=recovery", window.location.origin).toString();
+  const getPasswordRecoveryRedirectUrl = (flowId: string) => {
+    const redirectUrl = new URL("/auth/confirm?flow=recovery", window.location.origin);
+    redirectUrl.searchParams.set("flow_id", flowId);
+    return redirectUrl.toString();
+  };
 
   const handleLogin = async () => {
     if (!email.trim()) {
@@ -351,10 +400,11 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
 
     setLoading(true);
     clearStatus();
+    const flowId = window.crypto.randomUUID();
     try {
       const { error } = await withTimeout<Awaited<ReturnType<typeof supabase.auth.resetPasswordForEmail>>>(
         supabase.auth.resetPasswordForEmail(normalizedEmail, {
-          redirectTo: getPasswordRecoveryRedirectUrl(),
+          redirectTo: getPasswordRecoveryRedirectUrl(flowId),
         })
       );
       setStatus(error
@@ -401,7 +451,7 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
         return;
       }
 
-      try { window.sessionStorage.removeItem(passwordRecoveryStorageKey); } catch { /* ignore unavailable storage */ }
+      clearRecoveryGrant();
       await supabase.auth.signOut();
       setPassword("");
       setConfirmPassword("");
@@ -484,9 +534,7 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
   };
 
   const switchMode = (newMode: Mode) => {
-    if (mode === "reset-password") {
-      try { window.sessionStorage.removeItem(passwordRecoveryStorageKey); } catch { /* ignore unavailable storage */ }
-    }
+    if (mode === "reset-password") clearRecoveryGrant();
     setMode(newMode);
     setCanResendConfirmation(false);
     setConfirmPassword("");
@@ -502,9 +550,7 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView })
   };
 
   const openLoginFromRecovery = () => {
-    if (mode === "reset-password") {
-      try { window.sessionStorage.removeItem(passwordRecoveryStorageKey); } catch { /* ignore unavailable storage */ }
-    }
+    if (mode === "reset-password") clearRecoveryGrant();
     setMode("login");
     setPassword("");
     setConfirmPassword("");
