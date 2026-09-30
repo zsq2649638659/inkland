@@ -5,12 +5,6 @@ const publicPagePaths = [
   "/login",
   "/register",
   "/auth/confirm",
-  "/about",
-  "/contact",
-  "/copyright",
-  "/guidelines",
-  "/privacy",
-  "/terms",
 ];
 
 function isPublicPage(pathname: string) {
