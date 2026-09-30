@@ -4991,7 +4991,49 @@ p {
   }
 }
 
-@media (max-width: 700px) {
+@media (min-width: 561px) and (max-width: 700px) {
+  .auth-page {
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .auth-card-v2 {
+    width: 100%;
+    max-width: 660px;
+    height: min(760px, calc(100vh - 32px));
+    min-height: 520px;
+  }
+  .auth-form-panel {
+    padding: 28px 18px;
+  }
+  .auth-form-header {
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+  .auth-form-header .auth-logo-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 13px;
+  }
+  .auth-form-header .auth-logo-icon::after {
+    width: 34px;
+    height: 34px;
+  }
+  .auth-form-title {
+    font-size: 20px;
+  }
+  .auth-form-subtitle {
+    font-size: 13px;
+  }
+  .auth-decor-panel {
+    width: clamp(176px, 32vw, 220px);
+  }
+  .auth-carousel-controls {
+    right: 12px;
+    bottom: 12px;
+  }
+}
+
+@media (max-width: 560px) {
   .auth-page {
     align-items: flex-start;
     overflow-y: auto;
