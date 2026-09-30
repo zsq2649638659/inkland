@@ -23,7 +23,6 @@ const loginIllustrations = [
 
 function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
   const [activeSlide, setActiveSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -35,12 +34,12 @@ function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (isRegister || isPaused || reducedMotion) return;
+    if (isRegister || reducedMotion) return;
     const timer = window.setInterval(() => {
       setActiveSlide((current) => (current + 1) % loginIllustrations.length);
     }, 4500);
     return () => window.clearInterval(timer);
-  }, [isPaused, isRegister, reducedMotion]);
+  }, [isRegister, reducedMotion]);
 
   useEffect(() => {
     if (isRegister) setActiveSlide(0);
@@ -48,18 +47,18 @@ function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
 
   return (
     <div className="auth-decor-panel" role="group" aria-label={isRegister ? "注册主题插画" : "Inkland 产品介绍"}>
-      {isRegister ? (
-        <Image
-          src="/images/auth-register.png"
-          alt="Inkland 注册页面主题插画"
-          fill
-          priority
-          sizes="(max-width: 700px) 0px, 380px"
-          className="auth-decor-image"
-        />
-      ) : (
-        <>
-          {loginIllustrations.map((illustration, index) => (
+      <div className="auth-decor-artwork">
+        {isRegister ? (
+          <Image
+            src="/images/auth-register.png"
+            alt="Inkland 注册页面主题插画"
+            fill
+            priority
+            sizes="(max-width: 700px) 0px, 380px"
+            className="auth-decor-image is-active"
+          />
+        ) : (
+          loginIllustrations.map((illustration, index) => (
             <Image
               key={illustration.src}
               src={illustration.src}
@@ -71,32 +70,23 @@ function AuthDecorPanel({ isRegister }: { isRegister: boolean }) {
               className={`auth-decor-image${activeSlide === index ? " is-active" : ""}`}
             />
           ))}
-          <div className="auth-carousel-controls" role="group" aria-label="登录页主题插画控制">
-            <div className="auth-carousel-dots" role="group" aria-label="选择主题插画">
-              {loginIllustrations.map((illustration, index) => (
-                <button
-                  key={illustration.src}
-                  type="button"
-                  className={`auth-carousel-dot${activeSlide === index ? " is-active" : ""}`}
-                  aria-label={`显示第 ${index + 1} 张插画：${illustration.alt}`}
-                  aria-current={activeSlide === index ? "true" : undefined}
-                  onClick={() => setActiveSlide(index)}
-                />
-              ))}
-            </div>
-            {!reducedMotion && (
+        )}
+      </div>
+      {!isRegister && (
+        <div className="auth-carousel-controls" role="group" aria-label="选择登录页主题插画">
+          <div className="auth-carousel-dots">
+            {loginIllustrations.map((illustration, index) => (
               <button
+                key={illustration.src}
                 type="button"
-                className="auth-carousel-toggle"
-                aria-label={isPaused ? "继续自动轮播" : "暂停自动轮播"}
-                aria-pressed={isPaused}
-                onClick={() => setIsPaused((paused) => !paused)}
-              >
-                {isPaused ? <span className="auth-carousel-play" aria-hidden="true" /> : <span className="auth-carousel-pause" aria-hidden="true" />}
-              </button>
-            )}
+                className={`auth-carousel-dot${activeSlide === index ? " is-active" : ""}`}
+                aria-label={`显示第 ${index + 1} 张插画：${illustration.alt}`}
+                aria-current={activeSlide === index ? "true" : undefined}
+                onClick={() => setActiveSlide(index)}
+              />
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

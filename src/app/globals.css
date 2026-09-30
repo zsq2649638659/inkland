@@ -4890,8 +4890,16 @@ p {
   width: 380px;
   flex-shrink: 0;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
   background: var(--color-bg-page, #FAF9F7);
   position: relative;
+  overflow: hidden;
+}
+.auth-decor-artwork {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .auth-decor-image {
@@ -4904,40 +4912,17 @@ p {
   opacity: 1;
 }
 .auth-carousel-controls {
-  position: absolute;
-  z-index: 2;
-  right: 20px;
-  bottom: 20px;
+  flex: 0 0 auto;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 4px 18px rgba(82, 55, 48, 0.12);
-  backdrop-filter: blur(12px);
+  justify-content: center;
+  margin-bottom: 20px;
 }
 .auth-carousel-dots {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 4px;
 }
 .auth-carousel-dot {
-  width: 7px;
-  height: 7px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(73, 62, 58, 0.32);
-  cursor: pointer;
-  transition: width 180ms ease, background-color 180ms ease;
-}
-.auth-carousel-dot.is-active {
-  width: 20px;
-  background: var(--color-primary, #F26B5B);
-}
-.auth-carousel-toggle {
   display: grid;
   width: 24px;
   height: 24px;
@@ -4946,30 +4931,26 @@ p {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #493e3a;
   cursor: pointer;
 }
-.auth-carousel-toggle:hover {
-  background: rgba(73, 62, 58, 0.08);
+.auth-carousel-dot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(73, 62, 58, 0.32);
+  transition: transform 180ms ease, background-color 180ms ease;
 }
-.auth-carousel-toggle:focus-visible,
+.auth-carousel-dot.is-active {
+  background: transparent;
+}
 .auth-carousel-dot:focus-visible {
   outline: 2px solid var(--color-primary, #F26B5B);
-  outline-offset: 3px;
+  outline-offset: 1px;
 }
-.auth-carousel-pause {
-  width: 8px;
-  height: 10px;
-  border-right: 2px solid currentColor;
-  border-left: 2px solid currentColor;
-}
-.auth-carousel-play {
-  width: 0;
-  height: 0;
-  margin-left: 2px;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-left: 8px solid currentColor;
+.auth-carousel-dot.is-active::before {
+  background: var(--color-primary, #F26B5B);
+  transform: scale(1.2);
 }
 /* Responsive */
 @media (min-width: 701px) and (max-width: 900px) {
