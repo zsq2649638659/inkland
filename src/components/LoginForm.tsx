@@ -49,7 +49,7 @@ async function waitForServerSession(attempts = 20): Promise<boolean> {
   return false;
 }
 
-export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
+export function LoginForm({ initialMode = "login" }: { initialMode?: AuthView }) {
   const supabase = createClient();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
