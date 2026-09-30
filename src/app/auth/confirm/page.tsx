@@ -15,6 +15,7 @@ type PendingEmailConfirmation = {
 };
 
 const pendingConfirmationStorageKey = "inkland:pending-email-confirmation";
+const passwordRecoveryStorageKey = "inkland:password-recovery-confirmed";
 
 const supportedOtpTypes = new Set<EmailOtpType>([
   "signup",
@@ -31,9 +32,17 @@ function isConfirmationFlow(value: string | null): value is ConfirmationFlow {
 
 function markPasswordRecoveryConfirmed() {
   try {
-    window.sessionStorage.setItem("inkland:password-recovery-confirmed", "1");
+    window.sessionStorage.setItem(passwordRecoveryStorageKey, "1");
   } catch {
     // The reset form still checks the Supabase session before allowing a password change.
+  }
+}
+
+function hasPasswordRecoveryConfirmation() {
+  try {
+    return window.sessionStorage.getItem(passwordRecoveryStorageKey) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -107,6 +116,22 @@ export default function AuthConfirmPage() {
     let active = true;
     const supabase = createClient();
 
+    const continueWithExistingRecoverySession = async (currentFlow: ConfirmationFlow) => {
+      // A callback may already have completed in this tab, then return here via
+      // browser history or a repeated one-time callback. Only resume when this
+      // tab recorded a successful recovery and Supabase still verifies a user.
+      if (currentFlow !== "recovery" || !hasPasswordRecoveryConfirmation()) return false;
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (!active) return true;
+        if (error || !data.user) return false;
+      } catch {
+        return false;
+      }
+      window.location.replace("/login?mode=reset-password");
+      return true;
+    };
+
     const confirmEmail = async () => {
       const url = new URL(window.location.href);
       const query = url.searchParams;
@@ -145,6 +170,7 @@ export default function AuthConfirmPage() {
         return;
       }
       if (previousResult === "success" || previousResult === "pending" || previousResult === "error") {
+        if (previousResult === "error" && await continueWithExistingRecoverySession(currentFlow)) return;
         setResult(previousResult);
         if (previousResult === "error") {
           setConfirmationIssue(storedConfirmation?.issue ?? "unknown");
@@ -215,12 +241,14 @@ export default function AuthConfirmPage() {
         authError = error;
         confirmedUserResult = data.user;
       } else {
+        if (await continueWithExistingRecoverySession(currentFlow)) return;
         cleanConfirmationUrl(currentFlow, "error");
         if (active) setResult("error");
         return;
       }
 
       if (authError) {
+        if (await continueWithExistingRecoverySession(currentFlow)) return;
         const issue = code
           ? "exchange-failed"
           : isExpiredAuthError(authError)
@@ -263,14 +291,15 @@ export default function AuthConfirmPage() {
       }
     };
 
-    void confirmEmail().catch(() => {
+    void confirmEmail().catch(async () => {
       if (!active) return;
-      clearPendingConfirmation();
-      setConfirmationIssue("unknown");
       const url = new URL(window.location.href);
       const currentFlow = isConfirmationFlow(url.searchParams.get("flow"))
         ? url.searchParams.get("flow") as ConfirmationFlow
         : "signup";
+      if (await continueWithExistingRecoverySession(currentFlow)) return;
+      clearPendingConfirmation();
+      setConfirmationIssue("unknown");
       cleanConfirmationUrl(currentFlow, "error", "unknown");
       setFlow(currentFlow);
       setResult("error");
@@ -350,9 +379,20 @@ export default function AuthConfirmPage() {
     : flow === "email-change"
       ? "/profile-settings?tab=profile"
       : confirmedUser ? "/" : "/login";
-  const continueAfterConfirmation = () => {
+  const continueAfterConfirmation = async () => {
     if (result === "checking" || result === "awaiting") return;
     if (flow === "recovery") {
+      if (result === "error" && hasPasswordRecoveryConfirmation()) {
+        try {
+          const { data, error } = await createClient().auth.getUser();
+          if (!error && data.user) {
+            window.location.assign("/login?mode=reset-password");
+            return;
+          }
+        } catch {
+          // If session validation is temporarily unavailable, let the user request a fresh link.
+        }
+      }
       window.location.assign(continueHref);
       return;
     }
