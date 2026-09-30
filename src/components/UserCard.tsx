@@ -29,12 +29,14 @@ interface UserCardProps {
   isFollowed?: boolean;
   /** 是否显示批量操作复选框 */
   selectable?: boolean;
+  /** 隐藏卡片上的关注/取关/回关操作及更多菜单中的同类入口 */
+  hideRelationshipAction?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
   onUpdate: () => void;
 }
 
-export default function UserCard({ user, currentUserId, variant = "relationship", blockedRecordId, isFollowingTab, isFollowed, selectable = false, selected = false, onToggleSelect, onUpdate }: UserCardProps) {
+export default function UserCard({ user, currentUserId, variant = "relationship", blockedRecordId, isFollowingTab, isFollowed, selectable = false, hideRelationshipAction = false, selected = false, onToggleSelect, onUpdate }: UserCardProps) {
   const supabase = createClient();
   const dialog = useAppDialog();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -171,30 +173,34 @@ export default function UserCard({ user, currentUserId, variant = "relationship"
         </div>
       </Link>
       <div className="user-actions" onClick={(event) => event.stopPropagation()}>
-        <button
-          type="button"
-          className={`btn-follow${shouldUnfollow ? " followed" : ""}`}
-          disabled={relationshipActionLoading}
-          aria-busy={relationshipActionLoading}
-          onClick={() => void handleRelationshipAction()}
-        >
-          {btnText}
-        </button>
+        {!hideRelationshipAction && (
+          <button
+            type="button"
+            className={`btn-follow${shouldUnfollow ? " followed" : ""}`}
+            disabled={relationshipActionLoading}
+            aria-busy={relationshipActionLoading}
+            onClick={() => void handleRelationshipAction()}
+          >
+            {btnText}
+          </button>
+        )}
         {variant === "relationship" && (
           <>
             <button className="btn-block" onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); }} title="更多" aria-label="更多">
               <SiteIcon name="fa-ellipsis-vertical" variant="solid" />
             </button>
             <div className={`user-action-popup${moreOpen ? " show" : ""}`} ref={popupRef}>
-              <button
-                type="button"
-                className="user-action-popup-item relationship-action-popup-item"
-                disabled={relationshipActionLoading}
-                aria-busy={relationshipActionLoading}
-                onClick={() => { setMoreOpen(false); void handleRelationshipAction(); }}
-              >
-                <SiteIcon name={shouldUnfollow ? "fa-user-minus" : "fa-user-plus"} variant="outline" hoverVariant="solid" />{btnText}
-              </button>
+              {!hideRelationshipAction && (
+                <button
+                  type="button"
+                  className="user-action-popup-item relationship-action-popup-item"
+                  disabled={relationshipActionLoading}
+                  aria-busy={relationshipActionLoading}
+                  onClick={() => { setMoreOpen(false); void handleRelationshipAction(); }}
+                >
+                  <SiteIcon name={shouldUnfollow ? "fa-user-minus" : "fa-user-plus"} variant="outline" hoverVariant="solid" />{btnText}
+                </button>
+              )}
               <button className="user-action-popup-item" onClick={handleBlock}>
                 <SiteIcon name="fa-action-forbid" variant="outline" hoverVariant="solid" />屏蔽
               </button>

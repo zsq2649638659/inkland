@@ -8849,7 +8849,8 @@ p {
 [data-theme="dark"] #page-search .tags-grid .tag-card,
 [data-theme="dark"] #page-search .user-cards-grid .user-card,
 [data-theme="dark"] #page-search .work-list .work-item,
-[data-theme="dark"] #page-profile .user-card {
+[data-theme="dark"] #page-profile .user-card,
+[data-theme="dark"] #page-user .user-card {
   background: #242424;
 }
 [data-theme="dark"] #page-search .work-item-icon {
@@ -9735,6 +9736,265 @@ p {
   display: block;
 }
 
+#page-user .user-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+  grid-template-rows: auto 1fr;
+  align-items: start;
+  column-gap: var(--main-layout-gap);
+}
+
+#page-user .user-profile-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: var(--sidebar-width);
+}
+
+#page-user .user-profile-sidebar .sidebar-card {
+  margin-bottom: 0;
+  overflow: visible;
+}
+
+#page-user .user-main-content {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+#page-user .user-work-content {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+#page-user .user-profile-sidebar .sidebar-user-name {
+  margin: 0 0 10px;
+}
+
+#page-user .user-profile-sidebar .user-profile-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+#page-user .user-profile-actions > .btn-follow,
+#page-user .user-profile-actions > .user-profile-actions-wrapper {
+  width: 100%;
+  min-width: 0;
+  justify-self: stretch;
+}
+
+#page-user .user-profile-sidebar .user-profile-actions > .btn-follow {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: 1 1 0 !important;
+  box-sizing: border-box !important;
+}
+
+#page-user .user-profile-sidebar .user-profile-actions > .user-profile-actions-wrapper {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+#page-user .user-profile-actions .btn-follow,
+#page-user .user-profile-actions .user-profile-more-button {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font: var(--ink-font-control);
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+  text-decoration: none;
+}
+
+#page-user .user-profile-actions .btn-follow > svg,
+#page-user .user-profile-actions .user-profile-more-button > svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 14px !important;
+}
+
+#page-user .user-profile-actions-wrapper {
+  width: 100%;
+  min-width: 0;
+}
+
+#page-user .user-profile-actions .user-profile-more-button {
+  width: 100% !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 44px !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--color-border);
+  border-radius: 10px !important;
+  color: var(--color-text-muted, #6B6B6B);
+  background: transparent;
+  font-family: var(--font-family);
+  font-size: 13px;
+}
+
+#page-user .user-profile-actions .user-profile-more-button:hover,
+#page-user .user-profile-actions .user-profile-more-button.active {
+  background: var(--color-bg-secondary);
+}
+
+#page-user .user-profile-sidebar .user-profile-actions .btn-follow.btn-follow-outline:not(:hover) {
+  color: var(--color-text-muted, #6B6B6B) !important;
+}
+
+#page-user .user-profile-sidebar .user-profile-actions .btn-follow,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  box-sizing: border-box !important;
+  padding: 0 10px !important;
+  border: 1px solid #d4cec8 !important;
+  border-radius: 10px !important;
+  color: #6b6b6b !important;
+  background: transparent !important;
+  font-family: var(--font-family) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+}
+
+#page-user .user-profile-sidebar .user-profile-actions .btn-follow:hover,
+#page-user .user-profile-sidebar .user-profile-actions .btn-follow:focus-visible,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button:hover,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button:focus-visible,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button.active {
+  border: 1px solid #d4cec8 !important;
+  color: #6b6b6b !important;
+  background: #ede9e5 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+#page-user .user-profile-sidebar .sidebar-user-bio {
+  display: block;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  -webkit-line-clamp: unset;
+}
+
+#page-user .user-profile-sidebar .sidebar-user-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat,
+#page-user .user-profile-sidebar .sidebar-stat-link {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 64px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 12px;
+  color: inherit;
+  background: var(--ink-surface-subtle, #faf9f7);
+  text-align: center;
+  text-decoration: none;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat-value {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+#page-user .user-profile-sidebar .sidebar-stat-link:hover .sidebar-stat-value {
+  color: var(--color-primary-hover);
+}
+
+#page-user .user-profile-sidebar-details,
+#page-user .user-profile-sidebar-tags {
+  position: relative;
+  padding: 16px 20px 20px;
+  border-top: 0;
+}
+
+#page-user .user-profile-sidebar-details h2,
+#page-user .user-profile-sidebar-tags h2 {
+  margin: 0 0 12px;
+  color: var(--color-text, #1A1A1A);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#page-user .user-profile-sidebar-details dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+#page-user .user-profile-sidebar-details dl > div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+#page-user .user-profile-sidebar-details dt {
+  color: var(--color-text-muted, #6B6B6B);
+  font-size: 12px;
+}
+
+#page-user .user-profile-sidebar-details dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text, #1A1A1A);
+  font-size: 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+#page-user .user-profile-sidebar-tags > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ink-gap-compact-xs);
+}
+
+#page-user .user-profile-sidebar-tags .site-card__tag {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 #page-user .profile-identity {
   display: flex;
   min-width: 0;
@@ -9823,6 +10083,12 @@ p {
 #page-user .btn-more.active {
   background: var(--color-bg-secondary);
   color: var(--color-text-muted);
+}
+
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button--following,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button--following:hover,
+#page-user .user-profile-sidebar .user-profile-actions .user-profile-more-button--following.active {
+  color: var(--color-text-muted, #6B6B6B) !important;
 }
 
 #page-user .profile-actions-wrapper {
@@ -9962,9 +10228,58 @@ p {
 #page-user .filter-system-field .select-option[aria-selected="true"] { color: var(--ink-primary); background: var(--ink-primary-bg); }
 
 /* User page responsive */
+@media (max-width: 1024px) {
+  #page-user .user-profile-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    row-gap: 16px;
+  }
+  #page-user .user-profile-sidebar,
+  #page-user .user-main-content,
+  #page-user .user-work-content {
+    grid-column: 1;
+  }
+  #page-user .user-profile-sidebar {
+    display: block;
+    position: static;
+    grid-row: 1;
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    z-index: auto;
+  }
+  #page-user .user-profile-sidebar .sidebar-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+    align-items: start;
+  }
+  #page-user .user-profile-sidebar .sidebar-user {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  #page-user .user-profile-sidebar-details { grid-column: 2; grid-row: 1; }
+  #page-user .user-profile-sidebar-tags { grid-column: 2; grid-row: 2; }
+  #page-user .user-main-content { grid-row: 2; }
+  #page-user .user-work-content { grid-row: 3; }
+}
+
 @media (max-width: 768px) {
   #page-user .main-container {
     padding: 16px 16px 40px;
+  }
+  #page-user .user-profile-sidebar .sidebar-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #page-user .user-profile-sidebar .sidebar-user,
+  #page-user .user-profile-sidebar-details,
+  #page-user .user-profile-sidebar-tags {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  #page-user .user-profile-sidebar .sidebar-user {
+    border-bottom: 0;
   }
   #page-user .user-public-tabs .tabs-inner {
     gap: var(--ink-gap-4);
@@ -9976,46 +10291,17 @@ p {
     padding: 8px 0;
     text-align: center;
   }
-  #page-user .profile-section {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 16px;
-    padding: 24px;
-  }
-  #page-user .profile-identity {
-    min-width: 0;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  #page-user .profile-avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
-  }
-  #page-user .profile-info {
-    min-width: 0;
-    gap: 6px;
-  }
-  #page-user .profile-name {
-    font-size: 18px;
-  }
-  #page-user .profile-bio {
-    display: block;
-    overflow: visible;
-    -webkit-line-clamp: unset;
-  }
-  #page-user .profile-actions {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: start;
-    justify-content: flex-end;
-  }
   #page-user .type-filters-row {
     flex-direction: column;
     align-items: flex-start;
   }
-  #page-user .filter-system-composition-row { display: none; }
+  #page-user .filter-system-composition-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-bottom: var(--ink-space-2);
+  }
+  #page-user .filter-system-composition-row > :not(.filter-system-field--query) { display: none; }
   #page-user .profile-mobile-filter-bar { display: flex; width: 100%; gap: var(--ink-gap-compact); margin-bottom: var(--ink-space-3); }
   #page-user .profile-mobile-filter-button { min-height: var(--ink-height-control-md); border: var(--ink-border-none); border-radius: var(--ink-radius-sm); color: var(--ink-text-secondary); background: var(--ink-surface); cursor: pointer; }
   #page-user .profile-mobile-filter-button.profile-mobile-icon-button { display: inline-flex; width: 0; height: var(--ink-height-control-md); min-width: 0; flex: 1 1 0; align-items: center; justify-content: center; gap: var(--ink-space-2); padding: 0 var(--ink-space-3); }
@@ -10029,72 +10315,6 @@ p {
   #page-user .profile-filter-control { padding-inline: var(--ink-button-medium-padding-horizontal); }
   #page-user .profile-filter-drawer-actions { width: 100%; gap: var(--ink-space-2); }
   #page-user .profile-filter-drawer-actions button { width: 50%; flex: 1 1 50%; }
-}
-
-@media (max-width: 600px) {
-  #page-user .profile-identity { flex-wrap: wrap; }
-  #page-user .profile-info {
-    width: 100%;
-    flex: 0 0 100%;
-  }
-  #page-user .profile-avatar {
-    width: 48px;
-    height: 48px;
-    font-size: 24px;
-  }
-  #page-user .profile-name { overflow-wrap: anywhere; }
-}
-
-@media (max-width: 360px) {
-  #page-user .profile-section {
-    display: flex;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: var(--ink-space-4);
-    padding: var(--ink-space-4);
-  }
-  #page-user .profile-identity {
-    width: 100%;
-    align-items: flex-start;
-    gap: var(--ink-space-3);
-  }
-  #page-user .profile-actions {
-    width: 100%;
-    grid-column: auto;
-    grid-row: auto;
-    justify-content: flex-start;
-    margin-bottom: 0;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "avatar actions" "info info";
-    align-items: center;
-    column-gap: var(--ink-space-3);
-    row-gap: var(--ink-space-4);
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-identity {
-    display: contents;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-avatar {
-    grid-area: avatar;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-info {
-    grid-area: info;
-    width: 100%;
-    min-width: 0;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-follow, .profile-actions > .btn-edit-profile) .profile-actions {
-    grid-area: actions;
-    width: auto;
-    min-width: 0;
-    justify-self: end;
-    align-self: center;
-    justify-content: flex-end;
-  }
-  #page-user .profile-section:has(.profile-actions > .btn-edit-profile) .btn-edit-profile {
-    width: auto;
-  }
 }
 
 /* ===== User Profile - Card Grid (shared by #page-user and #page-profile) ===== */
@@ -11275,34 +11495,35 @@ p {
 #page-profile .user-card.selected { box-shadow:0 0 0 var(--ink-button-border-width) var(--ink-button-primary-border),var(--shadow-hover); }
 #page-profile .user-card-check { flex:0 0 20px; }
 #page-profile .relationship-filter-empty { min-height:220px; }
-#page-profile .user-cards-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--spacing-md);padding-bottom:var(--spacing-xl) }
-:is(#page-profile, #page-settings) .user-card { display:flex;align-items:center;gap:8px;padding:16px 8px;background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
-:is(#page-profile, #page-settings) .user-card .user-avatar { width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:600;position:relative;overflow:hidden }
-:is(#page-profile, #page-settings) .user-card .user-avatar img { width:100%;height:100%;object-fit:cover;border-radius:50% }
-:is(#page-profile, #page-settings) .user-card .user-info { flex:1;min-width:0 }
-:is(#page-profile, #page-settings) .user-card .user-name { font-size:15px;font-weight:600;letter-spacing:-0.02em;margin-bottom:2px;line-height:1.3;color:var(--color-text) }
-:is(#page-profile, #page-settings) .user-card .user-bio { font-size:13px;color:var(--color-text-muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.01em }
-:is(#page-profile, #page-settings) .user-card .user-actions { display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0 }
-:is(#page-profile, #page-settings) .user-card .btn-follow { width:80px;max-width:80px;min-width:0;box-sizing:border-box;min-height:var(--ink-button-small-height);padding:0 var(--ink-button-small-padding-horizontal);border:var(--ink-button-border-width) solid var(--ink-button-default-border);border-radius:var(--ink-button-border-radius);font:var(--ink-button-small-font);cursor:pointer;transition:color var(--ink-motion-base) var(--ink-ease-standard),background var(--ink-motion-base) var(--ink-ease-standard),border-color var(--ink-motion-base) var(--ink-ease-standard),transform var(--ink-motion-base) var(--ink-ease-standard);letter-spacing:normal;white-space:nowrap;color:var(--ink-button-default-color);background:var(--ink-surface);text-align:center }
-:is(#page-profile, #page-settings) .user-card .btn-follow:hover,
-:is(#page-profile, #page-settings) .user-card .btn-follow:focus-visible { color:var(--ink-button-default-color);background:var(--ink-button-default-bg);border-color:var(--ink-color-border-strong);transform:translateY(-1px);box-shadow:var(--ink-shadow-none);outline:var(--ink-outline-focus);outline-offset:var(--ink-outline-offset-focus) }
-:is(#page-profile, #page-settings) .user-card .btn-follow.followed { color:var(--ink-button-default-color);background:var(--ink-surface);border-color:var(--ink-button-default-border) }
-:is(#page-profile, #page-settings) .user-card:hover { box-shadow:var(--shadow-hover);transform:translateY(-2px) }
-:is(#page-profile, #page-settings) .user-card.show-popup { z-index:10 }
-:is(#page-profile, #page-settings) .user-card .btn-block { padding:6px;border:none;background:transparent;color:var(--color-text-light);font-size:15px;cursor:pointer;border-radius:var(--radius-md);transition:all .2s ease;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative }
-:is(#page-profile, #page-settings) .user-card .btn-block:hover { color:var(--color-text-muted);background:rgba(0,0,0,0.04) }
-:is(#page-profile, #page-settings) .user-card .user-action-popup { position:absolute;right:0;top:100%;margin-top:4px;z-index:50;background:var(--color-card);border-radius:var(--radius-md);box-shadow:0 4px 20px rgba(0,0,0,0.12);min-width:140px;overflow:visible;display:none }
-:is(#page-profile, #page-settings) .user-card .user-action-popup.show { display:block }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item { display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--color-text-muted);cursor:pointer;transition:all .15s ease;border:none;background:none;font-family:var(--font-family);width:100%;text-align:left }
-:is(#page-profile, #page-settings) .user-card .relationship-action-popup-item { display:none; }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item svg { width:16px;height:16px;flex-shrink:0 }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item:hover { background:var(--color-bg-secondary);color:var(--color-text) }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item.danger { color:var(--color-primary) }
-:is(#page-profile, #page-settings) .user-card .user-action-popup-item.danger:hover { background:var(--color-primary-light);color:var(--color-primary-hover) }
-:is(#page-profile, #page-settings) .user-card .btn-follow:disabled { cursor:not-allowed;opacity:var(--ink-opacity-disabled);transform:none; }
-:is(#page-settings, #page-profile) .user-card--blocked .btn-follow { width:auto;max-width:none;min-width:80px; }
+#page-profile .user-cards-grid,
+#page-user .user-cards-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--spacing-md);padding-bottom:var(--spacing-xl) }
+:is(#page-profile, #page-settings, #page-user) .user-card { display:flex;align-items:center;gap:8px;padding:16px 8px;background:var(--color-card);border-radius:var(--radius-lg);transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-avatar { width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:600;position:relative;overflow:hidden }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-avatar img { width:100%;height:100%;object-fit:cover;border-radius:50% }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-info { flex:1;min-width:0 }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-name { font-size:15px;font-weight:600;letter-spacing:-0.02em;margin-bottom:2px;line-height:1.3;color:var(--color-text) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-bio { font-size:13px;color:var(--color-text-muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.01em }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-actions { display:flex;align-items:center;gap:var(--spacing-sm);flex-shrink:0 }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow { width:80px;max-width:80px;min-width:0;box-sizing:border-box;min-height:var(--ink-button-small-height);padding:0 var(--ink-button-small-padding-horizontal);border:var(--ink-button-border-width) solid var(--ink-button-default-border);border-radius:var(--ink-button-border-radius);font:var(--ink-button-small-font);cursor:pointer;transition:color var(--ink-motion-base) var(--ink-ease-standard),background var(--ink-motion-base) var(--ink-ease-standard),border-color var(--ink-motion-base) var(--ink-ease-standard),transform var(--ink-motion-base) var(--ink-ease-standard);letter-spacing:normal;white-space:nowrap;color:var(--ink-button-default-color);background:var(--ink-surface);text-align:center }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow:hover,
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow:focus-visible { color:var(--ink-button-default-color);background:var(--ink-button-default-bg);border-color:var(--ink-color-border-strong);transform:translateY(-1px);box-shadow:var(--ink-shadow-none);outline:var(--ink-outline-focus);outline-offset:var(--ink-outline-offset-focus) }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow.followed { color:var(--ink-button-default-color);background:var(--ink-surface);border-color:var(--ink-button-default-border) }
+:is(#page-profile, #page-settings, #page-user) .user-card:hover { box-shadow:var(--shadow-hover);transform:translateY(-2px) }
+:is(#page-profile, #page-settings, #page-user) .user-card.show-popup { z-index:10 }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-block { padding:6px;border:none;background:transparent;color:var(--color-text-light);font-size:15px;cursor:pointer;border-radius:var(--radius-md);transition:all .2s ease;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-block:hover { color:var(--color-text-muted);background:rgba(0,0,0,0.04) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup { position:absolute;right:0;top:100%;margin-top:4px;z-index:50;background:var(--color-card);border-radius:var(--radius-md);box-shadow:0 4px 20px rgba(0,0,0,0.12);min-width:140px;overflow:visible;display:none }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup.show { display:block }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item { display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--color-text-muted);cursor:pointer;transition:all .15s ease;border:none;background:none;font-family:var(--font-family);width:100%;text-align:left }
+:is(#page-profile, #page-settings, #page-user) .user-card .relationship-action-popup-item { display:none; }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item svg { width:16px;height:16px;flex-shrink:0 }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item:hover { background:var(--color-bg-secondary);color:var(--color-text) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item.danger { color:var(--color-primary) }
+:is(#page-profile, #page-settings, #page-user) .user-card .user-action-popup-item.danger:hover { background:var(--color-primary-light);color:var(--color-primary-hover) }
+:is(#page-profile, #page-settings, #page-user) .user-card .btn-follow:disabled { cursor:not-allowed;opacity:var(--ink-opacity-disabled);transform:none; }
+:is(#page-settings, #page-profile, #page-user) .user-card--blocked .btn-follow { width:auto;max-width:none;min-width:80px; }
 @media (min-width: 768px) {
-  #page-profile .user-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  :is(#page-profile, #page-user) .user-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 768px) {
   #page-profile .section-header { flex-direction:column;align-items:flex-start }
@@ -11314,7 +11535,7 @@ p {
 }
 
 @media (max-width: 767px) {
-  #page-profile .user-cards-grid { grid-template-columns:1fr; }
+  :is(#page-profile, #page-user) .user-cards-grid { grid-template-columns:1fr; }
 }
 
 /* Keep the search and single batch entry on one row at every supported width.
@@ -11336,9 +11557,9 @@ p {
 /* At the narrowest width, keep the identity block and the overflow action on
    one row; the relationship action itself remains available in the menu. */
 @media (max-width: 360px) {
-  #page-profile .user-card { flex-wrap:nowrap; }
-  #page-profile .user-card > .no-underline { min-width:0; }
-  #page-profile .user-card .user-actions { flex:0 0 auto;width:auto;justify-content:flex-end; }
+  :is(#page-profile, #page-user) .user-card { flex-wrap:nowrap; }
+  :is(#page-profile, #page-user) .user-card > .no-underline { min-width:0; }
+  :is(#page-profile, #page-user) .user-card .user-actions { flex:0 0 auto;width:auto;justify-content:flex-end; }
   #page-profile .user-card:not(.user-card--blocked) .btn-follow { display:none !important; }
   #page-profile .user-card .relationship-action-popup-item { display:flex; }
   #page-settings .user-card--blocked .btn-follow { display:flex !important; }
