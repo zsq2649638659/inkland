@@ -522,7 +522,7 @@
 
 #page-home .tabs-wrapper--home {
   position: sticky;
-  top: var(--navbar-height);
+  top: calc(var(--navbar-height) + var(--spacing-md));
   z-index: 100;
   width: 100%;
   box-sizing: border-box;
@@ -626,6 +626,14 @@
     width: 100%;
   }
 
+}
+
+/* On phones the sidebar is hidden, so keep the tab shell at the navbar edge
+   and preserve the existing compact vertical inset inside the shell. */
+@media (max-width: 700px) {
+  #page-home .tabs-wrapper--home {
+    top: var(--navbar-height);
+  }
 }
 
 /* 标签详情页：与阅读历史共用 site-card 结构，筛选器在所有断点都保持选择器形态。 */
