@@ -820,6 +820,18 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
   const [editPostId, setEditPostId] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<"public" | "followers_only" | "private">("public");
 
+  const updatePostTags = (nextTags: string[]) => {
+    setTags(nextTags);
+    if (nextTags.length > 0) {
+      setErrorMsg((current) => current === "请至少添加一个标签" ? "" : current);
+    }
+  };
+
+  const addSuggestedPostTag = (tag: string) => {
+    setTags((current) => current.includes(tag) ? current : [...current, tag]);
+    setErrorMsg((current) => current === "请至少添加一个标签" ? "" : current);
+  };
+
   useEffect(() => {
     if (!successMsg || successAction !== "publish") return;
     const redirectTimer = window.setTimeout(() => {
@@ -1742,10 +1754,10 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
                 inputId="articleTagInput"
                 tags={tags}
                 inputValue={tagInput}
-                onChange={setTags}
+                onChange={updatePostTags}
                 onInputValueChange={setTagInput}
                 suggestedTags={recommendedTags}
-                onSelectSuggestedTag={(tag) => setTags((current) => current.includes(tag) ? current : [...current, tag])}
+                onSelectSuggestedTag={addSuggestedPostTag}
               />
             </div>
 
@@ -1918,10 +1930,10 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
                 label="标签"
                 tags={tags}
                 inputValue={tagInput}
-                onChange={setTags}
+                onChange={updatePostTags}
                 onInputValueChange={setTagInput}
                 suggestedTags={recommendedTags}
-                onSelectSuggestedTag={(tag) => setTags((current) => current.includes(tag) ? current : [...current, tag])}
+                onSelectSuggestedTag={addSuggestedPostTag}
               />
             </div>
 
