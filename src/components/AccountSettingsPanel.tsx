@@ -19,12 +19,7 @@ import {
 import { copyrightPolicyMap, copyrightPolicyOptions } from "@/lib/copyrightPolicy";
 import { readInterestPreferences } from "@/lib/interestPreferences";
 import { getOrCreateClientCache, invalidateClientCache } from "@/lib/client-cache";
-
-type AccountActivity = {
-  publishedDays: number;
-  readingDays: number;
-  engagementDays: number;
-};
+import { DAILY_REWARDS_CHANGED_EVENT } from "@/lib/dailyRewards";
 
 type SidebarStats = {
   following: number | null;
@@ -33,11 +28,7 @@ type SidebarStats = {
 };
 
 const emptySidebarStats: SidebarStats = { following: null, followers: null, works: null };
-const fallbackActivity: AccountActivity = {
-  publishedDays: 0,
-  readingDays: 0,
-  engagementDays: 0,
-};
+type RewardData = { coinBalance: number; experiencePoints: number };
 
 const levelBands = [
   { number: 1, start: 0, end: 100 },
@@ -48,39 +39,16 @@ const levelBands = [
   { number: 6, start: 20000, end: 100000 },
 ] as const;
 
-function deriveExperience(activity: AccountActivity) {
-  // 目前数据库还没有经验流水表，先按现有可核实记录折算历史经验：
-  // 发布、阅读、收藏/关注都按活跃日计分，同一天的多次行为只计一次；当前登录计 2 经验。
-  const activityExperience = activity.publishedDays * 10 + activity.readingDays * 2 + activity.engagementDays * 2;
-  const total = Math.max(2, activityExperience + 2);
+function deriveExperience(total: number) {
   const band = levelBands.find(({ end }) => total < end) || levelBands[levelBands.length - 1];
   const current = Math.min(Math.max(0, total - band.start), band.end - band.start);
   return { total, current, next: band.end - band.start, number: band.number, start: band.start, end: band.end };
 }
 
-function calendarDay(value: string | null | undefined) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map(({ type, value: partValue }) => [type, partValue]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function countActivityDays(values: Array<string | null | undefined>) {
-  return new Set(values.map(calendarDay).filter((value): value is string => Boolean(value))).size;
-}
-
-const coinBalance = 0;
 const dailyRewardTasks = [
-  ["每日登录", "+1"],
-  ["每日阅读一篇作品", "+1"],
-  ["每日收藏一篇作品", "+1"],
+  { type: "daily_login", label: "每日登录", reward: "+1" },
+  { type: "daily_read", label: "每日阅读一篇作品", reward: "+1" },
+  { type: "daily_bookmark", label: "每日收藏一篇作品", reward: "+1" },
 ] as const;
 
 function formatBirthDate(value: string | null) {
@@ -101,10 +69,11 @@ export default function AccountSettingsPanel() {
   const [copyrightMessageKind, setCopyrightMessageKind] = useState<"success" | "error" | "">("");
   const [copyrightOpen, setCopyrightOpen] = useState(false);
   const copyrightMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [activityResult, setActivityResult] = useState<{ userId: string; activity: AccountActivity } | null>(null);
+  const [rewardResult, setRewardResult] = useState<{ userId: string; data: RewardData | null; error: boolean } | null>(null);
   const [sidebarStatsResult, setSidebarStatsResult] = useState<{ userId: string; stats: SidebarStats } | null>(null);
   const copyrightSelectRef = useRef<HTMLDivElement>(null);
-  const activity = user && activityResult?.userId === user.id ? activityResult.activity : null;
+  const rewards = user && rewardResult?.userId === user.id ? rewardResult.data : null;
+  const rewardsError = Boolean(user && rewardResult?.userId === user.id && rewardResult.error);
   const sidebarStats = user && sidebarStatsResult?.userId === user.id ? sidebarStatsResult.stats : emptySidebarStats;
   const preferencesLoading = Boolean(user && preferencesLoad?.userId !== user.id);
   const preferencesError = Boolean(user && preferencesLoad?.userId === user.id && preferencesLoad.error);
@@ -169,34 +138,36 @@ export default function AccountSettingsPanel() {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    void (async () => {
-      const [{ data: publishedPosts }, { data: followingRows }, { data: bookmarkRows }, { data: readingRows }] = await Promise.all([
-        supabase
-          .from("posts")
-          .select("created_at, published_at, review_status")
-          .eq("user_id", user.id)
-          .eq("status", "published"),
-        supabase.from("follows").select("created_at").eq("follower_id", user.id),
-        supabase.from("bookmarks").select("created_at").eq("user_id", user.id),
-        supabase.from("reading_history").select("last_read_at").eq("user_id", user.id),
-      ]);
+    const loadRewards = async () => {
+      const summaryResult = await supabase.rpc("get_my_reward_summary");
       if (!active) return;
-      const publishRows = (publishedPosts || []) as Array<{ created_at?: string | null; published_at?: string | null; review_status?: string | null }>;
-      const followingDates = ((followingRows || []) as Array<{ created_at?: string | null }>).map((row) => row.created_at);
-      const bookmarkDates = ((bookmarkRows || []) as Array<{ created_at?: string | null }>).map((row) => row.created_at);
-      const readingDates = ((readingRows || []) as Array<{ last_read_at?: string | null }>).map((row) => row.last_read_at);
-      setActivityResult({
-        userId: user.id,
-        activity: {
-          publishedDays: countActivityDays(publishRows
-            .filter((row) => row.review_status !== "rejected")
-            .map((row) => row.published_at || row.created_at)),
-          readingDays: countActivityDays(readingDates),
-          engagementDays: countActivityDays([...followingDates, ...bookmarkDates]),
-        },
-      });
-    })();
-    return () => { active = false; };
+      if (summaryResult.error) {
+        setRewardResult({ userId: user.id, data: null, error: true });
+        return;
+      }
+      const summaryRow = (Array.isArray(summaryResult.data) ? summaryResult.data[0] : summaryResult.data) as
+        { coin_balance?: number | string; experience_points?: number | string } | null;
+      const coinBalance = Number(summaryRow?.coin_balance ?? 0);
+      const experiencePoints = Number(summaryRow?.experience_points ?? 0);
+      if (!Number.isFinite(coinBalance) || !Number.isFinite(experiencePoints)) {
+        setRewardResult({ userId: user.id, data: null, error: true });
+        return;
+      }
+      setRewardResult({ userId: user.id, data: { coinBalance, experiencePoints }, error: false });
+    };
+    const refreshWhenVisible = () => {
+      if (!document.hidden) void loadRewards();
+    };
+    void loadRewards();
+    window.addEventListener(DAILY_REWARDS_CHANGED_EVENT, loadRewards);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.removeEventListener(DAILY_REWARDS_CHANGED_EVENT, loadRewards);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [supabase, user]);
 
   useEffect(() => {
@@ -224,8 +195,8 @@ export default function AccountSettingsPanel() {
   const displayBio = profile?.bio || "";
   const avatarUrl = profile?.avatar_url || "";
   const selectedCopyright = copyrightPolicyMap[copyrightLicense] || copyrightPolicyOptions[0];
-  const experience = deriveExperience(activity || fallbackActivity);
-  const experienceProgress = activity ? Math.min(100, Math.round((experience.current / Math.max(1, experience.next)) * 100)) : 0;
+  const experience = deriveExperience(rewards?.experiencePoints ?? 0);
+  const experienceProgress = rewards ? Math.min(100, Math.round((experience.current / Math.max(1, experience.next)) * 100)) : 0;
 
   function clearCopyrightMessageTimer() {
     if (copyrightMessageTimerRef.current) {
@@ -299,20 +270,20 @@ export default function AccountSettingsPanel() {
         <hr className="account-settings-divider" />
 
         <div className="account-settings-profile-metrics" aria-label="墨滴与等级">
-          <div className="account-settings-profile-metric" role="group" aria-label={`墨滴 ${coinBalance}`}>
+          <div className="account-settings-profile-metric" role="group" aria-label={`墨滴 ${rewards ? rewards.coinBalance : "暂不可用"}`}>
             <span className="account-settings-coin-logo" aria-hidden="true"><SiteIcon name="fa-droplet" variant="solid" /></span>
-            <span className="account-settings-profile-metric-copy"><span>墨滴</span><strong>{coinBalance}</strong></span>
+            <span className="account-settings-profile-metric-copy"><span>墨滴</span><strong>{rewards ? rewards.coinBalance.toLocaleString("zh-CN") : rewardsError ? "暂不可用" : "汇总中"}</strong></span>
           </div>
-          <div className="account-settings-profile-metric" role="group" aria-label={`等级 ${activity ? `LV.${experience.number}` : "汇总中"}`}>
+          <div className="account-settings-profile-metric" role="group" aria-label={`等级 ${rewards ? `LV.${experience.number}` : rewardsError ? "暂不可用" : "汇总中"}`}>
             <span className="account-settings-level-logo" aria-hidden="true"><Image src="/icons/level.svg" alt="" width={15} height={15} unoptimized /></span>
-            <span className="account-settings-profile-metric-copy"><span>等级</span><strong>{activity ? `LV.${experience.number}` : "汇总中"}</strong></span>
+            <span className="account-settings-profile-metric-copy"><span>等级</span><strong>{rewards ? `LV.${experience.number}` : rewardsError ? "暂不可用" : "汇总中"}</strong></span>
           </div>
         </div>
 
         <section className="account-settings-experience" aria-label="个人经验进度">
           <div className="account-settings-experience-heading">
             <strong>经验进度</strong>
-            <span>{activity ? `${experience.current}/${experience.next}` : "—/—"}</span>
+            <span>{rewards ? `${experience.current}/${experience.next}` : rewardsError ? "—/—" : "汇总中"}</span>
           </div>
           <div className="account-settings-experience-track-row">
             <div
@@ -321,7 +292,7 @@ export default function AccountSettingsPanel() {
               aria-label="当前等级经验进度"
               aria-valuemin={0}
               aria-valuemax={experience.next}
-              aria-valuenow={activity ? experience.current : 0}
+              aria-valuenow={rewards ? experience.current : 0}
             >
               <span style={{ width: `${experienceProgress}%` }} />
             </div>
@@ -331,14 +302,22 @@ export default function AccountSettingsPanel() {
         <section className="account-settings-rule-group account-settings-coin-rule-group" aria-labelledby="account-coin-rules-title">
           <h4 className="account-settings-rule-title" id="account-coin-rules-title">墨滴如何获得</h4>
           <ul className="account-settings-coin-task-list">
-            {dailyRewardTasks.map(([label, reward]) => <li key={label}><b>{reward}</b><span>{label}</span></li>)}
+            {dailyRewardTasks.map(({ type, label, reward }) => (
+              <li key={type}>
+                <b>{reward}</b><span>{label}</span>
+              </li>
+            ))}
           </ul>
         </section>
 
         <section className="account-settings-rule-group account-settings-experience-rule-group" aria-labelledby="account-experience-rules-title">
           <h4 className="account-settings-rule-title" id="account-experience-rules-title">经验如何获得</h4>
           <ul className="account-settings-experience-rule-list">
-            {dailyRewardTasks.map(([label, reward]) => <li key={label}><b>{reward}</b><span>{label}</span></li>)}
+            {dailyRewardTasks.map(({ type, label, reward }) => (
+              <li key={type}>
+                <b>{reward}</b><span>{label}</span>
+              </li>
+            ))}
           </ul>
         </section>
 

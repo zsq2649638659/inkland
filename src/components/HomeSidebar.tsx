@@ -11,48 +11,13 @@ import { useAuth } from "@/components/AuthProvider";
 import { formatNotificationCount } from "@/lib/notifications";
 import { fetchVisibleUnreadNotificationCount, notificationPreferencesCacheKey, readNotificationPreferences } from "@/lib/notificationPreferences";
 import { includeTestDataForProfile, withTestDataVisibility } from "@/lib/test-data-visibility";
-import DefaultAvatar from "@/components/DefaultAvatar";
 import { getOrCreateClientCache, invalidateClientCache, readClientCache } from "@/lib/client-cache";
-
-type SidebarStats = {
-  following: number | null;
-  followers: number | null;
-  works: number | null;
-};
-
-const emptyStats: SidebarStats = { following: null, followers: null, works: null };
-const statsCache = new Map<string, SidebarStats>();
-
-function getCachedStats(userId: string): SidebarStats {
-  const memoryStats = statsCache.get(userId);
-  if (memoryStats) return memoryStats;
-  try {
-    const stored = sessionStorage.getItem(`inkland-sidebar-stats:${userId}`);
-    if (stored) {
-      const parsed = JSON.parse(stored) as Partial<SidebarStats>;
-      if (typeof parsed.following === "number" && typeof parsed.followers === "number" && typeof parsed.works === "number") {
-        const cached = parsed as SidebarStats;
-        statsCache.set(userId, cached);
-        return cached;
-      }
-    }
-  } catch { /* ignore unavailable session storage */ }
-  return emptyStats;
-}
-
-function saveCachedStats(userId: string, stats: SidebarStats) {
-  statsCache.set(userId, stats);
-  try {
-    sessionStorage.setItem(`inkland-sidebar-stats:${userId}`, JSON.stringify(stats));
-  } catch { /* ignore unavailable session storage */ }
-}
 
 function HomeSidebarContent() {
   const supabase = useMemo(() => createClient(), []);
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [userStats, setUserStats] = useState<SidebarStats>(() => user ? getCachedStats(user.id) : emptyStats);
   const [notificationCount, setNotificationCount] = useState(0);
   const [newWorksCount, setNewWorksCount] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -61,47 +26,9 @@ function HomeSidebarContent() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  const displayName = profile?.nickname || user?.email?.split("@")[0] || "用户";
-  const avatarChar = displayName[0] || "?";
-  const bio = profile?.bio || "这个人很懒，什么都没写";
-
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-    const cachedStats = getCachedStats(user.id);
-    setUserStats(cachedStats);
-    const loadStats = async () => {
-      const nextStats = await getOrCreateClientCache(`sidebar-stats:${user.id}`, async () => {
-        const [{ count: followingCount }, { count: followersCount }, { data: publishedPosts }, { data: series }] = await Promise.all([
-          supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id),
-          supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
-          supabase.from("posts").select("id, review_status").eq("user_id", user.id).eq("status", "published").neq("post_type", "serial").neq("review_status", "rejected"),
-          supabase.from("series").select("name").eq("user_id", user.id),
-        ]);
-
-        const seriesCount = new Set(((series || []) as Array<{ name?: string | null }>).map((item) => item.name).filter(Boolean)).size;
-        return {
-          following: followingCount || 0,
-          followers: followersCount || 0,
-          works: (publishedPosts || []).length + seriesCount,
-        };
-      }, { ttlMs: 30_000, persist: true });
-      setUserStats(nextStats);
-      saveCachedStats(user.id, nextStats);
-    };
-    loadStats();
-    const handleStatsChanged = () => {
-      invalidateClientCache(`sidebar-stats:${user.id}`);
-      loadStats();
-    };
-    window.addEventListener("inkland:stats-changed", handleStatsChanged);
-    return () => window.removeEventListener("inkland:stats-changed", handleStatsChanged);
-  }, [user, supabase]);
 
   useEffect(() => {
     if (!user) return;
@@ -198,23 +125,6 @@ function HomeSidebarContent() {
     return (
       <aside className="sidebar" aria-label="侧边导航加载中" aria-busy="true">
         <div className="sidebar-card">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">
-              <SiteIcon name="fa-user" variant="solid" className="text-white/60" />
-            </div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-skeleton-line sidebar-skeleton-name" aria-hidden="true" />
-              <div className="sidebar-skeleton-line sidebar-skeleton-bio" aria-hidden="true" />
-              <div className="sidebar-user-stats">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="sidebar-stat">
-                    <div className="sidebar-skeleton-line sidebar-skeleton-stat" aria-hidden="true" />
-                    <div className="sidebar-skeleton-line sidebar-skeleton-stat-label" aria-hidden="true" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
           {loadingMenuItems.map((item) => (
             <Link key={item.page} href={item.href} title={item.label} className={`sidebar-menu-item ${isActive(item.page) ? "active" : ""}`}>
               <span className="sidebar-menu-icon"><InklandIcon name={item.icon} variant={isActive(item.page) ? "solid" : "outline"} aria-hidden="true" /></span>
@@ -239,19 +149,6 @@ function HomeSidebarContent() {
     return (
       <aside className="sidebar">
         <div className="sidebar-card">
-          <div className="sidebar-user sidebar-user-unauth">
-            <div className="sidebar-user-avatar">
-              <SiteIcon name="fa-user" variant="solid" />
-            </div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">欢迎来到 inkland</div>
-              <div className="sidebar-user-bio">登录后即可发布作品、收藏喜欢的内容，加入创作社区</div>
-              <div className="sidebar-user-stats">
-                <Link href="/login" className="sidebar-login-btn">登录</Link>
-                <Link href="/login" className="sidebar-register-btn">还没有账号？立即注册 →</Link>
-              </div>
-            </div>
-          </div>
           {menuItems.map((item) => (
             <Link
               key={item.page}
@@ -310,39 +207,6 @@ function HomeSidebarContent() {
     <>
       <aside className="sidebar">
       <div className="sidebar-card">
-        {/* User info */}
-        <div className="sidebar-user">
-        <Link href="/profile" className="no-underline">
-          <div className="sidebar-user-avatar">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" />
-            ) : (
-              <DefaultAvatar name={avatarChar} style={{ width:"100%", height:"100%", borderRadius:"inherit" }} />
-            )}
-          </div>
-        </Link>
-        <div className="sidebar-user-info">
-          <Link href="/profile" className="no-underline">
-            <div className="sidebar-user-name">{displayName}</div>
-          </Link>
-          <div className="sidebar-user-bio">{bio}</div>
-          <div className="sidebar-user-stats">
-            <Link href="/relationships" className="sidebar-stat sidebar-stat-link" aria-label="查看我的关注">
-              <div className="sidebar-stat-value">{userStats.following ?? "—"}</div>
-              <div className="sidebar-stat-label">关注</div>
-            </Link>
-            <Link href="/relationships/followers" className="sidebar-stat sidebar-stat-link" aria-label="查看我的粉丝">
-              <div className="sidebar-stat-value">{userStats.followers ?? "—"}</div>
-              <div className="sidebar-stat-label">粉丝</div>
-            </Link>
-            <Link href="/profile" className="sidebar-stat sidebar-stat-link" aria-label="查看我的作品">
-              <div className="sidebar-stat-value">{userStats.works ?? "—"}</div>
-              <div className="sidebar-stat-label">作品</div>
-            </Link>
-          </div>
-        </div>
-      </div>
-
       {/* Menu items */}
       {menuItems.map((item) => (
         <Link

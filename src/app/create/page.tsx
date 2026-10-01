@@ -820,6 +820,18 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
   const [editPostId, setEditPostId] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<"public" | "followers_only" | "private">("public");
 
+  const updatePostTags = (nextTags: string[]) => {
+    setTags(nextTags);
+    if (nextTags.length > 0) {
+      setErrorMsg((current) => current === "请至少添加一个标签" ? "" : current);
+    }
+  };
+
+  const addSuggestedPostTag = (tag: string) => {
+    setTags((current) => current.includes(tag) ? current : [...current, tag]);
+    setErrorMsg((current) => current === "请至少添加一个标签" ? "" : current);
+  };
+
   useEffect(() => {
     if (!successMsg || successAction !== "publish") return;
     const redirectTimer = window.setTimeout(() => {
@@ -1120,7 +1132,7 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
           <div className="create-success-dialog">
             <span className="create-success-icon"><SiteIcon name="fa-check" variant="solid" /></span>
             <strong>操作成功</strong>
-            <p>{successMsg}{successAction === "publish" && <><br />即将返回{editPostId ? "作品管理" : "首页"}</>}</p>
+            <p>{successMsg}{successAction === "publish" && `，即将返回${editPostId ? "作品管理" : "首页"}`}</p>
             {successAction !== "publish" && (
               <button type="button" onClick={() => {
                 setSuccessMsg("");
@@ -1288,7 +1300,6 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
   const submitImage = async (options?: { scheduledAt?: string; draft?: boolean }) => {
     if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
     if (title.trim().length > 20) { setErrorMsg("作品标题不能超过20个字"); return; }
-    if (tags.length === 0) { setErrorMsg("请至少添加一个标签"); return; }
     setSubmitting(true);
     setErrorMsg("");
     setSuccessMsg("");
@@ -1374,7 +1385,6 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
 
   const handleSaveImageDraft = async () => {
     if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
-    if (tags.length === 0) { setErrorMsg("请至少添加一个标签"); return; }
     await submitImage({ draft: true });
   };
 
@@ -1742,10 +1752,10 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
                 inputId="articleTagInput"
                 tags={tags}
                 inputValue={tagInput}
-                onChange={setTags}
+                onChange={updatePostTags}
                 onInputValueChange={setTagInput}
                 suggestedTags={recommendedTags}
-                onSelectSuggestedTag={(tag) => setTags((current) => current.includes(tag) ? current : [...current, tag])}
+                onSelectSuggestedTag={addSuggestedPostTag}
               />
             </div>
 
@@ -1918,10 +1928,10 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
                 label="标签"
                 tags={tags}
                 inputValue={tagInput}
-                onChange={setTags}
+                onChange={updatePostTags}
                 onInputValueChange={setTagInput}
                 suggestedTags={recommendedTags}
-                onSelectSuggestedTag={(tag) => setTags((current) => current.includes(tag) ? current : [...current, tag])}
+                onSelectSuggestedTag={addSuggestedPostTag}
               />
             </div>
 
