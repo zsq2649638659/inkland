@@ -535,7 +535,7 @@
   width: 100%;
   height: 72px;
   box-sizing: border-box;
-  padding: calc(var(--ink-space-3) + var(--ink-space-1)) 0 var(--ink-space-3);
+  padding: 0 0 var(--ink-space-3);
   background: var(--ink-page);
 }
 
