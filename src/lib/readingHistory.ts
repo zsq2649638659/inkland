@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canViewTestData, withTestDataVisibility } from "@/lib/test-data-visibility";
 import { attachSeriesIds } from "@/lib/seriesLinks";
+import { notifyDailyRewardsChanged } from "@/lib/dailyRewards";
 
 export interface ReadingHistoryPostSnapshot {
   id: string;
@@ -160,6 +161,7 @@ export async function saveReadingHistory(
       },
       { onConflict: "user_id,post_id" },
     );
+    if (!error) notifyDailyRewardsChanged();
     return { ...next, error };
   } catch (error) {
     return { ...next, error };

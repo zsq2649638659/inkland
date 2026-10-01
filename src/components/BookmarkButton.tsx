@@ -8,6 +8,7 @@ import SiteIcon from "@/components/SiteIcon";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { createNotification } from "@/lib/notifications";
 import { assertCanInteract } from "@/lib/userRestrictions";
+import { notifyDailyRewardsChanged } from "@/lib/dailyRewards";
 
 interface BookmarkButtonProps {
   postId: string;
@@ -38,7 +39,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
       .eq("user_id", user.id)
       .single()
       .then(({ data }: { data: { id: string } | null }) => setBookmarked(!!data));
-  }, [user, postId, initialActive]);
+  }, [user, postId, initialActive, supabase]);
 
   const toggle = async () => {
     if (authLoading) return;
@@ -73,6 +74,7 @@ export default function BookmarkButton({ postId, initialCount, onLogin, iconOnly
       if (!error) {
         setBookmarked(true);
         setCount((c) => c + 1);
+        notifyDailyRewardsChanged();
         createNotification({
           type: "bookmark",
           actor_id: user.id,

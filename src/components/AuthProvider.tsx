@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { getShanghaiDayKey, notifyDailyRewardsChanged } from "@/lib/dailyRewards";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 export interface UserProfile {
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(true);
   const userIdRef = useRef<string | null>(null);
   const profileLoadedUserRef = useRef<string | null>(null);
+  const loginRewardClaimedRef = useRef<string | null>(null);
 
   // 根据 user 拉取 profile（带异常保护）
   const fetchProfile = useCallback(async (userId: string) => {
@@ -181,6 +183,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, [fetchProfile, supabase]);
+
+  const userId = user?.id || null;
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+
+    const claimDailyLoginReward = async () => {
+      const claimKey = `${userId}:${getShanghaiDayKey()}`;
+      if (loginRewardClaimedRef.current === claimKey) return;
+      const { error } = await supabase.rpc("claim_daily_login_reward");
+      if (!active || error) return;
+      loginRewardClaimedRef.current = claimKey;
+      notifyDailyRewardsChanged();
+    };
+
+    const claimWhenVisible = () => {
+      if (!document.hidden) void claimDailyLoginReward();
+    };
+
+    void claimDailyLoginReward();
+    window.addEventListener("focus", claimWhenVisible);
+    document.addEventListener("visibilitychange", claimWhenVisible);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", claimWhenVisible);
+      document.removeEventListener("visibilitychange", claimWhenVisible);
+    };
+  }, [supabase, userId]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
