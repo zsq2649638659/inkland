@@ -531,6 +531,15 @@
   background: var(--ink-page);
 }
 
+#page-home .tabs-wrapper--home::before {
+  position: absolute;
+  inset: calc(-1 * var(--spacing-md)) 0 auto;
+  height: var(--spacing-md);
+  background: var(--ink-page);
+  content: "";
+  pointer-events: none;
+}
+
 #page-home .tabs-wrapper--home-surface {
   width: 100%;
   height: 72px;
@@ -633,6 +642,12 @@
 @media (max-width: 700px) {
   #page-home .tabs-wrapper--home {
     top: var(--navbar-height);
+  }
+}
+
+@media (max-width: 700px) {
+  #page-home .tabs-wrapper--home::before {
+    display: none;
   }
 }
 
