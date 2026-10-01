@@ -1300,7 +1300,6 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
   const submitImage = async (options?: { scheduledAt?: string; draft?: boolean }) => {
     if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
     if (title.trim().length > 20) { setErrorMsg("作品标题不能超过20个字"); return; }
-    if (tags.length === 0) { setErrorMsg("请至少添加一个标签"); return; }
     setSubmitting(true);
     setErrorMsg("");
     setSuccessMsg("");
@@ -1386,7 +1385,6 @@ function CreatePageContent({ initialView = "select" }: { initialView?: ViewType 
 
   const handleSaveImageDraft = async () => {
     if (uploadedImages.length === 0) { setErrorMsg("请至少上传一张图片"); return; }
-    if (tags.length === 0) { setErrorMsg("请至少添加一个标签"); return; }
     await submitImage({ draft: true });
   };
 
