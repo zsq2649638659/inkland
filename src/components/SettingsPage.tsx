@@ -667,7 +667,7 @@ function SettingsPageContent({ section }: { section: SettingsSection }) {
               <div className="settings-about-logo-icon" />
               <div className="settings-about-text">
                 <p className="settings-about-desc">
-                  Inkland 是一个面向同人创作者的社区平台，致力于为创作者提供自由、开放、高质量的创作与交流空间。在这里，你可以发布作品、发现同好、参与活动，与志同道合的创作者一起成长。
+                  Inkland 是一个面向创作者与读者的低打扰创作社区。你可以发布作品、管理连载，关注喜欢的作者，并按自己的兴趣发现内容。我们尊重每个人对作品、标签与兴趣的主动选择，让创作与阅读回到作品本身。
                 </p>
               </div>
             </div>
