@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     locale: "zh_CN",
   },
   twitter: { card: "summary_large_image", title: "inkland — 低打扰创作社区", description: "一个干净、无广告、尊重阅读体验的低打扰创作社区。" },
-  robots: { index: true, follow: true },
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
