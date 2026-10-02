@@ -1,13 +1,14 @@
 # Inkland 国内访问试用版
 
-这份文件只对应 `codex/cloudflare-cn-test` 分支。它从主站最近确认的代码 `3d761be` 复制出来，试用版单独部署到 Cloudflare；Vercel 正式站不受影响。
+这份文件只对应 `codex/cloudflare-cn-test` 分支。它基于主站最新 `main` 代码 `9f9b287`，试用版单独部署到 Cloudflare；Vercel 正式站不受影响。
 
 ## 当前状态
 
 - 已在此分支加入 Cloudflare 的 Next.js 运行配置，Cloudflare Worker 名称为 `inkland-cloudflare-test`。
 - 试用版仍使用现有 Supabase 数据、登录和图片；没有搬数据库、改表或改图片。
 - 这个副本已设置为不让搜索引擎收录。
-- Cloudflare 兼容检查为 95%。主站路由和页面结构通过检查；图片调整和旧 Webpack 设置只有部分支持，需要在实际页面中验证。
+- 当前主站要求登录后才能访问大部分页面；试用者需要用专门账号登录后再测首页、列表和详情。
+- Cloudflare 兼容检查为 95%。主站路由和页面结构通过检查；图片调整和旧 Webpack 设置只有部分支持，需要在实际页面中验证。主站最新访问规则里有一条 Cloudflare 适配器读不懂的路径写法，测试分支改为在代码里跳过相同的接口和静态文件，保持原来的登录保护范围。
 - **尚未发布到 Cloudflare。**当前没有检测到 Cloudflare 登录凭据或已连接的部署工具，因此还没有真实试用网址；也还没有改 Supabase 登录网址设置。
 
 ## 发布前要准备

@@ -11,8 +11,22 @@ function isPublicPage(pathname: string) {
   return publicPagePaths.includes(pathname);
 }
 
+// vinext cannot compile the main branch's negative-lookahead matcher, so keep
+// the same excluded paths inside the proxy handler instead.
+function shouldSkipProxy(pathname: string) {
+  return (
+    pathname === "/api"
+    || pathname.startsWith("/api/")
+    || pathname.startsWith("/_next/static")
+    || pathname.startsWith("/_next/image")
+    || pathname.startsWith("/favicon.ico")
+    || /\.(?:avif|bmp|css|csv|eot|gif|ico|jpe?g|js|json|map|pdf|png|svg|ttf|txt|webp|woff2?|xml)$/.test(pathname)
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  if (shouldSkipProxy(pathname)) return NextResponse.next({ request });
   if (
     process.env.NODE_ENV === "development"
     && pathname === "/settings"
@@ -49,9 +63,3 @@ export async function proxy(request: NextRequest) {
 
   return response;
 }
-
-export const config = {
-  matcher: [
-    "/((?!api(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:avif|bmp|css|csv|eot|gif|ico|jpe?g|js|json|map|pdf|png|svg|ttf|txt|webp|woff2?|xml)$).*)",
-  ],
-};
