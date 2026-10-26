@@ -238,6 +238,13 @@ export async function loadFeed(
     }
   }
 
+  const seriesMeta = new Map<string, Record<string, unknown>>();
+  if (seriesData) {
+    for (const s of seriesData as Record<string, unknown>[]) {
+      if (s.user_id && s.name) seriesMeta.set(`${s.user_id}\u0000${s.name}`, s);
+    }
+  }
+
   const formatted: Post[] = normalPosts.map((p) => {
     const ptags = (p.post_tags as Array<{ tags: { name: string } }> | undefined)?.map((pt) => pt.tags?.name) || [];
     const author = p.author as { nickname: string; avatar_url: string | null } | null;
@@ -278,13 +285,6 @@ export async function loadFeed(
       time_ago: getTimeAgo(p.created_at as string),
     };
   });
-
-  const seriesMeta = new Map<string, Record<string, unknown>>();
-  if (seriesData) {
-    for (const s of seriesData as Record<string, unknown>[]) {
-      if (s.user_id && s.name) seriesMeta.set(`${s.user_id}\u0000${s.name}`, s);
-    }
-  }
 
   const serialCardList: SerialPostCardData[] = [];
   // 首页信息流按“发布的章节”展示动态。同一连载一次发布多章时，每章都应有一张
