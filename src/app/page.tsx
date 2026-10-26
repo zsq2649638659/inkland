@@ -226,7 +226,18 @@ export default function HomePage() {
       return;
     }
 
-    const res = (await fetchFeed()) ?? (await loadFeed(supabase, { tab, userId: user?.id ?? null }));
+    let res: FeedResult;
+    try {
+      res = (await fetchFeed()) ?? (await loadFeed(supabase, { tab, userId: user?.id ?? null }));
+    } catch {
+      if (requestId !== feedRequestRef.current) return;
+      setError("首页数据加载失败，请稍后重试。");
+      setPosts([]);
+      setSerialCards([]);
+      setLoading(false);
+      setRequestTimedOut(false);
+      return;
+    }
     if (requestId !== feedRequestRef.current) return;
     if (res.error) {
       setError(res.error);
